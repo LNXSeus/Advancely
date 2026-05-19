@@ -13,6 +13,7 @@
 #include <cstddef> // For size_t
 #include "template_scanner.h" // For the DiscoveredTemplate struct
 #include "settings_utils.h" // For VERSION_STRINGS_COUNT
+#include "file_utils.h" // For cJSON
 
 #ifdef __cplusplus
 extern "C" {
@@ -321,6 +322,44 @@ std::vector<RenameRow> compute_rename_candidates(
     bool match_overlap);
 
 /**
+ * @brief A single criterion delta entry: either a new criterion from the import side
+ * that doesn't exist in the template, or a stale template criterion not present in the import.
+ */
+struct CriterionDelta {
+    std::string root_name;
+    bool is_new;       // true: present in import, missing in template (add candidate).
+                       // false: present in template, missing in import (stale candidate).
+    bool is_selected;  // Default: false. The user picks what to stage.
+};
+
+/**
+ * @brief A template advancement row whose criteria differ from the matching import advancement.
+ */
+struct CriteriaDeltaRow {
+    int template_index;                 // Index into the template advancement vector supplied by the caller.
+    std::vector<CriterionDelta> deltas; // Mixed list, new entries first then stale.
+};
+
+/**
+ * @brief Computes per-advancement criterion deltas between the template and the import side.
+ *
+ * For every template advancement whose root_name is present in @p import_advs, this function
+ * lists criteria that exist only on one side. The result contains a row only when at least one
+ * delta exists. Recipe entries on the template side are skipped unless @p include_recipes is true.
+ *
+ * @param template_root_names  Root names already in the template (advancement keys).
+ * @param template_criteria    Parallel to @p template_root_names: criterion root names per template advancement.
+ * @param import_advs          Parsed advancements from the imported player file.
+ * @param include_recipes      When false, template entries whose root_name contains ":recipes/" are skipped.
+ * @return One CriteriaDeltaRow per template advancement with at least one differing criterion.
+ */
+std::vector<CriteriaDeltaRow> compute_criteria_deltas(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes);
+
+/**
  * @brief Scans a template JSON file and collects all unique icon paths referenced in it.
  * Paths are relative to the icons/ directory, e.g. "vanilla/stick.png".
  * @param template_json_path Full path to the template .json file.
@@ -337,6 +376,34 @@ bool collect_icon_paths_from_template(const char *template_json_path,
 * @return true if at least one icon file is present in the zip.
 */
 bool zip_contains_icons(const char *zip_path);
+
+/**
+ * @brief Reads the main template JSON inside a zip and returns the parsed cJSON tree.
+ * @param zip_path Path to the zip.
+ * @param error_message Buffer for an error message on failure.
+ * @param msg_size Size of the buffer.
+ * @return Parsed cJSON root (caller must cJSON_Delete) or nullptr on failure.
+ */
+cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, size_t msg_size);
+
+/**
+ * @brief Reads the default-language JSON (file ending in _lang.json) inside the zip and
+ * returns the parsed cJSON tree. Returns nullptr when no such file exists (not an error).
+ * @param zip_path Path to the zip.
+ * @return Parsed cJSON root (caller must cJSON_Delete) or nullptr.
+ */
+cJSON *read_lang_json_from_zip(const char *zip_path);
+
+/**
+ * @brief Extracts the named icons from a zip's icons/ directory to resources/icons/.
+ * Each path in @p icon_paths is relative to the icons/ root (e.g. "vanilla/stick.png").
+ * Files that already exist on disk are skipped. Returns the number of files actually
+ * written.
+ * @param zip_path Path to the zip.
+ * @param icon_paths Relative icon paths to extract.
+ * @return Count of icons written to disk.
+ */
+int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::string> &icon_paths);
 
 #ifdef __cplusplus
 }

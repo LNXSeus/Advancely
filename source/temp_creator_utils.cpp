@@ -14,6 +14,7 @@
 #include <cctype> // For isalnum
 #include <functional>
 #include <unordered_set>
+#include <unordered_map>
 
 #include "temp_creator_utils.h"
 #include "logger.h"
@@ -1542,4 +1543,174 @@ std::vector<RenameRow> compute_rename_candidates(
     }
 
     return result;
+}
+
+std::vector<CriteriaDeltaRow> compute_criteria_deltas(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes) {
+    std::vector<CriteriaDeltaRow> result;
+
+    std::unordered_map<std::string, int> import_index_by_root;
+    import_index_by_root.reserve(import_advs.size() * 2);
+    for (int i = 0; i < (int) import_advs.size(); i++) {
+        import_index_by_root[import_advs[i].root_name] = i;
+    }
+
+    for (int t = 0; t < (int) template_root_names.size(); t++) {
+        const std::string &tname = template_root_names[t];
+        if (!include_recipes && tname.find(":recipes/") != std::string::npos) continue;
+        auto it = import_index_by_root.find(tname);
+        if (it == import_index_by_root.end()) continue;
+        const auto &iadv = import_advs[it->second];
+
+        const std::vector<std::string> empty_v;
+        const std::vector<std::string> &tcrits =
+            (t < (int) template_criteria.size()) ? template_criteria[t] : empty_v;
+        std::unordered_set<std::string> tcrit_set(tcrits.begin(), tcrits.end());
+        std::unordered_set<std::string> icrit_set;
+        icrit_set.reserve(iadv.criteria.size() * 2);
+        for (const auto &c: iadv.criteria) icrit_set.insert(c.root_name);
+
+        CriteriaDeltaRow row;
+        row.template_index = t;
+        for (const auto &c: iadv.criteria) {
+            if (tcrit_set.find(c.root_name) == tcrit_set.end()) {
+                CriterionDelta d{};
+                d.root_name = c.root_name;
+                d.is_new = true;
+                d.is_selected = false;
+                row.deltas.push_back(std::move(d));
+            }
+        }
+        for (const auto &cname: tcrits) {
+            if (icrit_set.find(cname) == icrit_set.end()) {
+                CriterionDelta d{};
+                d.root_name = cname;
+                d.is_new = false;
+                d.is_selected = false;
+                row.deltas.push_back(std::move(d));
+            }
+        }
+        if (!row.deltas.empty()) result.push_back(std::move(row));
+    }
+
+    return result;
+}
+
+static cJSON *parse_zip_entry_as_json(mz_zip_archive *zip, mz_uint file_index) {
+    size_t out_size = 0;
+    void *buf = mz_zip_reader_extract_to_heap(zip, file_index, &out_size, 0);
+    if (!buf) return nullptr;
+    std::string text((const char *) buf, out_size);
+    mz_free(buf);
+    return cJSON_Parse(text.c_str());
+}
+
+cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, size_t msg_size) {
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
+        snprintf(error_message, msg_size, "Error: Could not read zip file.");
+        return nullptr;
+    }
+    int main_index = -1;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        const char *name = fs.m_filename;
+        const char *ext = strstr(name, ".json");
+        if (!ext) continue;
+        if (strstr(name, "_lang")) continue;
+        if (main_index >= 0) {
+            snprintf(error_message, msg_size, "Error: Zip contains multiple main template files.");
+            mz_zip_reader_end(&zip);
+            return nullptr;
+        }
+        main_index = (int) i;
+    }
+    if (main_index < 0) {
+        snprintf(error_message, msg_size, "Error: Zip does not contain a main template JSON file.");
+        mz_zip_reader_end(&zip);
+        return nullptr;
+    }
+    cJSON *root = parse_zip_entry_as_json(&zip, (mz_uint) main_index);
+    mz_zip_reader_end(&zip);
+    if (!root) {
+        snprintf(error_message, msg_size, "Error: Failed to parse the template JSON inside the zip.");
+        return nullptr;
+    }
+    return root;
+}
+
+cJSON *read_lang_json_from_zip(const char *zip_path) {
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return nullptr;
+    int lang_index = -1;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        const char *name = fs.m_filename;
+        const char *lang_suffix = strstr(name, "_lang.json");
+        if (!lang_suffix) continue;
+        // Prefer the no-flag default language file: matches "_lang.json" at the end.
+        if (strcmp(lang_suffix, "_lang.json") != 0) continue;
+        lang_index = (int) i;
+        break;
+    }
+    if (lang_index < 0) {
+        mz_zip_reader_end(&zip);
+        return nullptr;
+    }
+    cJSON *root = parse_zip_entry_as_json(&zip, (mz_uint) lang_index);
+    mz_zip_reader_end(&zip);
+    return root;
+}
+
+int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::string> &icon_paths) {
+    if (icon_paths.empty()) return 0;
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return 0;
+
+    std::unordered_set<std::string> wanted;
+    for (const auto &p: icon_paths) {
+        if (p.empty()) continue;
+        wanted.insert("icons/" + p);
+    }
+    if (wanted.empty()) {
+        mz_zip_reader_end(&zip);
+        return 0;
+    }
+
+    char icons_base[MAX_PATH_LENGTH];
+    snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+
+    int written = 0;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        if (wanted.find(fs.m_filename) == wanted.end()) continue;
+        const char *rel = fs.m_filename + 6; // skip "icons/"
+        char dest_path[MAX_PATH_LENGTH];
+        snprintf(dest_path, sizeof(dest_path), "%s/%s", icons_base, rel);
+        if (path_exists(dest_path)) continue;
+        char dest_dir[MAX_PATH_LENGTH];
+        get_parent_directory(dest_path, dest_dir, sizeof(dest_dir), 1);
+        size_t dir_len = strlen(dest_dir);
+        if (dir_len > 0 && dest_dir[dir_len - 1] != '/') {
+            dest_dir[dir_len] = '/';
+            dest_dir[dir_len + 1] = '\0';
+        }
+        fs_ensure_directory_exists(dest_dir);
+        if (mz_zip_reader_extract_to_file(&zip, i, dest_path, 0)) {
+            written++;
+        } else {
+            log_message(LOG_INFO, "[IMPORT FROM TEMPLATE] Warning: Could not extract '%s'.\n", fs.m_filename);
+        }
+    }
+    mz_zip_reader_end(&zip);
+    return written;
 }

@@ -2757,6 +2757,75 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<ImportableUnlock> importable_unlocks;
     static int last_clicked_unlock_index = -1;
 
+    // Cross-template import (shared across all tabs)
+    enum ImportFromTemplateScope {
+        IFTS_ADVANCEMENTS, IFTS_STATS, IFTS_UNLOCKS, IFTS_CUSTOM_GOALS,
+        IFTS_COUNTERS, IFTS_MS_GOALS, IFTS_DECORATIONS
+    };
+    static bool s_show_template_import_popup = false;
+    static ImportFromTemplateScope s_template_import_scope = IFTS_ADVANCEMENTS;
+    static EditorTemplate s_template_import_data;
+    static std::vector<bool> s_template_import_selected;
+    static char s_template_import_zip_path[MAX_PATH_LENGTH] = "";
+    static char s_template_import_search[256] = "";
+    static char s_template_import_error[256] = "";
+    static int s_template_import_last_clicked = -1;
+    static bool s_template_import_focus_search = false;
+
+    auto open_template_import = [&](ImportFromTemplateScope scope) {
+        const char *zip_filter[1] = {"*.zip"};
+        const char *file = tinyfd_openFileDialog("Select Template Zip", "", 1, zip_filter,
+                                                  "Template Zip (*.zip)", 0);
+        if (!file) return;
+
+        char err[256];
+        cJSON *root_json = read_template_json_from_zip(file, err, sizeof(err));
+        if (!root_json) {
+            save_message_type = MSG_ERROR;
+            strncpy(status_message, err, sizeof(status_message) - 1);
+            status_message[sizeof(status_message) - 1] = '\0';
+            return;
+        }
+        cJSON *lang_json = read_lang_json_from_zip(file);
+        if (!lang_json) lang_json = cJSON_CreateObject();
+
+        s_template_import_data.advancements.clear();
+        s_template_import_data.stats.clear();
+        s_template_import_data.unlocks.clear();
+        s_template_import_data.custom_goals.clear();
+        s_template_import_data.multi_stage_goals.clear();
+        s_template_import_data.counter_goals.clear();
+        s_template_import_data.decorations.clear();
+
+        parse_editor_trackable_categories(cJSON_GetObjectItem(root_json, "advancements"),
+                                          s_template_import_data.advancements, lang_json);
+        parse_editor_stats(cJSON_GetObjectItem(root_json, "stats"),
+                           s_template_import_data.stats, lang_json);
+        parse_editor_trackable_items(cJSON_GetObjectItem(root_json, "unlocks"),
+                                     s_template_import_data.unlocks, lang_json, "unlock.", false);
+        parse_editor_trackable_items(cJSON_GetObjectItem(root_json, "custom"),
+                                     s_template_import_data.custom_goals, lang_json, "custom.", true);
+        parse_editor_multi_stage_goals(cJSON_GetObjectItem(root_json, "multi_stage_goals"),
+                                       s_template_import_data.multi_stage_goals, lang_json);
+        parse_editor_counter_goals(cJSON_GetObjectItem(root_json, "counter_goals"),
+                                   s_template_import_data.counter_goals, lang_json);
+        parse_editor_decorations(cJSON_GetObjectItem(root_json, "decorations"),
+                                 s_template_import_data.decorations, lang_json);
+
+        cJSON_Delete(root_json);
+        cJSON_Delete(lang_json);
+
+        strncpy(s_template_import_zip_path, file, sizeof(s_template_import_zip_path) - 1);
+        s_template_import_zip_path[sizeof(s_template_import_zip_path) - 1] = '\0';
+        s_template_import_scope = scope;
+        s_template_import_search[0] = '\0';
+        s_template_import_error[0] = '\0';
+        s_template_import_selected.clear();
+        s_template_import_last_clicked = -1;
+        s_template_import_focus_search = true;
+        s_show_template_import_popup = true;
+    };
+
     // For multi-purpose import popups
     enum ImportMode { BATCH_IMPORT, SINGLE_SELECT_STAGE };
     static ImportMode current_import_mode = BATCH_IMPORT; // Default to import multiple
@@ -4732,10 +4801,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // LEFT PANE: List of Advancements/Achievements
 
                     // Import advancements/achievements on its own line
-                    char import_button_label[64];
-                    snprintf(import_button_label, sizeof(import_button_label), "Import %s",
-                             advancements_label_plural_upper);
-                    if (ImGui::Button(import_button_label)) {
+                    if (ImGui::Button("Import...")) {
+                        ImGui::OpenPopup("import_advs_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char import_btn_tip[256];
+                        snprintf(import_btn_tip, sizeof(import_btn_tip),
+                                 "Import %s from a player save file or from another exported template.",
+                                 advancements_label_plural_lower);
+                        ImGui::SetTooltip("%s", import_btn_tip);
+                    }
+                    if (ImGui::BeginPopup("import_advs_source_popup")) {
+                        if (ImGui::Selectable("...from player file")) {
                         current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
                         char start_path[MAX_PATH_LENGTH];
                         // Determine the correct starting path based on version and settings
@@ -4800,33 +4877,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 status_message[sizeof(status_message) - 1] = '\0';
                             }
                         }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char import_stats_tooltip[512];
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            if (app_settings->using_stats_per_world_legacy) {
-                                // Legacy using stats per world
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char import_stats_tooltip[512];
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                             "Import legacy achievements directly from a local world's player achievements .dat file.\n"
+                                             "Cannot import already existing root names.");
+                                } else {
+                                    snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                             "Import legacy achievements directly from a global world's player achievements .dat file.\n"
+                                             "Cannot import already existing root names.");
+                                }
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                 snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                         "Import legacy achievements directly from a local world's player achievements .dat file.\n"
+                                         "Import mid-era achievements directly from a world's player achievements .json file.\n"
                                          "Cannot import already existing root names.");
                             } else {
-                                // Legacy not using stats per world
                                 snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                         "Import legacy achievements directly from a global world's player achievements .dat file.\n"
+                                         "Import modern advancements/recipes directly from a world's player advancements .json file.\n"
                                          "Cannot import already existing root names.");
                             }
-                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                            // Mid-era
-                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                     "Import mid-era achievements directly from a world's player achievements .json file.\n"
-                                     "Cannot import already existing root names.");
-                        } else {
-                            // Modern
-                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                     "Import modern advancements/recipes directly from a world's player advancements .json file.\n"
-                                     "Cannot import already existing root names.");
+                            ImGui::SetTooltip("%s", import_stats_tooltip);
                         }
-                        ImGui::SetTooltip("%s", import_stats_tooltip);
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_ADVANCEMENTS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tt[256];
+                            snprintf(tt, sizeof(tt),
+                                     "Pick an Advancely template zip and merge selected %s into this\n"
+                                     "template. Referenced icons are extracted automatically.",
+                                     advancements_label_plural_lower);
+                            ImGui::SetTooltip("%s", tt);
+                        }
+                        ImGui::EndPopup();
                     }
 
                     // --- Category Sorting Controls ---
@@ -6255,7 +6341,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
 
-                    if (ImGui::Button("Import Stats")) {
+                    if (ImGui::Button("Import...##stats_top")) {
+                        ImGui::OpenPopup("import_stats_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Import stats from a player save file or from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_stats_source_popup")) {
+                        if (ImGui::Selectable("...from player file")) {
                         current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
                         char start_path[MAX_PATH_LENGTH];
                         // Determine the correct starting path based on version and settings
@@ -6311,35 +6405,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 status_message[sizeof(status_message) - 1] = '\0';
                             }
                         }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip[512];
-
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            if (app_settings->using_stats_per_world_legacy) {
-                                // Legacy using stats per world
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip[512];
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import stats directly from a local world's player stats/achievements .dat file.\n"
+                                             "Cannot import already existing root names.");
+                                } else {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import stats directly from a global world's player stats/achievements .dat file.\n"
+                                             "Cannot import already existing root names.");
+                                }
+                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
                                 snprintf(tooltip, sizeof(tooltip),
-                                         "Import stats directly from a local world's player stats/achievements .dat file.\n"
+                                         "Import stats directly from a world's player stats .json file.\n"
+                                         "(Also contains achievements for 1.7.2 - 1.11.2).\n"
                                          "Cannot import already existing root names.");
                             } else {
-                                // Legacy not using stats per world
                                 snprintf(tooltip, sizeof(tooltip),
-                                         "Import stats directly from a global world's player stats/achievements .dat file.\n"
+                                         "Import stats directly from a world's player stats .json file.\n"
                                          "Cannot import already existing root names.");
                             }
-                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                            // Mid-era (1.7.2 - 1.12.2)
-                            snprintf(tooltip, sizeof(tooltip),
-                                     "Import stats directly from a world's player stats .json file.\n"
-                                     "(Also contains achievements for 1.7.2 - 1.11.2).\n"
-                                     "Cannot import already existing root names.");
-                        } else {
-                            // Modern (1.13+)
-                            snprintf(tooltip, sizeof(tooltip),
-                                     "Import stats directly from a world's player stats .json file.\n"
-                                     "Cannot import already existing root names.");
+                            ImGui::SetTooltip("%s", tooltip);
                         }
-                        ImGui::SetTooltip("%s", tooltip);
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_STATS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected stats into this\n"
+                                              "template. Referenced icons are extracted automatically.");
+                        }
+                        ImGui::EndPopup();
                     }
 
                     ImGui::SameLine();
@@ -7763,45 +7862,95 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
                     // Import unlocks button
-                    if (ImGui::Button("Import Unlocks")) {
-                        char start_path[MAX_PATH_LENGTH];
-                        snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
-
-#ifdef __APPLE__
-                        const char *filter_patterns[2] = {"*.json", "public.json"};
-                        int filter_count = 2;
-#else
-                        const char *filter_patterns[1] = {"*.json"};
-                        int filter_count = 1;
-#endif
-                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path,
-                                                                      filter_count,
-                                                                      filter_patterns, "JSON files", 0);
-
-                        if (selection) {
-                            import_error_message[0] = '\0';
-                            if (parse_player_unlocks_for_import(selection, importable_unlocks, import_error_message,
-                                                                sizeof(import_error_message))) {
-                                show_import_unlocks_popup = true;
-                                last_clicked_unlock_index = -1; // Reset range selection
-                                focus_import_search = true;
-                            } else {
-                                save_message_type = MSG_ERROR;
-                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                status_message[sizeof(status_message) - 1] = '\0';
-                            }
-                        }
+                    if (ImGui::Button("Import...##unlocks")) {
+                        ImGui::OpenPopup("import_unlocks_source_popup");
                     }
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Import unlocks directly from a world's player unlocks .json file.\n"
-                                 "Cannot import already existing root names.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        ImGui::SetTooltip("%s",
+                                          "Import unlocks from a player save file or from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_unlocks_source_popup")) {
+                        if (ImGui::Selectable("...from player file")) {
+                            char start_path[MAX_PATH_LENGTH];
+                            snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
+
+#ifdef __APPLE__
+                            const char *filter_patterns[2] = {"*.json", "public.json"};
+                            int filter_count = 2;
+#else
+                            const char *filter_patterns[1] = {"*.json"};
+                            int filter_count = 1;
+#endif
+                            const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path,
+                                                                          filter_count,
+                                                                          filter_patterns, "JSON files", 0);
+
+                            if (selection) {
+                                import_error_message[0] = '\0';
+                                if (parse_player_unlocks_for_import(selection, importable_unlocks, import_error_message,
+                                                                    sizeof(import_error_message))) {
+                                    show_import_unlocks_popup = true;
+                                    last_clicked_unlock_index = -1;
+                                    focus_import_search = true;
+                                } else {
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                    status_message[sizeof(status_message) - 1] = '\0';
+                                }
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Import unlocks directly from a world's player unlocks .json file.\n"
+                                              "Cannot import already existing root names.");
+                        }
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_UNLOCKS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected unlocks into this\n"
+                                              "template. Referenced icons are extracted automatically.");
+                        }
+                        ImGui::EndPopup();
                     }
 
-                    // Add new unlock button
+                    // --- Sorting Controls (right-aligned on the Import line) ---
+                    bool can_sort_unlocks = false;
+                    for (const auto &goal: current_template_data.unlocks) {
+                        if (goal.sort_order > 0) { can_sort_unlocks = true; break; }
+                    }
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_unlocks);
+                    if (ImGui::Button("Sort##unlocks")) {
+                        apply_partial_sort(current_template_data.unlocks);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip),
+                                                       "Click the order badges next to unlocks to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered unlocks among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
                     ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##unlocks")) {
+                        for (auto &unlock: current_template_data.unlocks) unlock.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from unlocks.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
+
+                    // Add new unlock button
                     if (ImGui::Button("Add New Unlock")) {
                         // Create new unlock with default values
                         EditorTrackableItem new_unlock = {};
@@ -7835,57 +7984,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Click the 'Help' button for more info.");
                         ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
                     }
-
-                    // --- Sorting Controls ---
-                    bool can_sort = false;
-                    for (const auto &goal: current_template_data.unlocks) {
-                        if (goal.sort_order > 0) {
-                            can_sort = true;
-                            break;
-                        }
-                    }
-
-                    // Calculate the total width of both buttons + the spacing between them
-                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
-                                            2.0f;
-                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                    // Push the cursor to the right edge, minus the width of our buttons
-                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                    ImGui::BeginDisabled(!can_sort);
-                    if (ImGui::Button("Sort##unlocks")) {
-                        apply_partial_sort(current_template_data.unlocks);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click the order badges next to unlocks to assign a sort order first.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Rearrange the numbered unlocks among themselves.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##unlocks")) {
-                        for (auto &unlock: current_template_data.unlocks) unlock.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Clear all assigned sort orders from unlocks.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::EndDisabled();
-                    ImGui::NewLine();
 
                     // Determine if search is active for this scope
                     bool is_unlock_search_active = (
@@ -8196,6 +8294,60 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem
                     ("Custom Goals", nullptr, custom_tab_flags)) {
+                    if (ImGui::Button("Import...##custom_goals")) {
+                        ImGui::OpenPopup("import_custom_goals_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", "Import custom goals from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_custom_goals_source_popup")) {
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_CUSTOM_GOALS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected custom goals\n"
+                                              "into this template. Referenced icons are extracted automatically.\n"
+                                              "Existing root names are rejected.");
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    // --- Sorting Controls (right-aligned on the Import line) ---
+                    bool can_sort_custom = false;
+                    for (const auto &goal: current_template_data.custom_goals) {
+                        if (goal.sort_order > 0) { can_sort_custom = true; break; }
+                    }
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_custom);
+                    if (ImGui::Button("Sort##custom")) {
+                        apply_partial_sort(current_template_data.custom_goals);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_custom) snprintf(tip, sizeof(tip),
+                                                      "Click the order badges next to goals to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##custom")) {
+                        for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_custom) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from custom goals.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
+
                     if (ImGui::Button("Add New Custom Goal")) {
                         // Create a new custom goal with default values
                         EditorTrackableItem new_goal = {};
@@ -8234,57 +8386,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::SameLine();
                     ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
-
-                    // --- Sorting Controls ---
-                    bool can_sort = false;
-                    for (const auto &goal: current_template_data.custom_goals) {
-                        if (goal.sort_order > 0) {
-                            can_sort = true;
-                            break;
-                        }
-                    }
-
-                    // Calculate the total width of both buttons + the spacing between them
-                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
-                                            2.0f;
-                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                    // Push the cursor to the right edge, minus the width of our buttons
-                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                    ImGui::BeginDisabled(!can_sort);
-                    if (ImGui::Button("Sort")) {
-                        apply_partial_sort(current_template_data.custom_goals);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click the order badges next to goals to assign a sort order first.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Rearrange the numbered items among themselves.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order")) {
-                        for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Clear all assigned sort orders from custom goals.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::EndDisabled();
-                    ImGui::NewLine();
 
                     // Determine if search is active for this scope
                     bool is_custom_search_active = (
@@ -8732,6 +8833,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // TWO-PANE LAYOUT for Multi-Stage Goals
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
+
+                    if (ImGui::Button("Import...##ms_goals")) {
+                        ImGui::OpenPopup("import_ms_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Import multi-stage goals from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_ms_source_popup")) {
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_MS_GOALS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected multi-stage\n"
+                                              "goals into this template. Referenced icons are extracted\n"
+                                              "automatically. Stages keep their references to advancements,\n"
+                                              "stats and criteria; orphan references are left dangling, the\n"
+                                              "editor handles them like any other unresolved link.");
+                        }
+                        ImGui::EndPopup();
+                    }
 
                     // --- Sorting Controls ---
                     bool can_sort_ms = false;
@@ -10312,6 +10435,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
 
+                    if (ImGui::Button("Import...##counters")) {
+                        ImGui::OpenPopup("import_counters_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", "Import counters from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_counters_source_popup")) {
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_COUNTERS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected counters into\n"
+                                              "this template. Referenced icons are extracted automatically.\n"
+                                              "Linked goals are kept; orphan links are left dangling for you\n"
+                                              "to fix in the editor.");
+                        }
+                        ImGui::EndPopup();
+                    }
+
                     // --- Sorting Controls (right-aligned) ---
                     bool can_sort_ctr = false;
                     for (const auto &c: current_template_data.counter_goals) {
@@ -10831,6 +10974,61 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
                     // --- Add Decoration Buttons ---
+                    if (ImGui::Button("Import...##decorations")) {
+                        ImGui::OpenPopup("import_decorations_source_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", "Import decorations from another exported template.");
+                    }
+                    if (ImGui::BeginPopup("import_decorations_source_popup")) {
+                        if (ImGui::Selectable("...from other template")) {
+                            open_template_import(IFTS_DECORATIONS);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Pick an Advancely template zip and merge selected decorations\n"
+                                              "(text headers, lines, arrows) into this template. Arrows keep\n"
+                                              "their goal references; orphan refs are left dangling for you\n"
+                                              "to fix in the editor.");
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    // --- Sorting Controls (right-aligned on the Import line) ---
+                    bool can_sort_decos2 = false;
+                    for (const auto &deco: current_template_data.decorations) {
+                        if (deco.sort_order > 0) { can_sort_decos2 = true; break; }
+                    }
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_decos2);
+                    if (ImGui::Button("Sort##decorations")) {
+                        apply_partial_sort(current_template_data.decorations);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_decos2) snprintf(tip, sizeof(tip),
+                                                       "Click the order badges next to decorations to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered decorations among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##decorations")) {
+                        for (auto &deco: current_template_data.decorations) deco.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_decos2) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from decorations.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
+
                     if (ImGui::Button("Add Text Header")) {
                         EditorDecorationElement new_elem = {};
                         new_elem.type = DECORATION_TEXT_HEADER;
@@ -10923,54 +11121,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "An arrow may have up to 16 bends.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-
-                    // --- Sorting Controls ---
-                    bool can_sort_decos = false;
-                    for (const auto &deco: current_template_data.decorations) {
-                        if (deco.sort_order > 0) {
-                            can_sort_decos = true;
-                            break;
-                        }
-                    }
-
-                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
-                                            2.0f;
-                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                    ImGui::BeginDisabled(!can_sort_decos);
-                    if (ImGui::Button("Sort##decorations")) {
-                        apply_partial_sort(current_template_data.decorations);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort_decos) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click the order badges next to decorations to assign a sort order first.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Rearrange the numbered decorations among themselves.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##decorations")) {
-                        for (auto &deco: current_template_data.decorations) deco.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort_decos) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Clear all assigned sort orders from decorations.");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::EndDisabled();
-                    ImGui::NewLine();
 
                     // --- Search filter ---
                     bool is_deco_search_active = (
@@ -12028,11 +12178,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     static std::vector<std::pair<std::string, std::string>> s_pending_renames;
     static std::unordered_map<std::string, std::string> s_rename_user_picks;
+    struct PendingCriteriaChange {
+        std::string template_root;
+        std::vector<std::string> adds;
+        std::vector<std::string> removes;
+    };
+    static std::vector<PendingCriteriaChange> s_pending_criteria_changes;
+    static std::unordered_map<std::string, std::unordered_map<std::string, bool>> s_criteria_user_picks;
+    static std::vector<std::string> s_pending_advancement_removes;
+    static std::unordered_map<std::string, bool> s_stale_user_picks;
     static bool s_pending_renames_session_initialized = false;
     if (show_import_advancements_popup) {
         if (!s_pending_renames_session_initialized) {
             s_pending_renames.clear();
             s_rename_user_picks.clear();
+            s_pending_criteria_changes.clear();
+            s_criteria_user_picks.clear();
+            s_pending_advancement_removes.clear();
+            s_stale_user_picks.clear();
             s_pending_renames_session_initialized = true;
         }
         ImGui::OpenPopup(import_popup_title);
@@ -12109,24 +12272,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const char *recipes_note = (creator_selected_version > MC_VERSION_1_11_2)
                                                ? " (recipes hidden by default)" : "";
                 char rename_line[384] = "";
+                char stale_line[320] = "";
+                char criteria_line[384] = "";
                 if (creator_selected_version > MC_VERSION_1_6_4) {
                     const char *match_note = (creator_selected_version > MC_VERSION_1_11_2)
                                                  ? "Matches by basename, plus pairs whose criteria overlap is\n  80%% or more on the smaller side."
                                                  : "Matches by criteria overlap (80%% or more on the smaller side).";
                     snprintf(rename_line, sizeof(rename_line),
-                             "\n...match renames: stage rename pairs for template %s missing from the\n"
+                             "\n...%s renames: stage rename pairs for template %s missing from the\n"
                              "  imported file. %s The main Confirm commits them.",
-                             advancements_label_plural_lower, match_note);
+                             advancements_label_singular_lower, advancements_label_plural_lower, match_note);
+                    snprintf(criteria_line, sizeof(criteria_line),
+                             "\n...criteria differences: for every %s present on both sides, list new\n"
+                             "  criteria ([+]) and stale ones ([-]). Pick what to stage; the main\n"
+                             "  Confirm commits them.",
+                             advancements_label_singular_lower);
                 }
-                char select_dropdown_tooltip_buffer[1024];
+                snprintf(stale_line, sizeof(stale_line),
+                         "\n...stale %s: stage deletions for template %s whose post-rename name\n"
+                         "  is missing from the imported file. Useful when downgrading.",
+                         advancements_label_plural_lower, advancements_label_plural_lower);
+                char select_dropdown_tooltip_buffer[1536];
                 snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
                          "Selection tools and template update helpers.\n\n"
                          "...all visible: bulk-select every %s%s in the current search.\n"
                          "...new %s: preview %s present in the imported file\n"
-                         "  but missing from this template%s.%s",
+                         "  but missing from this template%s.%s%s%s",
                          visible_target, crit_clause,
                          advancements_label_plural_lower, advancements_label_plural_lower,
-                         recipes_note, rename_line);
+                         recipes_note, rename_line, stale_line, criteria_line);
                 ImGui::SetTooltip("%s", select_dropdown_tooltip_buffer);
             }
             static bool s_open_new_advs_popup = false;
@@ -12141,6 +12315,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static std::vector<int> s_rename_row_selection;
             static bool s_rename_show_recipes = false;
             static bool s_rename_needs_recompute = true;
+
+            static bool s_open_criteria_popup = false;
+            static std::vector<CriteriaDeltaRow> s_criteria_rows;
+            static bool s_criteria_show_recipes = false;
+            static bool s_criteria_needs_recompute = true;
+            static int s_criteria_last_row = -1;
+            static int s_criteria_last_delta = -1;
+
+            static bool s_open_stale_popup = false;
+            static std::vector<int> s_stale_indices;
+            static std::vector<bool> s_stale_selected;
+            static bool s_stale_show_recipes = false;
+            static bool s_stale_needs_recompute = true;
+            static int s_stale_last_clicked = -1;
 
             if (ImGui::BeginPopup("import_select_dropdown")) {
                 if (ImGui::Selectable("...all visible")) {
@@ -12216,7 +12404,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT &&
                     creator_selected_version > MC_VERSION_1_6_4) {
-                    if (ImGui::Selectable("...match renames")) {
+                    char rename_label[64];
+                    snprintf(rename_label, sizeof(rename_label), "...%s renames", advancements_label_singular_lower);
+                    if (ImGui::Selectable(rename_label)) {
                         s_open_rename_popup = true;
                         s_rename_needs_recompute = true;
                     }
@@ -12236,6 +12426,51 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "editor changes and can be discarded like any other edit.",
                                  advancements_label_singular_lower, match_rules);
                         ImGui::SetTooltip("%s", rename_tooltip_buffer);
+                    }
+                }
+                if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                    char stale_label[64];
+                    snprintf(stale_label, sizeof(stale_label), "...stale %s", advancements_label_plural_lower);
+                    if (ImGui::Selectable(stale_label)) {
+                        s_open_stale_popup = true;
+                        s_stale_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[640];
+                        snprintf(tip, sizeof(tip),
+                                 "List every template %s whose post-rename name is missing from the\n"
+                                 "imported file. Pick what to delete, then Apply to stage the removals.\n"
+                                 "The main Confirm commits them and scrubs every arrow, counter, custom\n"
+                                 "and stat link that referred to the deleted name. Useful for\n"
+                                 "downgrading a template to an older Minecraft version.",
+                                 advancements_label_singular_lower);
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                }
+                if (creator_selected_version > MC_VERSION_1_6_4) {
+                    if (ImGui::Selectable("...criteria differences")) {
+                        s_open_criteria_popup = true;
+                        s_criteria_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char intro[256];
+                        if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
+                            snprintf(intro, sizeof(intro),
+                                     "Scoped to this %s only. List", advancements_label_singular_lower);
+                        } else {
+                            snprintf(intro, sizeof(intro),
+                                     "For every %s that exists on both sides but whose criteria differ,\nlist",
+                                     advancements_label_singular_lower);
+                        }
+                        char criteria_tooltip_buffer[640];
+                        snprintf(criteria_tooltip_buffer, sizeof(criteria_tooltip_buffer),
+                                 "%s the differences: criteria present in the import but missing here ([+])\n"
+                                 "and criteria present here but missing from the import ([-]). Pick what\n"
+                                 "to stage, then Apply. The main Confirm commits them. Removed criteria\n"
+                                 "are scrubbed from counter, arrow, custom and stat links. Staged changes\n"
+                                 "land as unsaved editor edits and can be discarded like any other edit.",
+                                 intro);
+                        ImGui::SetTooltip("%s", criteria_tooltip_buffer);
                     }
                 }
                 ImGui::EndPopup();
@@ -12654,6 +12889,509 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::EndPopup();
             }
 
+            char stale_popup_title[96];
+            snprintf(stale_popup_title, sizeof(stale_popup_title),
+                     "Stale %s###import_stale_advs_popup", advancements_label_plural_upper);
+            if (s_open_stale_popup) {
+                s_stale_indices.clear();
+                s_stale_selected.clear();
+                s_stale_needs_recompute = true;
+                s_stale_last_clicked = -1;
+                ImGui::OpenPopup(stale_popup_title);
+                s_open_stale_popup = false;
+            }
+
+            if (ImGui::BeginPopupModal(stale_popup_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                inner_helper_active_this_frame = true;
+                if (s_stale_needs_recompute) {
+                    std::unordered_set<std::string> import_set;
+                    for (const auto &a: importable_advancements) import_set.insert(a.root_name);
+                    std::unordered_set<std::string> staged_removes(s_pending_advancement_removes.begin(),
+                                                                    s_pending_advancement_removes.end());
+                    std::unordered_map<std::string, std::string> rename_map;
+                    for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
+
+                    std::vector<int> fresh_indices;
+                    for (int i = 0; i < (int) current_template_data.advancements.size(); i++) {
+                        const auto &a = current_template_data.advancements[i];
+                        std::string name = a.root_name;
+                        auto it = rename_map.find(name);
+                        std::string post_rename = (it != rename_map.end()) ? it->second : name;
+                        if (!s_stale_show_recipes && post_rename.find(":recipes/") != std::string::npos) continue;
+                        if (import_set.count(post_rename)) continue;
+                        if (staged_removes.count(post_rename)) continue;
+                        fresh_indices.push_back(i);
+                    }
+                    std::vector<bool> fresh_selected(fresh_indices.size(), false);
+                    for (size_t k = 0; k < fresh_indices.size(); k++) {
+                        int idx = fresh_indices[k];
+                        const auto &a = current_template_data.advancements[idx];
+                        std::string name = a.root_name;
+                        auto it = rename_map.find(name);
+                        std::string post_rename = (it != rename_map.end()) ? it->second : name;
+                        auto pit = s_stale_user_picks.find(post_rename);
+                        if (pit != s_stale_user_picks.end()) fresh_selected[k] = pit->second;
+                    }
+                    s_stale_indices = std::move(fresh_indices);
+                    s_stale_selected = std::move(fresh_selected);
+                    s_stale_last_clicked = -1;
+                    s_stale_needs_recompute = false;
+                }
+
+                ImGui::Text("%d stale %s", (int) s_stale_indices.size(), advancements_label_plural_lower);
+                if (ImGui::IsItemHovered()) {
+                    char tip[320];
+                    snprintf(tip, sizeof(tip),
+                             "Template entries whose post-rename name does not exist in the imported\n"
+                             "file. Already-staged ones are excluded from the list.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                if (creator_selected_version > MC_VERSION_1_11_2) {
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Show recipes", &s_stale_show_recipes)) {
+                        s_stale_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[256];
+                        snprintf(tip, sizeof(tip),
+                                 "CHECKED: include recipe entries.\n"
+                                 "UNCHECKED: hide recipes (default).");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                }
+
+                auto stale_record_pick = [&](int k, bool val) {
+                    if (k < 0 || k >= (int) s_stale_indices.size()) return;
+                    int idx = s_stale_indices[k];
+                    if (idx < 0 || idx >= (int) current_template_data.advancements.size()) return;
+                    std::string name = current_template_data.advancements[idx].root_name;
+                    std::string post_rename = name;
+                    for (const auto &p: s_pending_renames) {
+                        if (p.first == name) { post_rename = p.second; break; }
+                    }
+                    s_stale_user_picks[post_rename] = val;
+                };
+
+                if (ImGui::SmallButton("Select all##stale_list")) {
+                    for (size_t k = 0; k < s_stale_selected.size(); k++) {
+                        s_stale_selected[k] = true;
+                        stale_record_pick((int) k, true);
+                    }
+                    s_stale_last_clicked = -1;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip), "Mark every previewed entry for removal.\n"
+                             "You can also Shift+Click checkboxes to toggle a range at once.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Clear all##stale_list")) {
+                    for (size_t k = 0; k < s_stale_selected.size(); k++) {
+                        s_stale_selected[k] = false;
+                        stale_record_pick((int) k, false);
+                    }
+                    s_stale_last_clicked = -1;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip), "Clear every checkbox in the preview.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginChild("##stale_list_scroll", ImVec2(560.0f, 320.0f), true);
+                for (size_t k = 0; k < s_stale_indices.size(); k++) {
+                    int idx = s_stale_indices[k];
+                    if (idx < 0 || idx >= (int) current_template_data.advancements.size()) continue;
+                    const auto &a = current_template_data.advancements[idx];
+                    std::string post_rename = a.root_name;
+                    for (const auto &p: s_pending_renames) {
+                        if (p.first == a.root_name) { post_rename = p.second; break; }
+                    }
+                    char label[384];
+                    if (post_rename != a.root_name) {
+                        snprintf(label, sizeof(label), "%s -> %s", a.root_name, post_rename.c_str());
+                    } else {
+                        snprintf(label, sizeof(label), "%s", a.root_name);
+                    }
+                    bool sel = s_stale_selected[k];
+                    ImGui::PushID((int) k);
+                    if (ImGui::Checkbox(label, &sel)) {
+                        bool shift = ImGui::GetIO().KeyShift;
+                        if (shift && s_stale_last_clicked >= 0 &&
+                            s_stale_last_clicked != (int) k &&
+                            s_stale_last_clicked < (int) s_stale_selected.size()) {
+                            int lo = std::min(s_stale_last_clicked, (int) k);
+                            int hi = std::max(s_stale_last_clicked, (int) k);
+                            for (int j = lo; j <= hi && j < (int) s_stale_selected.size(); j++) {
+                                s_stale_selected[j] = sel;
+                                stale_record_pick(j, sel);
+                            }
+                        } else {
+                            s_stale_selected[k] = sel;
+                            stale_record_pick((int) k, sel);
+                        }
+                        s_stale_last_clicked = (int) k;
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::Separator();
+
+                int staged_now = 0;
+                for (bool b: s_stale_selected) if (b) staged_now++;
+                ImGui::Text("%d to stage  (%d already staged)", staged_now,
+                            (int) s_pending_advancement_removes.size());
+
+                if (ImGui::Button("Apply##stale_list", ImVec2(140, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+                    ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+                    int newly_staged = 0;
+                    for (size_t k = 0; k < s_stale_indices.size(); k++) {
+                        if (!s_stale_selected[k]) continue;
+                        int idx = s_stale_indices[k];
+                        if (idx < 0 || idx >= (int) current_template_data.advancements.size()) continue;
+                        std::string name = current_template_data.advancements[idx].root_name;
+                        std::string post_rename = name;
+                        for (const auto &p: s_pending_renames) {
+                            if (p.first == name) { post_rename = p.second; break; }
+                        }
+                        bool already = false;
+                        for (const auto &e: s_pending_advancement_removes) {
+                            if (e == post_rename) { already = true; break; }
+                        }
+                        if (!already) s_pending_advancement_removes.push_back(post_rename);
+                        s_stale_user_picks.erase(post_rename);
+                        newly_staged++;
+                    }
+                    if (newly_staged > 0) {
+                        log_message(LOG_INFO, "[TEMP CREATOR] Staged %d stale removal(s) from import.\n", newly_staged);
+                    }
+                    s_stale_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[384];
+                    snprintf(tip, sizeof(tip),
+                             "Stage every ticked entry for removal. Nothing is written to the\n"
+                             "template until you confirm the main import popup.\n"
+                             "(You can also press ENTER)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel##stale_list", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    s_stale_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Close without staging the current selection. Removals staged earlier\n"
+                             "this popup session are kept.\n"
+                             "(You can also press ESCAPE)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::EndPopup();
+            }
+
+            char criteria_popup_title[96];
+            snprintf(criteria_popup_title, sizeof(criteria_popup_title),
+                     "Add New %s Criteria###import_add_criteria_popup", advancements_label_upper);
+            if (s_open_criteria_popup) {
+                s_criteria_rows.clear();
+                s_criteria_needs_recompute = true;
+                ImGui::OpenPopup(criteria_popup_title);
+                s_open_criteria_popup = false;
+            }
+
+            if (ImGui::BeginPopupModal(criteria_popup_title, nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                inner_helper_active_this_frame = true;
+                if (s_criteria_needs_recompute) {
+                    std::unordered_map<std::string, std::string> rename_map;
+                    for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
+
+                    std::vector<std::string> template_roots;
+                    std::vector<std::vector<std::string>> template_crits;
+                    if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
+                        template_roots.emplace_back(selected_advancement->root_name);
+                        std::vector<std::string> cs;
+                        cs.reserve(selected_advancement->criteria.size());
+                        for (const auto &c: selected_advancement->criteria) cs.emplace_back(c.root_name);
+                        template_crits.push_back(std::move(cs));
+                    } else {
+                        template_roots.reserve(current_template_data.advancements.size());
+                        template_crits.reserve(current_template_data.advancements.size());
+                        for (const auto &a: current_template_data.advancements) {
+                            auto it = rename_map.find(a.root_name);
+                            template_roots.emplace_back(it != rename_map.end() ? it->second : std::string(a.root_name));
+                            std::vector<std::string> cs;
+                            cs.reserve(a.criteria.size());
+                            for (const auto &c: a.criteria) cs.emplace_back(c.root_name);
+                            template_crits.push_back(std::move(cs));
+                        }
+                    }
+                    bool include_recipes_for_deltas =
+                        (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) ? true : s_criteria_show_recipes;
+                    s_criteria_rows = compute_criteria_deltas(
+                        template_roots, template_crits, importable_advancements,
+                        include_recipes_for_deltas);
+                    if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
+                        int sel_idx = -1;
+                        for (int i = 0; i < (int) current_template_data.advancements.size(); i++) {
+                            if (&current_template_data.advancements[i] == selected_advancement) { sel_idx = i; break; }
+                        }
+                        for (auto &row: s_criteria_rows) row.template_index = sel_idx;
+                    }
+
+                    std::unordered_set<std::string> staged_template_roots;
+                    for (const auto &chg: s_pending_criteria_changes) staged_template_roots.insert(chg.template_root);
+                    std::unordered_set<std::string> staged_remove_roots(s_pending_advancement_removes.begin(),
+                                                                         s_pending_advancement_removes.end());
+                    s_criteria_rows.erase(
+                        std::remove_if(s_criteria_rows.begin(), s_criteria_rows.end(),
+                                       [&](const CriteriaDeltaRow &r) {
+                                           if (r.template_index < 0 ||
+                                               r.template_index >= (int) current_template_data.advancements.size())
+                                               return true;
+                                           const char *tn = current_template_data.advancements[r.template_index].root_name;
+                                           auto rit = rename_map.find(tn);
+                                           const std::string &shadow = (rit != rename_map.end()) ? rit->second : std::string(tn);
+                                           return staged_template_roots.find(shadow) != staged_template_roots.end() ||
+                                                  staged_remove_roots.find(shadow) != staged_remove_roots.end();
+                                       }),
+                        s_criteria_rows.end());
+
+                    for (auto &row: s_criteria_rows) {
+                        if (row.template_index < 0 ||
+                            row.template_index >= (int) current_template_data.advancements.size()) continue;
+                        const char *tn = current_template_data.advancements[row.template_index].root_name;
+                        auto rit = rename_map.find(tn);
+                        std::string key = (rit != rename_map.end()) ? rit->second : std::string(tn);
+                        auto pick_it = s_criteria_user_picks.find(key);
+                        if (pick_it == s_criteria_user_picks.end()) continue;
+                        for (auto &d: row.deltas) {
+                            auto cit = pick_it->second.find(d.root_name);
+                            if (cit != pick_it->second.end()) d.is_selected = cit->second;
+                        }
+                    }
+                    s_criteria_last_row = -1;
+                    s_criteria_last_delta = -1;
+                    s_criteria_needs_recompute = false;
+                }
+
+                ImGui::Text("%d %s with criteria differences", (int) s_criteria_rows.size(),
+                            advancements_label_plural_lower);
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Only %s present on BOTH sides whose criteria sets differ are listed.",
+                             advancements_label_plural_lower);
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                if (creator_selected_version > MC_VERSION_1_11_2 &&
+                    current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Show recipes", &s_criteria_show_recipes)) {
+                        s_criteria_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[256];
+                        snprintf(tip, sizeof(tip),
+                                 "CHECKED: include recipe entries.\n"
+                                 "UNCHECKED: hide recipes (default).");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                }
+
+                if (ImGui::SmallButton("Select all##criteria_list")) {
+                    for (auto &row: s_criteria_rows) {
+                        for (auto &d: row.deltas) d.is_selected = true;
+                        if (row.template_index >= 0 &&
+                            row.template_index < (int) current_template_data.advancements.size()) {
+                            const char *tn = current_template_data.advancements[row.template_index].root_name;
+                            std::string shadow_root = tn;
+                            for (const auto &p: s_pending_renames) {
+                                if (p.first == tn) { shadow_root = p.second; break; }
+                            }
+                            for (auto &d: row.deltas) s_criteria_user_picks[shadow_root][d.root_name] = true;
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Check every difference on every row, both new (+) and stale (-).\n"
+                             "Useful since stale criteria can otherwise be easy to miss.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Clear all##criteria_list")) {
+                    for (auto &row: s_criteria_rows) {
+                        for (auto &d: row.deltas) d.is_selected = false;
+                        if (row.template_index >= 0 &&
+                            row.template_index < (int) current_template_data.advancements.size()) {
+                            const char *tn = current_template_data.advancements[row.template_index].root_name;
+                            std::string shadow_root = tn;
+                            for (const auto &p: s_pending_renames) {
+                                if (p.first == tn) { shadow_root = p.second; break; }
+                            }
+                            for (auto &d: row.deltas) s_criteria_user_picks[shadow_root][d.root_name] = false;
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip), "Uncheck every difference on every row.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginChild("##criteria_list_scroll", ImVec2(640.0f, 360.0f), true);
+                for (size_t i = 0; i < s_criteria_rows.size(); i++) {
+                    auto &row = s_criteria_rows[i];
+                    if (row.template_index < 0 ||
+                        row.template_index >= (int) current_template_data.advancements.size()) continue;
+                    const auto &tmpl_adv = current_template_data.advancements[row.template_index];
+                    std::string shadow_root = tmpl_adv.root_name;
+                    for (const auto &p: s_pending_renames) {
+                        if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
+                    }
+
+                    int n_new = 0, n_stale = 0;
+                    for (const auto &d: row.deltas) {
+                        if (d.is_new) n_new++;
+                        else n_stale++;
+                    }
+                    char header[384];
+                    if (shadow_root != tmpl_adv.root_name) {
+                        snprintf(header, sizeof(header), "%s -> %s  (+%d new, -%d stale)",
+                                 tmpl_adv.root_name, shadow_root.c_str(), n_new, n_stale);
+                    } else {
+                        snprintf(header, sizeof(header), "%s  (+%d new, -%d stale)",
+                                 tmpl_adv.root_name, n_new, n_stale);
+                    }
+                    ImGui::PushID((int) i);
+                    if (ImGui::TreeNodeEx(header, ImGuiTreeNodeFlags_DefaultOpen)) {
+                        for (size_t j = 0; j < row.deltas.size(); j++) {
+                            auto &d = row.deltas[j];
+                            char label[256];
+                            snprintf(label, sizeof(label), "%s %s##criteria_delta_%d_%d",
+                                     d.is_new ? "[+]" : "[-]", d.root_name.c_str(),
+                                     (int) i, (int) j);
+                            if (ImGui::Checkbox(label, &d.is_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_criteria_last_row == (int) i &&
+                                    s_criteria_last_delta >= 0 &&
+                                    s_criteria_last_delta < (int) row.deltas.size() &&
+                                    s_criteria_last_delta != (int) j) {
+                                    int lo = std::min(s_criteria_last_delta, (int) j);
+                                    int hi = std::max(s_criteria_last_delta, (int) j);
+                                    for (int k = lo; k <= hi; k++) {
+                                        row.deltas[k].is_selected = d.is_selected;
+                                        s_criteria_user_picks[shadow_root][row.deltas[k].root_name] = d.is_selected;
+                                    }
+                                } else {
+                                    s_criteria_user_picks[shadow_root][d.root_name] = d.is_selected;
+                                }
+                                s_criteria_last_row = (int) i;
+                                s_criteria_last_delta = (int) j;
+                            }
+                        }
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::Separator();
+
+                int will_add = 0, will_remove = 0;
+                for (const auto &row: s_criteria_rows) {
+                    for (const auto &d: row.deltas) {
+                        if (!d.is_selected) continue;
+                        if (d.is_new) will_add++;
+                        else will_remove++;
+                    }
+                }
+                ImGui::Text("To stage: +%d new, -%d stale", will_add, will_remove);
+
+                if (ImGui::Button("Apply##criteria_list", ImVec2(140, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+                    ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+                    int staged_rows = 0;
+                    for (const auto &row: s_criteria_rows) {
+                        if (row.template_index < 0 ||
+                            row.template_index >= (int) current_template_data.advancements.size()) continue;
+                        const char *tn = current_template_data.advancements[row.template_index].root_name;
+                        std::string shadow_root = tn;
+                        for (const auto &p: s_pending_renames) {
+                            if (p.first == tn) { shadow_root = p.second; break; }
+                        }
+                        PendingCriteriaChange change;
+                        change.template_root = shadow_root;
+                        for (const auto &d: row.deltas) {
+                            if (!d.is_selected) continue;
+                            if (d.is_new) change.adds.push_back(d.root_name);
+                            else change.removes.push_back(d.root_name);
+                        }
+                        if (change.adds.empty() && change.removes.empty()) continue;
+                        bool merged = false;
+                        for (auto &existing: s_pending_criteria_changes) {
+                            if (existing.template_root == change.template_root) {
+                                existing.adds = change.adds;
+                                existing.removes = change.removes;
+                                merged = true;
+                                break;
+                            }
+                        }
+                        if (!merged) s_pending_criteria_changes.push_back(std::move(change));
+                        s_criteria_user_picks.erase(shadow_root);
+                        staged_rows++;
+                    }
+                    if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
+                        for (auto &iadv: importable_advancements) {
+                            if (iadv.root_name == selected_advancement->root_name) {
+                                for (auto &crit: iadv.criteria) crit.is_selected = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (staged_rows > 0) {
+                        log_message(LOG_INFO, "[TEMP CREATOR] Staged criteria differences for %d row(s).\n", staged_rows);
+                    }
+                    s_criteria_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[384];
+                    snprintf(tip, sizeof(tip),
+                             "Stage the per-row differences. Nothing is written to the template until\n"
+                             "you confirm the main import popup. Re-staging a row replaces its\n"
+                             "previous staged change.\n"
+                             "(You can also press ENTER)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel##criteria_list", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    s_criteria_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Close without staging the current selection. Criteria changes staged\n"
+                             "earlier this popup session are kept.\n"
+                             "(You can also press ESCAPE)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::EndPopup();
+            }
+
             ImGui::SameLine();
             if (ImGui::Button("Deselect All")) {
                 for (auto *adv_ptr: filtered_advancements) {
@@ -12795,8 +13533,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", import_search_tooltip_buffer);
         }
 
-        if (!s_pending_renames.empty() && current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
-            ImGui::Separator();
+        bool renames_visible_here = (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) &&
+                                    !s_pending_renames.empty();
+        bool removes_visible_here = (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) &&
+                                    !s_pending_advancement_removes.empty();
+        if (renames_visible_here || removes_visible_here || !s_pending_criteria_changes.empty()) ImGui::Separator();
+        if (renames_visible_here) {
             char staged_header[96];
             snprintf(staged_header, sizeof(staged_header),
                      "Staged renames: %d###staged_renames_header", (int) s_pending_renames.size());
@@ -12811,6 +13553,59 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::TextUnformatted("->");
                     ImGui::SameLine();
                     ImGui::TextUnformatted(p.second.c_str());
+
+                    int diff_new = 0, diff_stale = 0;
+                    EditorTrackableCategory *tmpl_cat = nullptr;
+                    for (auto &cat: current_template_data.advancements) {
+                        if (strcmp(cat.root_name, p.first.c_str()) == 0) { tmpl_cat = &cat; break; }
+                    }
+                    ImportableAdvancement *imp_adv = nullptr;
+                    for (auto &a: importable_advancements) {
+                        if (a.root_name == p.second) { imp_adv = &a; break; }
+                    }
+                    if (tmpl_cat && imp_adv) {
+                        std::unordered_set<std::string> tcrit_set;
+                        for (auto &c: tmpl_cat->criteria) tcrit_set.insert(c.root_name);
+                        std::unordered_set<std::string> icrit_set;
+                        for (auto &c: imp_adv->criteria) icrit_set.insert(c.root_name);
+                        for (auto &name: icrit_set) if (!tcrit_set.count(name)) diff_new++;
+                        for (auto &name: tcrit_set) if (!icrit_set.count(name)) diff_stale++;
+                    }
+                    bool already_staged_criteria = false;
+                    for (auto &chg: s_pending_criteria_changes) {
+                        if (chg.template_root == p.second) { already_staged_criteria = true; break; }
+                    }
+                    if (diff_new > 0 || diff_stale > 0) {
+                        ImGui::SameLine();
+                        if (already_staged_criteria) {
+                            ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "(criteria staged)");
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Criteria differences for this rename are already staged via\n"
+                                         "'...add new criteria'.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                        } else {
+                            char diff_text[64];
+                            if (diff_new > 0 && diff_stale > 0)
+                                snprintf(diff_text, sizeof(diff_text), "(+%d/-%d crit differ)", diff_new, diff_stale);
+                            else if (diff_new > 0)
+                                snprintf(diff_text, sizeof(diff_text), "(+%d crit differ)", diff_new);
+                            else
+                                snprintf(diff_text, sizeof(diff_text), "(-%d crit differ)", diff_stale);
+                            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s", diff_text);
+                            if (ImGui::IsItemHovered()) {
+                                char tip[320];
+                                snprintf(tip, sizeof(tip),
+                                         "This rename's target has criteria that differ from the import\n"
+                                         "side. Open '...add new criteria' from the Select dropdown to\n"
+                                         "review and stage them in the same import session.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                        }
+                    }
+
                     ImGui::SameLine();
                     if (ImGui::SmallButton("Revert##staged_rename")) {
                         s_rename_user_picks.erase(p.first);
@@ -12823,6 +13618,77 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(tip, sizeof(tip),
                                  "Unstage this rename. The template advancement reappears in the\n"
                                  "rename modal so you can pick a different candidate.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::TreePop();
+            }
+        }
+        if (!s_pending_criteria_changes.empty()) {
+            int total_adds = 0, total_removes = 0;
+            for (const auto &chg: s_pending_criteria_changes) {
+                total_adds += (int) chg.adds.size();
+                total_removes += (int) chg.removes.size();
+            }
+            char crit_header[160];
+            snprintf(crit_header, sizeof(crit_header),
+                     "Staged criteria changes: %d (+%d, -%d)###staged_criteria_header",
+                     (int) s_pending_criteria_changes.size(), total_adds, total_removes);
+            if (ImGui::TreeNodeEx(crit_header, ImGuiTreeNodeFlags_DefaultOpen)) {
+                for (size_t i = 0; i < s_pending_criteria_changes.size(); i++) {
+                    const auto &chg = s_pending_criteria_changes[i];
+                    ImGui::PushID((int) i);
+                    char line[320];
+                    snprintf(line, sizeof(line), "%s  (+%d, -%d)",
+                             chg.template_root.c_str(), (int) chg.adds.size(), (int) chg.removes.size());
+                    ImGui::Bullet();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(line);
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Revert##staged_crit")) {
+                        s_criteria_user_picks.erase(chg.template_root);
+                        s_pending_criteria_changes.erase(s_pending_criteria_changes.begin() + (ptrdiff_t) i);
+                        ImGui::PopID();
+                        break;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[256];
+                        snprintf(tip, sizeof(tip),
+                                 "Unstage these criteria changes. The advancement reappears in the\n"
+                                 "criteria modal so you can pick a different change.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::TreePop();
+            }
+        }
+        if (!s_pending_advancement_removes.empty() && current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+            char rm_header[96];
+            snprintf(rm_header, sizeof(rm_header),
+                     "Staged removals: %d###staged_removes_header",
+                     (int) s_pending_advancement_removes.size());
+            if (ImGui::TreeNodeEx(rm_header, ImGuiTreeNodeFlags_DefaultOpen)) {
+                for (size_t i = 0; i < s_pending_advancement_removes.size(); i++) {
+                    const auto &name = s_pending_advancement_removes[i];
+                    ImGui::PushID((int) i);
+                    ImGui::Bullet();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(name.c_str());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Revert##staged_remove")) {
+                        s_stale_user_picks.erase(name);
+                        s_pending_advancement_removes.erase(s_pending_advancement_removes.begin() + (ptrdiff_t) i);
+                        ImGui::PopID();
+                        break;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[256];
+                        snprintf(tip, sizeof(tip),
+                                 "Unstage this removal. The %s reappears in the stale list so\n"
+                                 "you can pick a different action.",
+                                 advancements_label_singular_lower);
                         ImGui::SetTooltip("%s", tip);
                     }
                     ImGui::PopID();
@@ -12845,8 +13711,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 bool is_criterion_select_mode = (
                     current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type == SUBGOAL_CRITERION);
 
+                const char *staged_reason = nullptr;
+                if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                    for (const auto &p: s_pending_renames) {
+                        if (p.second == adv.root_name) { staged_reason = "rename"; break; }
+                    }
+                    if (!staged_reason) {
+                        for (const auto &chg: s_pending_criteria_changes) {
+                            if (chg.template_root == adv.root_name) { staged_reason = "criteria changes"; break; }
+                        }
+                    }
+                }
+                if (staged_reason) {
+                    adv.is_selected = false;
+                    for (auto &crit: adv.criteria) crit.is_selected = false;
+                }
                 bool disable_parent_checkbox = is_criterion_select_mode || (
-                                                   current_advancement_import_mode == CRITERIA_ONLY_IMPORT);
+                                                   current_advancement_import_mode == CRITERIA_ONLY_IMPORT) ||
+                                               (staged_reason != nullptr);
                 if (disable_parent_checkbox) {
                     ImGui::BeginDisabled(); // Disable advancement checkbox
                 }
@@ -12893,6 +13775,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a specific criterion below.\n"
                                  "The parent will be selected automatically.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
+                    } else if (staged_reason) {
+                        char tooltip_buffer[384];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "This %s has staged %s. Revert it via the panel above before\n"
+                                 "selecting it here to avoid double-applying.",
+                                 advancements_label_singular_lower, staged_reason);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                 }
                 if (!adv.criteria.empty()) {
@@ -12906,8 +13795,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Determine if the criterion checkbox should be disabled
+                        bool crit_staged_for_add = false;
+                        if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
+                            for (const auto &chg: s_pending_criteria_changes) {
+                                if (chg.template_root != selected_advancement->root_name) continue;
+                                for (const auto &add_name: chg.adds) {
+                                    if (add_name == crit.root_name) { crit_staged_for_add = true; break; }
+                                }
+                                if (crit_staged_for_add) break;
+                            }
+                        }
                         bool disable_crit_checkbox = (current_import_mode == SINGLE_SELECT_STAGE &&
-                                                      stage_to_edit->type == SUBGOAL_ADVANCEMENT);
+                                                      stage_to_edit->type == SUBGOAL_ADVANCEMENT) ||
+                                                     (staged_reason != nullptr) || crit_staged_for_add;
+
+                        if (crit_staged_for_add) crit.is_selected = false;
 
                         // Don't allow clicking criteria if the stage is a subgoal advancement
                         if (disable_crit_checkbox) {
@@ -12950,9 +13852,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (disable_crit_checkbox) {
                             ImGui::EndDisabled();
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tooltip[256];
-                                snprintf(tooltip, sizeof(tooltip), "Switch the stage's 'Type' to 'Criterion'\n"
-                                         "to import a specific criterion.");
+                                char tooltip[384];
+                                if (crit_staged_for_add) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "This criterion is already staged for addition via\n"
+                                             "'...criteria differences'. Revert it in the staged panel\n"
+                                             "above before selecting it here to avoid double-applying.");
+                                } else if (staged_reason) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Parent %s has staged %s. Revert it via the panel above\n"
+                                             "to re-enable per-criterion selection here.",
+                                             advancements_label_singular_lower, staged_reason);
+                                } else {
+                                    snprintf(tooltip, sizeof(tooltip), "Switch the stage's 'Type' to 'Criterion'\n"
+                                             "to import a specific criterion.");
+                                }
                                 ImGui::SetTooltip("%s", tooltip);
                             }
                         }
@@ -12985,7 +13899,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             (!inner_helper_active_this_frame && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             bool has_selections = (selected_adv_count > 0 || selected_crit_count > 0);
             bool has_renames = !s_pending_renames.empty();
-            if (!has_selections && !has_renames) {
+            bool has_criteria_changes = !s_pending_criteria_changes.empty();
+            bool has_removes = !s_pending_advancement_removes.empty();
+            if (!has_selections && !has_renames && !has_criteria_changes && !has_removes) {
                 snprintf(import_error_message, sizeof(import_error_message), "Error: No items selected for import.");
             } else if (!has_selections) {
                 int committed = 0;
@@ -13006,8 +13922,65 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         break;
                     }
                 }
-                log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n", committed);
+                if (committed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n", committed);
                 s_pending_renames.clear();
+
+                int crit_rows = 0;
+                for (const auto &chg: s_pending_criteria_changes) {
+                    for (auto &cat: current_template_data.advancements) {
+                        if (strcmp(cat.root_name, chg.template_root.c_str()) != 0) continue;
+                        for (const auto &add_name: chg.adds) {
+                            EditorTrackableItem item = {};
+                            strncpy(item.root_name, add_name.c_str(), sizeof(item.root_name) - 1);
+                            item.root_name[sizeof(item.root_name) - 1] = '\0';
+                            strncpy(item.display_name, add_name.c_str(), sizeof(item.display_name) - 1);
+                            item.display_name[sizeof(item.display_name) - 1] = '\0';
+                            strncpy(item.icon_path, "blocks/placeholder.png", sizeof(item.icon_path) - 1);
+                            item.icon_path[sizeof(item.icon_path) - 1] = '\0';
+                            cat.criteria.push_back(item);
+                        }
+                        for (const auto &rm_name: chg.removes) {
+                            cat.criteria.erase(
+                                std::remove_if(cat.criteria.begin(), cat.criteria.end(),
+                                               [&](const EditorTrackableItem &it) {
+                                                   return strcmp(it.root_name, rm_name.c_str()) == 0;
+                                               }),
+                                cat.criteria.end());
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals,
+                                                  rm_name.c_str(), "", cat.root_name,
+                                                  &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
+                        }
+                        crit_rows++;
+                        break;
+                    }
+                }
+                if (crit_rows > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
+                s_pending_criteria_changes.clear();
+
+                if (!s_pending_advancement_removes.empty()) {
+                    int removed = 0;
+                    for (const auto &name: s_pending_advancement_removes) {
+                        auto it = std::remove_if(current_template_data.advancements.begin(),
+                                                 current_template_data.advancements.end(),
+                                                 [&](const EditorTrackableCategory &cat) {
+                                                     return strcmp(cat.root_name, name.c_str()) == 0;
+                                                 });
+                        if (it != current_template_data.advancements.end()) {
+                            current_template_data.advancements.erase(it, current_template_data.advancements.end());
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals,
+                                                  name.c_str(), "", nullptr,
+                                                  &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
+                            removed++;
+                        }
+                    }
+                    if (removed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
+                    s_pending_advancement_removes.clear();
+                }
+
                 import_error_message[0] = '\0';
                 show_import_advancements_popup = false;
                 ImGui::CloseCurrentPopup();
@@ -13019,6 +13992,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 std::unordered_set<std::string> existing_crit_names;
                 for (const auto &crit: selected_advancement->criteria) {
                     existing_crit_names.insert(crit.root_name);
+                }
+                for (const auto &chg: s_pending_criteria_changes) {
+                    if (chg.template_root != selected_advancement->root_name) continue;
+                    for (const auto &add_name: chg.adds) existing_crit_names.insert(add_name);
+                    for (const auto &rm_name: chg.removes) existing_crit_names.erase(rm_name);
                 }
 
                 ImportableAdvancement *source_adv = nullptr;
@@ -13037,6 +14015,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                     }
+                }
+
+                if (!has_duplicates) {
+                    for (const auto &chg: s_pending_criteria_changes) {
+                        if (chg.template_root != selected_advancement->root_name) continue;
+                        for (const auto &add_name: chg.adds) {
+                            EditorTrackableItem item = {};
+                            strncpy(item.root_name, add_name.c_str(), sizeof(item.root_name) - 1);
+                            item.root_name[sizeof(item.root_name) - 1] = '\0';
+                            strncpy(item.display_name, add_name.c_str(), sizeof(item.display_name) - 1);
+                            item.display_name[sizeof(item.display_name) - 1] = '\0';
+                            strncpy(item.icon_path, "blocks/placeholder.png", sizeof(item.icon_path) - 1);
+                            item.icon_path[sizeof(item.icon_path) - 1] = '\0';
+                            selected_advancement->criteria.push_back(item);
+                        }
+                        for (const auto &rm_name: chg.removes) {
+                            selected_advancement->criteria.erase(
+                                std::remove_if(selected_advancement->criteria.begin(),
+                                               selected_advancement->criteria.end(),
+                                               [&](const EditorTrackableItem &it) {
+                                                   return strcmp(it.root_name, rm_name.c_str()) == 0;
+                                               }),
+                                selected_advancement->criteria.end());
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals,
+                                                  rm_name.c_str(), "", selected_advancement->root_name,
+                                                  &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
+                        }
+                    }
+                    s_pending_criteria_changes.clear();
                 }
 
                 if (!has_duplicates && source_adv) {
@@ -13095,7 +14104,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 import_error_message[0] = '\0'; // Clear previous error
                 bool has_duplicates = false;
 
-                if (!s_pending_renames.empty()) {
+                std::unordered_map<std::string, std::string> rename_map;
+                for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
+                std::unordered_set<std::string> staged_remove_set(s_pending_advancement_removes.begin(),
+                                                                   s_pending_advancement_removes.end());
+                std::unordered_set<std::string> existing_names;
+                for (const auto &existing_adv: current_template_data.advancements) {
+                    auto it = rename_map.find(existing_adv.root_name);
+                    std::string post_rename = (it != rename_map.end())
+                                                  ? it->second : std::string(existing_adv.root_name);
+                    if (staged_remove_set.count(post_rename)) continue;
+                    existing_names.insert(post_rename);
+                }
+                for (const auto &new_adv: importable_advancements) {
+                    if (new_adv.is_selected && existing_names.count(new_adv.root_name)) {
+                        snprintf(import_error_message, sizeof(import_error_message),
+                                 "Error: Advancement '%s' already exists in the template.", new_adv.root_name.c_str());
+                        has_duplicates = true;
+                        break;
+                    }
+                }
+
+                if (!has_duplicates && !s_pending_renames.empty()) {
                     int committed = 0;
                     for (const auto &p: s_pending_renames) {
                         for (auto &cat: current_template_data.advancements) {
@@ -13118,18 +14148,62 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_pending_renames.clear();
                 }
 
-                // 1. Check for duplicate root names before importing
-                std::unordered_set<std::string> existing_names;
-                for (const auto &existing_adv: current_template_data.advancements) {
-                    existing_names.insert(existing_adv.root_name);
-                }
-                for (const auto &new_adv: importable_advancements) {
-                    if (new_adv.is_selected && existing_names.count(new_adv.root_name)) {
-                        snprintf(import_error_message, sizeof(import_error_message),
-                                 "Error: Advancement '%s' already exists in the template.", new_adv.root_name.c_str());
-                        has_duplicates = true;
-                        break;
+                if (!has_duplicates && !s_pending_criteria_changes.empty()) {
+                    int crit_rows = 0;
+                    for (const auto &chg: s_pending_criteria_changes) {
+                        for (auto &cat: current_template_data.advancements) {
+                            if (strcmp(cat.root_name, chg.template_root.c_str()) != 0) continue;
+                            for (const auto &add_name: chg.adds) {
+                                EditorTrackableItem item = {};
+                                strncpy(item.root_name, add_name.c_str(), sizeof(item.root_name) - 1);
+                                item.root_name[sizeof(item.root_name) - 1] = '\0';
+                                strncpy(item.display_name, add_name.c_str(), sizeof(item.display_name) - 1);
+                                item.display_name[sizeof(item.display_name) - 1] = '\0';
+                                strncpy(item.icon_path, "blocks/placeholder.png", sizeof(item.icon_path) - 1);
+                                item.icon_path[sizeof(item.icon_path) - 1] = '\0';
+                                cat.criteria.push_back(item);
+                            }
+                            for (const auto &rm_name: chg.removes) {
+                                cat.criteria.erase(
+                                    std::remove_if(cat.criteria.begin(), cat.criteria.end(),
+                                                   [&](const EditorTrackableItem &it) {
+                                                       return strcmp(it.root_name, rm_name.c_str()) == 0;
+                                                   }),
+                                    cat.criteria.end());
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals,
+                                                      rm_name.c_str(), "", cat.root_name,
+                                                      &current_template_data.stats,
+                                                      &current_template_data.custom_goals);
+                            }
+                            crit_rows++;
+                            break;
+                        }
                     }
+                    log_message(LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
+                    s_pending_criteria_changes.clear();
+                }
+
+                if (!has_duplicates && !s_pending_advancement_removes.empty()) {
+                    int removed = 0;
+                    for (const auto &name: s_pending_advancement_removes) {
+                        auto it = std::remove_if(current_template_data.advancements.begin(),
+                                                 current_template_data.advancements.end(),
+                                                 [&](const EditorTrackableCategory &cat) {
+                                                     return strcmp(cat.root_name, name.c_str()) == 0;
+                                                 });
+                        if (it != current_template_data.advancements.end()) {
+                            current_template_data.advancements.erase(it, current_template_data.advancements.end());
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals,
+                                                  name.c_str(), "", nullptr,
+                                                  &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
+                            removed++;
+                        }
+                    }
+                    log_message(LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
+                    s_pending_advancement_removes.clear();
                 }
 
                 // 2. If no duplicates, proceed with import
@@ -13212,40 +14286,120 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- Display the counters, aligned to the right ---
         ImGui::SameLine();
-        char counter_text[128];
+        char counter_text[256];
+        const char *adv_short = (creator_selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
+        auto fmt_adv_word = [&](int n) -> const char * {
+            return n == 1 ? advancements_label_upper : adv_short;
+        };
+        auto fmt_crit_word = [](int n) -> const char * {
+            return n == 1 ? "Criterion" : "Crit";
+        };
         if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d Criteria", selected_crit_count);
-        } else if (creator_selected_version <= MC_VERSION_1_6_4) {
-            // Only achievements
-            if (current_import_mode == BATCH_IMPORT) {
-                snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements", selected_adv_count);
-            } else {
-                snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 Achievements", selected_adv_count);
-            }
-        } else {
-            // Achievements/Advancements and criteria
-            if (current_import_mode == BATCH_IMPORT) {
-                snprintf(counter_text, sizeof(counter_text), "Selected: %d %s, %d Criteria",
-                         selected_adv_count, advancements_label_plural_upper, selected_crit_count);
-            } else {
-                // SINGLE_SELECT_STAGE mode
-                if (stage_to_edit != nullptr && stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
-                    // For SUBGOAL_ADVANCEMENT, only show the parent count
-                    snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s",
-                             selected_adv_count, advancements_label_upper);
-                } else {
-                    // For SUBGOAL_CRITERION, show both counts
-                    snprintf(counter_text, sizeof(counter_text),
-                             "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper,
-                             selected_crit_count);
+            char crit_part[192];
+            snprintf(crit_part, sizeof(crit_part), "%d %s",
+                     selected_crit_count, fmt_crit_word(selected_crit_count));
+            int total_adds = 0, total_removes = 0;
+            for (const auto &chg: s_pending_criteria_changes) {
+                if (selected_advancement && chg.template_root == selected_advancement->root_name) {
+                    total_adds += (int) chg.adds.size();
+                    total_removes += (int) chg.removes.size();
                 }
             }
-        }
-
-        if (!s_pending_renames.empty() && current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
-            size_t len = strlen(counter_text);
-            snprintf(counter_text + len, sizeof(counter_text) - len, ", %d Renames",
-                     (int) s_pending_renames.size());
+            if (total_adds > 0 || total_removes > 0) {
+                char paren[64];
+                if (total_adds > 0 && total_removes > 0)
+                    snprintf(paren, sizeof(paren), "+%d/-%d", total_adds, total_removes);
+                else if (total_adds > 0)
+                    snprintf(paren, sizeof(paren), "+%d", total_adds);
+                else
+                    snprintf(paren, sizeof(paren), "-%d", total_removes);
+                char tmp[224];
+                snprintf(tmp, sizeof(tmp), "%s (%s)", crit_part, paren);
+                snprintf(crit_part, sizeof(crit_part), "%s", tmp);
+            }
+            snprintf(counter_text, sizeof(counter_text), "Selected: %s", crit_part);
+        } else if (creator_selected_version <= MC_VERSION_1_6_4) {
+            char adv_part[192];
+            snprintf(adv_part, sizeof(adv_part), "%d %s",
+                     selected_adv_count, fmt_adv_word(selected_adv_count));
+            if (current_import_mode == BATCH_IMPORT) {
+                char paren_body[128] = "";
+                size_t pblen = 0;
+                if (!s_pending_renames.empty()) {
+                    int n = (int) s_pending_renames.size();
+                    pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen,
+                                      "%d %s", n, n == 1 ? "Rename" : "Ren");
+                }
+                if (!s_pending_advancement_removes.empty()) {
+                    if (pblen > 0) pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen, ", ");
+                    pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen,
+                                      "-%d Stale", (int) s_pending_advancement_removes.size());
+                }
+                if (pblen > 0) {
+                    char tmp[256];
+                    snprintf(tmp, sizeof(tmp), "%s (%s)", adv_part, paren_body);
+                    snprintf(adv_part, sizeof(adv_part), "%s", tmp);
+                }
+            }
+            if (current_import_mode == BATCH_IMPORT) {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %s", adv_part);
+            } else {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s",
+                         selected_adv_count, fmt_adv_word(selected_adv_count));
+            }
+        } else {
+            if (current_import_mode == BATCH_IMPORT) {
+                char adv_part[192];
+                snprintf(adv_part, sizeof(adv_part), "%d %s",
+                         selected_adv_count, fmt_adv_word(selected_adv_count));
+                char paren_body[128] = "";
+                size_t pblen = 0;
+                if (!s_pending_renames.empty()) {
+                    int n = (int) s_pending_renames.size();
+                    pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen,
+                                      "%d %s", n, n == 1 ? "Rename" : "Ren");
+                }
+                if (!s_pending_advancement_removes.empty()) {
+                    if (pblen > 0) pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen, ", ");
+                    pblen += snprintf(paren_body + pblen, sizeof(paren_body) - pblen,
+                                      "-%d Stale", (int) s_pending_advancement_removes.size());
+                }
+                if (pblen > 0) {
+                    char tmp[256];
+                    snprintf(tmp, sizeof(tmp), "%s (%s)", adv_part, paren_body);
+                    snprintf(adv_part, sizeof(adv_part), "%s", tmp);
+                }
+                char crit_part[160];
+                snprintf(crit_part, sizeof(crit_part), "%d %s",
+                         selected_crit_count, fmt_crit_word(selected_crit_count));
+                int total_adds = 0, total_removes = 0;
+                for (const auto &chg: s_pending_criteria_changes) {
+                    total_adds += (int) chg.adds.size();
+                    total_removes += (int) chg.removes.size();
+                }
+                if (total_adds > 0 || total_removes > 0) {
+                    char paren[64];
+                    if (total_adds > 0 && total_removes > 0)
+                        snprintf(paren, sizeof(paren), "+%d/-%d", total_adds, total_removes);
+                    else if (total_adds > 0)
+                        snprintf(paren, sizeof(paren), "+%d", total_adds);
+                    else
+                        snprintf(paren, sizeof(paren), "-%d", total_removes);
+                    char tmp[192];
+                    snprintf(tmp, sizeof(tmp), "%s (%s)", crit_part, paren);
+                    snprintf(crit_part, sizeof(crit_part), "%s", tmp);
+                }
+                snprintf(counter_text, sizeof(counter_text), "Selected: %s, %s", adv_part, crit_part);
+            } else {
+                if (stage_to_edit != nullptr && stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
+                    snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s",
+                             selected_adv_count, fmt_adv_word(selected_adv_count));
+                } else {
+                    snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s, %d / 1 %s",
+                             selected_adv_count, fmt_adv_word(selected_adv_count),
+                             selected_crit_count, fmt_crit_word(selected_crit_count));
+                }
+            }
         }
 
         // Calculate position to right-align the text
@@ -13551,14 +14705,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Display the counter, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        if (current_import_mode == BATCH_IMPORT) {
-            // Arbitrary amount
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_stats_count,
-                     (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
+        const char *stat_word;
+        if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+            stat_word = (selected_stats_count == 1) ? "Sub-Stat" : "Sub-Stats";
         } else {
-            // Maximum of 1
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s", selected_stats_count,
-                     (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
+            stat_word = (selected_stats_count == 1) ? "Stat" : "Stats";
+        }
+        if (current_import_mode == BATCH_IMPORT) {
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_stats_count, stat_word);
+        } else {
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s", selected_stats_count, stat_word);
         }
         // Calculate position to right-align the text
         float text_width = ImGui::CalcTextSize(counter_text).x;
@@ -13781,10 +14937,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::SameLine();
         char counter_text[128];
+        const char *unlock_word = (selected_unlocks_count == 1) ? "Unlock" : "Unlocks";
         if (current_import_mode == BATCH_IMPORT) {
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d Unlocks", selected_unlocks_count);
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_unlocks_count, unlock_word);
         } else {
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 Unlocks", selected_unlocks_count);
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s", selected_unlocks_count, unlock_word);
         }
         float text_width = ImGui::CalcTextSize(counter_text).x;
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
@@ -13792,6 +14949,387 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::EndPopup();
     } // End of import unlocks popup
+
+    // ========== Import From Template Popup (shared across tabs) ==========
+    {
+        auto count_in_scope = [&]() -> int {
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS: return (int) s_template_import_data.advancements.size();
+                case IFTS_STATS: return (int) s_template_import_data.stats.size();
+                case IFTS_UNLOCKS: return (int) s_template_import_data.unlocks.size();
+                case IFTS_CUSTOM_GOALS: return (int) s_template_import_data.custom_goals.size();
+                case IFTS_COUNTERS: return (int) s_template_import_data.counter_goals.size();
+                case IFTS_MS_GOALS: return (int) s_template_import_data.multi_stage_goals.size();
+                case IFTS_DECORATIONS: return (int) s_template_import_data.decorations.size();
+            }
+            return 0;
+        };
+        auto label_at = [&](int i, char *out, size_t out_size) {
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS:
+                    snprintf(out, out_size, "%s", s_template_import_data.advancements[i].root_name);
+                    break;
+                case IFTS_STATS:
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[i].root_name);
+                    break;
+                case IFTS_UNLOCKS:
+                    snprintf(out, out_size, "%s", s_template_import_data.unlocks[i].root_name);
+                    break;
+                case IFTS_CUSTOM_GOALS:
+                    snprintf(out, out_size, "%s", s_template_import_data.custom_goals[i].root_name);
+                    break;
+                case IFTS_COUNTERS:
+                    snprintf(out, out_size, "%s", s_template_import_data.counter_goals[i].root_name);
+                    break;
+                case IFTS_MS_GOALS:
+                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[i].root_name);
+                    break;
+                case IFTS_DECORATIONS: {
+                    const auto &d = s_template_import_data.decorations[i];
+                    const char *t = "Decoration";
+                    if (d.type == DECORATION_TEXT_HEADER) t = "Text";
+                    else if (d.type == DECORATION_LINE) t = "Line";
+                    else if (d.type == DECORATION_ARROW) t = "Arrow";
+                    snprintf(out, out_size, "[%s] %s", t, d.id);
+                    break;
+                }
+            }
+        };
+        auto scope_title_word = [&]() -> const char * {
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS: return advancements_label_plural_upper;
+                case IFTS_STATS: return "Stats";
+                case IFTS_UNLOCKS: return "Unlocks";
+                case IFTS_CUSTOM_GOALS: return "Custom Goals";
+                case IFTS_COUNTERS: return "Counters";
+                case IFTS_MS_GOALS: return "Multi-Stage Goals";
+                case IFTS_DECORATIONS: return "Decorations";
+            }
+            return "Items";
+        };
+
+        char tpl_popup_title[128];
+        snprintf(tpl_popup_title, sizeof(tpl_popup_title),
+                 "Import %s from Template###import_from_template_popup", scope_title_word());
+
+        if (s_show_template_import_popup) {
+            ImGui::OpenPopup(tpl_popup_title);
+            s_show_template_import_popup = false;
+        }
+
+        if (ImGui::BeginPopupModal(tpl_popup_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                ImGui::IsKeyPressed(ImGuiKey_F)) {
+                s_template_import_focus_search = true;
+            }
+
+            int item_count = count_in_scope();
+            if (item_count == 0) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                   "The selected template has no %s to import.", scope_title_word());
+                ImGui::Separator();
+                if (ImGui::Button("Cancel##template_import_empty", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Escape) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Close the popup.\n(You can also press ESCAPE or ENTER)");
+                }
+                ImGui::EndPopup();
+                goto template_import_popup_done;
+            }
+
+            if ((int) s_template_import_selected.size() != item_count) {
+                s_template_import_selected.assign(item_count, false);
+            }
+
+            if (ImGui::Button("Select all##template_import")) {
+                for (size_t i = 0; i < s_template_import_selected.size(); i++) s_template_import_selected[i] = true;
+                s_template_import_last_clicked = -1;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Tick every entry in the list.\n"
+                                  "You can also Shift+Click checkboxes to toggle a range at once.");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear all##template_import")) {
+                for (size_t i = 0; i < s_template_import_selected.size(); i++) s_template_import_selected[i] = false;
+                s_template_import_last_clicked = -1;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", "Untick every entry in the list.");
+            }
+
+            const float tpl_search_width = 200.0f;
+            const float tpl_clear_width = ImGui::GetFrameHeight();
+            const float tpl_right_block = tpl_search_width + tpl_clear_width + ImGui::GetStyle().ItemSpacing.x * 2;
+            float tpl_right_x = ImGui::GetWindowWidth() - tpl_right_block - ImGui::GetStyle().WindowPadding.x;
+            if (tpl_right_x > ImGui::GetCursorPosX()) ImGui::SameLine(tpl_right_x);
+            if (s_template_import_search[0] != '\0') {
+                if (ImGui::Button("X##template_import_clear", ImVec2(tpl_clear_width, 0))) {
+                    s_template_import_search[0] = '\0';
+                }
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
+            } else {
+                ImGui::Dummy(ImVec2(tpl_clear_width, 0));
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(tpl_search_width);
+            if (s_template_import_focus_search) {
+                ImGui::SetKeyboardFocusHere();
+                s_template_import_focus_search = false;
+            }
+            ImGui::InputTextWithHint("##template_import_search", "Search...",
+                                     s_template_import_search, sizeof(s_template_import_search));
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Filter the list by root name or id (case-insensitive).\n\n"
+                                  "Press Ctrl+F or Cmd+F to focus.");
+            }
+            ImGui::Separator();
+
+            ImGui::BeginChild("##template_import_scroll", ImVec2(620.0f, 360.0f), true);
+            for (int i = 0; i < item_count; i++) {
+                char row_label[384];
+                label_at(i, row_label, sizeof(row_label));
+                if (s_template_import_search[0] != '\0' &&
+                    !str_contains_insensitive(row_label, s_template_import_search)) continue;
+                bool sel = s_template_import_selected[i];
+                ImGui::PushID(i);
+                if (ImGui::Checkbox(row_label, &sel)) {
+                    bool shift = ImGui::GetIO().KeyShift;
+                    if (shift && s_template_import_last_clicked >= 0 &&
+                        s_template_import_last_clicked < (int) s_template_import_selected.size() &&
+                        s_template_import_last_clicked != i) {
+                        int lo = std::min(s_template_import_last_clicked, i);
+                        int hi = std::max(s_template_import_last_clicked, i);
+                        for (int k = lo; k <= hi; k++) s_template_import_selected[k] = sel;
+                    } else {
+                        s_template_import_selected[i] = sel;
+                    }
+                    s_template_import_last_clicked = i;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+            ImGui::Separator();
+
+            int sel_count = 0;
+            for (bool b: s_template_import_selected) if (b) sel_count++;
+
+            if (s_template_import_error[0] != '\0') {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", s_template_import_error);
+            }
+
+            bool confirm_clicked = ImGui::Button("Confirm Import##template_import", ImVec2(140, 0));
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Append the ticked entries to this template. Referenced icons are\n"
+                                  "extracted from the source zip into resources/icons/ (existing files\n"
+                                  "are skipped). Existing root names or ids are rejected with an error.\n"
+                                  "(You can also press ENTER)");
+            }
+            if (confirm_clicked ||
+                ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+                if (sel_count == 0) {
+                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                             "Error: No items selected for import.");
+                } else {
+                    bool ok = true;
+                    std::vector<std::string> icons_to_pull;
+                    switch (s_template_import_scope) {
+                        case IFTS_ADVANCEMENTS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.advancements) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.advancements[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Advancement '%s' already exists in the template.",
+                                             src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.advancements[i];
+                                    current_template_data.advancements.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    for (const auto &c: src.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_STATS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.stats) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.stats[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Stat '%s' already exists in the template.", src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.stats[i];
+                                    current_template_data.stats.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    for (const auto &c: src.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_UNLOCKS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.unlocks) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.unlocks[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Unlock '%s' already exists in the template.", src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.unlocks[i];
+                                    current_template_data.unlocks.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_CUSTOM_GOALS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.custom_goals) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.custom_goals[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Custom goal '%s' already exists in the template.", src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.custom_goals[i];
+                                    current_template_data.custom_goals.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_COUNTERS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.counter_goals) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.counter_goals[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Counter '%s' already exists in the template.", src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.counter_goals[i];
+                                    current_template_data.counter_goals.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_MS_GOALS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.multi_stage_goals) existing.insert(a.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.multi_stage_goals[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Multi-stage goal '%s' already exists in the template.",
+                                             src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    const auto &src = s_template_import_data.multi_stage_goals[i];
+                                    current_template_data.multi_stage_goals.push_back(src);
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    for (const auto &st: src.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(st.icon_path);
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_DECORATIONS: {
+                            std::unordered_set<std::string> existing;
+                            for (const auto &a: current_template_data.decorations) existing.insert(a.id);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                const auto &src = s_template_import_data.decorations[i];
+                                if (existing.count(src.id)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Decoration id '%s' already exists in the template.", src.id);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    current_template_data.decorations.push_back(s_template_import_data.decorations[i]);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (ok) {
+                        int extracted = extract_zip_icons_by_paths(s_template_import_zip_path, icons_to_pull);
+                        log_message(LOG_INFO,
+                                    "[IMPORT FROM TEMPLATE] Imported %d item(s); extracted %d icon(s).\n",
+                                    sel_count, extracted);
+                        s_template_import_error[0] = '\0';
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel##template_import", ImVec2(120, 0)) ||
+                ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                s_template_import_error[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Close the popup without importing anything.\n(You can also press ESCAPE)");
+            }
+            ImGui::SameLine();
+            char counter_buf[128];
+            snprintf(counter_buf, sizeof(counter_buf), "Selected: %d / %d", sel_count, item_count);
+            float tw = ImGui::CalcTextSize(counter_buf).x;
+            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - tw - ImGui::GetStyle().WindowPadding.x);
+            ImGui::Text("%s", counter_buf);
+
+            ImGui::EndPopup();
+        }
+        template_import_popup_done: ;
+    }
 
     // ========== Goal Selector Popup ==========
     char goal_selector_popup_title[512];

@@ -877,16 +877,53 @@ the live tracker map instead of typing coordinates by hand.
 * **Restrictions**: While the Visual Layout Editor is active, applying settings and switching templates are disabled
   to prevent reloads. Custom Goal Hotkeys are also disabled.
 
-### Importing from Game Files
+### Importing from Game Files or Other Templates
 
-To save you from manually typing hundreds of root names, nearly every editor tab has an **"Import..."** button. This
-powerful feature allows you to:
+Every main tab in the editor has an `Import...` button. Clicking it opens a small dropdown with one or two source
+options:
 
-1. Click the button (e.g., "Import Advancements").
-2. Select a player data file (`.json` or `.dat`) from one of your world saves.
-3. A popup will appear with a searchable list of every single advancement, stat, or unlock present in that file.
-4. Simply check the boxes for the items you want to add to your template and confirm. They will be instantly added,
-   ready for you to assign icons and display names.
+- `...from player file` (Advancements/Achievements, Stats, Unlocks tabs): pick a player data file (`.json` or
+  `.dat`) from one of your world saves. A popup lists every advancement, stat or unlock present in that file,
+  and you tick what to add. Existing root names are detected and refused so you can't double-import.
+- `...from other template` (all seven tabs: Advancements/Achievements, Stats, Unlocks, Custom Goals, Counters,
+  Multi-Stage Goals, Decorations): pick a zipped Advancely template (`.zip`, the same format the editor exports).
+  A popup lists every item of that tab's type from the source template, you tick what to merge, and
+  `Confirm Import` appends the selected items into the current template. Referenced icons (`icon` paths on
+  advancements, criteria, stats, sub-stats, unlocks, custom goals, counters and multi-stage goal stages) are
+  extracted from the zip's `icons/` directory into `resources/icons/` automatically, skipping any file that
+  already exists. Duplicate root names (or decoration ids) are detected up-front and the import is refused,
+  exactly like the player-file flow. The popup supports `Ctrl+F` / `Cmd+F` to focus the search, Shift+Click
+  to toggle a checkbox range, and shows a clear message when the source template has nothing of that type.
+
+#### Template update helpers (advancement and achievement import)
+
+When upgrading a large template across Minecraft versions (or downgrading to an older one), the `Select...` dropdown
+in the import popup offers per-purpose helpers. Each opens a nested modal that previews changes. Nothing is written
+to the template until you press `Confirm Import`, and every change lands as a normal unsaved editor edit you can
+discard like any other.
+
+- `...all visible`: bulk-select every entry currently visible in the import list (respects the search bar and the
+  `Include Crit.` checkbox).
+- `...new advancements` / `...new achievements`: preview entries present in the imported file but missing from the
+  template, then confirm to pre-tick them in the main list. Recipes are hidden by default on `1.12+`; toggle
+  `Show recipes` inside the preview to include them.
+- `...advancement renames` / `...achievement renames` (`1.7+`): for every template entry whose root name is missing
+  from the imported file, propose rename candidates from the import side. Modern (`1.12+`) matches by basename
+  (everything after the final `/`) and additionally by `>=80%` criteria overlap on the smaller side; mid-era
+  (`1.7 - 1.11`) matches by criteria overlap only. Stage the picks you want, then `Confirm Import` rewrites the
+  template root names and retargets every arrow, counter, custom and stat link that referred to the old name.
+- `...stale advancements` / `...stale achievements`: list template entries whose post-rename name is missing from
+  the imported file. Pick what to delete; `Confirm Import` removes them and scrubs every link that referred to the
+  deleted name. Useful when downgrading to an older version that lacks those entries.
+- `...criteria differences` (`1.7+`): for every entry present on both sides whose criteria sets differ, list new
+  criteria (`[+]`) and stale ones (`[-]`). Pick what to stage on each row, then `Confirm Import` adds the new
+  criteria (with placeholder display/icon) and removes the stale ones with link scrubbing. Also available inside
+  the per-advancement criteria import popup, scoped to that single entry.
+
+Staged changes show up in a panel at the top of the import popup with a per-row `Revert` button. The right-aligned
+counter on the bottom row reflects them too, for example `Selected: 5 Adv (3 Ren, -2 Stale), 12 Crit (+8/-2)`. To
+prevent double-applying, advancements that are already targeted by a staged rename or criteria change are greyed
+out in the main import list with a tooltip explaining why.
 
 ### The Help Button
 
