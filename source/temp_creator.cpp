@@ -2760,7 +2760,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Cross-template import (shared across all tabs)
     enum ImportFromTemplateScope {
         IFTS_ADVANCEMENTS, IFTS_STATS, IFTS_UNLOCKS, IFTS_CUSTOM_GOALS,
-        IFTS_COUNTERS, IFTS_MS_GOALS, IFTS_DECORATIONS
+        IFTS_COUNTERS, IFTS_MS_GOALS, IFTS_DECORATIONS,
+        IFTS_TEMPLATE_CRITERIA, IFTS_TEMPLATE_SUB_STATS, IFTS_TEMPLATE_STAGES
     };
     static bool s_show_template_import_popup = false;
     static ImportFromTemplateScope s_template_import_scope = IFTS_ADVANCEMENTS;
@@ -2771,6 +2772,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char s_template_import_error[256] = "";
     static int s_template_import_last_clicked = -1;
     static bool s_template_import_focus_search = false;
+    static bool s_template_import_keep_positions = false;
+    static EditorTrackableCategory *s_template_import_target_adv = nullptr;
+    static EditorTrackableCategory *s_template_import_target_stat = nullptr;
+    static EditorMultiStageGoal *s_template_import_target_ms = nullptr;
+    static int s_template_import_parent_index = -1;
 
     auto open_template_import = [&](ImportFromTemplateScope scope) {
         const char *zip_filter[1] = {"*.zip"};
@@ -2823,7 +2829,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_selected.clear();
         s_template_import_last_clicked = -1;
         s_template_import_focus_search = true;
+        s_template_import_parent_index = -1;
         s_show_template_import_popup = true;
+    };
+
+    auto open_template_import_for_criteria = [&](EditorTrackableCategory *target) {
+        s_template_import_target_adv = target;
+        s_template_import_target_stat = nullptr;
+        s_template_import_target_ms = nullptr;
+        open_template_import(IFTS_TEMPLATE_CRITERIA);
+    };
+    auto open_template_import_for_sub_stats = [&](EditorTrackableCategory *target) {
+        s_template_import_target_adv = nullptr;
+        s_template_import_target_stat = target;
+        s_template_import_target_ms = nullptr;
+        open_template_import(IFTS_TEMPLATE_SUB_STATS);
+    };
+    auto open_template_import_for_stages = [&](EditorMultiStageGoal *target) {
+        s_template_import_target_adv = nullptr;
+        s_template_import_target_stat = nullptr;
+        s_template_import_target_ms = target;
+        open_template_import(IFTS_TEMPLATE_STAGES);
     };
 
     // For multi-purpose import popups
@@ -5640,11 +5666,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
                             ImGui::TextDisabled("%s", crit_counter_text);
 
-                            // Import Criteria Button
-                            char import_crit_label[128];
-                            snprintf(import_crit_label, sizeof(import_crit_label), "Import %s Criteria",
-                                     advancements_label_upper);
-                            if (ImGui::Button(import_crit_label)) {
+                            // Import Criteria Button (dropdown: player file or other template)
+                            if (ImGui::Button("Import...##crit_import")) {
+                                ImGui::OpenPopup("import_criteria_source_popup");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s",
+                                                  "Import criteria for this entry from a player file or another template.");
+                            }
+                            if (ImGui::BeginPopup("import_criteria_source_popup")) {
+                                if (ImGui::Selectable("...from player file")) {
                                 current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
                                 // This logic is copied from the main "Import Advancements" button
                                 char start_path[MAX_PATH_LENGTH];
@@ -5677,26 +5708,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                              sizeof(import_error_message))) {
                                         show_import_advancements_popup = true;
                                         focus_import_search = true;
-                                        import_search_criteria_only = true; // Default search to criteria
-                                        import_select_criteria = true; // Default selection to criteria
+                                        import_search_criteria_only = true;
+                                        import_select_criteria = true;
                                     } else {
                                         save_message_type = MSG_ERROR;
                                         strncpy(status_message, import_error_message, sizeof(status_message) - 1);
                                     }
                                 }
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip[512];
-                                if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import criteria for this %s directly from a player stats file.",
-                                             advancements_label_singular_lower);
-                                } else {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import criteria for this %s directly from a player advancements file.",
-                                             advancements_label_singular_lower);
                                 }
-                                ImGui::SetTooltip("%s", tooltip);
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[512];
+                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Import criteria for this %s directly from a player stats file.",
+                                                 advancements_label_singular_lower);
+                                    } else {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Import criteria for this %s directly from a player advancements file.",
+                                                 advancements_label_singular_lower);
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                                if (ImGui::Selectable("...from other template")) {
+                                    open_template_import_for_criteria(&advancement);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                                      "Pick an Advancely template zip, choose a source advancement,\n"
+                                                      "and tick which criteria to merge into this one. Referenced\n"
+                                                      "icons are extracted automatically.");
+                                }
+                                ImGui::EndPopup();
                             }
                             ImGui::SameLine();
 
@@ -7271,8 +7313,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
                             ImGui::TextDisabled("%s", crit_counter_text);
 
-                            // "Import Sub-Stats" button
-                            if (ImGui::Button("Import Sub-Stats")) {
+                            // "Import Sub-Stats" dropdown
+                            if (ImGui::Button("Import...##sub_stats")) {
+                                ImGui::OpenPopup("import_sub_stats_source_popup");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s",
+                                                  "Import sub-stats for this stat from a player file or another template.");
+                            }
+                            if (ImGui::BeginPopup("import_sub_stats_source_popup")) {
+                                if (ImGui::Selectable("...from player file")) {
                                 current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
                                 char start_path[MAX_PATH_LENGTH];
                                 if (creator_selected_version <= MC_VERSION_1_6_4) {
@@ -7322,34 +7372,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         strncpy(status_message, import_error_message, sizeof(status_message) - 1);
                                     }
                                 }
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip[512];
-
-                                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                    if (app_settings->using_stats_per_world_legacy) {
-                                        // Legacy using stats per world
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[512];
+                                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                        if (app_settings->using_stats_per_world_legacy) {
+                                            snprintf(tooltip, sizeof(tooltip),
+                                                     "Import sub-stats directly from a local world's player stats/achievements .dat file.\n"
+                                                     "Cannot import already existing root names within this stat category.");
+                                        } else {
+                                            snprintf(tooltip, sizeof(tooltip),
+                                                     "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
+                                                     "Cannot import already existing root names within this stat category.");
+                                        }
+                                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
                                         snprintf(tooltip, sizeof(tooltip),
-                                                 "Import sub-stats directly from a local world's player stats/achievements .dat file.\n"
+                                                 "Import sub-stats directly from a world's player stats/achievements .json file.\n"
                                                  "Cannot import already existing root names within this stat category.");
                                     } else {
-                                        // Legacy not using stats per world
                                         snprintf(tooltip, sizeof(tooltip),
-                                                 "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
+                                                 "Import sub-stats directly from a world's player stats .json file.\n"
                                                  "Cannot import already existing root names within this stat category.");
                                     }
-                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                                    // Mid-era (1.7.2 - 1.12.2)
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import sub-stats directly from a world's player stats/achievements .json file.\n"
-                                             "Cannot import already existing root names within this stat category.");
-                                } else {
-                                    // Modern(1.13+)
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import sub-stats directly from a world's player stats .json file.\n"
-                                             "Cannot import already existing root names within this stat category.");
+                                    ImGui::SetTooltip("%s", tooltip);
                                 }
-                                ImGui::SetTooltip("%s", tooltip);
+                                if (ImGui::Selectable("...from other template")) {
+                                    open_template_import_for_sub_stats(&stat_cat);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                                      "Pick an Advancely template zip, choose a source stat, and tick\n"
+                                                      "which sub-stats to merge into this one.");
+                                }
+                                ImGui::EndPopup();
                             }
                             ImGui::SameLine();
 
@@ -9573,6 +9628,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::TextDisabled("%s", stage_counter_text);
 
 
+                        if (ImGui::Button("Import...##stages")) {
+                            ImGui::OpenPopup("import_stages_source_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s",
+                                              "Import stages for this multi-stage goal from another exported template.");
+                        }
+                        if (ImGui::BeginPopup("import_stages_source_popup")) {
+                            if (ImGui::Selectable("...from other template")) {
+                                open_template_import_for_stages(&goal);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s",
+                                                  "Pick an Advancely template zip, choose a source multi-stage goal,\n"
+                                                  "and tick which stages to merge into this one. Final stages are\n"
+                                                  "skipped on import to preserve this goal's own final stage.\n"
+                                                  "Referenced stage icons are extracted automatically.");
+                            }
+                            ImGui::EndPopup();
+                        }
+                        ImGui::SameLine();
                         if (ImGui::Button("Add New Stage")) {
                             // Create a new stage with default values and insert it before the final stage
                             EditorSubGoal new_stage = {};
@@ -14952,6 +15028,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // ========== Import From Template Popup (shared across tabs) ==========
     {
+        auto parent_count_in_scope = [&]() -> int {
+            switch (s_template_import_scope) {
+                case IFTS_TEMPLATE_CRITERIA: return (int) s_template_import_data.advancements.size();
+                case IFTS_TEMPLATE_SUB_STATS: return (int) s_template_import_data.stats.size();
+                case IFTS_TEMPLATE_STAGES: return (int) s_template_import_data.multi_stage_goals.size();
+                default: return 0;
+            }
+        };
+        auto is_parented_scope = [&]() -> bool {
+            return s_template_import_scope == IFTS_TEMPLATE_CRITERIA ||
+                   s_template_import_scope == IFTS_TEMPLATE_SUB_STATS ||
+                   s_template_import_scope == IFTS_TEMPLATE_STAGES;
+        };
         auto count_in_scope = [&]() -> int {
             switch (s_template_import_scope) {
                 case IFTS_ADVANCEMENTS: return (int) s_template_import_data.advancements.size();
@@ -14961,6 +15050,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_COUNTERS: return (int) s_template_import_data.counter_goals.size();
                 case IFTS_MS_GOALS: return (int) s_template_import_data.multi_stage_goals.size();
                 case IFTS_DECORATIONS: return (int) s_template_import_data.decorations.size();
+                case IFTS_TEMPLATE_CRITERIA: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return 0;
+                    return (int) s_template_import_data.advancements[p].criteria.size();
+                }
+                case IFTS_TEMPLATE_SUB_STATS: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) return 0;
+                    return (int) s_template_import_data.stats[p].criteria.size();
+                }
+                case IFTS_TEMPLATE_STAGES: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return 0;
+                    return (int) s_template_import_data.multi_stage_goals[p].stages.size();
+                }
             }
             return 0;
         };
@@ -14993,6 +15097,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(out, out_size, "[%s] %s", t, d.id);
                     break;
                 }
+                case IFTS_TEMPLATE_CRITERIA: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) { out[0] = '\0'; break; }
+                    snprintf(out, out_size, "%s", s_template_import_data.advancements[p].criteria[i].root_name);
+                    break;
+                }
+                case IFTS_TEMPLATE_SUB_STATS: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) { out[0] = '\0'; break; }
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[p].criteria[i].root_name);
+                    break;
+                }
+                case IFTS_TEMPLATE_STAGES: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) { out[0] = '\0'; break; }
+                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[p].stages[i].stage_id);
+                    break;
+                }
+            }
+        };
+        auto parent_label_at = [&](int i, char *out, size_t out_size) {
+            switch (s_template_import_scope) {
+                case IFTS_TEMPLATE_CRITERIA:
+                    snprintf(out, out_size, "%s", s_template_import_data.advancements[i].root_name); break;
+                case IFTS_TEMPLATE_SUB_STATS:
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[i].root_name); break;
+                case IFTS_TEMPLATE_STAGES:
+                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[i].root_name); break;
+                default: out[0] = '\0';
             }
         };
         auto scope_title_word = [&]() -> const char * {
@@ -15004,8 +15137,105 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_COUNTERS: return "Counters";
                 case IFTS_MS_GOALS: return "Multi-Stage Goals";
                 case IFTS_DECORATIONS: return "Decorations";
+                case IFTS_TEMPLATE_CRITERIA: return "Criteria";
+                case IFTS_TEMPLATE_SUB_STATS: return "Sub-Stats";
+                case IFTS_TEMPLATE_STAGES: return "Stages";
             }
             return "Items";
+        };
+
+        auto stage_type_valid_for_version = [&](SubGoalType t) -> bool {
+            if (t == SUBGOAL_MANUAL) return false;
+            if (creator_selected_version <= MC_VERSION_1_6_4) return t == SUBGOAL_STAT;
+            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                return t == SUBGOAL_STAT || t == SUBGOAL_ADVANCEMENT || t == SUBGOAL_CRITERION;
+            }
+            if (strcmp(creator_version_str, "25w14craftmine") == 0) return true;
+            return t != SUBGOAL_UNLOCK;
+        };
+        auto root_name_valid_for_version = [&](const char *rn) -> bool {
+            if (!rn || !*rn) return false;
+            if (creator_selected_version > MC_VERSION_1_11_2) {
+                return strchr(rn, ':') != nullptr;
+            }
+            if (creator_selected_version > MC_VERSION_1_6_4) {
+                return strchr(rn, ':') == nullptr;
+            }
+            for (const char *p = rn; *p; p++) {
+                if (*p < '0' || *p > '9') return false;
+            }
+            return true;
+        };
+        auto entry_invalid_reason = [&](int i) -> const char * {
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS: {
+                    if (i < 0 || i >= (int) s_template_import_data.advancements.size()) return "Out of range.";
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[i].root_name))
+                        return "Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_STATS: {
+                    if (i < 0 || i >= (int) s_template_import_data.stats.size()) return "Out of range.";
+                    const auto &cat = s_template_import_data.stats[i];
+                    if (!root_name_valid_for_version(cat.root_name))
+                        return "Root name format does not match this Minecraft version.";
+                    for (const auto &c: cat.criteria) {
+                        if (!root_name_valid_for_version(c.root_name))
+                            return "Contains a sub-stat whose root name format does not match this Minecraft version.";
+                    }
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_CRITERIA: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return "Invalid parent.";
+                    if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return "Out of range.";
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name))
+                        return "Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_SUB_STATS: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) return "Invalid parent.";
+                    if (i < 0 || i >= (int) s_template_import_data.stats[p].criteria.size()) return "Out of range.";
+                    if (!root_name_valid_for_version(s_template_import_data.stats[p].criteria[i].root_name))
+                        return "Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_STAGES: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return "Invalid parent.";
+                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return "Out of range.";
+                    const auto &st = s_template_import_data.multi_stage_goals[p].stages[i];
+                    if (!stage_type_valid_for_version(st.type))
+                        return "Stage type is not supported in this Minecraft version.";
+                    if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name))
+                        return "Stage root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_MS_GOALS: {
+                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals.size()) return "Out of range.";
+                    const auto &goal = s_template_import_data.multi_stage_goals[i];
+                    for (const auto &st: goal.stages) {
+                        if (st.type == SUBGOAL_MANUAL) continue;
+                        if (!stage_type_valid_for_version(st.type))
+                            return "Contains a stage whose type is not supported in this Minecraft version.";
+                        if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name))
+                            return "Contains a stage whose root name format does not match this Minecraft version.";
+                    }
+                    return nullptr;
+                }
+                default: return nullptr;
+            }
+        };
+        auto entry_is_final_stage = [&](int i) -> bool {
+            if (s_template_import_scope != IFTS_TEMPLATE_STAGES) return false;
+            int p = s_template_import_parent_index;
+            if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return false;
+            if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return false;
+            return s_template_import_data.multi_stage_goals[p].stages[i].type == SUBGOAL_MANUAL;
+        };
+        auto scope_has_positions = [&]() -> bool {
+            return s_template_import_scope != IFTS_TEMPLATE_STAGES;
         };
 
         char tpl_popup_title[128];
@@ -15023,8 +15253,66 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_template_import_focus_search = true;
             }
 
+            if (is_parented_scope()) {
+                int pcount = parent_count_in_scope();
+                if (pcount == 0) {
+                    const char *parent_word =
+                        (s_template_import_scope == IFTS_TEMPLATE_CRITERIA) ? "advancements" :
+                        (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS) ? "stats" :
+                        "multi-stage goals";
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                       "The selected template has no %s to import from.", parent_word);
+                    ImGui::Separator();
+                    if (ImGui::Button("Cancel##template_import_empty", ImVec2(120, 0)) ||
+                        ImGui::IsKeyPressed(ImGuiKey_Escape) ||
+                        ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE or ENTER)");
+                    }
+                    ImGui::EndPopup();
+                    goto template_import_popup_done;
+                }
+                if (s_template_import_parent_index < 0 || s_template_import_parent_index >= pcount) {
+                    s_template_import_parent_index = 0;
+                    s_template_import_selected.clear();
+                    s_template_import_last_clicked = -1;
+                }
+                const char *combo_label =
+                    (s_template_import_scope == IFTS_TEMPLATE_CRITERIA) ? "Source advancement" :
+                    (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS) ? "Source stat" :
+                    "Source multi-stage goal";
+                char parent_preview[256];
+                parent_label_at(s_template_import_parent_index, parent_preview, sizeof(parent_preview));
+                ImGui::SetNextItemWidth(420.0f);
+                if (ImGui::BeginCombo(combo_label, parent_preview)) {
+                    for (int p = 0; p < pcount; p++) {
+                        char plabel[256];
+                        parent_label_at(p, plabel, sizeof(plabel));
+                        bool sel = (p == s_template_import_parent_index);
+                        ImGui::PushID(p);
+                        if (ImGui::Selectable(plabel, sel)) {
+                            if (p != s_template_import_parent_index) {
+                                s_template_import_parent_index = p;
+                                s_template_import_selected.clear();
+                                s_template_import_last_clicked = -1;
+                            }
+                        }
+                        if (sel) ImGui::SetItemDefaultFocus();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Pick which entry from the source template provides the items below.");
+                }
+                ImGui::Separator();
+            }
+
             int item_count = count_in_scope();
-            if (item_count == 0) {
+            if (!is_parented_scope() && item_count == 0) {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
                                    "The selected template has no %s to import.", scope_title_word());
                 ImGui::Separator();
@@ -15040,18 +15328,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::EndPopup();
                 goto template_import_popup_done;
             }
+            if (is_parented_scope() && item_count == 0) {
+                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
+                                   "The picked entry has no %s. Choose a different source above.",
+                                   scope_title_word());
+            }
 
             if ((int) s_template_import_selected.size() != item_count) {
                 s_template_import_selected.assign(item_count, false);
             }
 
             if (ImGui::Button("Select all##template_import")) {
-                for (size_t i = 0; i < s_template_import_selected.size(); i++) s_template_import_selected[i] = true;
+                for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
+                    if (entry_is_final_stage(i)) continue;
+                    if (entry_invalid_reason(i)) continue;
+                    s_template_import_selected[i] = true;
+                }
                 s_template_import_last_clicked = -1;
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s",
-                                  "Tick every entry in the list.\n"
+                                  "Tick every importable entry. Greyed-out rows (invalid format or\n"
+                                  "unsupported stage type) are skipped.\n"
                                   "You can also Shift+Click checkboxes to toggle a range at once.");
             }
             ImGui::SameLine();
@@ -15062,12 +15360,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", "Untick every entry in the list.");
             }
+            if (scope_has_positions()) {
+                ImGui::SameLine();
+                ImGui::Checkbox("Layout positions##template_import", &s_template_import_keep_positions);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "CHECKED: keep manual layout positions (icon/text/progress) from the\n"
+                                      "source template. Useful when copying an entire visual layout block.\n"
+                                      "UNCHECKED (default): reset positions so imported items use the\n"
+                                      "auto-layout in this template.");
+                }
+            }
 
             const float tpl_search_width = 200.0f;
             const float tpl_clear_width = ImGui::GetFrameHeight();
-            const float tpl_right_block = tpl_search_width + tpl_clear_width + ImGui::GetStyle().ItemSpacing.x * 2;
-            float tpl_right_x = ImGui::GetWindowWidth() - tpl_right_block - ImGui::GetStyle().WindowPadding.x;
-            if (tpl_right_x > ImGui::GetCursorPosX()) ImGui::SameLine(tpl_right_x);
+            const float tpl_right_block = tpl_search_width + tpl_clear_width + ImGui::GetStyle().ItemSpacing.x;
+            ImGui::SameLine(ImGui::GetWindowWidth() - tpl_right_block - ImGui::GetStyle().WindowPadding.x);
             if (s_template_import_search[0] != '\0') {
                 if (ImGui::Button("X##template_import_clear", ImVec2(tpl_clear_width, 0))) {
                     s_template_import_search[0] = '\0';
@@ -15093,12 +15401,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             ImGui::BeginChild("##template_import_scroll", ImVec2(620.0f, 360.0f), true);
             for (int i = 0; i < item_count; i++) {
+                if (entry_is_final_stage(i)) continue;
                 char row_label[384];
                 label_at(i, row_label, sizeof(row_label));
                 if (s_template_import_search[0] != '\0' &&
                     !str_contains_insensitive(row_label, s_template_import_search)) continue;
+                const char *invalid_reason = entry_invalid_reason(i);
+                if (invalid_reason) s_template_import_selected[i] = false;
                 bool sel = s_template_import_selected[i];
                 ImGui::PushID(i);
+                if (invalid_reason) ImGui::BeginDisabled();
                 if (ImGui::Checkbox(row_label, &sel)) {
                     bool shift = ImGui::GetIO().KeyShift;
                     if (shift && s_template_import_last_clicked >= 0 &&
@@ -15106,11 +15418,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         s_template_import_last_clicked != i) {
                         int lo = std::min(s_template_import_last_clicked, i);
                         int hi = std::max(s_template_import_last_clicked, i);
-                        for (int k = lo; k <= hi; k++) s_template_import_selected[k] = sel;
+                        for (int k = lo; k <= hi; k++) {
+                            if (entry_is_final_stage(k)) continue;
+                            if (entry_invalid_reason(k)) continue;
+                            s_template_import_selected[k] = sel;
+                        }
                     } else {
                         s_template_import_selected[i] = sel;
                     }
                     s_template_import_last_clicked = i;
+                }
+                if (invalid_reason) {
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        ImGui::SetTooltip("%s", invalid_reason);
+                    }
                 }
                 ImGui::PopID();
             }
@@ -15146,6 +15468,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &a: current_template_data.advancements) existing.insert(a.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
+                                if (entry_invalid_reason(i)) continue;
                                 const auto &src = s_template_import_data.advancements[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -15157,10 +15480,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.advancements[i];
-                                    current_template_data.advancements.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
-                                    for (const auto &c: src.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    if (entry_invalid_reason(i)) continue;
+                                    auto item = s_template_import_data.advancements[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                        for (auto &c: item.criteria) {
+                                            c.icon_pos = ManualPos{};
+                                            c.text_pos = ManualPos{};
+                                            c.progress_pos = ManualPos{};
+                                        }
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    current_template_data.advancements.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15170,6 +15504,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &a: current_template_data.stats) existing.insert(a.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
+                                if (entry_invalid_reason(i)) continue;
                                 const auto &src = s_template_import_data.stats[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -15180,10 +15515,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.stats[i];
-                                    current_template_data.stats.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
-                                    for (const auto &c: src.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    if (entry_invalid_reason(i)) continue;
+                                    auto item = s_template_import_data.stats[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                        for (auto &c: item.criteria) {
+                                            c.icon_pos = ManualPos{};
+                                            c.text_pos = ManualPos{};
+                                            c.progress_pos = ManualPos{};
+                                        }
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    current_template_data.stats.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15203,9 +15549,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.unlocks[i];
-                                    current_template_data.unlocks.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    auto item = s_template_import_data.unlocks[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    current_template_data.unlocks.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15225,9 +15576,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.custom_goals[i];
-                                    current_template_data.custom_goals.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    auto item = s_template_import_data.custom_goals[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    current_template_data.custom_goals.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15247,9 +15603,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.counter_goals[i];
-                                    current_template_data.counter_goals.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
+                                    auto item = s_template_import_data.counter_goals[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    current_template_data.counter_goals.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15270,10 +15631,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    const auto &src = s_template_import_data.multi_stage_goals[i];
-                                    current_template_data.multi_stage_goals.push_back(src);
-                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
-                                    for (const auto &st: src.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(st.icon_path);
+                                    auto item = s_template_import_data.multi_stage_goals[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    for (const auto &st: item.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(st.icon_path);
+                                    current_template_data.multi_stage_goals.push_back(std::move(item));
                                 }
                             }
                             break;
@@ -15293,7 +15659,128 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    current_template_data.decorations.push_back(s_template_import_data.decorations[i]);
+                                    auto item = s_template_import_data.decorations[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.pos = ManualPos{};
+                                        item.pos2 = ManualPos{};
+                                        item.bend_count = 0;
+                                        for (int b = 0; b < MAX_ARROW_BENDS; b++) item.bends[b] = ManualPos{};
+                                    }
+                                    current_template_data.decorations.push_back(std::move(item));
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_TEMPLATE_CRITERIA: {
+                            if (!s_template_import_target_adv) {
+                                snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                         "Error: No target advancement.");
+                                ok = false;
+                                break;
+                            }
+                            int p = s_template_import_parent_index;
+                            const auto &src_adv = s_template_import_data.advancements[p];
+                            std::unordered_set<std::string> existing;
+                            for (const auto &c: s_template_import_target_adv->criteria) existing.insert(c.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                if (entry_invalid_reason(i)) continue;
+                                const auto &src = src_adv.criteria[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Criterion '%s' already exists in this %s.",
+                                             src.root_name, advancements_label_singular_lower);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    if (entry_invalid_reason(i)) continue;
+                                    auto item = src_adv.criteria[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    s_template_import_target_adv->criteria.push_back(std::move(item));
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_TEMPLATE_SUB_STATS: {
+                            if (!s_template_import_target_stat) {
+                                snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                         "Error: No target stat.");
+                                ok = false;
+                                break;
+                            }
+                            int p = s_template_import_parent_index;
+                            const auto &src_stat = s_template_import_data.stats[p];
+                            std::unordered_set<std::string> existing;
+                            for (const auto &c: s_template_import_target_stat->criteria) existing.insert(c.root_name);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                if (entry_invalid_reason(i)) continue;
+                                const auto &src = src_stat.criteria[i];
+                                if (existing.count(src.root_name)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Sub-stat '%s' already exists in this stat.", src.root_name);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    if (entry_invalid_reason(i)) continue;
+                                    auto item = src_stat.criteria[i];
+                                    if (!s_template_import_keep_positions) {
+                                        item.icon_pos = ManualPos{};
+                                        item.text_pos = ManualPos{};
+                                        item.progress_pos = ManualPos{};
+                                    }
+                                    if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
+                                    s_template_import_target_stat->criteria.push_back(std::move(item));
+                                }
+                            }
+                            break;
+                        }
+                        case IFTS_TEMPLATE_STAGES: {
+                            if (!s_template_import_target_ms) {
+                                snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                         "Error: No target multi-stage goal.");
+                                ok = false;
+                                break;
+                            }
+                            int p = s_template_import_parent_index;
+                            const auto &src_goal = s_template_import_data.multi_stage_goals[p];
+                            std::unordered_set<std::string> existing;
+                            for (const auto &s: s_template_import_target_ms->stages) existing.insert(s.stage_id);
+                            for (int i = 0; ok && i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                if (entry_is_final_stage(i)) continue;
+                                if (entry_invalid_reason(i)) continue;
+                                const auto &src = src_goal.stages[i];
+                                if (existing.count(src.stage_id)) {
+                                    snprintf(s_template_import_error, sizeof(s_template_import_error),
+                                             "Error: Stage id '%s' already exists in this goal.", src.stage_id);
+                                    ok = false;
+                                }
+                            }
+                            if (ok) {
+                                auto &dst_stages = s_template_import_target_ms->stages;
+                                auto insert_pos = dst_stages.end();
+                                if (!dst_stages.empty() && dst_stages.back().type == SUBGOAL_MANUAL) {
+                                    insert_pos = dst_stages.end() - 1;
+                                }
+                                for (int i = 0; i < item_count; i++) {
+                                    if (!s_template_import_selected[i]) continue;
+                                    if (entry_is_final_stage(i)) continue;
+                                    if (entry_invalid_reason(i)) continue;
+                                    const auto &src = src_goal.stages[i];
+                                    insert_pos = dst_stages.insert(insert_pos, src) + 1;
+                                    if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
                                 }
                             }
                             break;

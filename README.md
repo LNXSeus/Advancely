@@ -894,6 +894,29 @@ options:
   already exists. Duplicate root names (or decoration ids) are detected up-front and the import is refused,
   exactly like the player-file flow. The popup supports `Ctrl+F` / `Cmd+F` to focus the search, Shift+Click
   to toggle a checkbox range, and shows a clear message when the source template has nothing of that type.
+  A `Layout positions` checkbox decides whether the source's manual layout positions (icon / text / progress
+  for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
+  auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
+  greyed out with a tooltip so they can't accidentally pollute the destination. The format check requires
+  `:` on `1.12+`, forbids `:` on `1.7-1.11`, and accepts only numeric IDs on `1.6.4` and below. Container
+  entries (complex stat categories with sub-stats and entire multi-stage goals) are also greyed out when
+  any of their children would themselves fail the check, including stages with a type not supported in
+  this version.
+
+The same dropdown is also available **inside** the per-item editors when picking from another template makes
+sense at a finer grain:
+
+- The `Import...` button next to an advancement's criteria offers `...from player file` (existing) and
+  `...from other template`. The template option opens the same popup with a Combo at the top to pick a
+  source advancement; ticking criteria below merges them into the advancement you're editing.
+- The `Import...` button next to a complex stat's sub-stats works the same way, with the Combo picking
+  the source stat and the children being its sub-stats.
+- The `Import...` button on a multi-stage goal's stages list offers `...from other template` only.
+  The Combo picks the source multi-stage goal; ticked stages are inserted just before this goal's final
+  stage. Final stages from the source are hidden in the list entirely, and any stage whose type is not
+  valid for the current Minecraft version (for example a `Criterion` stage on a legacy template, or an
+  `Unlock` stage outside the `25w14craftmine` snapshot) is greyed out with an explanation. Stage icons
+  are extracted automatically too.
 
 #### Template update helpers (advancement and achievement import)
 
@@ -1307,6 +1330,8 @@ How the Host combines multiple players' progress into the **All Players** view d
   current stage from the Host's broadcast.)_
 * **Counters:** Derived from their linked goals' merged state, so they follow whichever rule applies to each linked
   goal.
+
+> 📺 **Video Guide:** [Coop Faces](https://youtu.be/pc11-_8VG3c)
 
 The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these face indicators render. When enabled,
 the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
