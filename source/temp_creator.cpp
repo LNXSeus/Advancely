@@ -12082,47 +12082,66 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Selection Controls & Search Bar (now operating on the filtered list) ---
         // Only show batch controls when not doing a single selection for a multi-stage goal
         if (current_import_mode == BATCH_IMPORT) {
-            // Selecting multiple, not multi-stage goal stage
-            if (ImGui::Button("Select All")) {
-                for (auto *adv_ptr: filtered_advancements) {
-                    // In criteria-only mode, we don't select the parent, only its children.
-                    if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
-                        adv_ptr->is_selected = true;
-                    }
-                    if (import_select_criteria) {
-                        bool parent_matched =
-                                str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
-                        for (auto &crit: adv_ptr->criteria) {
-                            // Select criteria only if they are visible (parent matched or they matched themselves)
-                            if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
-                                    crit.root_name.c_str(), import_search_buffer)) {
-                                crit.is_selected = true;
+            if (ImGui::Button("Select...")) {
+                ImGui::OpenPopup("import_select_dropdown");
+            }
+            if (ImGui::IsItemHovered()) {
+                char select_dropdown_tooltip_buffer[512];
+                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
+                             "Selection tools and template update helpers.\n\n"
+                             "...all visible: bulk-select every achievement in the current search.");
+                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
+                             "Selection tools and template update helpers.\n\n"
+                             "...all visible: bulk-select every achievement (and their criteria if\n"
+                             "'Include Crit.' is checked) in the current search.");
+                } else {
+                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
+                             "Selection tools and template update helpers.\n\n"
+                             "...all visible: bulk-select every advancement/recipe (and their criteria\n"
+                             "if 'Include Crit.' is checked) in the current search.");
+                }
+                ImGui::SetTooltip("%s", select_dropdown_tooltip_buffer);
+            }
+            if (ImGui::BeginPopup("import_select_dropdown")) {
+                if (ImGui::Selectable("...all visible")) {
+                    for (auto *adv_ptr: filtered_advancements) {
+                        if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                            adv_ptr->is_selected = true;
+                        }
+                        if (import_select_criteria) {
+                            bool parent_matched =
+                                    str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
+                            for (auto &crit: adv_ptr->criteria) {
+                                if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
+                                        crit.root_name.c_str(), import_search_buffer)) {
+                                    crit.is_selected = true;
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (ImGui::IsItemHovered()) {
-                char select_all_tooltip_buffer[512];
-                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                    // Legacy
-                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                             "Selects all achievements visible in the current search.\n\n"
-                             "You can also Shift+Click to select a range of items.");
-                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                    // Mid-era
-                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                             "Selects all achievements visible in the current search.\n"
-                             "Also selects their criteria if 'Include Criteria' is checked.\n\n"
-                             "You can also Shift+Click to select a range of items.");
-                } else {
-                    // Modern
-                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                             "Selects all advancements/recipes visible in the current search.\n"
-                             "Also selects their criteria if 'Include Criteria' is checked.\n\n"
-                             "You can also Shift+Click to select a range of items.");
+                if (ImGui::IsItemHovered()) {
+                    char select_all_tooltip_buffer[512];
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                                 "Selects all achievements visible in the current search.\n\n"
+                                 "You can also Shift+Click to select a range of items.");
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                                 "Selects all achievements visible in the current search.\n"
+                                 "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                                 "You can also Shift+Click to select a range of items.");
+                    } else {
+                        snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                                 "Selects all advancements/recipes visible in the current search.\n"
+                                 "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                                 "You can also Shift+Click to select a range of items.");
+                    }
+                    ImGui::SetTooltip("%s", select_all_tooltip_buffer);
                 }
-                ImGui::SetTooltip("%s", select_all_tooltip_buffer);
+                ImGui::EndPopup();
             }
             ImGui::SameLine();
             if (ImGui::Button("Deselect All")) {
