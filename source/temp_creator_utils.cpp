@@ -1445,3 +1445,101 @@ std::vector<int> compute_new_advancement_indices(
     }
     return result;
 }
+
+static std::string basename_after_last_slash(const std::string &s) {
+    size_t pos = s.find_last_of('/');
+    return (pos == std::string::npos) ? s : s.substr(pos + 1);
+}
+
+std::vector<RenameRow> compute_rename_candidates(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes,
+    bool match_basename,
+    bool match_overlap) {
+    std::vector<RenameRow> result;
+    if (!match_basename && !match_overlap) return result;
+    std::unordered_set<std::string> template_set(template_root_names.begin(), template_root_names.end());
+
+    std::vector<int> candidate_imports;
+    candidate_imports.reserve(import_advs.size());
+    for (int i = 0; i < (int) import_advs.size(); i++) {
+        const auto &adv = import_advs[i];
+        if (!include_recipes && adv.root_name.find(":recipes/") != std::string::npos) continue;
+        if (template_set.find(adv.root_name) != template_set.end()) continue;
+        candidate_imports.push_back(i);
+    }
+    if (candidate_imports.empty()) return result;
+
+    std::unordered_set<std::string> import_set;
+    import_set.reserve(import_advs.size() * 2);
+    for (const auto &adv: import_advs) import_set.insert(adv.root_name);
+
+    std::vector<std::unordered_set<std::string>> import_crit_sets(import_advs.size());
+    for (int idx: candidate_imports) {
+        const auto &adv = import_advs[idx];
+        for (const auto &c: adv.criteria) import_crit_sets[idx].insert(c.root_name);
+    }
+
+    for (int t = 0; t < (int) template_root_names.size(); t++) {
+        const std::string &tname = template_root_names[t];
+        if (import_set.find(tname) != import_set.end()) continue;
+        std::string tbase = basename_after_last_slash(tname);
+
+        const std::vector<std::string> &tcrits =
+            (t < (int) template_criteria.size()) ? template_criteria[t] : std::vector<std::string>{};
+        std::unordered_set<std::string> tcrit_set(tcrits.begin(), tcrits.end());
+
+        std::vector<RenameCandidate> cands;
+        for (int idx: candidate_imports) {
+            const auto &iadv = import_advs[idx];
+            std::string ibase = basename_after_last_slash(iadv.root_name);
+            bool basename_hit = match_basename && !tbase.empty() && tbase == ibase;
+
+            int overlap = 0;
+            int smaller = std::min((int) tcrit_set.size(), (int) import_crit_sets[idx].size());
+            if (smaller > 0) {
+                const auto &small_set = (tcrit_set.size() <= import_crit_sets[idx].size())
+                                            ? tcrit_set : import_crit_sets[idx];
+                const auto &big_set = (tcrit_set.size() <= import_crit_sets[idx].size())
+                                          ? import_crit_sets[idx] : tcrit_set;
+                for (const auto &name: small_set) if (big_set.find(name) != big_set.end()) overlap++;
+            }
+
+            bool overlap_hit = false;
+            if (match_overlap && smaller > 0 &&
+                (double) overlap / (double) smaller >= 0.8) {
+                overlap_hit = true;
+            }
+
+            if (basename_hit || overlap_hit) {
+                RenameCandidate rc{};
+                rc.import_index = idx;
+                rc.criteria_overlap = overlap;
+                rc.smaller_criteria_size = smaller;
+                rc.basename_match = basename_hit;
+                rc.overlap_match = overlap_hit;
+                cands.push_back(rc);
+            }
+        }
+
+        if (cands.empty()) continue;
+        std::sort(cands.begin(), cands.end(), [](const RenameCandidate &a, const RenameCandidate &b) {
+            if (a.basename_match != b.basename_match) return a.basename_match;
+            double sa = (a.smaller_criteria_size > 0)
+                            ? (double) a.criteria_overlap / (double) a.smaller_criteria_size : 0.0;
+            double sb = (b.smaller_criteria_size > 0)
+                            ? (double) b.criteria_overlap / (double) b.smaller_criteria_size : 0.0;
+            if (sa != sb) return sa > sb;
+            return a.import_index < b.import_index;
+        });
+
+        RenameRow row;
+        row.template_index = t;
+        row.candidates = std::move(cands);
+        result.push_back(std::move(row));
+    }
+
+    return result;
+}

@@ -25,6 +25,7 @@
 #include <string>
 #include <set>
 #include <unordered_set> // For checking duplicates
+#include <unordered_map>
 
 #include "tinyfiledialogs.h"
 
@@ -12025,8 +12026,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 ? "Import Achievements from File"
                                                 : "Import Advancements from File");
 
+    static std::vector<std::pair<std::string, std::string>> s_pending_renames;
+    static std::unordered_map<std::string, std::string> s_rename_user_picks;
+    static bool s_pending_renames_session_initialized = false;
     if (show_import_advancements_popup) {
+        if (!s_pending_renames_session_initialized) {
+            s_pending_renames.clear();
+            s_rename_user_picks.clear();
+            s_pending_renames_session_initialized = true;
+        }
         ImGui::OpenPopup(import_popup_title);
+    } else {
+        s_pending_renames_session_initialized = false;
     }
     if (ImGui::BeginPopupModal(import_popup_title, nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -12091,28 +12102,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::OpenPopup("import_select_dropdown");
             }
             if (ImGui::IsItemHovered()) {
-                char select_dropdown_tooltip_buffer[512];
-                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
-                             "Selection tools and template update helpers.\n\n"
-                             "...all visible: bulk-select every achievement in the current search.\n"
-                             "...new achievements: preview achievements present in the imported file\n"
-                             "  but missing from this template.");
-                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
-                             "Selection tools and template update helpers.\n\n"
-                             "...all visible: bulk-select every achievement (and their criteria if\n"
-                             "  'Include Crit.' is checked) in the current search.\n"
-                             "...new achievements: preview achievements present in the imported file\n"
-                             "  but missing from this template.");
-                } else {
-                    snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
-                             "Selection tools and template update helpers.\n\n"
-                             "...all visible: bulk-select every advancement/recipe (and their criteria\n"
-                             "  if 'Include Crit.' is checked) in the current search.\n"
-                             "...new advancements: preview advancements present in the imported file\n"
-                             "  but missing from this template (recipes hidden by default).");
+                const char *visible_target = (creator_selected_version > MC_VERSION_1_11_2)
+                                                 ? "advancement/recipe" : advancements_label_singular_lower;
+                const char *crit_clause = (creator_selected_version > MC_VERSION_1_6_4)
+                                              ? " (and their criteria if 'Include Crit.' is checked)" : "";
+                const char *recipes_note = (creator_selected_version > MC_VERSION_1_11_2)
+                                               ? " (recipes hidden by default)" : "";
+                char rename_line[384] = "";
+                if (creator_selected_version > MC_VERSION_1_6_4) {
+                    const char *match_note = (creator_selected_version > MC_VERSION_1_11_2)
+                                                 ? "Matches by basename, plus pairs whose criteria overlap is\n  80%% or more on the smaller side."
+                                                 : "Matches by criteria overlap (80%% or more on the smaller side).";
+                    snprintf(rename_line, sizeof(rename_line),
+                             "\n...match renames: stage rename pairs for template %s missing from the\n"
+                             "  imported file. %s The main Confirm commits them.",
+                             advancements_label_plural_lower, match_note);
                 }
+                char select_dropdown_tooltip_buffer[1024];
+                snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
+                         "Selection tools and template update helpers.\n\n"
+                         "...all visible: bulk-select every %s%s in the current search.\n"
+                         "...new %s: preview %s present in the imported file\n"
+                         "  but missing from this template%s.%s",
+                         visible_target, crit_clause,
+                         advancements_label_plural_lower, advancements_label_plural_lower,
+                         recipes_note, rename_line);
                 ImGui::SetTooltip("%s", select_dropdown_tooltip_buffer);
             }
             static bool s_open_new_advs_popup = false;
@@ -12121,6 +12135,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static bool s_new_advs_show_recipes = false;
             static bool s_new_advs_needs_recompute = true;
             static int s_new_advs_last_clicked = -1;
+
+            static bool s_open_rename_popup = false;
+            static std::vector<RenameRow> s_rename_rows;
+            static std::vector<int> s_rename_row_selection;
+            static bool s_rename_show_recipes = false;
+            static bool s_rename_needs_recompute = true;
 
             if (ImGui::BeginPopup("import_select_dropdown")) {
                 if (ImGui::Selectable("...all visible")) {
@@ -12194,19 +12214,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", new_advs_tooltip_buffer);
                     }
                 }
+                if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT &&
+                    creator_selected_version > MC_VERSION_1_6_4) {
+                    if (ImGui::Selectable("...match renames")) {
+                        s_open_rename_popup = true;
+                        s_rename_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        const char *match_rules = (creator_selected_version > MC_VERSION_1_11_2)
+                                                      ? "whose basename (after the final '/') matches, plus pairs\n"
+                                                        "whose criteria overlap is 80%% or more on the smaller side"
+                                                      : "whose criteria overlap is 80%% or more on the smaller side";
+                        char rename_tooltip_buffer[640];
+                        snprintf(rename_tooltip_buffer, sizeof(rename_tooltip_buffer),
+                                 "For every %s that lives in this template but is missing from the\n"
+                                 "imported file, propose rename candidates %s. Pick one per row, then\n"
+                                 "Apply to stage the rename. Renames stay staged until you confirm the\n"
+                                 "main import popup, at which point the template root names get\n"
+                                 "rewritten and every arrow, counter, custom and stat link that\n"
+                                 "referred to the old name retargets. Staged renames land as unsaved\n"
+                                 "editor changes and can be discarded like any other edit.",
+                                 advancements_label_singular_lower, match_rules);
+                        ImGui::SetTooltip("%s", rename_tooltip_buffer);
+                    }
+                }
                 ImGui::EndPopup();
             }
 
+            char new_advs_popup_title[96];
+            snprintf(new_advs_popup_title, sizeof(new_advs_popup_title),
+                     "New %s###import_new_advancements_popup", advancements_label_plural_upper);
             if (s_open_new_advs_popup) {
                 s_new_adv_indices.clear();
                 s_new_adv_local_selected.clear();
                 s_new_advs_needs_recompute = true;
                 s_new_advs_last_clicked = -1;
-                ImGui::OpenPopup("import_new_advancements_popup");
+                ImGui::OpenPopup(new_advs_popup_title);
                 s_open_new_advs_popup = false;
             }
 
-            if (ImGui::BeginPopupModal("import_new_advancements_popup", nullptr,
+            if (ImGui::BeginPopupModal(new_advs_popup_title, nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
                 inner_helper_active_this_frame = true;
                 if (s_new_advs_needs_recompute) {
@@ -12356,6 +12403,257 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::EndPopup();
             }
+
+            char rename_popup_title[96];
+            snprintf(rename_popup_title, sizeof(rename_popup_title),
+                     "Match %s Renames###import_match_renames_popup", advancements_label_upper);
+            if (s_open_rename_popup) {
+                s_rename_rows.clear();
+                s_rename_row_selection.clear();
+                s_rename_needs_recompute = true;
+                ImGui::OpenPopup(rename_popup_title);
+                s_open_rename_popup = false;
+            }
+
+            if (ImGui::BeginPopupModal(rename_popup_title, nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                inner_helper_active_this_frame = true;
+                if (s_rename_needs_recompute) {
+                    std::unordered_map<std::string, std::string> pending_map;
+                    for (const auto &p: s_pending_renames) pending_map[p.first] = p.second;
+
+                    std::vector<std::string> template_roots;
+                    std::vector<std::vector<std::string>> template_crits;
+                    template_roots.reserve(current_template_data.advancements.size());
+                    template_crits.reserve(current_template_data.advancements.size());
+                    for (const auto &a: current_template_data.advancements) {
+                        auto it = pending_map.find(a.root_name);
+                        template_roots.emplace_back(it != pending_map.end() ? it->second : std::string(a.root_name));
+                        std::vector<std::string> cs;
+                        cs.reserve(a.criteria.size());
+                        for (const auto &c: a.criteria) cs.emplace_back(c.root_name);
+                        template_crits.push_back(std::move(cs));
+                    }
+                    bool modern = (creator_selected_version > MC_VERSION_1_11_2);
+                    s_rename_rows = compute_rename_candidates(
+                        template_roots, template_crits, importable_advancements,
+                        s_rename_show_recipes, /*match_basename*/ modern, /*match_overlap*/ true);
+                    s_rename_row_selection.assign(s_rename_rows.size(), -1);
+                    for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                        int t = s_rename_rows[i].template_index;
+                        if (t < 0 || t >= (int) current_template_data.advancements.size()) continue;
+                        auto pick_it = s_rename_user_picks.find(
+                            current_template_data.advancements[t].root_name);
+                        if (pick_it == s_rename_user_picks.end()) continue;
+                        for (size_t c = 0; c < s_rename_rows[i].candidates.size(); c++) {
+                            int imp_idx = s_rename_rows[i].candidates[c].import_index;
+                            if (imp_idx < 0 || imp_idx >= (int) importable_advancements.size()) continue;
+                            if (importable_advancements[imp_idx].root_name == pick_it->second) {
+                                s_rename_row_selection[i] = (int) c;
+                                break;
+                            }
+                        }
+                    }
+                    s_rename_needs_recompute = false;
+                }
+
+                const char *adv_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                   ? "achievements" : "advancements";
+                ImGui::Text("%d %s with rename candidates", (int) s_rename_rows.size(), adv_label_plural);
+                if (ImGui::IsItemHovered()) {
+                    char tip[320];
+                    snprintf(tip, sizeof(tip),
+                             "Only template entries that are MISSING from the imported file are shown.\n"
+                             "Each row lists candidates from the import side that may be the new name.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                if (creator_selected_version > MC_VERSION_1_11_2) {
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Show recipes", &s_rename_show_recipes)) {
+                        s_rename_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[384];
+                        snprintf(tip, sizeof(tip),
+                                 "CHECKED: include recipe entries from the import side as candidates.\n"
+                                 "UNCHECKED: hide recipes (default).");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                }
+
+                if (ImGui::SmallButton("Pick best for all##rename_list")) {
+                    for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                        s_rename_row_selection[i] = s_rename_rows[i].candidates.empty() ? -1 : 0;
+                        int t = s_rename_rows[i].template_index;
+                        if (t < 0 || t >= (int) current_template_data.advancements.size()) continue;
+                        const char *tmpl_root = current_template_data.advancements[t].root_name;
+                        if (s_rename_row_selection[i] < 0) {
+                            s_rename_user_picks.erase(tmpl_root);
+                        } else {
+                            int imp_idx = s_rename_rows[i].candidates[0].import_index;
+                            if (imp_idx >= 0 && imp_idx < (int) importable_advancements.size()) {
+                                s_rename_user_picks[tmpl_root] = importable_advancements[imp_idx].root_name;
+                            }
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Select the highest-ranked candidate for every row.\n"
+                             "Candidates are ordered by criteria overlap, then basename match.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Clear all##rename_list")) {
+                    for (size_t i = 0; i < s_rename_row_selection.size(); i++) {
+                        s_rename_row_selection[i] = -1;
+                        int t = s_rename_rows[i].template_index;
+                        if (t >= 0 && t < (int) current_template_data.advancements.size()) {
+                            s_rename_user_picks.erase(current_template_data.advancements[t].root_name);
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip), "Clear every per-row selection.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginChild("##rename_list_scroll", ImVec2(640.0f, 360.0f), true);
+                for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                    const RenameRow &row = s_rename_rows[i];
+                    if (row.template_index < 0 ||
+                        row.template_index >= (int) current_template_data.advancements.size()) continue;
+                    const auto &tmpl_adv = current_template_data.advancements[row.template_index];
+
+                    char header[320];
+                    int sel = s_rename_row_selection[i];
+                    if (sel >= 0 && sel < (int) row.candidates.size()) {
+                        int imp_idx = row.candidates[sel].import_index;
+                        const char *new_name = (imp_idx >= 0 && imp_idx < (int) importable_advancements.size())
+                                                   ? importable_advancements[imp_idx].root_name.c_str() : "?";
+                        snprintf(header, sizeof(header), "%s  ->  %s (%d candidates)",
+                                 tmpl_adv.root_name, new_name, (int) row.candidates.size());
+                    } else {
+                        snprintf(header, sizeof(header), "%s  (%d candidates)",
+                                 tmpl_adv.root_name, (int) row.candidates.size());
+                    }
+                    ImGui::PushID((int) i);
+                    if (ImGui::TreeNodeEx(header, ImGuiTreeNodeFlags_DefaultOpen)) {
+                        char none_label[64];
+                        snprintf(none_label, sizeof(none_label), "(none)##rename_none_%d", (int) i);
+                        if (ImGui::RadioButton(none_label, s_rename_row_selection[i] == -1)) {
+                            s_rename_row_selection[i] = -1;
+                            s_rename_user_picks.erase(tmpl_adv.root_name);
+                        }
+                        for (size_t c = 0; c < row.candidates.size(); c++) {
+                            const RenameCandidate &cand = row.candidates[c];
+                            if (cand.import_index < 0 ||
+                                cand.import_index >= (int) importable_advancements.size()) continue;
+                            const auto &iadv = importable_advancements[cand.import_index];
+
+                            char badge[96];
+                            if (cand.smaller_criteria_size > 0) {
+                                int pct = (int) (100.0 * (double) cand.criteria_overlap /
+                                                 (double) cand.smaller_criteria_size + 0.5);
+                                snprintf(badge, sizeof(badge), "[%d%% crit %d/%d%s%s]",
+                                         pct, cand.criteria_overlap, cand.smaller_criteria_size,
+                                         cand.basename_match ? ", basename" : "",
+                                         cand.overlap_match ? ", overlap" : "");
+                            } else {
+                                snprintf(badge, sizeof(badge), "[%s]",
+                                         cand.basename_match ? "basename" : "no criteria");
+                            }
+                            bool zero_overlap_warn = (cand.smaller_criteria_size > 0 && cand.criteria_overlap == 0);
+                            char cand_label[512];
+                            snprintf(cand_label, sizeof(cand_label), "%s%s  %s##rename_cand_%d_%d",
+                                     zero_overlap_warn ? "(!) " : "",
+                                     iadv.root_name.c_str(), badge, (int) i, (int) c);
+                            if (ImGui::RadioButton(cand_label, s_rename_row_selection[i] == (int) c)) {
+                                s_rename_row_selection[i] = (int) c;
+                                s_rename_user_picks[tmpl_adv.root_name] = iadv.root_name;
+                            }
+                            if (zero_overlap_warn && ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Zero criteria overlap with the template row.\n"
+                                         "Likely a coincidental basename match. Verify before applying.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                        }
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::Separator();
+
+                int staged_count = 0;
+                for (int s: s_rename_row_selection) if (s >= 0) staged_count++;
+                ImGui::Text("%d to stage  (%d already staged)", staged_count, (int) s_pending_renames.size());
+
+                if (ImGui::Button("Apply Renames##rename_list", ImVec2(140, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+                    ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+                    int staged = 0;
+                    for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                        int sel = s_rename_row_selection[i];
+                        if (sel < 0 || sel >= (int) s_rename_rows[i].candidates.size()) continue;
+                        int t = s_rename_rows[i].template_index;
+                        int imp_idx = s_rename_rows[i].candidates[sel].import_index;
+                        if (t < 0 || t >= (int) current_template_data.advancements.size()) continue;
+                        if (imp_idx < 0 || imp_idx >= (int) importable_advancements.size()) continue;
+
+                        std::string old_name = current_template_data.advancements[t].root_name;
+                        const std::string &new_name = importable_advancements[imp_idx].root_name;
+                        if (old_name == new_name) continue;
+
+                        bool already_pending = false;
+                        for (auto &p: s_pending_renames) {
+                            if (p.first == old_name) { p.second = new_name; already_pending = true; break; }
+                        }
+                        if (!already_pending) s_pending_renames.emplace_back(old_name, new_name);
+                        s_rename_user_picks.erase(old_name);
+                        importable_advancements[imp_idx].is_selected = false;
+                        for (auto &crit: importable_advancements[imp_idx].criteria) crit.is_selected = false;
+                        staged++;
+                    }
+                    if (staged > 0) {
+                        log_message(LOG_INFO, "[TEMP CREATOR] Staged %d rename(s) from import.\n", staged);
+                    }
+                    s_rename_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[384];
+                    snprintf(tip, sizeof(tip),
+                             "Stage each selected rename. Nothing is written to the template until\n"
+                             "you confirm the main import popup, at which point the renames commit\n"
+                             "and every arrow/counter/custom/stat link retargets. Staged renames\n"
+                             "show up in the counter as ', N Renames'.\n"
+                             "(You can also press ENTER)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel##rename_list", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    s_rename_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[256];
+                    snprintf(tip, sizeof(tip),
+                             "Close without staging the current selection. Renames staged earlier\n"
+                             "this popup session are kept.\n"
+                             "(You can also press ESCAPE)");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::EndPopup();
+            }
+
             ImGui::SameLine();
             if (ImGui::Button("Deselect All")) {
                 for (auto *adv_ptr: filtered_advancements) {
@@ -12495,6 +12793,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Press Ctrl+F or Cmd+F to focus.");
             }
             ImGui::SetTooltip("%s", import_search_tooltip_buffer);
+        }
+
+        if (!s_pending_renames.empty() && current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+            ImGui::Separator();
+            char staged_header[96];
+            snprintf(staged_header, sizeof(staged_header),
+                     "Staged renames: %d###staged_renames_header", (int) s_pending_renames.size());
+            if (ImGui::TreeNodeEx(staged_header, ImGuiTreeNodeFlags_DefaultOpen)) {
+                for (size_t i = 0; i < s_pending_renames.size(); i++) {
+                    const auto &p = s_pending_renames[i];
+                    ImGui::PushID((int) i);
+                    ImGui::Bullet();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(p.first.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("->");
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(p.second.c_str());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Revert##staged_rename")) {
+                        s_rename_user_picks.erase(p.first);
+                        s_pending_renames.erase(s_pending_renames.begin() + (ptrdiff_t) i);
+                        ImGui::PopID();
+                        break;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tip[256];
+                        snprintf(tip, sizeof(tip),
+                                 "Unstage this rename. The template advancement reappears in the\n"
+                                 "rename modal so you can pick a different candidate.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::TreePop();
+            }
         }
         ImGui::Separator();
 
@@ -12649,8 +12983,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button(confirm_text, ImVec2(120, 0)) ||
             (!inner_helper_active_this_frame && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
-            if (selected_adv_count == 0 && selected_crit_count == 0) {
+            bool has_selections = (selected_adv_count > 0 || selected_crit_count > 0);
+            bool has_renames = !s_pending_renames.empty();
+            if (!has_selections && !has_renames) {
                 snprintf(import_error_message, sizeof(import_error_message), "Error: No items selected for import.");
+            } else if (!has_selections) {
+                int committed = 0;
+                for (const auto &p: s_pending_renames) {
+                    for (auto &cat: current_template_data.advancements) {
+                        if (strcmp(cat.root_name, p.first.c_str()) != 0) continue;
+                        char old_name[sizeof(cat.root_name)];
+                        strncpy(old_name, cat.root_name, sizeof(old_name) - 1);
+                        old_name[sizeof(old_name) - 1] = '\0';
+                        strncpy(cat.root_name, p.second.c_str(), sizeof(cat.root_name) - 1);
+                        cat.root_name[sizeof(cat.root_name) - 1] = '\0';
+                        propagate_goal_rename(current_template_data.decorations,
+                                              current_template_data.counter_goals,
+                                              old_name, cat.root_name, nullptr,
+                                              &current_template_data.stats,
+                                              &current_template_data.custom_goals);
+                        committed++;
+                        break;
+                    }
+                }
+                log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n", committed);
+                s_pending_renames.clear();
+                import_error_message[0] = '\0';
+                show_import_advancements_popup = false;
+                ImGui::CloseCurrentPopup();
             } else if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
                 // Importing Advancement/Achievement Criteria
                 import_error_message[0] = '\0';
@@ -12734,6 +13094,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Regular batch import
                 import_error_message[0] = '\0'; // Clear previous error
                 bool has_duplicates = false;
+
+                if (!s_pending_renames.empty()) {
+                    int committed = 0;
+                    for (const auto &p: s_pending_renames) {
+                        for (auto &cat: current_template_data.advancements) {
+                            if (strcmp(cat.root_name, p.first.c_str()) != 0) continue;
+                            char old_name[sizeof(cat.root_name)];
+                            strncpy(old_name, cat.root_name, sizeof(old_name) - 1);
+                            old_name[sizeof(old_name) - 1] = '\0';
+                            strncpy(cat.root_name, p.second.c_str(), sizeof(cat.root_name) - 1);
+                            cat.root_name[sizeof(cat.root_name) - 1] = '\0';
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals,
+                                                  old_name, cat.root_name, nullptr,
+                                                  &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
+                            committed++;
+                            break;
+                        }
+                    }
+                    log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n", committed);
+                    s_pending_renames.clear();
+                }
 
                 // 1. Check for duplicate root names before importing
                 std::unordered_set<std::string> existing_names;
@@ -12857,6 +13240,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              selected_crit_count);
                 }
             }
+        }
+
+        if (!s_pending_renames.empty() && current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+            size_t len = strlen(counter_text);
+            snprintf(counter_text + len, sizeof(counter_text) - len, ", %d Renames",
+                     (int) s_pending_renames.size());
         }
 
         // Calculate position to right-align the text

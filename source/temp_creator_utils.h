@@ -272,6 +272,55 @@ std::vector<int> compute_new_advancement_indices(
     bool include_recipes);
 
 /**
+ * @brief A single rename candidate: an importable advancement that could be the new name
+ * for a template advancement missing from the imported file.
+ */
+struct RenameCandidate {
+    int import_index;           // Index into the importable_advancements vector.
+    int criteria_overlap;       // Number of criterion root_names shared between template and import sides.
+    int smaller_criteria_size;  // Min of template/import criteria counts on this pair (0 if either side has no criteria).
+    bool basename_match;        // True when the substring after the final '/' is identical on both sides.
+    bool overlap_match;         // True when accepted via the >=80% criteria-overlap rule.
+};
+
+/**
+ * @brief A template advancement row in the rename modal, paired with its ranked candidate list.
+ */
+struct RenameRow {
+    int template_index;                       // Index into the template advancement vector supplied by the caller.
+    std::vector<RenameCandidate> candidates;  // Sorted by descending criteria similarity, then basename-priority.
+};
+
+/**
+ * @brief Computes rename suggestions for every template advancement missing from the imported file.
+ *
+ * Each template advancement whose root_name does not appear in the import is paired with importable
+ * advancements (also missing from the template) according to two independent rules:
+ *  - If @p match_basename is true, pairs sharing a basename (substring after the final '/') match.
+ *  - If @p match_overlap is true, pairs whose shared criterion count is at least 80% of the smaller
+ *    side's criterion count match.
+ * A candidate is included if either rule fires. Recipe entries on the import side are filtered out
+ * unless @p include_recipes is true.
+ *
+ * Typical wiring: mid-era (1.7-1.11) uses overlap only; modern (1.12+) uses both.
+ *
+ * @param template_root_names  Root names already in the template (advancement keys).
+ * @param template_criteria    Parallel to @p template_root_names: criterion root names per template advancement.
+ * @param import_advs          Parsed advancements from the imported player file.
+ * @param include_recipes      When false, imports whose root_name contains ":recipes/" are excluded.
+ * @param match_basename       Enable basename-based matching.
+ * @param match_overlap        Enable >=80% criteria-overlap matching.
+ * @return One RenameRow per template advancement that has at least one candidate, in template order.
+ */
+std::vector<RenameRow> compute_rename_candidates(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes,
+    bool match_basename,
+    bool match_overlap);
+
+/**
  * @brief Scans a template JSON file and collects all unique icon paths referenced in it.
  * Paths are relative to the icons/ directory, e.g. "vanilla/stick.png".
  * @param template_json_path Full path to the template .json file.
