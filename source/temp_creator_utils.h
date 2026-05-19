@@ -257,6 +257,21 @@ bool execute_import_language_file(const char *version, const char *category, con
                                   const char *new_lang_flag, char *error_message, size_t error_msg_size);
 
 /**
+ * @brief Returns indices into import_advs whose root_name is not present in template_root_names.
+ * Used by the "Add new advancements" import helper to compute the set difference between an
+ * imported player file and the current template.
+ * @param template_root_names Root names already in the template (advancement/achievement keys).
+ * @param import_advs Parsed advancements from the imported player file.
+ * @param include_recipes When false, entries whose root_name contains ":recipes/" are excluded
+ *                        from the result (matches the editor's recipe-detection convention).
+ * @return Indices into import_advs that represent new (not-in-template) entries.
+ */
+std::vector<int> compute_new_advancement_indices(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes);
+
+/**
  * @brief Scans a template JSON file and collects all unique icon paths referenced in it.
  * Paths are relative to the icons/ directory, e.g. "vanilla/stick.png".
  * @param template_json_path Full path to the template .json file.

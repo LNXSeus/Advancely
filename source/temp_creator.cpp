@@ -12030,6 +12030,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     if (ImGui::BeginPopupModal(import_popup_title, nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Tracks whether a nested helper popup (e.g. "...new advancements" preview) actually
+        // rendered this frame. Used to gate the outer popup's Enter/Escape shortcuts so the
+        // inner popup's identical shortcuts don't cascade out to the parent.
+        bool inner_helper_active_this_frame = false;
+
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -12090,20 +12095,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (creator_selected_version <= MC_VERSION_1_6_4) {
                     snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
                              "Selection tools and template update helpers.\n\n"
-                             "...all visible: bulk-select every achievement in the current search.");
+                             "...all visible: bulk-select every achievement in the current search.\n"
+                             "...new achievements: preview achievements present in the imported file\n"
+                             "  but missing from this template.");
                 } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                     snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
                              "Selection tools and template update helpers.\n\n"
                              "...all visible: bulk-select every achievement (and their criteria if\n"
-                             "'Include Crit.' is checked) in the current search.");
+                             "  'Include Crit.' is checked) in the current search.\n"
+                             "...new achievements: preview achievements present in the imported file\n"
+                             "  but missing from this template.");
                 } else {
                     snprintf(select_dropdown_tooltip_buffer, sizeof(select_dropdown_tooltip_buffer),
                              "Selection tools and template update helpers.\n\n"
                              "...all visible: bulk-select every advancement/recipe (and their criteria\n"
-                             "if 'Include Crit.' is checked) in the current search.");
+                             "  if 'Include Crit.' is checked) in the current search.\n"
+                             "...new advancements: preview advancements present in the imported file\n"
+                             "  but missing from this template (recipes hidden by default).");
                 }
                 ImGui::SetTooltip("%s", select_dropdown_tooltip_buffer);
             }
+            static bool s_open_new_advs_popup = false;
+            static std::vector<int> s_new_adv_indices;
+            static std::vector<bool> s_new_adv_local_selected;
+            static bool s_new_advs_show_recipes = false;
+            static bool s_new_advs_needs_recompute = true;
+            static int s_new_advs_last_clicked = -1;
+
             if (ImGui::BeginPopup("import_select_dropdown")) {
                 if (ImGui::Selectable("...all visible")) {
                     for (auto *adv_ptr: filtered_advancements) {
@@ -12140,6 +12158,201 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "You can also Shift+Click to select a range of items.");
                     }
                     ImGui::SetTooltip("%s", select_all_tooltip_buffer);
+                }
+
+                if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                    const char *new_label = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "...new achievements"
+                                                : "...new advancements";
+                    if (ImGui::Selectable(new_label)) {
+                        s_open_new_advs_popup = true;
+                        s_new_advs_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char new_advs_tooltip_buffer[640];
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            snprintf(new_advs_tooltip_buffer, sizeof(new_advs_tooltip_buffer),
+                                     "Find every achievement in the imported file that does not yet exist\n"
+                                     "in this template, preview them, then confirm to pre-select them in the\n"
+                                     "main list. Useful for adding the new achievements of a newer Minecraft\n"
+                                     "version to an existing template without manually diffing the lists.");
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            snprintf(new_advs_tooltip_buffer, sizeof(new_advs_tooltip_buffer),
+                                     "Find every achievement in the imported file that does not yet exist\n"
+                                     "in this template, preview them, then confirm to pre-select them in the\n"
+                                     "main list. Useful for adding the new achievements of a newer Minecraft\n"
+                                     "version to an existing template without manually diffing the lists.");
+                        } else {
+                            snprintf(new_advs_tooltip_buffer, sizeof(new_advs_tooltip_buffer),
+                                     "Find every advancement in the imported file that does not yet exist\n"
+                                     "in this template, preview them, then confirm to pre-select them in the\n"
+                                     "main list. Recipes are hidden by default since they would otherwise\n"
+                                     "dominate the list; toggle 'Show recipes' inside the preview to include\n"
+                                     "them. Useful for adding the new advancements of a newer Minecraft\n"
+                                     "version to an existing template without manually diffing the lists.");
+                        }
+                        ImGui::SetTooltip("%s", new_advs_tooltip_buffer);
+                    }
+                }
+                ImGui::EndPopup();
+            }
+
+            if (s_open_new_advs_popup) {
+                s_new_adv_indices.clear();
+                s_new_adv_local_selected.clear();
+                s_new_advs_needs_recompute = true;
+                s_new_advs_last_clicked = -1;
+                ImGui::OpenPopup("import_new_advancements_popup");
+                s_open_new_advs_popup = false;
+            }
+
+            if (ImGui::BeginPopupModal("import_new_advancements_popup", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                inner_helper_active_this_frame = true;
+                if (s_new_advs_needs_recompute) {
+                    std::vector<std::string> template_roots;
+                    template_roots.reserve(current_template_data.advancements.size());
+                    for (const auto &a: current_template_data.advancements) {
+                        template_roots.emplace_back(a.root_name);
+                    }
+                    std::vector<int> new_indices_v = compute_new_advancement_indices(
+                        template_roots, importable_advancements, s_new_advs_show_recipes);
+
+                    std::vector<bool> new_selected(new_indices_v.size(), false);
+                    size_t old_p = 0;
+                    for (size_t new_p = 0; new_p < new_indices_v.size(); new_p++) {
+                        while (old_p < s_new_adv_indices.size() &&
+                               s_new_adv_indices[old_p] < new_indices_v[new_p]) old_p++;
+                        if (old_p < s_new_adv_indices.size() &&
+                            s_new_adv_indices[old_p] == new_indices_v[new_p] &&
+                            old_p < s_new_adv_local_selected.size()) {
+                            new_selected[new_p] = s_new_adv_local_selected[old_p];
+                            old_p++;
+                        }
+                    }
+                    s_new_adv_indices = std::move(new_indices_v);
+                    s_new_adv_local_selected = std::move(new_selected);
+                    s_new_advs_last_clicked = -1;
+                    s_new_advs_needs_recompute = false;
+                }
+
+                const char *new_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                   ? "new achievements"
+                                                   : "new advancements";
+                ImGui::Text("%d %s found", (int) s_new_adv_indices.size(), new_label_plural);
+                if (ImGui::IsItemHovered()) {
+                    char counter_tooltip_buffer[256];
+                    snprintf(counter_tooltip_buffer, sizeof(counter_tooltip_buffer),
+                             "Count reflects the current 'Show recipes' setting.\n"
+                             "Entries are those present in the imported file but missing from this template.");
+                    ImGui::SetTooltip("%s", counter_tooltip_buffer);
+                }
+
+                if (creator_selected_version > MC_VERSION_1_11_2) {
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Show recipes", &s_new_advs_show_recipes)) {
+                        s_new_advs_needs_recompute = true;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char show_recipes_tooltip_buffer[384];
+                        snprintf(show_recipes_tooltip_buffer, sizeof(show_recipes_tooltip_buffer),
+                                 "CHECKED: include recipe entries (':recipes/' in the root name) in the preview.\n"
+                                 "UNCHECKED: hide recipes (default). Recipes would otherwise dominate the list\n"
+                                 "for most templates that don't track them.");
+                        ImGui::SetTooltip("%s", show_recipes_tooltip_buffer);
+                    }
+                }
+
+                if (ImGui::SmallButton("Select all##new_advs_list")) {
+                    std::fill(s_new_adv_local_selected.begin(), s_new_adv_local_selected.end(), true);
+                    s_new_advs_last_clicked = -1;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip),
+                             "Mark every previewed entry for import.\n"
+                             "You can also Shift+Click checkboxes to toggle a range at once.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Deselect all##new_advs_list")) {
+                    std::fill(s_new_adv_local_selected.begin(), s_new_adv_local_selected.end(), false);
+                    s_new_advs_last_clicked = -1;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tip[192];
+                    snprintf(tip, sizeof(tip),
+                             "Clear every checkbox in the preview.\n"
+                             "You can also Shift+Click checkboxes to toggle a range at once.");
+                    ImGui::SetTooltip("%s", tip);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginChild("##new_advs_list_scroll", ImVec2(520.0f, 320.0f), true);
+                for (size_t i = 0; i < s_new_adv_indices.size(); i++) {
+                    int idx = s_new_adv_indices[i];
+                    if (idx < 0 || idx >= (int) importable_advancements.size()) continue;
+                    const auto &adv = importable_advancements[idx];
+                    bool sel = s_new_adv_local_selected[i];
+                    ImGui::PushID((int) i);
+                    if (ImGui::Checkbox(adv.root_name.c_str(), &sel)) {
+                        bool shift = ImGui::GetIO().KeyShift;
+                        if (shift && s_new_advs_last_clicked >= 0 &&
+                            s_new_advs_last_clicked != (int) i &&
+                            s_new_advs_last_clicked < (int) s_new_adv_local_selected.size()) {
+                            int lo = std::min(s_new_advs_last_clicked, (int) i);
+                            int hi = std::max(s_new_advs_last_clicked, (int) i);
+                            for (int k = lo; k <= hi && k < (int) s_new_adv_local_selected.size(); k++) {
+                                s_new_adv_local_selected[k] = sel;
+                            }
+                        } else {
+                            s_new_adv_local_selected[i] = sel;
+                        }
+                        s_new_advs_last_clicked = (int) i;
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                ImGui::Separator();
+
+                int staged_count = 0;
+                for (bool b: s_new_adv_local_selected) if (b) staged_count++;
+                ImGui::Text("%d staged", staged_count);
+                ImGui::SameLine();
+                if (ImGui::Button("Confirm##new_advs_list", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+                    ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+                    for (size_t i = 0; i < s_new_adv_indices.size(); i++) {
+                        if (s_new_adv_local_selected[i]) {
+                            int idx = s_new_adv_indices[i];
+                            if (idx >= 0 && idx < (int) importable_advancements.size()) {
+                                importable_advancements[idx].is_selected = true;
+                            }
+                        }
+                    }
+                    s_new_advs_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char confirm_tooltip_buffer[384];
+                    snprintf(confirm_tooltip_buffer, sizeof(confirm_tooltip_buffer),
+                             "Pre-select every checked entry in the main import list.\n"
+                             "Nothing is added to the template until you press the main 'Confirm Import' button.\n"
+                             "(You can also press ENTER)");
+                    ImGui::SetTooltip("%s", confirm_tooltip_buffer);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel##new_advs_list", ImVec2(120, 0)) ||
+                    ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    s_new_advs_needs_recompute = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char cancel_tooltip_buffer[320];
+                    snprintf(cancel_tooltip_buffer, sizeof(cancel_tooltip_buffer),
+                             "Discard the preview selection without changing the main list.\n"
+                             "(You can also press ESCAPE)");
+                    ImGui::SetTooltip("%s", cancel_tooltip_buffer);
                 }
                 ImGui::EndPopup();
             }
@@ -12434,7 +12647,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Bottom Controls ---
         const char *confirm_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
 
-        if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (ImGui::Button(confirm_text, ImVec2(120, 0)) ||
+            (!inner_helper_active_this_frame && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (selected_adv_count == 0 && selected_crit_count == 0) {
                 snprintf(import_error_message, sizeof(import_error_message), "Error: No items selected for import.");
             } else if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
@@ -12596,7 +12810,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) ||
+            (!inner_helper_active_this_frame && ImGui::IsKeyPressed(ImGuiKey_Escape))) {
             show_import_advancements_popup = false;
             ImGui::CloseCurrentPopup(); // Close popup actually
             current_import_mode = BATCH_IMPORT;

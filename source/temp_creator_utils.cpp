@@ -13,6 +13,7 @@
 #include <sys/stat.h> // For stat and mkdir
 #include <cctype> // For isalnum
 #include <functional>
+#include <unordered_set>
 
 #include "temp_creator_utils.h"
 #include "logger.h"
@@ -1428,4 +1429,19 @@ bool execute_import_language_file(const char *version, const char *category, con
 
     log_message(LOG_INFO, "[TEMP CREATE UTILS] Imported language file from '%s' to '%s'\n", source_path, dest_path);
     return true;
+}
+
+std::vector<int> compute_new_advancement_indices(
+    const std::vector<std::string> &template_root_names,
+    const std::vector<ImportableAdvancement> &import_advs,
+    bool include_recipes) {
+    std::unordered_set<std::string> template_set(template_root_names.begin(), template_root_names.end());
+    std::vector<int> result;
+    result.reserve(import_advs.size());
+    for (int i = 0; i < (int) import_advs.size(); i++) {
+        const auto &adv = import_advs[i];
+        if (!include_recipes && adv.root_name.find(":recipes/") != std::string::npos) continue;
+        if (template_set.find(adv.root_name) == template_set.end()) result.push_back(i);
+    }
+    return result;
 }
