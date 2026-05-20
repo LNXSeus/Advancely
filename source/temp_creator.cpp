@@ -274,6 +274,7 @@ struct EditorTemplate {
     std::vector<EditorMultiStageGoal> multi_stage_goals;
     std::vector<EditorCounterGoal> counter_goals;
     std::vector<EditorDecorationElement> decorations;
+    char display_category[MAX_PATH_LENGTH] = {0}; // Per-language override for the settings Display Category prefill
 };
 
 // Helper: propagate a rename through a vector of EditorCounterLinkedGoal
@@ -707,6 +708,7 @@ static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
 
 // Main comparison function for the entire editor state
 static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b) {
+    if (strcmp(a.display_category, b.display_category) != 0) return true;
     if (a.unlocks.size() != b.unlocks.size() ||
         a.custom_goals.size() != b.custom_goals.size() ||
         a.advancements.size() != b.advancements.size() ||
@@ -1742,6 +1744,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     editor_data.custom_goals.clear();
     editor_data.multi_stage_goals.clear();
     editor_data.decorations.clear();
+    editor_data.display_category[0] = '\0';
 
     char version_filename[64]; // Replacing . with _
     strncpy(version_filename, version, sizeof(version_filename) - 1);
@@ -1773,6 +1776,13 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     cJSON *lang_json = cJSON_from_file(lang_path);
     if (!lang_json) {
         lang_json = cJSON_CreateObject(); // Create an empty object if it doesn't exist to prevent crashes
+    }
+
+    cJSON *display_category_json = cJSON_GetObjectItem(lang_json, "display_category");
+    if (display_category_json && cJSON_IsString(display_category_json) && display_category_json->valuestring) {
+        strncpy(editor_data.display_category, display_category_json->valuestring,
+                sizeof(editor_data.display_category) - 1);
+        editor_data.display_category[sizeof(editor_data.display_category) - 1] = '\0';
     }
 
     parse_editor_trackable_categories(cJSON_GetObjectItem(root, "advancements"), editor_data.advancements, lang_json);
@@ -2160,6 +2170,11 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
 
     // SAVE LANG FILE WITH SPECIFIC ORDER
     cJSON *lang_json = cJSON_CreateObject();
+
+    // 0. Display Category (only written when non-empty so absence falls back to auto-naming)
+    if (editor_data.display_category[0] != '\0') {
+        cJSON_AddStringToObject(lang_json, "display_category", editor_data.display_category);
+    }
 
     // 1. Advancements (Parent then Criteria)
     for (const auto &cat: editor_data.advancements) {
@@ -4668,6 +4683,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", select_lang_file_tooltip_buffer);
         }
         ImGui::EndDisabled(); // template_switching_disabled (language selector)
+
+        // Per-language Display Category override (sits next to the language selector)
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(300);
+        ImGui::InputText("Display Category", current_template_data.display_category,
+                         sizeof(current_template_data.display_category));
+        if (ImGui::IsItemHovered()) {
+            char display_category_tooltip_buffer[1024];
+            snprintf(display_category_tooltip_buffer, sizeof(display_category_tooltip_buffer),
+                     "Optional per-language Display Category for this template.\n\n"
+                     "When set, selecting this template + language in the main settings will\n"
+                     "pre-fill the Settings 'Display Category' field with this exact text.\n\n"
+                     "Leave empty to fall back to the automatic name derived from the category\n"
+                     "and optional flag (e.g., 'all_advancements' + '_aatool_optimized' -> 'All Advancements - Aatool Optimized').\n\n"
+                     "Changes the value for the language currently selected above and is saved\n"
+                     "into that language file when you click 'Save'.");
+            ImGui::SetTooltip("%s", display_category_tooltip_buffer);
+        }
+
         ImGui::Separator();
 
         // Save when creator window is focused

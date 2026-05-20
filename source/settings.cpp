@@ -37,6 +37,7 @@
 #include "update_checker.h"
 #include "coop_net.h" // For co-op networking status display
 #include "skin_cache.h" // For player face textures in lobby roster
+#include "file_utils.h" // For cJSON_from_file when reading per-lang display_category
 #include <SDL3/SDL_clipboard.h> // For room code copy/paste
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_keycode.h>
@@ -392,6 +393,39 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     auto update_temp_display_category = [&]() {
         // If Display name is locked
         if (temp_settings.lock_category_display_name) return;
+
+        // First, try to honor a per-language override stored in the selected lang file.
+        if (temp_settings.version_str[0] != '\0' && temp_settings.category[0] != '\0') {
+            char version_filename[64];
+            strncpy(version_filename, temp_settings.version_str, sizeof(version_filename) - 1);
+            version_filename[sizeof(version_filename) - 1] = '\0';
+            for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+            char lang_suffix[80];
+            if (temp_settings.lang_flag[0] != '\0') {
+                snprintf(lang_suffix, sizeof(lang_suffix), "_%s", temp_settings.lang_flag);
+            } else {
+                lang_suffix[0] = '\0';
+            }
+
+            char lang_path[MAX_PATH_LENGTH];
+            snprintf(lang_path, sizeof(lang_path), "%s/templates/%s/%s/%s_%s%s_lang%s.json",
+                     get_resources_path(), temp_settings.version_str, temp_settings.category,
+                     version_filename, temp_settings.category, temp_settings.optional_flag, lang_suffix);
+
+            cJSON *lang_json = cJSON_from_file(lang_path);
+            if (lang_json) {
+                cJSON *dc = cJSON_GetObjectItem(lang_json, "display_category");
+                if (dc && cJSON_IsString(dc) && dc->valuestring && dc->valuestring[0] != '\0') {
+                    strncpy(temp_settings.category_display_name, dc->valuestring,
+                            sizeof(temp_settings.category_display_name) - 1);
+                    temp_settings.category_display_name[sizeof(temp_settings.category_display_name) - 1] = '\0';
+                    cJSON_Delete(lang_json);
+                    return;
+                }
+                cJSON_Delete(lang_json);
+            }
+        }
 
         char formatted_category[MAX_PATH_LENGTH];
         format_category_string(temp_settings.category, formatted_category, sizeof(formatted_category));
@@ -1156,53 +1190,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
             if (coop_template_locked) ImGui::EndDisabled();
 
-            // --- Category Display Name Text Input ---
-
-            // Calculate the standard width used by other items (like the Combos above)
-            float standard_width = ImGui::CalcItemWidth();
-            // float spacing = ImGui::GetStyle().ItemSpacing.x;
-
-            // Calculate the width of the "Lock" checkbox so we can subtract it
-            // Checkbox Width = Box Square (FrameHeight) + Text Gap (ItemInnerSpacing) + Text Width ("Lock")
-            // float lock_checkbox_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize("Lock").x;
-
-            // Set the input field width to fill the remaining space
-            ImGui::SetNextItemWidth(standard_width);
-
-            // Disable input if locked
-            if (temp_settings.lock_category_display_name) ImGui::BeginDisabled();
-
-
-            ImGui::InputText("Display Category", temp_settings.category_display_name,
-                             sizeof(temp_settings.category_display_name));
-
-            if (temp_settings.lock_category_display_name) ImGui::EndDisabled(); // End disabled if locked
-
-
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                char tooltip_buffer[512];
-                if (temp_settings.lock_category_display_name) {
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Display Name is currently locked.\n"
-                             "Uncheck the box to edit or auto-update.");
-                } else {
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "This is the name used for display on the tracker, overlay, and in debug logs.\n"
-                             "It is automatically formatted from the Category and Optional Flag,\n"
-                             "but you can override it with any custom text here.");
-                }
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            // The Lock Checkbox
-            ImGui::SameLine();
-            // The Lock Checkbox
-            ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Prevent the Display Name from changing automatically when switching templates.");
-            }
-
             // --- LANGUAGE DROPDOWN ---
+            // (Display Category InputText now lives below the Language dropdown, since the
+            //  language file can provide a per-language override.)
             if (category_idx != -1) {
                 // Find the selected template to get its available languages
                 DiscoveredTemplate *selected_template = nullptr;
@@ -1235,15 +1225,54 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             strncpy(temp_settings.lang_flag, selected_flag_str.c_str(),
                                     sizeof(temp_settings.lang_flag) - 1);
                             temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
+
+                            // Language change can swap the per-lang Display Category override
+                            update_temp_display_category();
                         }
                     }
                     if (ImGui::IsItemHovered()) {
                         char lang_tooltip_buffer[1024];
                         snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer),
                                  "Choose between available language files for the selected template.\n"
-                                 "The Default `_lang.json` is usually english and comes with every template.");
+                                 "The Default `_lang.json` is usually english and comes with every template.\n\n"
+                                 "If a language file declares a 'display_category' field, that value is used\n"
+                                 "to pre-fill the 'Display Category' field below (unless it is locked).");
                         ImGui::SetTooltip("%s", lang_tooltip_buffer);
                     }
+                }
+            }
+
+            // --- Category Display Name Text Input (placed below the Language dropdown
+            //     because the language can pre-fill / override it) ---
+            {
+                float standard_width = ImGui::CalcItemWidth();
+                ImGui::SetNextItemWidth(standard_width);
+
+                if (temp_settings.lock_category_display_name) ImGui::BeginDisabled();
+                ImGui::InputText("Display Category", temp_settings.category_display_name,
+                                 sizeof(temp_settings.category_display_name));
+                if (temp_settings.lock_category_display_name) ImGui::EndDisabled();
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    char tooltip_buffer[768];
+                    if (temp_settings.lock_category_display_name) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Display Name is currently locked.\n"
+                                 "Uncheck the box to edit or auto-update.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "This is the name used for display on the tracker, overlay, and in debug logs.\n"
+                                 "Pre-filled from the selected language file's 'display_category' field if present,\n"
+                                 "otherwise automatically formatted from the Category and Optional Flag.\n"
+                                 "You can override it with any custom text here.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+
+                ImGui::SameLine();
+                ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Prevent the Display Name from changing automatically when switching templates or languages.");
                 }
             }
 
