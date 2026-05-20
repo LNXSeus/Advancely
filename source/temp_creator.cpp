@@ -807,7 +807,34 @@ static void apply_partial_sort(std::vector<T> &vec) {
     }
 }
 
-// Helper to check for duplicate root_names in a vector of items
+// Multi-row drag-to-reorder: moves every entry in `vec` whose real index is in `sel`
+// to position `target_real`, preserving the selection's relative order. Updates `sel`
+// to point at the new contiguous indices. Returns the post-move insertion position.
+template<typename T>
+static int multi_move_selected(std::vector<T> &vec, std::set<int> &sel, int target_real) {
+    if (sel.empty()) return target_real;
+    std::vector<int> sel_sorted(sel.begin(), sel.end());
+    std::sort(sel_sorted.begin(), sel_sorted.end());
+    int adjusted = target_real;
+    for (int idx : sel_sorted) if (idx >= 0 && idx < target_real) adjusted--;
+    std::vector<T> moving;
+    moving.reserve(sel_sorted.size());
+    for (int idx : sel_sorted) {
+        if (idx < 0 || (size_t)idx >= vec.size()) continue;
+        moving.push_back(vec[idx]);
+    }
+    for (auto it = sel_sorted.rbegin(); it != sel_sorted.rend(); ++it) {
+        if (*it < 0 || (size_t)*it >= vec.size()) continue;
+        vec.erase(vec.begin() + *it);
+    }
+    if (adjusted < 0) adjusted = 0;
+    if (adjusted > (int)vec.size()) adjusted = (int)vec.size();
+    vec.insert(vec.begin() + adjusted, moving.begin(), moving.end());
+    sel.clear();
+    for (int i = 0; i < (int)moving.size(); i++) sel.insert(adjusted + i);
+    return adjusted;
+}
+
 static bool has_duplicate_root_names(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
     std::unordered_set<std::string> seen_names;
     for (const auto &item: items) {
@@ -4820,7 +4847,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       : 0;
                 if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
-                    // TWO-PANE LAYOUT
+                    static std::set<int> s_adv_selection;
+                    static int s_adv_last_clicked = -1;
+                    for (auto it = s_adv_selection.begin(); it != s_adv_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.advancements.size()) it = s_adv_selection.erase(it);
+                        else ++it;
+                    }
+
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
 
@@ -5117,12 +5150,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    // --- Counter for the list ---
-                    char counter_text[128];
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(),
-                             advancements_to_render.size() == 1
-                                 ? advancements_label_upper
-                                 : advancements_label_plural_upper);
+                    char counter_text[160];
+                    int adv_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
+                                                   advancements_to_render.size(),
+                                                   advancements_to_render.size() == 1
+                                                       ? advancements_label_upper
+                                                       : advancements_label_plural_upper);
+                    if (!s_adv_selection.empty() && adv_counter_pos < (int)sizeof(counter_text)) {
+                        snprintf(counter_text + adv_counter_pos, sizeof(counter_text) - adv_counter_pos,
+                                 " \xC2\xB7 %d selected", (int)s_adv_selection.size());
+                    }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
                     ImGui::SetCursorPosX(
                         ImGui::GetCursorPosX() + (
@@ -5131,20 +5168,123 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::TextDisabled("%s", counter_text);
 
                     int advancement_to_remove_idx = -1;
-                    int advancement_to_copy_idx = -1; // To queue a copy action
-
-                    // State for drag and drop
+                    int advancement_to_copy_idx = -1;
                     int adv_dnd_source_index = -1;
                     int adv_dnd_target_index = -1;
+                    bool bulk_delete_adv = false;
+
+                    if (!s_adv_selection.empty()) {
+                        static char s_adv_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...##adv")) {
+                            s_adv_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("adv_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[384];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected %s.\n"
+                                     "Type a path under resources/icons/, or click Browse.",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("adv_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected %s",
+                                                (int)s_adv_selection.size(),
+                                                s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##adv_bulk_icon_path", s_adv_bulk_icon_buf,
+                                                                 sizeof(s_adv_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##adv_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_adv_bulk_icon_buf, new_path, sizeof(s_adv_bulk_icon_buf) - 1);
+                                    s_adv_bulk_icon_buf[sizeof(s_adv_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##adv_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_adv_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_adv_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                    strncpy(current_template_data.advancements[idx].icon_path, s_adv_bulk_icon_buf,
+                                            sizeof(current_template_data.advancements[idx].icon_path) - 1);
+                                    current_template_data.advancements[idx].icon_path[
+                                        sizeof(current_template_data.advancements[idx].icon_path) - 1] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden##adv")) {
+                            int hidden_count = 0;
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                if (current_template_data.advancements[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_adv_selection.size());
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                current_template_data.advancements[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected %s.\n"
+                                     "If most are visible they all become hidden, and vice versa.",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected##adv")) {
+                            ImGui::OpenPopup("adv_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Remove all selected %s. Requires confirmation.",
+                                     advancements_label_plural_lower);
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("adv_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected %s?", (int)s_adv_selection.size(),
+                                        s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                            if (ImGui::Button("Delete##adv_bulk_confirm")) {
+                                bulk_delete_adv = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##adv_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##adv")) {
+                            s_adv_selection.clear();
+                            s_adv_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[160];
+                            snprintf(tip, sizeof(tip), "Clear the %s selection.",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < advancements_to_render.size(); ++i) {
-                        auto &advancement = *advancements_to_render[i]; // Dereference the pointer
-                        ImGui::PushID(&advancement); // Use pointer for a stable ID
+                        auto &advancement = *advancements_to_render[i];
+                        int adv_real_i = (int)(&advancement - &current_template_data.advancements[0]);
+                        ImGui::PushID(&advancement);
 
                         const char *display_name = advancement.display_name;
                         const char *root_name = advancement.root_name;
 
-                        // Show display names based on setting
                         const char *label = show_advancement_display_names
                                                 ? (display_name[0] ? display_name : root_name)
                                                 : root_name;
@@ -5154,7 +5294,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             label = placeholder;
                         }
 
-                        // --- Sort Badge (Category) ---
+                        {
+                            bool is_adv_selected = s_adv_selection.find(adv_real_i) != s_adv_selection.end();
+                            if (ImGui::Checkbox("##adv_bulk_sel", &is_adv_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_adv_last_clicked >= 0 && s_adv_last_clicked != adv_real_i) {
+                                    int lo = std::min(s_adv_last_clicked, adv_real_i);
+                                    int hi = std::max(s_adv_last_clicked, adv_real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.advancements.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p : advancements_to_render) {
+                                            if (p == &current_template_data.advancements[k]) { in_filter = true; break; }
+                                        }
+                                        if (!in_filter) continue;
+                                        if (is_adv_selected) s_adv_selection.insert(k);
+                                        else s_adv_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_adv_selected) s_adv_selection.insert(adv_real_i);
+                                    else s_adv_selection.erase(adv_real_i);
+                                }
+                                s_adv_last_clicked = adv_real_i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[384];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple %s at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.",
+                                         advancements_label_plural_lower);
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
+
                         char cat_badge_label[32];
                         if (advancement.sort_order > 0) {
                             snprintf(cat_badge_label, sizeof(cat_badge_label), "%d##cat_badge", advancement.sort_order);
@@ -5230,7 +5405,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             // Use a unique payload ID for this list
                             ImGui::SetDragDropPayload("ADVANCEMENT_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", label);
+                            if (s_adv_selection.find(adv_real_i) != s_adv_selection.end() &&
+                                s_adv_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_adv_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
                             ImGui::EndDragDropSource();
                         }
                         // Make the entire row a drop target
@@ -5245,37 +5425,87 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::PopID();
                     }
 
-                    // Handle Drag and Drop reordering after the loop
+                    if (bulk_delete_adv && !s_adv_selection.empty()) {
+                        std::vector<int> sorted_desc(s_adv_selection.begin(), s_adv_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_advancement) {
+                            strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        bool wipe_selected_ptr = false;
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            EditorTrackableCategory *adv_ptr = &current_template_data.advancements[idx];
+                            if (selected_advancement == adv_ptr) wipe_selected_ptr = true;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals,
+                                             adv_ptr->root_name);
+                            current_template_data.advancements.erase(
+                                current_template_data.advancements.begin() + idx);
+                        }
+                        if (wipe_selected_ptr) {
+                            selected_advancement = nullptr;
+                        } else if (selected_root_name_before_op[0] != '\0') {
+                            selected_advancement = nullptr;
+                            for (auto &adv : current_template_data.advancements) {
+                                if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                    selected_advancement = &adv;
+                                    break;
+                                }
+                            }
+                        }
+                        s_adv_selection.clear();
+                        s_adv_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        advancement_to_remove_idx = -1;
+                        adv_dnd_source_index = -1;
+                        adv_dnd_target_index = -1;
+                    }
+
                     if (adv_dnd_source_index != -1 && adv_dnd_target_index != -1) {
-                        // Get pointers to the source and target items from the list that was rendered
                         EditorTrackableCategory *source_item_ptr = advancements_to_render[adv_dnd_source_index];
                         EditorTrackableCategory *target_item_ptr = advancements_to_render[adv_dnd_target_index];
+                        int adv_src_real = (int)(source_item_ptr - &current_template_data.advancements[0]);
+                        int adv_tgt_real = (int)(target_item_ptr - &current_template_data.advancements[0]);
 
-                        // Find the iterator for the source item in the original data vector
-                        auto source_it = std::find_if(current_template_data.advancements.begin(),
-                                                      current_template_data.advancements.end(),
-                                                      [&](const EditorTrackableCategory &adv) {
-                                                          return &adv == source_item_ptr;
-                                                      });
-
-                        // Create a copy of the item to move, then erase it
-                        EditorTrackableCategory item_to_move = *source_item_ptr;
-                        current_template_data.advancements.erase(source_it);
-
-                        // Find the iterator for the target item in the (now modified) original vector
-                        auto target_it = std::find_if(current_template_data.advancements.begin(),
-                                                      current_template_data.advancements.end(),
-                                                      [&](const EditorTrackableCategory &adv) {
-                                                          return &adv == target_item_ptr;
-                                                      });
-
-                        // Insert the copied item at the target's position
-                        current_template_data.advancements.insert(target_it, item_to_move);
-
+                        if (s_adv_selection.find(adv_src_real) != s_adv_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_advancement) {
+                                strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.advancements, s_adv_selection, adv_tgt_real);
+                            s_adv_last_clicked = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                selected_advancement = nullptr;
+                                for (auto &adv : current_template_data.advancements) {
+                                    if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                        selected_advancement = &adv;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            auto source_it = std::find_if(current_template_data.advancements.begin(),
+                                                          current_template_data.advancements.end(),
+                                                          [&](const EditorTrackableCategory &adv) {
+                                                              return &adv == source_item_ptr;
+                                                          });
+                            EditorTrackableCategory item_to_move = *source_item_ptr;
+                            current_template_data.advancements.erase(source_it);
+                            auto target_it = std::find_if(current_template_data.advancements.begin(),
+                                                          current_template_data.advancements.end(),
+                                                          [&](const EditorTrackableCategory &adv) {
+                                                              return &adv == target_item_ptr;
+                                                          });
+                            current_template_data.advancements.insert(target_it, item_to_move);
+                            s_adv_selection.clear();
+                            s_adv_last_clicked = -1;
+                        }
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle Copying
                     if (advancement_to_copy_idx != -1) {
                         char selected_root_name_before_op[192] = {};
                         if (selected_advancement) {
@@ -5352,7 +5582,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Fallback: if source not found (shouldn't happen), add to the end
                             current_template_data.advancements.push_back(new_advancement);
                         }
-                        // Re-find and update the selected_advancement pointer
                         if (selected_root_name_before_op[0] != '\0') {
                             for (auto &adv: current_template_data.advancements) {
                                 if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
@@ -5361,10 +5590,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_adv_selection.clear();
+                        s_adv_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle Removal
                     if (advancement_to_remove_idx != -1) {
                         char selected_root_name_before_op[192] = {};
                         if (selected_advancement) {
@@ -5392,7 +5622,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.advancements.end()
                         );
 
-                        // Re-find pointer if it wasn't the one being deleted
                         if (selected_advancement && selected_root_name_before_op[0] != '\0') {
                             for (auto &adv: current_template_data.advancements) {
                                 if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
@@ -5401,10 +5630,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_adv_selection.clear();
+                        s_adv_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
 
-                    ImGui::EndChild(); // End of Left Pane
+                    ImGui::EndChild();
                     ImGui::SameLine();
 
                     // RIGHT PANE: Details of Selected Advancement
@@ -5572,20 +5803,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::Checkbox("Groups", &advancement.groups_enabled)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char groups_tooltip_buffer[512];
-                            snprintf(groups_tooltip_buffer, sizeof(groups_tooltip_buffer),
-                                     "Enable criterion grouping for this %s.\n"
-                                     "When enabled, criteria can be assigned to a shared group ID:\n"
-                                     "all criteria in a group collapse into one progress unit, so\n"
-                                     "completing any one marks the entire group as done (used by\n"
-                                     "special blaze and caves advancements like Ultimate Enchanter).",
-                                     advancements_label_singular_lower);
-                            ImGui::SetTooltip("%s", groups_tooltip_buffer);
+                        if (!advancement.criteria.empty()) {
+                            ImGui::SameLine();
+                            if (ImGui::Checkbox("Groups", &advancement.groups_enabled)) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char groups_tooltip_buffer[512];
+                                snprintf(groups_tooltip_buffer, sizeof(groups_tooltip_buffer),
+                                         "Enable criterion grouping for this %s.\n"
+                                         "When enabled, criteria can be assigned to a shared group ID:\n"
+                                         "all criteria in a group collapse into one progress unit, so\n"
+                                         "completing any one marks the entire group as done (used by\n"
+                                         "special blaze and caves advancements like Ultimate Enchanter).",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", groups_tooltip_buffer);
+                            }
                         }
 
                         if (render_layout_coordinates_header(advancements_label_singular_lower,
@@ -5650,17 +5883,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 int distinct_groups = (int)crit_collect_group_ids(advancement).size();
                                 int loose_crit = 0;
                                 for (const auto &c : advancement.criteria) if (c.group[0] == '\0') loose_crit++;
-                                int selected_crit = (int)s_crit_selection.size();
                                 if (distinct_groups > 0 && pos < (int)sizeof(crit_counter_text)) {
                                     pos += snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
                                                     " (%d %s + %d loose)",
                                                     distinct_groups, distinct_groups == 1 ? "group" : "groups",
                                                     loose_crit);
                                 }
-                                if (selected_crit > 0 && pos < (int)sizeof(crit_counter_text)) {
-                                    snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
-                                             " · %d selected", selected_crit);
-                                }
+                            }
+                            if (!s_crit_selection.empty() && pos < (int)sizeof(crit_counter_text)) {
+                                snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
+                                         " \xC2\xB7 %d selected", (int)s_crit_selection.size());
                             }
                             float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
@@ -5855,66 +6087,58 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int criterion_dnd_source_index = -1;
                         int criterion_dnd_target_index = -1;
 
-                        // Compact group action bar: only visible when at least one criterion is selected.
-                        // Right-aligned to keep the criteria list visually quiet (grouping is niche).
-                        if (advancement.groups_enabled && !s_crit_selection.empty()) {
-                            // Pre-measure the three buttons + spacing so we can right-align them.
+                        bool bulk_delete_criteria = false;
+                        if (!s_crit_selection.empty()) {
                             ImGuiStyle &style = ImGui::GetStyle();
-                            float w_add = ImGui::CalcTextSize("Add selection to group").x + style.FramePadding.x * 2.0f;
-                            float w_un  = ImGui::CalcTextSize("Ungroup selection").x      + style.FramePadding.x * 2.0f;
-                            float w_des = ImGui::CalcTextSize("Deselect all").x           + style.FramePadding.x * 2.0f;
-                            float total_w = w_add + w_un + w_des + style.ItemSpacing.x * 2.0f;
+                            float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
+                            float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
+                            float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                            float w_add  = ImGui::CalcTextSize("Add selection to group").x + style.FramePadding.x * 2.0f;
+                            float w_un   = ImGui::CalcTextSize("Ungroup selection").x + style.FramePadding.x * 2.0f;
+                            float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                            int btn_count = 4;
+                            float total_w = w_icon + w_hide + w_del + w_des;
+                            if (advancement.groups_enabled) { total_w += w_add + w_un; btn_count += 2; }
+                            total_w += style.ItemSpacing.x * (btn_count - 1);
                             float avail = ImGui::GetContentRegionAvail().x;
                             if (avail > total_w) {
                                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
                             }
 
-                            static char s_new_group_buffer[64] = "";
-                            if (ImGui::SmallButton("Add selection to group")) {
-                                crit_auto_name_group(advancement, s_new_group_buffer);
-                                ImGui::OpenPopup("crit_add_to_group_popup");
+                            static char s_crit_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                            if (ImGui::SmallButton("Set Icon...")) {
+                                s_crit_bulk_icon_buf[0] = '\0';
+                                ImGui::OpenPopup("crit_bulk_icon_popup");
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tip[320];
+                                char tip[256];
                                 snprintf(tip, sizeof(tip),
-                                         "Assign every selected criterion to a group.\n"
-                                         "Either click an existing group, or type a new name.\n"
-                                         "Criteria sharing a group collapse into one progress unit.");
+                                         "Apply the same icon path to every selected criterion.\n"
+                                         "Type a path under resources/icons/, or click Browse.");
                                 ImGui::SetTooltip("%s", tip);
                             }
-                            if (ImGui::BeginPopup("crit_add_to_group_popup")) {
-                                std::vector<std::string> existing = crit_collect_group_ids(advancement);
-                                if (!existing.empty()) {
-                                    ImGui::TextDisabled("Existing groups");
-                                    for (const auto &id : existing) {
-                                        char row[128];
-                                        snprintf(row, sizeof(row), "%s##existing", id.c_str());
-                                        if (ImGui::Selectable(row)) {
-                                            for (int idx : s_crit_selection) {
-                                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                                strncpy(advancement.criteria[idx].group, id.c_str(),
-                                                        sizeof(advancement.criteria[idx].group) - 1);
-                                                advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
-                                            }
-                                            save_message_type = MSG_NONE;
-                                            ImGui::CloseCurrentPopup();
-                                        }
-                                    }
-                                    ImGui::Separator();
-                                }
-                                ImGui::TextDisabled("New group");
-                                ImGui::SetNextItemWidth(160.0f);
-                                bool submit_enter = ImGui::InputText("##new_group", s_new_group_buffer,
-                                                                     sizeof(s_new_group_buffer),
+                            if (ImGui::BeginPopup("crit_bulk_icon_popup")) {
+                                ImGui::TextDisabled("Icon path for %d selected criteria", (int)s_crit_selection.size());
+                                ImGui::SetNextItemWidth(280.0f);
+                                bool submit_enter = ImGui::InputText("##crit_bulk_icon_path", s_crit_bulk_icon_buf,
+                                                                     sizeof(s_crit_bulk_icon_buf),
                                                                      ImGuiInputTextFlags_EnterReturnsTrue);
                                 ImGui::SameLine();
-                                bool submit_button = ImGui::Button("Apply##new_group");
-                                if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
+                                if (ImGui::Button("Browse##crit_bulk_icon")) {
+                                    char new_path[MAX_PATH_LENGTH];
+                                    if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                        strncpy(s_crit_bulk_icon_buf, new_path, sizeof(s_crit_bulk_icon_buf) - 1);
+                                        s_crit_bulk_icon_buf[sizeof(s_crit_bulk_icon_buf) - 1] = '\0';
+                                    }
+                                }
+                                bool submit_apply = ImGui::Button("Apply##crit_bulk_icon");
+                                if ((submit_enter || submit_apply) && s_crit_bulk_icon_buf[0] != '\0') {
                                     for (int idx : s_crit_selection) {
                                         if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                        strncpy(advancement.criteria[idx].group, s_new_group_buffer,
-                                                sizeof(advancement.criteria[idx].group) - 1);
-                                        advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                        strncpy(advancement.criteria[idx].icon_path, s_crit_bulk_icon_buf,
+                                                sizeof(advancement.criteria[idx].icon_path) - 1);
+                                        advancement.criteria[idx].icon_path[
+                                            sizeof(advancement.criteria[idx].icon_path) - 1] = '\0';
                                     }
                                     save_message_type = MSG_NONE;
                                     ImGui::CloseCurrentPopup();
@@ -5923,21 +6147,119 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             ImGui::SameLine();
-                            if (ImGui::SmallButton("Ungroup selection")) {
+                            if (ImGui::SmallButton("Toggle Hidden")) {
+                                int hidden_count = 0;
                                 for (int idx : s_crit_selection) {
                                     if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                    advancement.criteria[idx].group[0] = '\0';
+                                    if (advancement.criteria[idx].is_hidden) hidden_count++;
+                                }
+                                bool target_hidden = (hidden_count * 2 < (int)s_crit_selection.size());
+                                for (int idx : s_crit_selection) {
+                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    advancement.criteria[idx].is_hidden = target_hidden;
                                 }
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tip[160];
-                                snprintf(tip, sizeof(tip), "Clear the group ID on every selected criterion.");
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Flip Hidden on every selected criterion.\n"
+                                         "If most are visible they all become hidden, and vice versa.");
                                 ImGui::SetTooltip("%s", tip);
                             }
 
                             ImGui::SameLine();
-                            if (ImGui::SmallButton("Deselect all")) {
+                            if (ImGui::SmallButton("Delete Selected")) {
+                                ImGui::OpenPopup("crit_bulk_delete_confirm");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip), "Remove all selected criteria. Requires confirmation.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::BeginPopup("crit_bulk_delete_confirm")) {
+                                ImGui::Text("Delete %d selected criteria?", (int)s_crit_selection.size());
+                                if (ImGui::Button("Delete##crit_bulk_confirm")) {
+                                    bulk_delete_criteria = true;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::Button("Cancel##crit_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                ImGui::EndPopup();
+                            }
+
+                            static char s_new_group_buffer[64] = "";
+                            if (advancement.groups_enabled) {
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Add selection to group")) {
+                                    crit_auto_name_group(advancement, s_new_group_buffer);
+                                    ImGui::OpenPopup("crit_add_to_group_popup");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[320];
+                                    snprintf(tip, sizeof(tip),
+                                             "Assign every selected criterion to a group.\n"
+                                             "Either click an existing group, or type a new name.\n"
+                                             "Criteria sharing a group collapse into one progress unit.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                if (ImGui::BeginPopup("crit_add_to_group_popup")) {
+                                    std::vector<std::string> existing = crit_collect_group_ids(advancement);
+                                    if (!existing.empty()) {
+                                        ImGui::TextDisabled("Existing groups");
+                                        for (const auto &id : existing) {
+                                            char row[128];
+                                            snprintf(row, sizeof(row), "%s##existing", id.c_str());
+                                            if (ImGui::Selectable(row)) {
+                                                for (int idx : s_crit_selection) {
+                                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                                    strncpy(advancement.criteria[idx].group, id.c_str(),
+                                                            sizeof(advancement.criteria[idx].group) - 1);
+                                                    advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                                }
+                                                save_message_type = MSG_NONE;
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                        }
+                                        ImGui::Separator();
+                                    }
+                                    ImGui::TextDisabled("New group");
+                                    ImGui::SetNextItemWidth(160.0f);
+                                    bool submit_enter = ImGui::InputText("##new_group", s_new_group_buffer,
+                                                                         sizeof(s_new_group_buffer),
+                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
+                                    ImGui::SameLine();
+                                    bool submit_button = ImGui::Button("Apply##new_group");
+                                    if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
+                                        for (int idx : s_crit_selection) {
+                                            if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                            strncpy(advancement.criteria[idx].group, s_new_group_buffer,
+                                                    sizeof(advancement.criteria[idx].group) - 1);
+                                            advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                        }
+                                        save_message_type = MSG_NONE;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Ungroup selection")) {
+                                    for (int idx : s_crit_selection) {
+                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                        advancement.criteria[idx].group[0] = '\0';
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[160];
+                                    snprintf(tip, sizeof(tip), "Clear the group ID on every selected criterion.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Deselect all##crit")) {
                                 s_crit_selection.clear();
                                 s_crit_last_clicked = -1;
                             }
@@ -5992,52 +6314,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 scroll_to_child_root_name[0] = '\0';
                             }
 
-                            // First row: bulk-action checkbox + per-criterion Group field.
-                            // The checkbox doubles as a future drag-to-reorder selection handle; the
-                            // group field is the niche thing it currently feeds.
+                            // Per-criterion Group field row (visible only when groups are enabled).
+                            // The bulk-selection checkbox itself lives inline with the Hidden checkbox
+                            // below so it's always visible regardless of Groups.
                             if (advancement.groups_enabled) {
-                            bool is_selected = s_crit_selection.find((int)j) != s_crit_selection.end();
-                            if (ImGui::Checkbox("##select_crit", &is_selected)) {
-                                bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_crit_last_clicked >= 0 && s_crit_last_clicked != (int)j) {
-                                    int lo = std::min(s_crit_last_clicked, (int)j);
-                                    int hi = std::max(s_crit_last_clicked, (int)j);
-                                    for (int k = lo; k <= hi && k < (int)advancement.criteria.size(); k++) {
-                                        // Skip rows hidden by the details search so range-select can't
-                                        // silently toggle off-screen criteria.
-                                        if (is_details_search_active) {
-                                            const auto &cc = advancement.criteria[k];
-                                            if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.group, tc_search_buffer)) {
-                                                continue;
-                                            }
-                                        }
-                                        if (is_selected) s_crit_selection.insert(k);
-                                        else s_crit_selection.erase(k);
-                                    }
-                                } else {
-                                    if (is_selected) s_crit_selection.insert((int)j);
-                                    else s_crit_selection.erase((int)j);
-                                }
-                                s_crit_last_clicked = (int)j;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tip[160];
-                                snprintf(tip, sizeof(tip),
-                                         "Select for bulk actions. Shift-click to range select or deselect.");
-                                ImGui::SetTooltip("%s", tip);
-                            }
                             if (criterion.group[0] != '\0') {
-                                ImGui::SameLine();
                                 ImVec2 sw = ImGui::GetCursorScreenPos();
                                 float h = ImGui::GetFrameHeight();
                                 ImGui::GetWindowDrawList()->AddRectFilled(
                                     sw, ImVec2(sw.x + 8.0f, sw.y + h), crit_group_color(criterion.group));
                                 ImGui::Dummy(ImVec2(8.0f, h));
+                                ImGui::SameLine();
                             }
-                            ImGui::SameLine();
                             ImGui::SetNextItemWidth(160.0f);
                             if (ImGui::InputText("Group", criterion.group, sizeof(criterion.group))) {
                                 save_message_type = MSG_NONE;
@@ -6161,6 +6449,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "The icon must be inside the 'resources/icons' folder!");
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
+                            bool is_crit_selected = s_crit_selection.find((int) j) != s_crit_selection.end();
+                            if (ImGui::Checkbox("##select_crit", &is_crit_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_crit_last_clicked >= 0 && s_crit_last_clicked != (int) j) {
+                                    int lo = std::min(s_crit_last_clicked, (int) j);
+                                    int hi = std::max(s_crit_last_clicked, (int) j);
+                                    for (int k = lo; k <= hi && k < (int) advancement.criteria.size(); k++) {
+                                        if (is_details_search_active) {
+                                            const auto &cc = advancement.criteria[k];
+                                            if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.group, tc_search_buffer)) {
+                                                continue;
+                                            }
+                                        }
+                                        if (is_crit_selected) s_crit_selection.insert(k);
+                                        else s_crit_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_crit_selected) s_crit_selection.insert((int) j);
+                                    else s_crit_selection.erase((int) j);
+                                }
+                                s_crit_last_clicked = (int) j;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[384];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple criteria at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, grouping, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
                             if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                                 save_message_type = MSG_NONE;
                             }
@@ -6257,7 +6580,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Use the flag to make the non-interactive group a drag source
                             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                                 ImGui::SetDragDropPayload("CRITERION_DND", &j, sizeof(int));
-                                ImGui::Text("Reorder %s", criterion.root_name);
+                                if (s_crit_selection.find((int)j) != s_crit_selection.end() &&
+                                    s_crit_selection.size() > 1) {
+                                    ImGui::Text("Reordering %d selected items", (int)s_crit_selection.size());
+                                } else {
+                                    ImGui::Text("Reorder %s", criterion.root_name);
+                                }
                                 ImGui::EndDragDropSource();
                             }
 
@@ -6278,17 +6606,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Handle actions after the loop
                         if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1 &&
                             criterion_dnd_source_index != criterion_dnd_target_index) {
-                            EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
-                            advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
-                            if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
-                            advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
-                                                        item_to_move);
-                            // Indices in the selection set no longer correspond to the same criteria.
-                            s_crit_selection.clear();
-                            s_crit_last_clicked = -1;
+                            if (s_crit_selection.find(criterion_dnd_source_index) != s_crit_selection.end()) {
+                                multi_move_selected(advancement.criteria, s_crit_selection, criterion_dnd_target_index);
+                                s_crit_last_clicked = -1;
+                            } else {
+                                EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
+                                advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
+                                if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
+                                advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
+                                                            item_to_move);
+                                s_crit_selection.clear();
+                                s_crit_last_clicked = -1;
+                            }
                             save_message_type = MSG_NONE;
                         }
 
+
+                        if (bulk_delete_criteria && !s_crit_selection.empty()) {
+                            std::vector<int> sorted_desc(s_crit_selection.begin(), s_crit_selection.end());
+                            std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                            for (int idx : sorted_desc) {
+                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                clear_goal_links(current_template_data.decorations,
+                                                 current_template_data.counter_goals,
+                                                 advancement.criteria[idx].root_name);
+                                advancement.criteria.erase(advancement.criteria.begin() + idx);
+                            }
+                            s_crit_selection.clear();
+                            s_crit_last_clicked = -1;
+                            save_message_type = MSG_NONE;
+                            criterion_to_remove = -1;
+                        }
 
                         if (criterion_to_remove != -1) {
                             clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
@@ -6379,7 +6727,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         : 0;
                 if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
-                    // TWO PANE LAYOUT for Stats
+                    static std::set<int> s_stat_selection;
+                    static int s_stat_last_clicked = -1;
+                    for (auto it = s_stat_selection.begin(); it != s_stat_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.stats.size()) it = s_stat_selection.erase(it);
+                        else ++it;
+                    }
+
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
 
@@ -6682,25 +7036,126 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Counter for the list ---
 
-                    char counter_text[128];
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", stats_to_render.size(),
-                             stats_to_render.size() == 1 ? "Stat" : "Stats");
+                    char counter_text[160];
+                    int stat_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
+                                                    stats_to_render.size(),
+                                                    stats_to_render.size() == 1 ? "Stat" : "Stats");
+                    if (!s_stat_selection.empty() && stat_counter_pos < (int)sizeof(counter_text)) {
+                        snprintf(counter_text + stat_counter_pos, sizeof(counter_text) - stat_counter_pos,
+                                 " \xC2\xB7 %d selected", (int)s_stat_selection.size());
+                    }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
-                    // Center Count
                     ImGui::SetCursorPosX(
                         ImGui::GetCursorPosX() + (
                             ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
                         0.5f);
                     ImGui::TextDisabled("%s", counter_text);
 
-                    // 3. Render the list using pointers.
                     int stat_to_remove_idx = -1;
                     int stat_to_copy_idx = -1;
                     int stat_dnd_source_index = -1;
                     int stat_dnd_target_index = -1;
+                    bool bulk_delete_stats = false;
+
+                    if (!s_stat_selection.empty()) {
+                        static char s_stat_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...##stat_bulk")) {
+                            s_stat_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("stat_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected stat.\n"
+                                     "Type a path under resources/icons/, or click Browse.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("stat_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected stats", (int)s_stat_selection.size());
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##stat_bulk_icon_path", s_stat_bulk_icon_buf,
+                                                                 sizeof(s_stat_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##stat_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_stat_bulk_icon_buf, new_path, sizeof(s_stat_bulk_icon_buf) - 1);
+                                    s_stat_bulk_icon_buf[sizeof(s_stat_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##stat_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_stat_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_stat_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                    strncpy(current_template_data.stats[idx].icon_path, s_stat_bulk_icon_buf,
+                                            sizeof(current_template_data.stats[idx].icon_path) - 1);
+                                    current_template_data.stats[idx].icon_path[
+                                        sizeof(current_template_data.stats[idx].icon_path) - 1] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden##stat_bulk")) {
+                            int hidden_count = 0;
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                if (current_template_data.stats[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_stat_selection.size());
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                current_template_data.stats[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected stat.\n"
+                                     "If most are visible they all become hidden, and vice versa.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected##stat_bulk")) {
+                            ImGui::OpenPopup("stat_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected stats. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("stat_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected stats?", (int)s_stat_selection.size());
+                            if (ImGui::Button("Delete##stat_bulk_confirm")) {
+                                bulk_delete_stats = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##stat_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##stat_bulk")) {
+                            s_stat_selection.clear();
+                            s_stat_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the stat selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < stats_to_render.size(); i++) {
                         auto &stat = *stats_to_render[i];
+                        int stat_real_i = (int)(&stat - &current_template_data.stats[0]);
                         ImGui::PushID(&stat);
 
                         const char *display_name = stat.display_name;
@@ -6712,7 +7167,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             label = "[New Stat]";
                         }
 
-                        // --- Sort Badge (Stat Category) ---
+                        {
+                            bool is_stat_selected = s_stat_selection.find(stat_real_i) != s_stat_selection.end();
+                            if (ImGui::Checkbox("##stat_bulk_sel", &is_stat_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_stat_last_clicked >= 0 && s_stat_last_clicked != stat_real_i) {
+                                    int lo = std::min(s_stat_last_clicked, stat_real_i);
+                                    int hi = std::max(s_stat_last_clicked, stat_real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.stats.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p : stats_to_render) {
+                                            if (p == &current_template_data.stats[k]) { in_filter = true; break; }
+                                        }
+                                        if (!in_filter) continue;
+                                        if (is_stat_selected) s_stat_selection.insert(k);
+                                        else s_stat_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_stat_selected) s_stat_selection.insert(stat_real_i);
+                                    else s_stat_selection.erase(stat_real_i);
+                                }
+                                s_stat_last_clicked = stat_real_i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple stats at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
+
                         char stat_badge_label[64];
                         if (stat.sort_order > 0) {
                             snprintf(stat_badge_label, sizeof(stat_badge_label), "%d##stat_badge", stat.sort_order);
@@ -6772,7 +7261,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             ImGui::SetDragDropPayload("STAT_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", label);
+                            if (s_stat_selection.find(stat_real_i) != s_stat_selection.end() &&
+                                s_stat_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_stat_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
                             ImGui::EndDragDropSource();
                         }
                         if (ImGui::BeginDragDropTarget()) {
@@ -6785,27 +7279,86 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::PopID();
                     }
 
-                    // Handle Drag and Drop
+                    if (bulk_delete_stats && !s_stat_selection.empty()) {
+                        std::vector<int> sorted_desc(s_stat_selection.begin(), s_stat_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_stat) {
+                            strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        bool wipe_selected_ptr = false;
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            EditorTrackableCategory *sp = &current_template_data.stats[idx];
+                            if (selected_stat == sp) wipe_selected_ptr = true;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals, sp->root_name);
+                            for (const auto &sub : sp->criteria) {
+                                clear_goal_links(current_template_data.decorations,
+                                                 current_template_data.counter_goals, sub.root_name);
+                            }
+                            current_template_data.stats.erase(current_template_data.stats.begin() + idx);
+                        }
+                        if (wipe_selected_ptr) {
+                            selected_stat = nullptr;
+                        } else if (selected_root_name_before_op[0] != '\0') {
+                            selected_stat = nullptr;
+                            for (auto &stat : current_template_data.stats) {
+                                if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
+                                    selected_stat = &stat;
+                                    break;
+                                }
+                            }
+                        }
+                        s_stat_selection.clear();
+                        s_stat_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        stat_to_remove_idx = -1;
+                        stat_dnd_source_index = -1;
+                        stat_dnd_target_index = -1;
+                    }
+
                     if (stat_dnd_source_index != -1 && stat_dnd_target_index != -1) {
                         EditorTrackableCategory *source_item_ptr = stats_to_render[stat_dnd_source_index];
                         EditorTrackableCategory *target_item_ptr = stats_to_render[stat_dnd_target_index];
+                        int stat_src_real = (int)(source_item_ptr - &current_template_data.stats[0]);
+                        int stat_tgt_real = (int)(target_item_ptr - &current_template_data.stats[0]);
 
-                        auto source_it = std::find_if(current_template_data.stats.begin(),
-                                                      current_template_data.stats.end(),
-                                                      [&](const EditorTrackableCategory &s) {
-                                                          return &s == source_item_ptr;
-                                                      });
-
-                        EditorTrackableCategory item_to_move = *source_item_ptr;
-                        current_template_data.stats.erase(source_it);
-
-                        auto target_it = std::find_if(current_template_data.stats.begin(),
-                                                      current_template_data.stats.end(),
-                                                      [&](const EditorTrackableCategory &s) {
-                                                          return &s == target_item_ptr;
-                                                      });
-
-                        current_template_data.stats.insert(target_it, item_to_move);
+                        if (s_stat_selection.find(stat_src_real) != s_stat_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_stat) {
+                                strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.stats, s_stat_selection, stat_tgt_real);
+                            s_stat_last_clicked = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                selected_stat = nullptr;
+                                for (auto &st : current_template_data.stats) {
+                                    if (strcmp(st.root_name, selected_root_name_before_op) == 0) {
+                                        selected_stat = &st;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            auto source_it = std::find_if(current_template_data.stats.begin(),
+                                                          current_template_data.stats.end(),
+                                                          [&](const EditorTrackableCategory &s) {
+                                                              return &s == source_item_ptr;
+                                                          });
+                            EditorTrackableCategory item_to_move = *source_item_ptr;
+                            current_template_data.stats.erase(source_it);
+                            auto target_it = std::find_if(current_template_data.stats.begin(),
+                                                          current_template_data.stats.end(),
+                                                          [&](const EditorTrackableCategory &s) {
+                                                              return &s == target_item_ptr;
+                                                          });
+                            current_template_data.stats.insert(target_it, item_to_move);
+                            s_stat_selection.clear();
+                            s_stat_last_clicked = -1;
+                        }
                         save_message_type = MSG_NONE;
                     }
 
@@ -6876,7 +7429,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.stats.push_back(new_stat);
                         }
 
-                        // Re-find and update the selected_stat pointer
                         if (selected_root_name_before_op[0] != '\0') {
                             for (auto &stat: current_template_data.stats) {
                                 if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
@@ -6885,10 +7437,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_stat_selection.clear();
+                        s_stat_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle Removal
                     if (stat_to_remove_idx != -1) {
                         char selected_root_name_before_op[192] = {};
                         if (selected_stat) {
@@ -6915,7 +7468,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.stats.end()
                         );
 
-                        // Re-find pointer if it wasn't the one being deleted
                         if (selected_stat && selected_root_name_before_op[0] != '\0') {
                             for (auto &stat: current_template_data.stats) {
                                 if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
@@ -6924,6 +7476,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_stat_selection.clear();
+                        s_stat_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::EndChild();
@@ -7285,10 +7839,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", target_tooltip_buffer);
                             }
                         } else {
-                            // UI for a complex, multi-stat category (similar to advancements)
                             ImGui::Text("Sub-Stats");
 
-                            // --- Counter for the sub-stat list ---
+                            static char s_sub_sel_owner[192] = "";
+                            static std::set<int> s_sub_selection;
+                            static int s_sub_last_clicked = -1;
+                            if (strcmp(s_sub_sel_owner, stat_cat.root_name) != 0) {
+                                strncpy(s_sub_sel_owner, stat_cat.root_name, sizeof(s_sub_sel_owner) - 1);
+                                s_sub_sel_owner[sizeof(s_sub_sel_owner) - 1] = '\0';
+                                s_sub_selection.clear();
+                                s_sub_last_clicked = -1;
+                            }
+                            for (auto it = s_sub_selection.begin(); it != s_sub_selection.end();) {
+                                if (*it < 0 || (size_t)*it >= stat_cat.criteria.size()) it = s_sub_selection.erase(it);
+                                else ++it;
+                            }
+
                             char crit_counter_text[128];
                             bool is_details_search_active = (
                                 current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
@@ -7307,8 +7873,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
                             }
-                            snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
-                                     visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
+                            int sub_pos = snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s",
+                                                   visible_criteria_count,
+                                                   visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
+                            if (!s_sub_selection.empty() && sub_pos < (int)sizeof(crit_counter_text)) {
+                                snprintf(crit_counter_text + sub_pos, sizeof(crit_counter_text) - sub_pos,
+                                         " \xC2\xB7 %d selected", (int)s_sub_selection.size());
+                            }
                             float text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
                             ImGui::TextDisabled("%s", crit_counter_text);
@@ -7501,6 +8072,115 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             int stat_crit_dnd_source_index = -1;
                             int stat_crit_dnd_target_index = -1;
+                            bool bulk_delete_sub = false;
+
+                            if (!s_sub_selection.empty()) {
+                                ImGuiStyle &style = ImGui::GetStyle();
+                                float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
+                                float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
+                                float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                                float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                                float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
+                                float avail = ImGui::GetContentRegionAvail().x;
+                                if (avail > total_w) {
+                                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                                }
+
+                                static char s_sub_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                                if (ImGui::SmallButton("Set Icon...##sub")) {
+                                    s_sub_bulk_icon_buf[0] = '\0';
+                                    ImGui::OpenPopup("sub_bulk_icon_popup");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[256];
+                                    snprintf(tip, sizeof(tip),
+                                             "Apply the same icon path to every selected sub-stat.\n"
+                                             "Type a path under resources/icons/, or click Browse.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                if (ImGui::BeginPopup("sub_bulk_icon_popup")) {
+                                    ImGui::TextDisabled("Icon path for %d selected sub-stats", (int)s_sub_selection.size());
+                                    ImGui::SetNextItemWidth(280.0f);
+                                    bool submit_enter = ImGui::InputText("##sub_bulk_icon_path", s_sub_bulk_icon_buf,
+                                                                         sizeof(s_sub_bulk_icon_buf),
+                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("Browse##sub_bulk_icon")) {
+                                        char new_path[MAX_PATH_LENGTH];
+                                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                            strncpy(s_sub_bulk_icon_buf, new_path, sizeof(s_sub_bulk_icon_buf) - 1);
+                                            s_sub_bulk_icon_buf[sizeof(s_sub_bulk_icon_buf) - 1] = '\0';
+                                        }
+                                    }
+                                    bool submit_apply = ImGui::Button("Apply##sub_bulk_icon");
+                                    if ((submit_enter || submit_apply) && s_sub_bulk_icon_buf[0] != '\0') {
+                                        for (int idx : s_sub_selection) {
+                                            if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                            strncpy(stat_cat.criteria[idx].icon_path, s_sub_bulk_icon_buf,
+                                                    sizeof(stat_cat.criteria[idx].icon_path) - 1);
+                                            stat_cat.criteria[idx].icon_path[
+                                                sizeof(stat_cat.criteria[idx].icon_path) - 1] = '\0';
+                                        }
+                                        save_message_type = MSG_NONE;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Toggle Hidden##sub")) {
+                                    int hidden_count = 0;
+                                    for (int idx : s_sub_selection) {
+                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                        if (stat_cat.criteria[idx].is_hidden) hidden_count++;
+                                    }
+                                    bool target_hidden = (hidden_count * 2 < (int)s_sub_selection.size());
+                                    for (int idx : s_sub_selection) {
+                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                        stat_cat.criteria[idx].is_hidden = target_hidden;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[256];
+                                    snprintf(tip, sizeof(tip),
+                                             "Flip Hidden on every selected sub-stat.\n"
+                                             "If most are visible they all become hidden, and vice versa.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Delete Selected##sub")) {
+                                    ImGui::OpenPopup("sub_bulk_delete_confirm");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[256];
+                                    snprintf(tip, sizeof(tip), "Remove all selected sub-stats. Requires confirmation.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                if (ImGui::BeginPopup("sub_bulk_delete_confirm")) {
+                                    ImGui::Text("Delete %d selected sub-stats?", (int)s_sub_selection.size());
+                                    if (ImGui::Button("Delete##sub_bulk_confirm")) {
+                                        bulk_delete_sub = true;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("Cancel##sub_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                    ImGui::EndPopup();
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Deselect all##sub")) {
+                                    s_sub_selection.clear();
+                                    s_sub_last_clicked = -1;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[128];
+                                    snprintf(tip, sizeof(tip), "Clear the sub-stat selection.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                            }
+
                             for (size_t j = 0; j < stat_cat.criteria.size(); j++) {
                                 auto &crit = stat_cat.criteria[j];
 
@@ -7621,6 +8301,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              ">0 = Progress-based counter (completes when value reached).\n"
                                              "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                     ImGui::SetTooltip("%s", target_tooltip_buffer);
+                                }
+                                {
+                                    bool is_sub_selected = s_sub_selection.find((int)j) != s_sub_selection.end();
+                                    if (ImGui::Checkbox("##sub_bulk_sel", &is_sub_selected)) {
+                                        bool shift = ImGui::GetIO().KeyShift;
+                                        if (shift && s_sub_last_clicked >= 0 && s_sub_last_clicked != (int)j) {
+                                            int lo = std::min(s_sub_last_clicked, (int)j);
+                                            int hi = std::max(s_sub_last_clicked, (int)j);
+                                            for (int k = lo; k <= hi && k < (int)stat_cat.criteria.size(); k++) {
+                                                if (is_details_search_active) {
+                                                    const auto &cc = stat_cat.criteria[k];
+                                                    char gs[32];
+                                                    snprintf(gs, sizeof(gs), "%d", cc.goal);
+                                                    if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
+                                                        !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
+                                                        !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
+                                                        (cc.goal == 0 || strstr(gs, tc_search_buffer) == nullptr)) {
+                                                        continue;
+                                                    }
+                                                }
+                                                if (is_sub_selected) s_sub_selection.insert(k);
+                                                else s_sub_selection.erase(k);
+                                            }
+                                        } else {
+                                            if (is_sub_selected) s_sub_selection.insert((int)j);
+                                            else s_sub_selection.erase((int)j);
+                                        }
+                                        s_sub_last_clicked = (int)j;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char sel_tip[320];
+                                        snprintf(sel_tip, sizeof(sel_tip),
+                                                 "Select for bulk actions on multiple sub-stats at once:\n"
+                                                 "reordering (drag any selected row), setting the same icon,\n"
+                                                 "toggling Hidden, and deletion.\n"
+                                                 "Shift+Click to range-select or -deselect.");
+                                        ImGui::SetTooltip("%s", sel_tip);
+                                    }
+                                    ImGui::SameLine();
                                 }
                                 if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
                                     save_message_type = MSG_NONE;
@@ -7818,7 +8537,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                 if (ImGui::BeginDragDropSource()) {
                                     ImGui::SetDragDropPayload("STAT_CRITERION_DND", &j, sizeof(int));
-                                    ImGui::Text("Reorder %s", crit.root_name);
+                                    if (s_sub_selection.find((int)j) != s_sub_selection.end() &&
+                                        s_sub_selection.size() > 1) {
+                                        ImGui::Text("Reordering %d selected items", (int)s_sub_selection.size());
+                                    } else {
+                                        ImGui::Text("Reorder %s", crit.root_name);
+                                    }
                                     ImGui::EndDragDropSource();
                                 }
 
@@ -7837,20 +8561,60 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             if (stat_crit_dnd_source_index != -1 && stat_crit_dnd_target_index != -1 &&
                                 stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
-                                EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
-                                stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
-                                if (stat_crit_dnd_target_index > stat_crit_dnd_source_index)
-                                    stat_crit_dnd_target_index
-                                            --;
-                                stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
-                                                         item_to_move);
+                                if (s_sub_selection.find(stat_crit_dnd_source_index) != s_sub_selection.end()) {
+                                    multi_move_selected(stat_cat.criteria, s_sub_selection, stat_crit_dnd_target_index);
+                                    s_sub_last_clicked = -1;
+                                } else {
+                                    EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
+                                    stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
+                                    if (stat_crit_dnd_target_index > stat_crit_dnd_source_index)
+                                        stat_crit_dnd_target_index--;
+                                    stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
+                                                             item_to_move);
+                                    std::set<int> shifted_dnd;
+                                    for (int idx : s_sub_selection) {
+                                        int new_idx = idx;
+                                        if (idx == stat_crit_dnd_source_index) new_idx = stat_crit_dnd_target_index;
+                                        else {
+                                            if (idx > stat_crit_dnd_source_index) new_idx--;
+                                            if (new_idx >= stat_crit_dnd_target_index) new_idx++;
+                                        }
+                                        shifted_dnd.insert(new_idx);
+                                    }
+                                    s_sub_selection = shifted_dnd;
+                                    s_sub_last_clicked = -1;
+                                }
                                 save_message_type = MSG_NONE;
+                            }
+
+                            if (bulk_delete_sub && !s_sub_selection.empty()) {
+                                std::vector<int> sorted_desc(s_sub_selection.begin(), s_sub_selection.end());
+                                std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                                for (int idx : sorted_desc) {
+                                    if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                    clear_goal_links(current_template_data.decorations,
+                                                     current_template_data.counter_goals,
+                                                     stat_cat.criteria[idx].root_name);
+                                    stat_cat.criteria.erase(stat_cat.criteria.begin() + idx);
+                                }
+                                s_sub_selection.clear();
+                                s_sub_last_clicked = -1;
+                                save_message_type = MSG_NONE;
+                                crit_to_remove = -1;
                             }
 
                             if (crit_to_remove != -1) {
                                 clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
                                                  stat_cat.criteria[crit_to_remove].root_name);
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
+                                std::set<int> shifted_rm;
+                                for (int idx : s_sub_selection) {
+                                    if (idx == crit_to_remove) continue;
+                                    shifted_rm.insert(idx > crit_to_remove ? idx - 1 : idx);
+                                }
+                                s_sub_selection = shifted_rm;
+                                if (s_sub_last_clicked == crit_to_remove) s_sub_last_clicked = -1;
+                                else if (s_sub_last_clicked > crit_to_remove) s_sub_last_clicked--;
                                 save_message_type = MSG_NONE;
                             }
 
@@ -7896,6 +8660,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(new_crit.root_name, new_name, sizeof(new_crit.root_name) - 1);
                                 new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                                 stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
+                                std::set<int> shifted_cp;
+                                for (int idx : s_sub_selection) shifted_cp.insert(idx > crit_to_copy ? idx + 1 : idx);
+                                s_sub_selection = shifted_cp;
+                                if (s_sub_last_clicked > crit_to_copy) s_sub_last_clicked++;
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -7916,7 +8684,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
-                    // Import unlocks button
+                    static std::set<int> s_unlocks_selection;
+                    static int s_unlocks_last_clicked = -1;
+                    for (auto it = s_unlocks_selection.begin(); it != s_unlocks_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.unlocks.size()) it = s_unlocks_selection.erase(it);
+                        else ++it;
+                    }
+
                     if (ImGui::Button("Import...##unlocks")) {
                         ImGui::OpenPopup("import_unlocks_source_popup");
                     }
@@ -7970,40 +8744,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Sorting Controls (right-aligned on the Import line) ---
-                    bool can_sort_unlocks = false;
-                    for (const auto &goal: current_template_data.unlocks) {
-                        if (goal.sort_order > 0) { can_sort_unlocks = true; break; }
-                    }
+                    // --- Counter for the list (right-aligned on the Import line) ---
+                    bool is_unlock_search_active = (
+                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
                     {
-                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                        char counter_text_top[128];
+                        size_t count_top = 0;
+                        if (!is_unlock_search_active) {
+                            count_top = current_template_data.unlocks.size();
+                        } else {
+                            for (const auto &unlock: current_template_data.unlocks) {
+                                if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
+                                    count_top++;
+                                }
+                            }
+                        }
+                        int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
+                                               count_top, count_top == 1 ? "Unlock" : "Unlocks");
+                        if (!s_unlocks_selection.empty() && pos_top < (int)sizeof(counter_text_top)) {
+                            snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
+                                     " \xC2\xB7 %d selected", (int)s_unlocks_selection.size());
+                        }
+                        float tw_top = ImGui::CalcTextSize(counter_text_top).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
+                        ImGui::TextDisabled("%s", counter_text_top);
                     }
-                    ImGui::BeginDisabled(!can_sort_unlocks);
-                    if (ImGui::Button("Sort##unlocks")) {
-                        apply_partial_sort(current_template_data.unlocks);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip),
-                                                       "Click the order badges next to unlocks to assign a sort order first.");
-                        else snprintf(tip, sizeof(tip), "Rearrange the numbered unlocks among themselves.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##unlocks")) {
-                        for (auto &unlock: current_template_data.unlocks) unlock.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
-                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from unlocks.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::EndDisabled();
 
                     // Add new unlock button
                     if (ImGui::Button("Add New Unlock")) {
@@ -8040,33 +8807,155 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
                     }
 
-                    // Determine if search is active for this scope
-                    bool is_unlock_search_active = (
-                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
-
-                    // --- Counter for the list ---
-                    char counter_text[128];
-                    size_t count = 0;
-                    if (!is_unlock_search_active) {
-                        count = current_template_data.unlocks.size();
-                    } else {
-                        for (const auto &unlock: current_template_data.unlocks) {
-                            if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
-                                str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
-                                count++;
-                            }
-                        }
+                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    bool can_sort_unlocks = false;
+                    for (const auto &goal: current_template_data.unlocks) {
+                        if (goal.sort_order > 0) { can_sort_unlocks = true; break; }
                     }
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", count, count == 1 ? "Unlock" : "Unlocks");
-                    float text_width = ImGui::CalcTextSize(counter_text).x;
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
-                    ImGui::TextDisabled("%s", counter_text);
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_unlocks);
+                    if (ImGui::Button("Sort##unlocks")) {
+                        apply_partial_sort(current_template_data.unlocks);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip),
+                                                       "Click the order badges next to unlocks to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered unlocks among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##unlocks")) {
+                        for (auto &unlock: current_template_data.unlocks) unlock.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from unlocks.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
 
                     int item_to_remove = -1;
                     int item_to_copy = -1;
                     int unlocks_dnd_source_index = -1;
                     int unlocks_dnd_target_index = -1;
+                    bool bulk_delete_unlocks = false;
+
+                    if (!s_unlocks_selection.empty()) {
+                        ImGuiStyle &style = ImGui::GetStyle();
+                        float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
+                        float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
+                        float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                        float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                        float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
+                        float avail = ImGui::GetContentRegionAvail().x;
+                        if (avail > total_w) {
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                        }
+
+                        static char s_unlocks_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...")) {
+                            s_unlocks_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("unlocks_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected unlock.\n"
+                                     "Type a path under resources/icons/, or click Browse.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("unlocks_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected unlocks", (int)s_unlocks_selection.size());
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##bulk_icon_path", s_unlocks_bulk_icon_buf,
+                                                                 sizeof(s_unlocks_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##unlocks_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_unlocks_bulk_icon_buf, new_path, sizeof(s_unlocks_bulk_icon_buf) - 1);
+                                    s_unlocks_bulk_icon_buf[sizeof(s_unlocks_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##unlocks_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_unlocks_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_unlocks_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                    strncpy(current_template_data.unlocks[idx].icon_path, s_unlocks_bulk_icon_buf,
+                                            sizeof(current_template_data.unlocks[idx].icon_path) - 1);
+                                    current_template_data.unlocks[idx].icon_path[
+                                        sizeof(current_template_data.unlocks[idx].icon_path) - 1] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden")) {
+                            int hidden_count = 0;
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                if (current_template_data.unlocks[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_unlocks_selection.size());
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                current_template_data.unlocks[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected unlock.\n"
+                                     "If most are visible they all become hidden, and vice versa.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected")) {
+                            ImGui::OpenPopup("unlocks_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected unlocks. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("unlocks_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected unlocks?", (int)s_unlocks_selection.size());
+                            if (ImGui::Button("Delete##unlocks_bulk_confirm")) {
+                                bulk_delete_unlocks = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##unlocks_bulk_confirm")) {
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##unlocks")) {
+                            s_unlocks_selection.clear();
+                            s_unlocks_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the unlock selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         auto &unlock = current_template_data.unlocks[i];
@@ -8166,8 +9055,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The icon must be inside the 'resources/icons' folder!");
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
+                        {
+                            bool is_unlock_selected = s_unlocks_selection.find((int)i) != s_unlocks_selection.end();
+                            if (ImGui::Checkbox("##unlock_bulk_sel", &is_unlock_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_unlocks_last_clicked >= 0 && s_unlocks_last_clicked != (int)i) {
+                                    int lo = std::min(s_unlocks_last_clicked, (int)i);
+                                    int hi = std::max(s_unlocks_last_clicked, (int)i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.unlocks.size()) continue;
+                                        if (is_unlock_selected) s_unlocks_selection.insert(k);
+                                        else s_unlocks_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_unlock_selected) s_unlocks_selection.insert((int)i);
+                                    else s_unlocks_selection.erase((int)i);
+                                }
+                                s_unlocks_last_clicked = (int)i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple unlocks at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
-                            save_message_type = MSG_NONE; // Clear message on new edit
+                            save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char hidden_tooltip_buffer[512];
@@ -8260,7 +9178,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource()) {
                             ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", unlock.root_name);
+                            if (s_unlocks_selection.find((int)i) != s_unlocks_selection.end() &&
+                                s_unlocks_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_unlocks_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", unlock.root_name);
+                            }
                             ImGui::EndDragDropSource();
                         }
 
@@ -8279,19 +9202,61 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (unlocks_dnd_source_index != -1 && unlocks_dnd_target_index != -1 && unlocks_dnd_source_index !=
                         unlocks_dnd_target_index) {
-                        EditorTrackableItem item_to_move = current_template_data.unlocks[unlocks_dnd_source_index];
-                        current_template_data.unlocks.erase(
-                            current_template_data.unlocks.begin() + unlocks_dnd_source_index);
-                        if (unlocks_dnd_target_index > unlocks_dnd_source_index) unlocks_dnd_target_index--;
-                        current_template_data.unlocks.insert(
-                            current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
+                        if (s_unlocks_selection.find(unlocks_dnd_source_index) != s_unlocks_selection.end()) {
+                            multi_move_selected(current_template_data.unlocks, s_unlocks_selection,
+                                                unlocks_dnd_target_index);
+                            s_unlocks_last_clicked = -1;
+                        } else {
+                            EditorTrackableItem item_to_move = current_template_data.unlocks[unlocks_dnd_source_index];
+                            current_template_data.unlocks.erase(
+                                current_template_data.unlocks.begin() + unlocks_dnd_source_index);
+                            if (unlocks_dnd_target_index > unlocks_dnd_source_index) unlocks_dnd_target_index--;
+                            current_template_data.unlocks.insert(
+                                current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
+                            std::set<int> shifted_dnd;
+                            for (int idx : s_unlocks_selection) {
+                                int new_idx = idx;
+                                if (idx == unlocks_dnd_source_index) new_idx = unlocks_dnd_target_index;
+                                else {
+                                    if (idx > unlocks_dnd_source_index) new_idx--;
+                                    if (new_idx >= unlocks_dnd_target_index) new_idx++;
+                                }
+                                shifted_dnd.insert(new_idx);
+                            }
+                            s_unlocks_selection = shifted_dnd;
+                            s_unlocks_last_clicked = -1;
+                        }
                         save_message_type = MSG_NONE;
+                    }
+
+                    if (bulk_delete_unlocks && !s_unlocks_selection.empty()) {
+                        std::vector<int> sorted_desc(s_unlocks_selection.begin(), s_unlocks_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals,
+                                             current_template_data.unlocks[idx].root_name);
+                            current_template_data.unlocks.erase(current_template_data.unlocks.begin() + idx);
+                        }
+                        s_unlocks_selection.clear();
+                        s_unlocks_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        item_to_remove = -1;
                     }
 
                     if (item_to_remove != -1) {
                         clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
                                          current_template_data.unlocks[item_to_remove].root_name);
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
+                        std::set<int> shifted_rm;
+                        for (int idx : s_unlocks_selection) {
+                            if (idx == item_to_remove) continue;
+                            shifted_rm.insert(idx > item_to_remove ? idx - 1 : idx);
+                        }
+                        s_unlocks_selection = shifted_rm;
+                        if (s_unlocks_last_clicked == item_to_remove) s_unlocks_last_clicked = -1;
+                        else if (s_unlocks_last_clicked > item_to_remove) s_unlocks_last_clicked--;
                         save_message_type = MSG_NONE;
                     }
 
@@ -8338,6 +9303,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
                                                              new_item);
+                        std::set<int> shifted_cp;
+                        for (int idx : s_unlocks_selection) shifted_cp.insert(idx > item_to_copy ? idx + 1 : idx);
+                        s_unlocks_selection = shifted_cp;
+                        if (s_unlocks_last_clicked > item_to_copy) s_unlocks_last_clicked++;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::EndTabItem();
@@ -8349,6 +9318,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem
                     ("Custom Goals", nullptr, custom_tab_flags)) {
+                    static std::set<int> s_custom_selection;
+                    static int s_custom_last_clicked = -1;
+                    for (auto it = s_custom_selection.begin(); it != s_custom_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.custom_goals.size()) it = s_custom_selection.erase(it);
+                        else ++it;
+                    }
+
                     if (ImGui::Button("Import...##custom_goals")) {
                         ImGui::OpenPopup("import_custom_goals_source_popup");
                     }
@@ -8368,40 +9344,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Sorting Controls (right-aligned on the Import line) ---
-                    bool can_sort_custom = false;
-                    for (const auto &goal: current_template_data.custom_goals) {
-                        if (goal.sort_order > 0) { can_sort_custom = true; break; }
-                    }
+                    // --- Counter for the list (right-aligned on the Import line) ---
+                    bool is_custom_search_active_top = (
+                        current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
                     {
-                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                        char counter_text_top[128];
+                        size_t count_top = 0;
+                        if (!is_custom_search_active_top) {
+                            count_top = current_template_data.custom_goals.size();
+                        } else {
+                            for (const auto &g: current_template_data.custom_goals) {
+                                char gs[32];
+                                snprintf(gs, sizeof(gs), "%d", g.goal);
+                                if (str_contains_insensitive(g.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(g.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(g.icon_path, tc_search_buffer) ||
+                                    (g.goal != 0 && strstr(gs, tc_search_buffer) != nullptr)) {
+                                    count_top++;
+                                }
+                            }
+                        }
+                        int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
+                                               count_top, count_top == 1 ? "Custom Goal" : "Custom Goals");
+                        if (!s_custom_selection.empty() && pos_top < (int)sizeof(counter_text_top)) {
+                            snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
+                                     " \xC2\xB7 %d selected", (int)s_custom_selection.size());
+                        }
+                        float tw_top = ImGui::CalcTextSize(counter_text_top).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
+                        ImGui::TextDisabled("%s", counter_text_top);
                     }
-                    ImGui::BeginDisabled(!can_sort_custom);
-                    if (ImGui::Button("Sort##custom")) {
-                        apply_partial_sort(current_template_data.custom_goals);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_custom) snprintf(tip, sizeof(tip),
-                                                      "Click the order badges next to goals to assign a sort order first.");
-                        else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##custom")) {
-                        for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_custom) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
-                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from custom goals.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::EndDisabled();
 
                     if (ImGui::Button("Add New Custom Goal")) {
                         // Create a new custom goal with default values
@@ -8442,6 +9414,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SameLine();
                     ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
 
+                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    bool can_sort_custom = false;
+                    for (const auto &goal: current_template_data.custom_goals) {
+                        if (goal.sort_order > 0) { can_sort_custom = true; break; }
+                    }
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_custom);
+                    if (ImGui::Button("Sort##custom")) {
+                        apply_partial_sort(current_template_data.custom_goals);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_custom) snprintf(tip, sizeof(tip),
+                                                      "Click the order badges next to goals to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##custom")) {
+                        for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_custom) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from custom goals.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
+
                     // Determine if search is active for this scope
                     bool is_custom_search_active = (
                         current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
@@ -8466,22 +9473,122 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    // --- Counter for the list ---
-                    char counter_text[128];
-                    size_t count = goals_to_render.size();
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", count,
-                             count == 1 ? "Custom Goal" : "Custom Goals");
-                    float text_width = ImGui::CalcTextSize(counter_text).x;
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
-                    ImGui::TextDisabled("%s", counter_text);
-
                     int item_to_remove = -1;
                     int item_to_copy = -1;
                     int custom_dnd_source_index = -1;
                     int custom_dnd_target_index = -1;
+                    bool bulk_delete_custom = false;
+
+                    if (!s_custom_selection.empty()) {
+                        ImGuiStyle &style = ImGui::GetStyle();
+                        float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
+                        float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
+                        float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                        float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                        float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
+                        float avail = ImGui::GetContentRegionAvail().x;
+                        if (avail > total_w) {
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                        }
+
+                        static char s_custom_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...##custom")) {
+                            s_custom_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("custom_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected custom goal.\n"
+                                     "Type a path under resources/icons/, or click Browse.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("custom_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected custom goals", (int)s_custom_selection.size());
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##custom_bulk_icon_path", s_custom_bulk_icon_buf,
+                                                                 sizeof(s_custom_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##custom_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_custom_bulk_icon_buf, new_path, sizeof(s_custom_bulk_icon_buf) - 1);
+                                    s_custom_bulk_icon_buf[sizeof(s_custom_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##custom_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_custom_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_custom_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                    strncpy(current_template_data.custom_goals[idx].icon_path, s_custom_bulk_icon_buf,
+                                            sizeof(current_template_data.custom_goals[idx].icon_path) - 1);
+                                    current_template_data.custom_goals[idx].icon_path[
+                                        sizeof(current_template_data.custom_goals[idx].icon_path) - 1] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden##custom")) {
+                            int hidden_count = 0;
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                if (current_template_data.custom_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_custom_selection.size());
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                current_template_data.custom_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected custom goal.\n"
+                                     "If most are visible they all become hidden, and vice versa.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected##custom")) {
+                            ImGui::OpenPopup("custom_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected custom goals. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("custom_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected custom goals?", (int)s_custom_selection.size());
+                            if (ImGui::Button("Delete##custom_bulk_confirm")) {
+                                bulk_delete_custom = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##custom_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##custom")) {
+                            s_custom_selection.clear();
+                            s_custom_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the custom goal selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
                         auto &goal = *goals_to_render[i];
+                        int real_i = (int)(&goal - &current_template_data.custom_goals[0]);
 
                         ImGui::PushID(i);
 
@@ -8677,8 +9784,48 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
+                        {
+                            bool is_cg_selected = s_custom_selection.find(real_i) != s_custom_selection.end();
+                            if (ImGui::Checkbox("##custom_bulk_sel", &is_cg_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_custom_last_clicked >= 0 && s_custom_last_clicked != real_i) {
+                                    int lo = std::min(s_custom_last_clicked, real_i);
+                                    int hi = std::max(s_custom_last_clicked, real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.custom_goals.size()) continue;
+                                        if (is_custom_search_active) {
+                                            const auto &gg = current_template_data.custom_goals[k];
+                                            char gs[32];
+                                            snprintf(gs, sizeof(gs), "%d", gg.goal);
+                                            if (!str_contains_insensitive(gg.display_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(gg.root_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(gg.icon_path, tc_search_buffer) &&
+                                                !(gg.goal != 0 && strstr(gs, tc_search_buffer) != nullptr)) {
+                                                continue;
+                                            }
+                                        }
+                                        if (is_cg_selected) s_custom_selection.insert(k);
+                                        else s_custom_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_cg_selected) s_custom_selection.insert(real_i);
+                                    else s_custom_selection.erase(real_i);
+                                }
+                                s_custom_last_clicked = real_i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple custom goals at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
                         if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
-                            save_message_type = MSG_NONE; // Clear message on new edit
+                            save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char hidden_tooltip_buffer[512];
@@ -8789,7 +9936,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Add the required flag here
                         if (ImGui::BeginDragDropSource()) {
                             ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", goal.root_name);
+                            if (s_custom_selection.find(real_i) != s_custom_selection.end() &&
+                                s_custom_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_custom_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", goal.root_name);
+                            }
                             ImGui::EndDragDropSource();
                         }
 
@@ -8808,21 +9960,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index !=
                         custom_dnd_target_index) {
-                        EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
-                        current_template_data.custom_goals.erase(
-                            current_template_data.custom_goals.begin() + custom_dnd_source_index);
-                        if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
-                        current_template_data.custom_goals.insert(
-                            current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
+                        int cg_src_real = -1, cg_tgt_real = -1;
+                        if (custom_dnd_source_index >= 0 && custom_dnd_source_index < (int)goals_to_render.size()) {
+                            cg_src_real = (int)(goals_to_render[custom_dnd_source_index] -
+                                                &current_template_data.custom_goals[0]);
+                        }
+                        if (custom_dnd_target_index >= 0 && custom_dnd_target_index < (int)goals_to_render.size()) {
+                            cg_tgt_real = (int)(goals_to_render[custom_dnd_target_index] -
+                                                &current_template_data.custom_goals[0]);
+                        } else {
+                            cg_tgt_real = (int)current_template_data.custom_goals.size();
+                        }
+                        if (cg_src_real >= 0 && s_custom_selection.find(cg_src_real) != s_custom_selection.end()) {
+                            multi_move_selected(current_template_data.custom_goals, s_custom_selection, cg_tgt_real);
+                            s_custom_last_clicked = -1;
+                        } else {
+                            EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
+                            current_template_data.custom_goals.erase(
+                                current_template_data.custom_goals.begin() + custom_dnd_source_index);
+                            if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
+                            current_template_data.custom_goals.insert(
+                                current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
+                            s_custom_selection.clear();
+                            s_custom_last_clicked = -1;
+                        }
                         save_message_type = MSG_NONE;
                     }
 
+                    if (bulk_delete_custom && !s_custom_selection.empty()) {
+                        std::vector<int> sorted_desc(s_custom_selection.begin(), s_custom_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals,
+                                             current_template_data.custom_goals[idx].root_name);
+                            current_template_data.custom_goals.erase(
+                                current_template_data.custom_goals.begin() + idx);
+                        }
+                        s_custom_selection.clear();
+                        s_custom_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        item_to_remove = -1;
+                    }
 
                     if (item_to_remove != -1) {
                         clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
                                          current_template_data.custom_goals[item_to_remove].root_name);
                         current_template_data.custom_goals.erase(
                             current_template_data.custom_goals.begin() + item_to_remove);
+                        s_custom_selection.clear();
+                        s_custom_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
 
@@ -8869,6 +10057,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.custom_goals.insert(
                             current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
+                        s_custom_selection.clear();
+                        s_custom_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::EndTabItem();
@@ -8885,7 +10075,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // This flag still tracks ALL CHANGES within multi-stage goals
                     bool ms_goal_data_changed = false;
 
-                    // TWO-PANE LAYOUT for Multi-Stage Goals
+                    static std::set<int> s_msg_selection;
+                    static int s_msg_last_clicked = -1;
+                    for (auto it = s_msg_selection.begin(); it != s_msg_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.multi_stage_goals.size()) it = s_msg_selection.erase(it);
+                        else ++it;
+                    }
+
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
 
@@ -9162,26 +10358,128 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    // --- Counter for the list ---
-                    char counter_text[128];
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", goals_to_render.size(),
-                             goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
+                    char counter_text[160];
+                    int msg_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
+                                                   goals_to_render.size(),
+                                                   goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
+                    if (!s_msg_selection.empty() && msg_counter_pos < (int)sizeof(counter_text)) {
+                        snprintf(counter_text + msg_counter_pos, sizeof(counter_text) - msg_counter_pos,
+                                 " \xC2\xB7 %d selected", (int)s_msg_selection.size());
+                    }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
-                    // Center Count
                     ImGui::SetCursorPosX(
                         ImGui::GetCursorPosX() + (
                             ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
                         0.5f);
                     ImGui::TextDisabled("%s", counter_text);
 
-                    // 3. Render the list using pointers.
                     int goal_to_remove_idx = -1;
                     int goal_to_copy_idx = -1;
                     int ms_goal_dnd_source_index = -1;
                     int ms_goal_dnd_target_index = -1;
+                    bool bulk_delete_msg = false;
+
+                    if (!s_msg_selection.empty()) {
+                        static char s_msg_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...##msg_bulk")) {
+                            s_msg_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("msg_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected multi-stage goal.\n"
+                                     "Type a path under resources/icons/, or click Browse.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("msg_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected goals", (int)s_msg_selection.size());
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##msg_bulk_icon_path", s_msg_bulk_icon_buf,
+                                                                 sizeof(s_msg_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##msg_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_msg_bulk_icon_buf, new_path, sizeof(s_msg_bulk_icon_buf) - 1);
+                                    s_msg_bulk_icon_buf[sizeof(s_msg_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##msg_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_msg_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_msg_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                    strncpy(current_template_data.multi_stage_goals[idx].icon_path, s_msg_bulk_icon_buf,
+                                            sizeof(current_template_data.multi_stage_goals[idx].icon_path) - 1);
+                                    current_template_data.multi_stage_goals[idx].icon_path[
+                                        sizeof(current_template_data.multi_stage_goals[idx].icon_path) - 1] = '\0';
+                                }
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden##msg_bulk")) {
+                            int hidden_count = 0;
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                if (current_template_data.multi_stage_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_msg_selection.size());
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                current_template_data.multi_stage_goals[idx].is_hidden = target_hidden;
+                            }
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected multi-stage goal.\n"
+                                     "If most are visible they all become hidden, and vice versa.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected##msg_bulk")) {
+                            ImGui::OpenPopup("msg_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected multi-stage goals. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("msg_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected multi-stage goals?", (int)s_msg_selection.size());
+                            if (ImGui::Button("Delete##msg_bulk_confirm")) {
+                                bulk_delete_msg = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##msg_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##msg_bulk")) {
+                            s_msg_selection.clear();
+                            s_msg_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the multi-stage goal selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
                         auto &goal = *goals_to_render[i];
+                        int msg_real_i = (int)(&goal - &current_template_data.multi_stage_goals[0]);
                         ImGui::PushID(&goal);
 
                         const char *display_name = goal.display_name;
@@ -9193,7 +10491,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             label = "[New Goal]";
                         }
 
-                        // --- Sort Badge (Multi-Stage Goal) ---
+                        {
+                            bool is_msg_selected = s_msg_selection.find(msg_real_i) != s_msg_selection.end();
+                            if (ImGui::Checkbox("##msg_bulk_sel", &is_msg_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_msg_last_clicked >= 0 && s_msg_last_clicked != msg_real_i) {
+                                    int lo = std::min(s_msg_last_clicked, msg_real_i);
+                                    int hi = std::max(s_msg_last_clicked, msg_real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.multi_stage_goals.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p : goals_to_render) {
+                                            if (p == &current_template_data.multi_stage_goals[k]) { in_filter = true; break; }
+                                        }
+                                        if (!in_filter) continue;
+                                        if (is_msg_selected) s_msg_selection.insert(k);
+                                        else s_msg_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_msg_selected) s_msg_selection.insert(msg_real_i);
+                                    else s_msg_selection.erase(msg_real_i);
+                                }
+                                s_msg_last_clicked = msg_real_i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple multi-stage goals at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
+
                         char ms_badge_label[64];
                         if (goal.sort_order > 0) {
                             snprintf(ms_badge_label, sizeof(ms_badge_label), "%d##ms_badge", goal.sort_order);
@@ -9254,7 +10586,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             ImGui::SetDragDropPayload("MS_GOAL_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", label);
+                            if (s_msg_selection.find(msg_real_i) != s_msg_selection.end() &&
+                                s_msg_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_msg_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
                             ImGui::EndDragDropSource();
                         }
                         if (ImGui::BeginDragDropTarget()) {
@@ -9267,32 +10604,88 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::PopID();
                     }
 
-                    // Handle Drag and Drop
+                    if (bulk_delete_msg && !s_msg_selection.empty()) {
+                        std::vector<int> sorted_desc(s_msg_selection.begin(), s_msg_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_ms_goal) {
+                            strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        bool wipe_selected_ptr = false;
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            EditorMultiStageGoal *gp = &current_template_data.multi_stage_goals[idx];
+                            if (selected_ms_goal == gp) wipe_selected_ptr = true;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals, gp->root_name);
+                            current_template_data.multi_stage_goals.erase(
+                                current_template_data.multi_stage_goals.begin() + idx);
+                        }
+                        if (wipe_selected_ptr) {
+                            selected_ms_goal = nullptr;
+                        } else if (selected_root_name_before_op[0] != '\0') {
+                            selected_ms_goal = nullptr;
+                            for (auto &g : current_template_data.multi_stage_goals) {
+                                if (strcmp(g.root_name, selected_root_name_before_op) == 0) {
+                                    selected_ms_goal = &g;
+                                    break;
+                                }
+                            }
+                        }
+                        s_msg_selection.clear();
+                        s_msg_last_clicked = -1;
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                        goal_to_remove_idx = -1;
+                        ms_goal_dnd_source_index = -1;
+                        ms_goal_dnd_target_index = -1;
+                    }
+
                     if (ms_goal_dnd_source_index != -1 && ms_goal_dnd_target_index != -1) {
                         EditorMultiStageGoal *source_item_ptr = goals_to_render[ms_goal_dnd_source_index];
                         EditorMultiStageGoal *target_item_ptr = goals_to_render[ms_goal_dnd_target_index];
+                        int msg_src_real = (int)(source_item_ptr - &current_template_data.multi_stage_goals[0]);
+                        int msg_tgt_real = (int)(target_item_ptr - &current_template_data.multi_stage_goals[0]);
 
-                        auto source_it = std::find_if(current_template_data.multi_stage_goals.begin(),
-                                                      current_template_data.multi_stage_goals.end(),
-                                                      [&](const EditorMultiStageGoal &g) {
-                                                          return &g == source_item_ptr;
-                                                      });
-
-                        EditorMultiStageGoal item_to_move = *source_item_ptr;
-                        current_template_data.multi_stage_goals.erase(source_it);
-
-                        auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
-                                                      current_template_data.multi_stage_goals.end(),
-                                                      [&](const EditorMultiStageGoal &g) {
-                                                          return &g == target_item_ptr;
-                                                      });
-
-                        current_template_data.multi_stage_goals.insert(target_it, item_to_move);
+                        if (s_msg_selection.find(msg_src_real) != s_msg_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_ms_goal) {
+                                strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.multi_stage_goals, s_msg_selection, msg_tgt_real);
+                            s_msg_last_clicked = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                selected_ms_goal = nullptr;
+                                for (auto &g : current_template_data.multi_stage_goals) {
+                                    if (strcmp(g.root_name, selected_root_name_before_op) == 0) {
+                                        selected_ms_goal = &g;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            auto source_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                          current_template_data.multi_stage_goals.end(),
+                                                          [&](const EditorMultiStageGoal &g) {
+                                                              return &g == source_item_ptr;
+                                                          });
+                            EditorMultiStageGoal item_to_move = *source_item_ptr;
+                            current_template_data.multi_stage_goals.erase(source_it);
+                            auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                          current_template_data.multi_stage_goals.end(),
+                                                          [&](const EditorMultiStageGoal &g) {
+                                                              return &g == target_item_ptr;
+                                                          });
+                            current_template_data.multi_stage_goals.insert(target_it, item_to_move);
+                            s_msg_selection.clear();
+                            s_msg_last_clicked = -1;
+                        }
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle Copying
                     if (goal_to_copy_idx != -1) {
                         char selected_root_name_before_op[192] = {};
                         if (selected_ms_goal) {
@@ -9359,7 +10752,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.multi_stage_goals.push_back(new_goal);
                         }
 
-                        // Re-find and update the selected_ms_goal pointer
                         if (selected_root_name_before_op[0] != '\0') {
                             for (auto &goal: current_template_data.multi_stage_goals) {
                                 if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
@@ -9368,11 +10760,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_msg_selection.clear();
+                        s_msg_last_clicked = -1;
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle Removal
                     if (goal_to_remove_idx != -1) {
                         char selected_root_name_before_op[192] = {};
                         if (selected_ms_goal) {
@@ -9396,7 +10789,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.multi_stage_goals.end()
                         );
 
-                        // Re-find pointer if it wasn't the one being deleted
                         if (selected_ms_goal && selected_root_name_before_op[0] != '\0') {
                             for (auto &goal: current_template_data.multi_stage_goals) {
                                 if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
@@ -9405,6 +10797,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        s_msg_selection.clear();
+                        s_msg_last_clicked = -1;
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
@@ -9580,7 +10974,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
                         ImGui::Text("Stages");
 
-                        // --- Counter for the stages list ---
+                        static char s_stage_sel_owner[192] = "";
+                        static std::set<int> s_stage_selection;
+                        static int s_stage_last_clicked = -1;
+                        if (strcmp(s_stage_sel_owner, goal.root_name) != 0) {
+                            strncpy(s_stage_sel_owner, goal.root_name, sizeof(s_stage_sel_owner) - 1);
+                            s_stage_sel_owner[sizeof(s_stage_sel_owner) - 1] = '\0';
+                            s_stage_selection.clear();
+                            s_stage_last_clicked = -1;
+                        }
+                        for (auto it = s_stage_selection.begin(); it != s_stage_selection.end();) {
+                            if (*it < 0 || (size_t)*it >= goal.stages.size()) it = s_stage_selection.erase(it);
+                            else ++it;
+                        }
+
                         char stage_counter_text[128];
                         bool is_details_search_active = (
                             current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
@@ -9621,8 +11028,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
-                        snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s", visible_stages_count,
-                                 visible_stages_count == 1 ? "Stage" : "Stages");
+                        int stage_pos = snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s",
+                                                 visible_stages_count,
+                                                 visible_stages_count == 1 ? "Stage" : "Stages");
+                        if (!s_stage_selection.empty() && stage_pos < (int)sizeof(stage_counter_text)) {
+                            snprintf(stage_counter_text + stage_pos, sizeof(stage_counter_text) - stage_pos,
+                                     " \xC2\xB7 %d selected", (int)s_stage_selection.size());
+                        }
                         float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
                         ImGui::TextDisabled("%s", stage_counter_text);
@@ -9816,6 +11228,97 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         int stage_dnd_source_index = -1;
                         int stage_dnd_target_index = -1;
+                        bool bulk_delete_stages = false;
+
+                        if (!s_stage_selection.empty()) {
+                            ImGuiStyle &style = ImGui::GetStyle();
+                            float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
+                            float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                            float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                            int btn_count = 2;
+                            float total_w = w_del + w_des;
+                            if (goal.use_stage_icons) { total_w += w_icon; btn_count++; }
+                            total_w += style.ItemSpacing.x * (btn_count - 1);
+                            float avail = ImGui::GetContentRegionAvail().x;
+                            if (avail > total_w) {
+                                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                            }
+
+                            if (goal.use_stage_icons) {
+                                static char s_stage_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                                if (ImGui::SmallButton("Set Icon...##stage")) {
+                                    s_stage_bulk_icon_buf[0] = '\0';
+                                    ImGui::OpenPopup("stage_bulk_icon_popup");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[256];
+                                    snprintf(tip, sizeof(tip),
+                                             "Apply the same icon path to every selected stage.\n"
+                                             "Type a path under resources/icons/, or click Browse.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                if (ImGui::BeginPopup("stage_bulk_icon_popup")) {
+                                    ImGui::TextDisabled("Icon path for %d selected stages", (int)s_stage_selection.size());
+                                    ImGui::SetNextItemWidth(280.0f);
+                                    bool submit_enter = ImGui::InputText("##stage_bulk_icon_path", s_stage_bulk_icon_buf,
+                                                                         sizeof(s_stage_bulk_icon_buf),
+                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("Browse##stage_bulk_icon")) {
+                                        char new_path[MAX_PATH_LENGTH];
+                                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                            strncpy(s_stage_bulk_icon_buf, new_path, sizeof(s_stage_bulk_icon_buf) - 1);
+                                            s_stage_bulk_icon_buf[sizeof(s_stage_bulk_icon_buf) - 1] = '\0';
+                                        }
+                                    }
+                                    bool submit_apply = ImGui::Button("Apply##stage_bulk_icon");
+                                    if ((submit_enter || submit_apply) && s_stage_bulk_icon_buf[0] != '\0') {
+                                        for (int idx : s_stage_selection) {
+                                            if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
+                                            strncpy(goal.stages[idx].icon_path, s_stage_bulk_icon_buf,
+                                                    sizeof(goal.stages[idx].icon_path) - 1);
+                                            goal.stages[idx].icon_path[
+                                                sizeof(goal.stages[idx].icon_path) - 1] = '\0';
+                                        }
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
+                                ImGui::SameLine();
+                            }
+
+                            if (ImGui::SmallButton("Delete Selected##stage")) {
+                                ImGui::OpenPopup("stage_bulk_delete_confirm");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip), "Remove all selected stages. Requires confirmation.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::BeginPopup("stage_bulk_delete_confirm")) {
+                                ImGui::Text("Delete %d selected stages?", (int)s_stage_selection.size());
+                                if (ImGui::Button("Delete##stage_bulk_confirm")) {
+                                    bulk_delete_stages = true;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::Button("Cancel##stage_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                ImGui::EndPopup();
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Deselect all##stage")) {
+                                s_stage_selection.clear();
+                                s_stage_last_clicked = -1;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[128];
+                                snprintf(tip, sizeof(tip), "Clear the stage selection.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                        }
 
                         for (size_t j = 0; j < goal.stages.size(); ++j) {
                             auto &stage = goal.stages[j];
@@ -10330,6 +11833,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
 
+                            {
+                                bool is_stage_selected = s_stage_selection.find((int)j) != s_stage_selection.end();
+                                if (ImGui::Checkbox("##stage_bulk_sel", &is_stage_selected)) {
+                                    bool shift = ImGui::GetIO().KeyShift;
+                                    if (shift && s_stage_last_clicked >= 0 && s_stage_last_clicked != (int)j) {
+                                        int lo = std::min(s_stage_last_clicked, (int)j);
+                                        int hi = std::max(s_stage_last_clicked, (int)j);
+                                        for (int k = lo; k <= hi && k < (int)goal.stages.size(); k++) {
+                                            if (is_stage_selected) s_stage_selection.insert(k);
+                                            else s_stage_selection.erase(k);
+                                        }
+                                    } else {
+                                        if (is_stage_selected) s_stage_selection.insert((int)j);
+                                        else s_stage_selection.erase((int)j);
+                                    }
+                                    s_stage_last_clicked = (int)j;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char sel_tip[384];
+                                    if (goal.use_stage_icons) {
+                                        snprintf(sel_tip, sizeof(sel_tip),
+                                                 "Select for bulk actions on multiple stages at once:\n"
+                                                 "reordering (drag any selected row), setting the same icon,\n"
+                                                 "and deletion.\n"
+                                                 "Shift+Click to range-select or -deselect.");
+                                    } else {
+                                        snprintf(sel_tip, sizeof(sel_tip),
+                                                 "Select for bulk actions on multiple stages at once:\n"
+                                                 "reordering (drag any selected row) and deletion.\n"
+                                                 "Enable per-stage icons on the goal to bulk-set icons.\n"
+                                                 "Shift+Click to range-select or -deselect.");
+                                    }
+                                    ImGui::SetTooltip("%s", sel_tip);
+                                }
+                                ImGui::SameLine();
+                            }
                             if (ImGui::Button("Copy")) {
                                 stage_to_copy = j;
                                 ms_goal_data_changed = true;
@@ -10395,7 +11934,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // To make a non-interactive item a drag source we use the flag
                             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                                 ImGui::SetDragDropPayload("MS_STAGE_DND", &j, sizeof(int));
-                                ImGui::Text("Reorder Stage: %s", stage.stage_id);
+                                if (s_stage_selection.find((int)j) != s_stage_selection.end() &&
+                                    s_stage_selection.size() > 1) {
+                                    ImGui::Text("Reordering %d selected stages", (int)s_stage_selection.size());
+                                } else {
+                                    ImGui::Text("Reorder Stage: %s", stage.stage_id);
+                                }
                                 ImGui::EndDragDropSource();
                             }
 
@@ -10412,15 +11956,48 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndDragDropTarget();
                         }
 
-                        // Handle stage reordering after the loop
                         if (stage_dnd_source_index != -1 && stage_dnd_target_index != -1 && stage_dnd_source_index !=
                             stage_dnd_target_index) {
-                            EditorSubGoal item_to_move = goal.stages[stage_dnd_source_index];
-                            goal.stages.erase(goal.stages.begin() + stage_dnd_source_index);
-                            if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
-                            goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
+                            if (s_stage_selection.find(stage_dnd_source_index) != s_stage_selection.end()) {
+                                multi_move_selected(goal.stages, s_stage_selection, stage_dnd_target_index);
+                                s_stage_last_clicked = -1;
+                            } else {
+                                EditorSubGoal item_to_move = goal.stages[stage_dnd_source_index];
+                                goal.stages.erase(goal.stages.begin() + stage_dnd_source_index);
+                                if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
+                                goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
+                                std::set<int> shifted_dnd;
+                                for (int idx : s_stage_selection) {
+                                    int new_idx = idx;
+                                    if (idx == stage_dnd_source_index) new_idx = stage_dnd_target_index;
+                                    else {
+                                        if (idx > stage_dnd_source_index) new_idx--;
+                                        if (new_idx >= stage_dnd_target_index) new_idx++;
+                                    }
+                                    shifted_dnd.insert(new_idx);
+                                }
+                                s_stage_selection = shifted_dnd;
+                                s_stage_last_clicked = -1;
+                            }
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
+                        }
+
+                        if (bulk_delete_stages && !s_stage_selection.empty()) {
+                            std::vector<int> sorted_desc(s_stage_selection.begin(), s_stage_selection.end());
+                            std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                            for (int idx : sorted_desc) {
+                                if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
+                                clear_goal_links(current_template_data.decorations,
+                                                 current_template_data.counter_goals,
+                                                 goal.root_name, goal.stages[idx].stage_id);
+                                goal.stages.erase(goal.stages.begin() + idx);
+                            }
+                            s_stage_selection.clear();
+                            s_stage_last_clicked = -1;
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                            stage_to_remove = -1;
                         }
 
                         if (stage_to_remove != -1) {
@@ -10428,6 +12005,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              goal.root_name,
                                              goal.stages[stage_to_remove].stage_id);
                             goal.stages.erase(goal.stages.begin() + stage_to_remove);
+                            std::set<int> shifted_rm;
+                            for (int idx : s_stage_selection) {
+                                if (idx == stage_to_remove) continue;
+                                shifted_rm.insert(idx > stage_to_remove ? idx - 1 : idx);
+                            }
+                            s_stage_selection = shifted_rm;
+                            if (s_stage_last_clicked == stage_to_remove) s_stage_last_clicked = -1;
+                            else if (s_stage_last_clicked > stage_to_remove) s_stage_last_clicked--;
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -10482,6 +12067,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
                             new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                             goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
+                            std::set<int> shifted_cp;
+                            for (int idx : s_stage_selection) shifted_cp.insert(idx > stage_to_copy ? idx + 1 : idx);
+                            s_stage_selection = shifted_cp;
+                            if (s_stage_last_clicked > stage_to_copy) s_stage_last_clicked++;
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -10507,7 +12096,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_COUNTERS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Counters", nullptr, counter_tab_flags)) {
-                    // --- Two-Pane Layout ---
+                    static std::set<int> s_ctr_selection;
+                    static int s_ctr_last_clicked = -1;
+                    for (auto it = s_ctr_selection.begin(); it != s_ctr_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.counter_goals.size()) it = s_ctr_selection.erase(it);
+                        else ++it;
+                    }
+
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
 
@@ -10531,51 +12126,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Sorting Controls (right-aligned) ---
                     bool can_sort_ctr = false;
                     for (const auto &c: current_template_data.counter_goals) {
-                        if (c.sort_order > 0) {
-                            can_sort_ctr = true;
-                            break;
-                        }
+                        if (c.sort_order > 0) { can_sort_ctr = true; break; }
                     }
-
-                    float sort_btn_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float reset_btn_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float total_btns_w = sort_btn_w + reset_btn_w + ImGui::GetStyle().ItemSpacing.x;
-                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_btns_w);
-
+                    {
+                        float sort_btn_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float reset_btn_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_btns_w = sort_btn_w + reset_btn_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_btns_w);
+                    }
                     ImGui::BeginDisabled(!can_sort_ctr);
                     if (ImGui::Button("Sort##ctr")) {
                         apply_partial_sort(current_template_data.counter_goals);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort_ctr)
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click the order badges next to counters to assign a sort order first.");
-                        else
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Rearrange the numbered items among themselves.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        char tip[128];
+                        if (!can_sort_ctr) snprintf(tip, sizeof(tip),
+                                                   "Click the order badges next to counters to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
+                        ImGui::SetTooltip("%s", tip);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Reset Order##ctr")) {
                         for (auto &c: current_template_data.counter_goals) c.sort_order = 0;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buffer[128];
-                        if (!can_sort_ctr)
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                        else
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Clear all assigned sort orders from counters.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        char tip[128];
+                        if (!can_sort_ctr) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from counters.");
+                        ImGui::SetTooltip("%s", tip);
                     }
                     ImGui::EndDisabled();
 
-                    // --- Add New Counter Button ---
                     if (ImGui::Button("Add New Counter")) {
                         EditorCounterGoal new_counter = {};
                         int ctr_num = 1;
@@ -10610,11 +12194,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("Show Display Names##ctr", &show_counter_display_names);
+
                     ImGui::Separator();
 
-                    // --- Build render list with search filtering ---
-                    std::vector<EditorCounterGoal *> counters_to_render;
                     bool ctr_search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_COUNTERS);
+                    {
+                        size_t count_top = 0;
+                        if (!ctr_search_active) {
+                            count_top = current_template_data.counter_goals.size();
+                        } else {
+                            for (const auto &c: current_template_data.counter_goals) {
+                                if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(c.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(c.icon_path, tc_search_buffer)) {
+                                    count_top++;
+                                }
+                            }
+                        }
+                        char ctr_count_text[160];
+                        int ctr_pos = snprintf(ctr_count_text, sizeof(ctr_count_text), "%zu %s",
+                                               count_top, count_top == 1 ? "Counter" : "Counters");
+                        if (!s_ctr_selection.empty() && ctr_pos < (int)sizeof(ctr_count_text)) {
+                            snprintf(ctr_count_text + ctr_pos, sizeof(ctr_count_text) - ctr_pos,
+                                     " \xC2\xB7 %d selected", (int)s_ctr_selection.size());
+                        }
+                        float tw = ImGui::CalcTextSize(ctr_count_text).x;
+                        ImGui::SetCursorPosX(
+                            ImGui::GetCursorPosX() + (
+                                ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - tw) *
+                            0.5f);
+                        ImGui::TextDisabled("%s", ctr_count_text);
+                    }
+
+                    std::vector<EditorCounterGoal *> counters_to_render;
                     if (ctr_search_active) {
                         for (auto &c: current_template_data.counter_goals) {
                             if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
@@ -10629,24 +12241,111 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    // --- Counter text (centered) ---
-                    char ctr_count_text[128];
-                    snprintf(ctr_count_text, sizeof(ctr_count_text), "%zu %s", counters_to_render.size(),
-                             counters_to_render.size() == 1 ? "Counter" : "Counters");
-                    float ctr_text_w = ImGui::CalcTextSize(ctr_count_text).x;
-                    ImGui::SetCursorPosX(
-                        ImGui::GetCursorPosX() + (
-                            ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ctr_text_w) * 0.5f);
-                    ImGui::TextDisabled("%s", ctr_count_text);
-
-                    // --- Render the list ---
                     int ctr_to_remove_idx = -1;
                     int ctr_to_copy_idx = -1;
                     int ctr_dnd_source_index = -1;
                     int ctr_dnd_target_index = -1;
+                    bool bulk_delete_ctr = false;
+
+                    if (!s_ctr_selection.empty()) {
+                        static char s_ctr_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+                        if (ImGui::SmallButton("Set Icon...##ctr_bulk")) {
+                            s_ctr_bulk_icon_buf[0] = '\0';
+                            ImGui::OpenPopup("ctr_bulk_icon_popup");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Apply the same icon path to every selected counter.\n"
+                                     "Type a path under resources/icons/, or click Browse.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("ctr_bulk_icon_popup")) {
+                            ImGui::TextDisabled("Icon path for %d selected counters", (int)s_ctr_selection.size());
+                            ImGui::SetNextItemWidth(280.0f);
+                            bool submit_enter = ImGui::InputText("##ctr_bulk_icon_path", s_ctr_bulk_icon_buf,
+                                                                 sizeof(s_ctr_bulk_icon_buf),
+                                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##ctr_bulk_icon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(s_ctr_bulk_icon_buf, new_path, sizeof(s_ctr_bulk_icon_buf) - 1);
+                                    s_ctr_bulk_icon_buf[sizeof(s_ctr_bulk_icon_buf) - 1] = '\0';
+                                }
+                            }
+                            bool submit_apply = ImGui::Button("Apply##ctr_bulk_icon");
+                            if ((submit_enter || submit_apply) && s_ctr_bulk_icon_buf[0] != '\0') {
+                                for (int idx : s_ctr_selection) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                    strncpy(current_template_data.counter_goals[idx].icon_path, s_ctr_bulk_icon_buf,
+                                            sizeof(current_template_data.counter_goals[idx].icon_path) - 1);
+                                    current_template_data.counter_goals[idx].icon_path[
+                                        sizeof(current_template_data.counter_goals[idx].icon_path) - 1] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Toggle Hidden##ctr_bulk")) {
+                            int hidden_count = 0;
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                if (current_template_data.counter_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_ctr_selection.size());
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                current_template_data.counter_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Flip Hidden on every selected counter.\n"
+                                     "If most are visible they all become hidden, and vice versa.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Delete Selected##ctr_bulk")) {
+                            ImGui::OpenPopup("ctr_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected counters. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("ctr_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected counters?", (int)s_ctr_selection.size());
+                            if (ImGui::Button("Delete##ctr_bulk_confirm")) {
+                                bulk_delete_ctr = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##ctr_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##ctr_bulk")) {
+                            s_ctr_selection.clear();
+                            s_ctr_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the counter selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < counters_to_render.size(); ++i) {
                         auto &counter = *counters_to_render[i];
+                        int ctr_real_i = (int)(&counter - &current_template_data.counter_goals[0]);
                         ImGui::PushID(&counter);
 
                         const char *display_name = counter.display_name;
@@ -10656,7 +12355,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 : root_name;
                         if (label[0] == '\0') label = "[New Counter]";
 
-                        // Sort Badge
+                        {
+                            bool is_ctr_selected = s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end();
+                            if (ImGui::Checkbox("##ctr_bulk_sel", &is_ctr_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_ctr_last_clicked >= 0 && s_ctr_last_clicked != ctr_real_i) {
+                                    int lo = std::min(s_ctr_last_clicked, ctr_real_i);
+                                    int hi = std::max(s_ctr_last_clicked, ctr_real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.counter_goals.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p : counters_to_render) {
+                                            if (p == &current_template_data.counter_goals[k]) { in_filter = true; break; }
+                                        }
+                                        if (!in_filter) continue;
+                                        if (is_ctr_selected) s_ctr_selection.insert(k);
+                                        else s_ctr_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_ctr_selected) s_ctr_selection.insert(ctr_real_i);
+                                    else s_ctr_selection.erase(ctr_real_i);
+                                }
+                                s_ctr_last_clicked = ctr_real_i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple counters at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
+
                         char ctr_badge_label[64];
                         if (counter.sort_order > 0)
                             snprintf(ctr_badge_label, sizeof(ctr_badge_label), "%d##ctr_badge", counter.sort_order);
@@ -10717,7 +12450,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             ImGui::SetDragDropPayload("COUNTER_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", label);
+                            if (s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end() &&
+                                s_ctr_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_ctr_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
                             ImGui::EndDragDropSource();
                         }
                         if (ImGui::BeginDragDropTarget()) {
@@ -10731,40 +12469,93 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::PopID();
                     }
 
-                    // Handle Drag and Drop
+                    if (bulk_delete_ctr && !s_ctr_selection.empty()) {
+                        std::vector<int> sorted_desc(s_ctr_selection.begin(), s_ctr_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_counter_index >= 0 && selected_counter_index < (int)current_template_data.counter_goals.size()) {
+                            strncpy(selected_root_name_before_op,
+                                    current_template_data.counter_goals[selected_counter_index].root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                            clear_goal_links(current_template_data.decorations,
+                                             current_template_data.counter_goals,
+                                             current_template_data.counter_goals[idx].root_name);
+                            current_template_data.counter_goals.erase(
+                                current_template_data.counter_goals.begin() + idx);
+                        }
+                        selected_counter_index = -1;
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                                if (strcmp(current_template_data.counter_goals[ci].root_name,
+                                           selected_root_name_before_op) == 0) {
+                                    selected_counter_index = ci;
+                                    break;
+                                }
+                            }
+                        }
+                        s_ctr_selection.clear();
+                        s_ctr_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        ctr_to_remove_idx = -1;
+                        ctr_dnd_source_index = -1;
+                        ctr_dnd_target_index = -1;
+                    }
+
                     if (ctr_dnd_source_index != -1 && ctr_dnd_target_index != -1) {
                         EditorCounterGoal *source_item_ptr = counters_to_render[ctr_dnd_source_index];
                         EditorCounterGoal *target_item_ptr = counters_to_render[ctr_dnd_target_index];
+                        int ctr_src_real = (int)(source_item_ptr - &current_template_data.counter_goals[0]);
+                        int ctr_tgt_real = (int)(target_item_ptr - &current_template_data.counter_goals[0]);
 
-                        auto source_it = std::find_if(current_template_data.counter_goals.begin(),
-                                                      current_template_data.counter_goals.end(),
-                                                      [&](const EditorCounterGoal &g) {
-                                                          return &g == source_item_ptr;
-                                                      });
-
-                        EditorCounterGoal item_to_move = *source_item_ptr;
-                        current_template_data.counter_goals.erase(source_it);
-
-                        auto target_it = std::find_if(current_template_data.counter_goals.begin(),
-                                                      current_template_data.counter_goals.end(),
-                                                      [&](const EditorCounterGoal &g) {
-                                                          return &g == target_item_ptr;
-                                                      });
-
-                        current_template_data.counter_goals.insert(target_it, item_to_move);
-                        save_message_type = MSG_NONE;
-
-                        // Update selected index to follow the moved item
-                        for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
-                            if (strcmp(current_template_data.counter_goals[ci].root_name,
-                                       item_to_move.root_name) == 0) {
-                                selected_counter_index = ci;
-                                break;
+                        if (s_ctr_selection.find(ctr_src_real) != s_ctr_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_counter_index >= 0 && selected_counter_index < (int)current_template_data.counter_goals.size()) {
+                                strncpy(selected_root_name_before_op,
+                                        current_template_data.counter_goals[selected_counter_index].root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
                             }
+                            multi_move_selected(current_template_data.counter_goals, s_ctr_selection, ctr_tgt_real);
+                            s_ctr_last_clicked = -1;
+                            selected_counter_index = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                                    if (strcmp(current_template_data.counter_goals[ci].root_name,
+                                               selected_root_name_before_op) == 0) {
+                                        selected_counter_index = ci;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            auto source_it = std::find_if(current_template_data.counter_goals.begin(),
+                                                          current_template_data.counter_goals.end(),
+                                                          [&](const EditorCounterGoal &g) {
+                                                              return &g == source_item_ptr;
+                                                          });
+                            EditorCounterGoal item_to_move = *source_item_ptr;
+                            current_template_data.counter_goals.erase(source_it);
+                            auto target_it = std::find_if(current_template_data.counter_goals.begin(),
+                                                          current_template_data.counter_goals.end(),
+                                                          [&](const EditorCounterGoal &g) {
+                                                              return &g == target_item_ptr;
+                                                          });
+                            current_template_data.counter_goals.insert(target_it, item_to_move);
+                            for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
+                                if (strcmp(current_template_data.counter_goals[ci].root_name,
+                                           item_to_move.root_name) == 0) {
+                                    selected_counter_index = ci;
+                                    break;
+                                }
+                            }
+                            s_ctr_selection.clear();
+                            s_ctr_last_clicked = -1;
                         }
+                        save_message_type = MSG_NONE;
                     }
 
-                    // Handle remove
                     if (ctr_to_remove_idx >= 0 && ctr_to_remove_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_remove_idx];
                         int actual_idx = (int) (ptr - &current_template_data.counter_goals[0]);
@@ -10774,10 +12565,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.counter_goals.begin() + actual_idx);
                         if (selected_counter_index == actual_idx) selected_counter_index = -1;
                         else if (selected_counter_index > actual_idx) selected_counter_index--;
+                        std::set<int> shifted_rm;
+                        for (int idx : s_ctr_selection) {
+                            if (idx == actual_idx) continue;
+                            shifted_rm.insert(idx > actual_idx ? idx - 1 : idx);
+                        }
+                        s_ctr_selection = shifted_rm;
+                        if (s_ctr_last_clicked == actual_idx) s_ctr_last_clicked = -1;
+                        else if (s_ctr_last_clicked > actual_idx) s_ctr_last_clicked--;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Handle copy
                     if (ctr_to_copy_idx >= 0 && ctr_to_copy_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_copy_idx];
                         EditorCounterGoal copy = *ptr;
@@ -10809,6 +12607,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy.progress_pos = {};
                         current_template_data.counter_goals.push_back(copy);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
+                        s_ctr_selection.clear();
+                        s_ctr_last_clicked = -1;
                         save_message_type = MSG_NONE;
                     }
 
@@ -11049,7 +12849,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        : 0;
                 if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
-                    // --- Add Decoration Buttons ---
+                    static std::set<int> s_deco_selection;
+                    static int s_deco_last_clicked = -1;
+                    for (auto it = s_deco_selection.begin(); it != s_deco_selection.end();) {
+                        if (*it < 0 || (size_t)*it >= current_template_data.decorations.size()) it = s_deco_selection.erase(it);
+                        else ++it;
+                    }
+
                     if (ImGui::Button("Import...##decorations")) {
                         ImGui::OpenPopup("import_decorations_source_popup");
                     }
@@ -11070,40 +12876,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Sorting Controls (right-aligned on the Import line) ---
-                    bool can_sort_decos2 = false;
-                    for (const auto &deco: current_template_data.decorations) {
-                        if (deco.sort_order > 0) { can_sort_decos2 = true; break; }
-                    }
+                    // --- Counter for the list (right-aligned on the Import line) ---
                     {
-                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                        bool deco_search_active_top = (
+                            current_search_scope == SCOPE_DECORATIONS && tc_search_buffer[0] != '\0');
+                        size_t deco_count_top = 0;
+                        if (!deco_search_active_top) {
+                            deco_count_top = current_template_data.decorations.size();
+                        } else {
+                            for (const auto &deco: current_template_data.decorations) {
+                                const char *type_str = "Unknown";
+                                if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
+                                else if (deco.type == DECORATION_LINE) type_str = "Line";
+                                else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
+                                if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
+                                    str_contains_insensitive(deco.id, tc_search_buffer) ||
+                                    str_contains_insensitive(type_str, tc_search_buffer)) {
+                                    deco_count_top++;
+                                }
+                            }
+                        }
+                        char deco_counter_top[128];
+                        int deco_pos_top = snprintf(deco_counter_top, sizeof(deco_counter_top), "%zu %s",
+                                                    deco_count_top, deco_count_top == 1 ? "Decoration" : "Decorations");
+                        if (!s_deco_selection.empty() && deco_pos_top < (int)sizeof(deco_counter_top)) {
+                            snprintf(deco_counter_top + deco_pos_top, sizeof(deco_counter_top) - deco_pos_top,
+                                     " \xC2\xB7 %d selected", (int)s_deco_selection.size());
+                        }
+                        float deco_tw_top = ImGui::CalcTextSize(deco_counter_top).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - deco_tw_top);
+                        ImGui::TextDisabled("%s", deco_counter_top);
                     }
-                    ImGui::BeginDisabled(!can_sort_decos2);
-                    if (ImGui::Button("Sort##decorations")) {
-                        apply_partial_sort(current_template_data.decorations);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_decos2) snprintf(tip, sizeof(tip),
-                                                       "Click the order badges next to decorations to assign a sort order first.");
-                        else snprintf(tip, sizeof(tip), "Rearrange the numbered decorations among themselves.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##decorations")) {
-                        for (auto &deco: current_template_data.decorations) deco.sort_order = 0;
-                    }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tip[128];
-                        if (!can_sort_decos2) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
-                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from decorations.");
-                        ImGui::SetTooltip("%s", tip);
-                    }
-                    ImGui::EndDisabled();
 
                     if (ImGui::Button("Add Text Header")) {
                         EditorDecorationElement new_elem = {};
@@ -11198,38 +13001,90 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
-                    // --- Search filter ---
+                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    bool can_sort_decos2 = false;
+                    for (const auto &deco: current_template_data.decorations) {
+                        if (deco.sort_order > 0) { can_sort_decos2 = true; break; }
+                    }
+                    {
+                        float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_w);
+                    }
+                    ImGui::BeginDisabled(!can_sort_decos2);
+                    if (ImGui::Button("Sort##decorations")) {
+                        apply_partial_sort(current_template_data.decorations);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_decos2) snprintf(tip, sizeof(tip),
+                                                       "Click the order badges next to decorations to assign a sort order first.");
+                        else snprintf(tip, sizeof(tip), "Rearrange the numbered decorations among themselves.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##decorations")) {
+                        for (auto &deco: current_template_data.decorations) deco.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tip[128];
+                        if (!can_sort_decos2) snprintf(tip, sizeof(tip), "No sort orders assigned yet.");
+                        else snprintf(tip, sizeof(tip), "Clear all assigned sort orders from decorations.");
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                    ImGui::EndDisabled();
+
                     bool is_deco_search_active = (
                         current_search_scope == SCOPE_DECORATIONS && tc_search_buffer[0] != '\0');
-
-                    // --- Counter ---
-                    char counter_text[128];
-                    size_t deco_count = 0;
-                    if (!is_deco_search_active) {
-                        deco_count = current_template_data.decorations.size();
-                    } else {
-                        for (const auto &deco: current_template_data.decorations) {
-                            const char *type_str = "Unknown";
-                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
-                            else if (deco.type == DECORATION_LINE) type_str = "Line";
-                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
-                            if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
-                                str_contains_insensitive(deco.id, tc_search_buffer) ||
-                                str_contains_insensitive(type_str, tc_search_buffer)) {
-                                deco_count++;
-                            }
-                        }
-                    }
-                    snprintf(counter_text, sizeof(counter_text), "%zu %s", deco_count,
-                             deco_count == 1 ? "Decoration" : "Decorations");
-                    float text_width = ImGui::CalcTextSize(counter_text).x;
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
-                    ImGui::TextDisabled("%s", counter_text);
 
                     int deco_to_remove = -1;
                     int deco_to_copy = -1;
                     int deco_dnd_source_index = -1;
                     int deco_dnd_target_index = -1;
+                    bool bulk_delete_decos = false;
+
+                    if (!s_deco_selection.empty()) {
+                        ImGuiStyle &style = ImGui::GetStyle();
+                        float w_del = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
+                        float w_des = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
+                        float total_w = w_del + w_des + style.ItemSpacing.x;
+                        float avail = ImGui::GetContentRegionAvail().x;
+                        if (avail > total_w) {
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                        }
+
+                        if (ImGui::SmallButton("Delete Selected##deco")) {
+                            ImGui::OpenPopup("deco_bulk_delete_confirm");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip), "Remove all selected decorations. Requires confirmation.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                        if (ImGui::BeginPopup("deco_bulk_delete_confirm")) {
+                            ImGui::Text("Delete %d selected decorations?", (int)s_deco_selection.size());
+                            if (ImGui::Button("Delete##deco_bulk_confirm")) {
+                                bulk_delete_decos = true;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Cancel##deco_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Deselect all##deco")) {
+                            s_deco_selection.clear();
+                            s_deco_last_clicked = -1;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[128];
+                            snprintf(tip, sizeof(tip), "Clear the decoration selection.");
+                            ImGui::SetTooltip("%s", tip);
+                        }
+                    }
 
                     for (size_t i = 0; i < current_template_data.decorations.size(); i++) {
                         auto &deco = current_template_data.decorations[i];
@@ -11554,7 +13409,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
-                        // Copy button
+                        {
+                            bool is_deco_selected = s_deco_selection.find((int)i) != s_deco_selection.end();
+                            if (ImGui::Checkbox("##deco_bulk_sel", &is_deco_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_deco_last_clicked >= 0 && s_deco_last_clicked != (int)i) {
+                                    int lo = std::min(s_deco_last_clicked, (int)i);
+                                    int hi = std::max(s_deco_last_clicked, (int)i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t)k >= current_template_data.decorations.size()) continue;
+                                        if (is_deco_search_active) {
+                                            const auto &dd = current_template_data.decorations[k];
+                                            const char *type_str = "Unknown";
+                                            if (dd.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
+                                            else if (dd.type == DECORATION_LINE) type_str = "Line";
+                                            else if (dd.type == DECORATION_ARROW) type_str = "Arrow";
+                                            if (!str_contains_insensitive(dd.display_text, tc_search_buffer) &&
+                                                !str_contains_insensitive(dd.id, tc_search_buffer) &&
+                                                !str_contains_insensitive(type_str, tc_search_buffer)) {
+                                                continue;
+                                            }
+                                        }
+                                        if (is_deco_selected) s_deco_selection.insert(k);
+                                        else s_deco_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_deco_selected) s_deco_selection.insert((int)i);
+                                    else s_deco_selection.erase((int)i);
+                                }
+                                s_deco_last_clicked = (int)i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple decorations at once:\n"
+                                         "reordering (drag any selected row) and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
                         if (ImGui::Button("Copy")) {
                             deco_to_copy = (int) i;
                             save_message_type = MSG_NONE;
@@ -11702,7 +13596,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource()) {
                             ImGui::SetDragDropPayload("DECO_DND", &i, sizeof(int));
-                            ImGui::Text("Reorder %s", deco.id);
+                            if (s_deco_selection.find((int)i) != s_deco_selection.end() &&
+                                s_deco_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int)s_deco_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", deco.id);
+                            }
                             ImGui::EndDragDropSource();
                         }
 
@@ -11719,22 +13618,60 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndDragDropTarget();
                     }
 
-                    // Process drag-and-drop reorder
                     if (deco_dnd_source_index != -1 && deco_dnd_target_index != -1 &&
                         deco_dnd_source_index != deco_dnd_target_index) {
-                        EditorDecorationElement item_to_move = current_template_data.decorations[deco_dnd_source_index];
-                        current_template_data.decorations.erase(
-                            current_template_data.decorations.begin() + deco_dnd_source_index);
-                        if (deco_dnd_target_index > deco_dnd_source_index) deco_dnd_target_index--;
-                        current_template_data.decorations.insert(
-                            current_template_data.decorations.begin() + deco_dnd_target_index, item_to_move);
+                        if (s_deco_selection.find(deco_dnd_source_index) != s_deco_selection.end()) {
+                            multi_move_selected(current_template_data.decorations, s_deco_selection,
+                                                deco_dnd_target_index);
+                            s_deco_last_clicked = -1;
+                        } else {
+                            EditorDecorationElement item_to_move = current_template_data.decorations[deco_dnd_source_index];
+                            current_template_data.decorations.erase(
+                                current_template_data.decorations.begin() + deco_dnd_source_index);
+                            if (deco_dnd_target_index > deco_dnd_source_index) deco_dnd_target_index--;
+                            current_template_data.decorations.insert(
+                                current_template_data.decorations.begin() + deco_dnd_target_index, item_to_move);
+                            std::set<int> shifted_dnd;
+                            for (int idx : s_deco_selection) {
+                                int new_idx = idx;
+                                if (idx == deco_dnd_source_index) new_idx = deco_dnd_target_index;
+                                else {
+                                    if (idx > deco_dnd_source_index) new_idx--;
+                                    if (new_idx >= deco_dnd_target_index) new_idx++;
+                                }
+                                shifted_dnd.insert(new_idx);
+                            }
+                            s_deco_selection = shifted_dnd;
+                            s_deco_last_clicked = -1;
+                        }
                         save_message_type = MSG_NONE;
                     }
 
-                    // Process removal
+                    if (bulk_delete_decos && !s_deco_selection.empty()) {
+                        std::vector<int> sorted_desc(s_deco_selection.begin(), s_deco_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        for (int idx : sorted_desc) {
+                            if (idx < 0 || (size_t)idx >= current_template_data.decorations.size()) continue;
+                            current_template_data.decorations.erase(
+                                current_template_data.decorations.begin() + idx);
+                        }
+                        s_deco_selection.clear();
+                        s_deco_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        deco_to_remove = -1;
+                    }
+
                     if (deco_to_remove != -1) {
                         current_template_data.decorations.erase(
                             current_template_data.decorations.begin() + deco_to_remove);
+                        std::set<int> shifted_rm;
+                        for (int idx : s_deco_selection) {
+                            if (idx == deco_to_remove) continue;
+                            shifted_rm.insert(idx > deco_to_remove ? idx - 1 : idx);
+                        }
+                        s_deco_selection = shifted_rm;
+                        if (s_deco_last_clicked == deco_to_remove) s_deco_last_clicked = -1;
+                        else if (s_deco_last_clicked > deco_to_remove) s_deco_last_clicked--;
                         save_message_type = MSG_NONE;
                     }
 
@@ -11796,6 +13733,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_elem.id[sizeof(new_elem.id) - 1] = '\0';
                         current_template_data.decorations.insert(
                             current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
+                        std::set<int> shifted_cp;
+                        for (int idx : s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
+                        s_deco_selection = shifted_cp;
+                        if (s_deco_last_clicked > deco_to_copy) s_deco_last_clicked++;
                         save_message_type = MSG_NONE;
                     }
 
