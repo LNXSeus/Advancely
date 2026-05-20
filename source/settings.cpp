@@ -3402,7 +3402,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             bool inputs_ok = transport_direct
                                              ? (ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate)
                                              : true; // Relay: no ip/port; password is optional.
-                            bool can_start = inputs_ok
+                            bool relay_outdated = !transport_direct && g_latest_known_version[0] != '\0'
+                                                  && compare_version_strings(ADVANCELY_VERSION,
+                                                                              g_latest_known_version) < 0;
+                            bool can_start = inputs_ok && !relay_outdated
                                              && g_coop_ctx && !net_is_active && !has_unsaved_changes && !editor_open;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
@@ -3441,6 +3444,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 char tooltip_buf[256];
                                 if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
+                                } else if (relay_outdated) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Update Advancely to %s before hosting a relay lobby.\n"
+                                             "(Direct connections still work on any matching version.)",
+                                             g_latest_known_version);
                                 } else if (has_unsaved_changes) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Apply settings before starting a lobby.");
@@ -3533,7 +3541,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::Button("Disconnect")) {
                                     coop_net_stop(g_coop_ctx);
                                     SDL_SetAtomicInt(&g_settings_changed, 1);
-                                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                                 }
                                 ImGui::Spacing();
                                 char status_buf[256];
@@ -3541,7 +3548,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
                             } else if (!transport_direct) {
                                 bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;
+                                bool relay_outdated_recv = g_latest_known_version[0] != '\0'
+                                                           && compare_version_strings(ADVANCELY_VERSION,
+                                                                                       g_latest_known_version) < 0;
                                 bool can_join_relay = !has_unsaved_changes && !join_editor_open
+                                                       && !relay_outdated_recv
                                                        && coop_relay_room_code_recv[0] != '\0';
 
                                 ImGui::SetNextItemWidth(120.0f);
@@ -3636,6 +3647,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         else if (has_unsaved_changes)
                                             snprintf(tt, sizeof(tt),
                                                      "Apply settings before joining a lobby.");
+                                        else if (relay_outdated_recv)
+                                            snprintf(tt, sizeof(tt),
+                                                     "Update Advancely to %s before joining a relay lobby.\n"
+                                                     "(Direct connections still work on any matching version.)",
+                                                     g_latest_known_version);
                                         else
                                             snprintf(tt, sizeof(tt),
                                                      "Enter a room code first.");
@@ -3768,9 +3784,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (ImGui::SmallButton("Disconnect##lobby")) {
                                 coop_net_stop(g_coop_ctx);
                                 coop_room_code_buf[0] = '\0';
-                                // Apply settings to trigger a proper reload
                                 SDL_SetAtomicInt(&g_settings_changed, 1);
-                                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                             }
                         }
 

@@ -27,8 +27,7 @@
 #endif
 
 
-// New helper function to numerically compare version strings (e.g., "v0.9.100")
-static int compare_versions(const char *version1, const char *version2) {
+int compare_version_strings(const char *version1, const char *version2) {
     int major1 = 0, minor1 = 0, patch1 = 0;
     int major2 = 0, minor2 = 0, patch2 = 0;
 
@@ -143,7 +142,7 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                     strncpy(out_latest_version, tag_name_json->valuestring, max_len - 1);
                     out_latest_version[max_len - 1] = '\0';
 
-                    if (compare_versions(current_version, out_latest_version) < 0) {
+                    if (compare_version_strings(current_version, out_latest_version) < 0) {
                         is_new_version_available = true;
 
 #if defined(_WIN32)

@@ -84,6 +84,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->template_editor_has_unsaved_changes = false;
     t->settings_has_unsaved_changes = false;
     t->quit_requested = false;
+    t->quit_popup_active = false;
 
     log_message(LOG_INFO, "[INIT SDL] Tracker initialized!\n");
 

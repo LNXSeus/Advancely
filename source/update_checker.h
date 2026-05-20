@@ -77,6 +77,13 @@ bool apply_update(const char *main_executable_path);
 * @return true if the restart process was successfully initiated, false on error.
 */
 bool application_restart();
+
+/**
+ * @brief Numerically compares two version strings of the form "vMAJOR.MINOR.PATCH".
+ * @return negative if version1 < version2, 0 if equal, positive if version1 > version2.
+ */
+int compare_version_strings(const char *version1, const char *version2);
+
 #ifdef __cplusplus
 }
 #endif

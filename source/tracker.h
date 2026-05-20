@@ -105,6 +105,7 @@ struct Tracker {
     bool template_editor_has_unsaved_changes; // Communicated from the template editor to the settings window
     bool settings_has_unsaved_changes; // Communicated from settings to the quit confirmation popup
     bool quit_requested; // Set when user tries to quit with unsaved changes, triggers confirmation popup
+    bool quit_popup_active; // True while the Unsaved Changes quit popup is open. Causes main.cpp to re-open it every frame so other persistent popups (e.g. import) cannot reassert themselves on top.
 
     // Multi-select state for visual layout editing
     bool visual_item_interacted_this_frame; // Set when any draggable item is hovered or active

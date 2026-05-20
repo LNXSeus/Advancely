@@ -102,6 +102,7 @@ SDL_AtomicInt g_hotkey_captured_scancode;
 
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
+char g_latest_known_version[64] = "";
 
 // --- Command Line Globals for Linux packaging, --settings-file <path>, --disable-updater and --use-home-dir ---
 static char g_custom_settings_path[MAX_PATH_LENGTH] = "";
@@ -1453,6 +1454,8 @@ int main(int argc, char *argv[]) {
             char release_page_url[256];
             if (check_for_updates(ADVANCELY_VERSION, latest_version_str, sizeof(latest_version_str), download_url,
                                   sizeof(download_url), release_page_url, sizeof(release_page_url))) {
+                strncpy(g_latest_known_version, latest_version_str, sizeof(g_latest_known_version) - 1);
+                g_latest_known_version[sizeof(g_latest_known_version) - 1] = '\0';
                 char message_buffer[2048];
                 snprintf(message_buffer, sizeof(message_buffer),
                          "A new version of Advancely is available!\n\n"
@@ -3399,8 +3402,11 @@ int main(int argc, char *argv[]) {
             bool quit_lobby_active = (quit_net_state == COOP_NET_LISTENING || quit_net_state == COOP_NET_CONNECTED
                                       || quit_net_state == COOP_NET_CONNECTING);
             if (tracker->quit_requested) {
+                tracker->quit_popup_active = true;
+                tracker->quit_requested = false;
+            }
+            if (tracker->quit_popup_active) {
                 ImGui::OpenPopup("Unsaved Changes##quit");
-                tracker->quit_requested = false; // Only open once, popup stays open via ImGui state
             }
 
             // Center the popup on screen
@@ -3438,6 +3444,7 @@ int main(int argc, char *argv[]) {
                 bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
                 if (ImGui::Button("Exit Without Saving") || enter_pressed) {
                     is_running = false;
+                    tracker->quit_popup_active = false;
                     ImGui::CloseCurrentPopup();
                 }
                 if (ImGui::IsItemHovered()) {
@@ -3466,6 +3473,7 @@ int main(int argc, char *argv[]) {
                     if (app_settings.enable_overlay && !overlay_alive) {
                         SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     }
+                    tracker->quit_popup_active = false;
                     ImGui::CloseCurrentPopup();
                 }
                 if (ImGui::IsItemHovered()) {

@@ -706,6 +706,15 @@ static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
     }
 }
 
+// True when the template carries no trackable content. Used after Revert to drop the user
+// out of the editor when reverting leaves an entirely empty template (otherwise the user
+// is stuck looking at empty entry fields that would seed garbage data on a subsequent save).
+static bool is_editor_template_empty(const EditorTemplate &t) {
+    return t.advancements.empty() && t.stats.empty() && t.unlocks.empty() &&
+           t.custom_goals.empty() && t.multi_stage_goals.empty() &&
+           t.counter_goals.empty() && t.decorations.empty();
+}
+
 // Main comparison function for the entire editor state
 static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b) {
     if (strcmp(a.display_category, b.display_category) != 0) return true;
@@ -3070,6 +3079,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (is_active_template) {
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
+        // Pointers into the previous current_template_data vectors are invalidated
+        // by the copy-assignment above; counters use an index and are unaffected.
+        selected_advancement = nullptr;
+        selected_stat = nullptr;
+        selected_ms_goal = nullptr;
+        if (is_editor_template_empty(saved_template_data)) {
+            editing_template = false;
+        }
     }
 
     // Handle Ctrl+S / Cmd+S to save
@@ -4742,6 +4759,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   app_settings->optional_flag) == 0);
                 if (is_active_template) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
+                }
+                selected_advancement = nullptr;
+                selected_stat = nullptr;
+                selected_ms_goal = nullptr;
+                if (is_editor_template_empty(saved_template_data)) {
+                    editing_template = false;
                 }
             }
         }
