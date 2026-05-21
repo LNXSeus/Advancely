@@ -2551,7 +2551,7 @@ static bool render_layout_coordinates_header(const char *goal_type_name, bool fo
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false,
-                                 bool show_hide_checkbox = true) {
+                                 bool show_hide_checkbox = true, bool note_player_face = false) {
     ImGui::PushID(label_id);
 
     bool was_set = pos->is_set;
@@ -2564,9 +2564,18 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         }
     }
     if (ImGui::IsItemHovered()) {
-        char tooltip[256];
-        snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type,
-                 tooltip_item_name);
+        char tooltip[512];
+        if (note_player_face) {
+            snprintf(tooltip, sizeof(tooltip),
+                     "Enable manual positioning for the %s of this %s.\n"
+                     "In coop, the contributor player face is part of this box:\n"
+                     "left/center anchors place the face to the left of the text,\n"
+                     "right anchors place it to the right.",
+                     pos_type, tooltip_item_name);
+        } else {
+            snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type,
+                     tooltip_item_name);
+        }
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -6625,7 +6634,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 render_manual_pos_ui("c_icon", "criterion", "Icon Pos.", &criterion.icon_pos,
                                                      save_message_type);
                                 render_manual_pos_ui("c_text", "criterion", "Text Pos.", &criterion.text_pos,
-                                                     save_message_type);
+                                                     save_message_type, false, true, true);
                             }
 
                             ImGui::EndGroup();
@@ -8581,7 +8590,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     render_manual_pos_ui("sc_icon", "sub-stat", "Icon Pos.", &crit.icon_pos,
                                                          save_message_type);
                                     render_manual_pos_ui("sc_text", "sub-stat", "Text Pos.", &crit.text_pos,
-                                                         save_message_type);
+                                                         save_message_type, false, true, true);
                                     render_manual_pos_ui("sc_prog", "sub-stat", "Progress Pos.", &crit.progress_pos,
                                                          save_message_type);
                                 }

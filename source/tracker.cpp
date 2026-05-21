@@ -7213,69 +7213,74 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                0.5f;
                             ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
 
+                            // In manual layout the contributor face is part of the
+                            // text's bounding box: left/center anchors place it on the
+                            // left, right anchors flip it to the right edge. Otherwise
+                            // the face would land on top of the criterion icon.
+                            SDL_Texture *crit_text_face_tex = nullptr;
+                            const char *crit_text_face_uuid = nullptr;
+                            const float crit_face_size = 20.0f;
+                            const float crit_face_pad = 4.0f;
+                            if (settings->use_manual_layout && crit->text_pos.is_set) {
+                                if (adv_crit_face_eligible && adv_crit_face_follows_text) {
+                                    crit_text_face_uuid = cat->first_contributor_uuid;
+                                } else if (stat_face_eligible && stat_face_follows_text) {
+                                    crit_text_face_uuid = crit->highest_contributor_uuid;
+                                }
+                                if (crit_text_face_uuid && crit_text_face_uuid[0] != '\0') {
+                                    CoopLobbyPlayer ctf_lobby[COOP_MAX_LOBBY];
+                                    int ctf_lc = coop_net_get_lobby_players(g_coop_ctx, ctf_lobby, COOP_MAX_LOBBY);
+                                    AccountType ctf_acc = ACCOUNT_ONLINE;
+                                    for (int li = 0; li < ctf_lc; li++) {
+                                        if (strcmp(ctf_lobby[li].uuid, crit_text_face_uuid) == 0) {
+                                            ctf_acc = ctf_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                            break;
+                                        }
+                                    }
+                                    crit_text_face_tex = skin_cache_get_face(crit_text_face_uuid, ctf_acc);
+                                }
+                            }
+                            float crit_face_slot_w = crit_text_face_tex ? (crit_face_size + crit_face_pad) : 0.0f;
+                            bool crit_face_on_right = false;
+                            if (crit_text_face_tex) {
+                                AnchorPoint a = crit->text_pos.anchor;
+                                crit_face_on_right = (a == ANCHOR_TOP_RIGHT || a == ANCHOR_CENTER_RIGHT ||
+                                                      a == ANCHOR_BOTTOM_RIGHT);
+                            }
+                            float crit_combined_w = child_text_size.x + crit_face_slot_w;
+                            ImVec2 crit_combined_min_screen = ImVec2(current_element_x_screen, text_y_pos);
+                            // Face position in screen coords, computed once layout is resolved
+                            float crit_face_x_screen = 0.0f;
+
                             if (settings->use_manual_layout && crit->text_pos.is_set) {
                                 ImVec2 crit_text_anchor_off = get_anchor_offset(
-                                    crit->text_pos.anchor, child_text_size.x, child_text_size.y);
-                                child_text_pos = ImVec2(
-                                    ((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
-                                    ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
+                                    crit->text_pos.anchor, crit_combined_w, child_text_size.y);
+                                float combined_min_x_screen =
+                                    ((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x;
+                                float combined_min_y_screen =
+                                    ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                                if (crit_face_on_right) {
+                                    child_text_pos = ImVec2(combined_min_x_screen, combined_min_y_screen);
+                                    crit_face_x_screen =
+                                        combined_min_x_screen + (child_text_size.x + crit_face_pad) * t->zoom_level;
+                                } else {
+                                    child_text_pos = ImVec2(
+                                        combined_min_x_screen + crit_face_slot_w * t->zoom_level,
+                                        combined_min_y_screen);
+                                    crit_face_x_screen = combined_min_x_screen;
+                                }
+                                crit_combined_min_screen = ImVec2(combined_min_x_screen, combined_min_y_screen);
                                 current_element_x_screen = child_text_pos.x;
-                                // Update cursor so progress text follows naturally
                             }
 
-                            // Coop: deferred advancement-criterion leader face for
-                            // manual layout. When crit->text_pos.is_set the icon and
-                            // text move independently, so the face travels with the
-                            // text (drawn just to its left) rather than the icon.
-                            if (adv_crit_face_eligible && adv_crit_face_follows_text) {
-                                CoopLobbyPlayer ac_lobby[COOP_MAX_LOBBY];
-                                int ac_lc = coop_net_get_lobby_players(g_coop_ctx, ac_lobby, COOP_MAX_LOBBY);
-                                AccountType ac_acc = ACCOUNT_ONLINE;
-                                for (int li = 0; li < ac_lc; li++) {
-                                    if (strcmp(ac_lobby[li].uuid, cat->first_contributor_uuid) == 0) {
-                                        ac_acc = ac_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
-                                        break;
-                                    }
-                                }
-                                SDL_Texture *ac_tex = skin_cache_get_face(cat->first_contributor_uuid, ac_acc);
-                                if (ac_tex) {
-                                    const float face_size = 20.0f;
-                                    const float face_pad = 4.0f;
-                                    ImVec2 face_min = ImVec2(
-                                        child_text_pos.x - (face_size + face_pad) * t->zoom_level,
-                                        child_text_pos.y + (child_text_size.y * t->zoom_level -
-                                                            face_size * t->zoom_level) * 0.5f);
-                                    ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
-                                                             face_min.y + face_size * t->zoom_level);
-                                    draw_list->AddImage((void *) ac_tex, face_min, face_max);
-                                }
-                            }
-
-                            // Coop: deferred sub-stat face render — drawn just left of
-                            // the text when manual layout has moved the text away from
-                            // the checkbox flow (see stat_face_follows_text above).
-                            if (stat_face_eligible && stat_face_follows_text) {
-                                CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
-                                int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
-                                AccountType face_acc = ACCOUNT_ONLINE;
-                                for (int li = 0; li < face_lc; li++) {
-                                    if (strcmp(face_lobby[li].uuid, crit->highest_contributor_uuid) == 0) {
-                                        face_acc = face_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
-                                        break;
-                                    }
-                                }
-                                SDL_Texture *face_tex = skin_cache_get_face(crit->highest_contributor_uuid, face_acc);
-                                if (face_tex) {
-                                    const float face_size = 20.0f;
-                                    const float face_pad = 4.0f;
-                                    ImVec2 face_min = ImVec2(
-                                        child_text_pos.x - (face_size + face_pad) * t->zoom_level,
-                                        child_text_pos.y + (child_text_size.y * t->zoom_level -
-                                                            face_size * t->zoom_level) * 0.5f);
-                                    ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
-                                                             face_min.y + face_size * t->zoom_level);
-                                    draw_list->AddImage((void *) face_tex, face_min, face_max);
-                                }
+                            if (crit_text_face_tex) {
+                                ImVec2 face_min = ImVec2(
+                                    crit_face_x_screen,
+                                    child_text_pos.y + (child_text_size.y * t->zoom_level -
+                                                        crit_face_size * t->zoom_level) * 0.5f);
+                                ImVec2 face_max = ImVec2(face_min.x + crit_face_size * t->zoom_level,
+                                                         face_min.y + crit_face_size * t->zoom_level);
+                                draw_list->AddImage((void *) crit_text_face_tex, face_min, face_max);
                             }
 
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
@@ -7283,8 +7288,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
                             snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name, crit->root_name);
-                            handle_visual_layout_dragging(t, drag_id, child_text_pos,
-                                                          ImVec2(child_text_size.x * t->zoom_level,
+                            handle_visual_layout_dragging(t, drag_id, crit_combined_min_screen,
+                                                          ImVec2(crit_combined_w * t->zoom_level,
                                                                  child_text_size.y * t->zoom_level),
                                                           crit->text_pos, crit_type, crit->display_name,
                                                           "Text", crit->root_name,
