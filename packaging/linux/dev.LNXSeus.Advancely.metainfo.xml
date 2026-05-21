@@ -14,8 +14,19 @@
   <screenshots>
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
-
   <releases>
+    <release version="1.5.0" date="2026-05-21">
+      <description>
+        <ul>
+          <li>Cross-template imports on every main tab and on nested per-parent imports (criteria, sub-stats, stages). A Language dropdown picks the source lang file for display names, and any linked-goal refs that won't resolve after the import are flagged before you confirm.</li>
+          <li>Template update helpers in the advancement/achievement player-file import popup: preview new entries, detect renames by basename and ≥80% criteria overlap, prune stale entries, and apply criteria differences row by row. Every helper popup has its own search bar.</li>
+          <li>Advancement criteria grouping: multiple criteria can share a single progress slot, so packs like BlazeandCaves' "Ultimate Enchanter" track correctly.</li>
+          <li>Bulk actions consolidated under one button across all 10 editor lists: bulk delete, reorder, icon-path change, and manual layout positioning with automatic grid placement.</li>
+          <li>Every template now carries a built-in display_category; all official templates updated.</li>
+          <li>Fixes: corrected 1.12 - 1.12.2 root-name format checks on import, unsaved-changes popup no longer flickers behind the import popup, relay requires matching latest version (direct LAN only needs matching versions), coop face now respects text anchor, new-template-then-revert no longer leaves the editor in a stuck state.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.4" date="2026-05-16">
       <description>
         <ul>
