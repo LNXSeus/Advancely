@@ -926,7 +926,11 @@ options:
   for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
   auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
   greyed out with a tooltip so they can't accidentally pollute the destination. The format check requires
-  `:` on `1.12+`, forbids `:` on `1.7-1.11`, and accepts only numeric IDs on `1.6.4` and below. Container
+  `:` on `1.13+`, forbids `:` on `1.7-1.11`, and accepts only numeric IDs on `1.6.4` and below. `1.12 - 1.12.2`
+  is hybrid: advancement / criteria root names need `:`, but stat (and stat-typed stage) root names must not
+  contain `:` because that range still uses the mid-era flat stats format. In every mid-era stat case
+  (`1.7 - 1.12.2`) sub-stat root names must also start with `stat.` so legacy `achievement.` strings can't be
+  smuggled in as stats. Stat category keys themselves are not format-checked; only their sub-stats are. Container
   entries (complex stat categories with sub-stats and entire multi-stage goals) are also greyed out when
   any of their children would themselves fail the check, including stages with a type not supported in
   this version.

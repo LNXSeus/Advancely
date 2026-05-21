@@ -18336,12 +18336,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (strcmp(creator_version_str, "25w14craftmine") == 0) return true;
             return t != SUBGOAL_UNLOCK;
         };
-        auto root_name_valid_for_version = [&](const char *rn) -> bool {
+        auto root_name_valid_for_version = [&](const char *rn, bool is_stat) -> bool {
             if (!rn || !*rn) return false;
+            bool mid_era_stat_window = is_stat &&
+                creator_selected_version >= MC_VERSION_1_12 &&
+                creator_selected_version <= MC_VERSION_1_12_2;
+            if (mid_era_stat_window) {
+                if (strncmp(rn, "stat.", 5) != 0) return false;
+                return strchr(rn, ':') == nullptr;
+            }
             if (creator_selected_version > MC_VERSION_1_11_2) {
                 return strchr(rn, ':') != nullptr;
             }
             if (creator_selected_version > MC_VERSION_1_6_4) {
+                if (is_stat && strncmp(rn, "stat.", 5) != 0) return false;
                 return strchr(rn, ':') == nullptr;
             }
             for (const char *p = rn; *p; p++) {
@@ -18353,17 +18361,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             switch (s_template_import_scope) {
                 case IFTS_ADVANCEMENTS: {
                     if (i < 0 || i >= (int) s_template_import_data.advancements.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.advancements[i].root_name))
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[i].root_name, false))
                         return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
                 case IFTS_STATS: {
                     if (i < 0 || i >= (int) s_template_import_data.stats.size()) return "Out of range.";
                     const auto &cat = s_template_import_data.stats[i];
-                    if (!root_name_valid_for_version(cat.root_name))
-                        return "Root name format does not match this Minecraft version.";
                     for (const auto &c: cat.criteria) {
-                        if (!root_name_valid_for_version(c.root_name))
+                        if (!root_name_valid_for_version(c.root_name, true))
                             return "Contains a sub-stat whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
@@ -18372,7 +18378,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return "Invalid parent.";
                     if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name))
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name, false))
                         return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
@@ -18380,7 +18386,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.stats.size()) return "Invalid parent.";
                     if (i < 0 || i >= (int) s_template_import_data.stats[p].criteria.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.stats[p].criteria[i].root_name))
+                    if (!root_name_valid_for_version(s_template_import_data.stats[p].criteria[i].root_name, true))
                         return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
@@ -18391,7 +18397,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const auto &st = s_template_import_data.multi_stage_goals[p].stages[i];
                     if (!stage_type_valid_for_version(st.type))
                         return "Stage type is not supported in this Minecraft version.";
-                    if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name))
+                    if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name, st.type == SUBGOAL_STAT))
                         return "Stage root name format does not match this Minecraft version.";
                     return nullptr;
                 }
@@ -18402,7 +18408,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (st.type == SUBGOAL_MANUAL) continue;
                         if (!stage_type_valid_for_version(st.type))
                             return "Contains a stage whose type is not supported in this Minecraft version.";
-                        if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name))
+                        if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name, st.type == SUBGOAL_STAT))
                             return "Contains a stage whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
