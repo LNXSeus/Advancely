@@ -6382,34 +6382,128 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         bool bulk_delete_criteria = false;
                         if (!s_crit_selection.empty()) {
-                            ImGuiStyle &style = ImGui::GetStyle();
-                            float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
-                            float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
-                            float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                            float w_add  = ImGui::CalcTextSize("Add selection to group").x + style.FramePadding.x * 2.0f;
-                            float w_un   = ImGui::CalcTextSize("Ungroup selection").x + style.FramePadding.x * 2.0f;
-                            float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                            int btn_count = 4;
-                            float total_w = w_icon + w_hide + w_del + w_des;
-                            if (advancement.groups_enabled) { total_w += w_add + w_un; btn_count += 2; }
-                            total_w += style.ItemSpacing.x * (btn_count - 1);
-                            float avail = ImGui::GetContentRegionAvail().x;
-                            if (avail > total_w) {
-                                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
-                            }
-
                             static char s_crit_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                            if (ImGui::SmallButton("Set Icon...")) {
-                                s_crit_bulk_icon_buf[0] = '\0';
-                                ImGui::OpenPopup("crit_bulk_icon_popup");
+                            static char s_new_group_buffer[64] = "";
+
+                            static bool s_crit_bl_icon_set = true;
+                            static bool s_crit_bl_icon_hide = false;
+                            static float s_crit_bl_icon_x = 100.0f, s_crit_bl_icon_y = 100.0f;
+                            static float s_crit_bl_icon_xs = 0.0f, s_crit_bl_icon_ys = 0.0f;
+                            static int s_crit_bl_icon_cols = 0;
+                            static int s_crit_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                            static bool s_crit_bl_text_set = true;
+                            static bool s_crit_bl_text_hide = false;
+                            static float s_crit_bl_text_x = 100.0f, s_crit_bl_text_y = 100.0f;
+                            static float s_crit_bl_text_xs = 0.0f, s_crit_bl_text_ys = 0.0f;
+                            static int s_crit_bl_text_cols = 0;
+                            static int s_crit_bl_text_anchor = ANCHOR_TOP_LEFT;
+
+                            bool ba_open_icon = false;
+                            bool ba_open_layout = false;
+                            bool ba_open_delete = false;
+                            bool ba_open_group_add = false;
+                            bool ba_do_toggle_hidden = false;
+                            bool ba_do_ungroup = false;
+
+                            float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                             ImGui::GetStyle().FramePadding.x * 2.0f;
+                            float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                               ImGui::GetStyle().FramePadding.x * 2.0f;
+                            float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                                 ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                            if (ImGui::SmallButton("Bulk Actions...##crit")) {
+                                ImGui::OpenPopup("crit_bulk_actions_menu");
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tip[256];
                                 snprintf(tip, sizeof(tip),
-                                         "Apply the same icon path to every selected criterion.\n"
-                                         "Type a path under resources/icons/, or click Browse.");
+                                         "Actions to apply to all selected criteria at once.");
                                 ImGui::SetTooltip("%s", tip);
                             }
+
+                            if (ImGui::BeginPopup("crit_bulk_actions_menu")) {
+                                char hdr[160];
+                                snprintf(hdr, sizeof(hdr), "%d selected %s",
+                                         (int)s_crit_selection.size(),
+                                         s_crit_selection.size() == 1 ? "criterion" : "criteria");
+                                ImGui::TextDisabled("%s", hdr);
+                                ImGui::Separator();
+                                if (ImGui::Selectable("Set Icon...##crit_ba")) ba_open_icon = true;
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                        "Apply the same icon path to every selected criterion.");
+                                }
+                                if (ImGui::Selectable("Toggle Hidden##crit_ba")) ba_do_toggle_hidden = true;
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                        "Flip Hidden on every selected criterion.\n"
+                                        "If most are visible they all become hidden, and vice versa.");
+                                }
+                                if (ImGui::Selectable("Layout Coordinates...##crit_ba")) ba_open_layout = true;
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                        "Bulk-set Icon Pos. and Text Pos. for every selected criterion.\n"
+                                        "Each X and Y supports an optional stride that distributes\n"
+                                        "values across the selection in template order.");
+                                }
+                                if (advancement.groups_enabled) {
+                                    ImGui::Separator();
+                                    if (ImGui::Selectable("Add selection to group...##crit_ba")) ba_open_group_add = true;
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s",
+                                            "Assign every selected criterion to a group.\n"
+                                            "Either click an existing group, or type a new name.\n"
+                                            "Criteria sharing a group collapse into one progress unit.");
+                                    }
+                                    if (ImGui::Selectable("Ungroup selection##crit_ba")) ba_do_ungroup = true;
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s",
+                                            "Clear the group ID on every selected criterion.");
+                                    }
+                                }
+                                ImGui::Separator();
+                                if (ImGui::Selectable("Delete Selected...##crit_ba")) ba_open_delete = true;
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                        "Remove all selected criteria. Requires confirmation.");
+                                }
+                                ImGui::EndPopup();
+                            }
+
+                            if (ba_do_toggle_hidden) {
+                                int hidden_count = 0;
+                                for (int idx : s_crit_selection) {
+                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    if (advancement.criteria[idx].is_hidden) hidden_count++;
+                                }
+                                bool target_hidden = (hidden_count * 2 < (int)s_crit_selection.size());
+                                for (int idx : s_crit_selection) {
+                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    advancement.criteria[idx].is_hidden = target_hidden;
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ba_do_ungroup) {
+                                for (int idx : s_crit_selection) {
+                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    advancement.criteria[idx].group[0] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+
+                            if (ba_open_icon) {
+                                s_crit_bulk_icon_buf[0] = '\0';
+                                ImGui::OpenPopup("crit_bulk_icon_popup");
+                            }
+                            if (ba_open_layout) ImGui::OpenPopup("crit_bulk_layout_popup");
+                            if (ba_open_delete) ImGui::OpenPopup("crit_bulk_delete_confirm");
+                            if (ba_open_group_add) {
+                                crit_auto_name_group(advancement, s_new_group_buffer);
+                                ImGui::OpenPopup("crit_add_to_group_popup");
+                            }
+
                             if (ImGui::BeginPopup("crit_bulk_icon_popup")) {
                                 ImGui::TextDisabled("Icon path for %d selected criteria", (int)s_crit_selection.size());
                                 ImGui::SetNextItemWidth(280.0f);
@@ -6439,37 +6533,128 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::EndPopup();
                             }
 
-                            ImGui::SameLine();
-                            if (ImGui::SmallButton("Toggle Hidden")) {
-                                int hidden_count = 0;
-                                for (int idx : s_crit_selection) {
-                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                    if (advancement.criteria[idx].is_hidden) hidden_count++;
+                            if (ImGui::BeginPopup("crit_bulk_layout_popup")) {
+                                ImGui::TextDisabled("Layout coordinates for %d selected criteria",
+                                                    (int)s_crit_selection.size());
+                                ImGui::TextDisabled("Strides distribute values in template order.");
+                                ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                                ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                                ImGui::Separator();
+
+                                std::vector<int> bulk_layout_sorted(s_crit_selection.begin(), s_crit_selection.end());
+                                std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                                ImGui::PushID("crit_bulk_layout_icon");
+                                ImGui::Checkbox("Icon Pos.", &s_crit_bl_icon_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide##crit_bl_icon", &s_crit_bl_icon_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", &s_crit_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_icon_x = fminf(fmaxf(roundf(s_crit_bl_icon_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                bool target_hidden = (hidden_count * 2 < (int)s_crit_selection.size());
-                                for (int idx : s_crit_selection) {
-                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                    advancement.criteria[idx].is_hidden = target_hidden;
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", &s_crit_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_icon_xs = fminf(fmaxf(roundf(s_crit_bl_icon_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tip[256];
-                                snprintf(tip, sizeof(tip),
-                                         "Flip Hidden on every selected criterion.\n"
-                                         "If most are visible they all become hidden, and vice versa.");
-                                ImGui::SetTooltip("%s", tip);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", &s_crit_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_icon_y = fminf(fmaxf(roundf(s_crit_bl_icon_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", &s_crit_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_icon_ys = fminf(fmaxf(roundf(s_crit_bl_icon_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", &s_crit_bl_icon_cols, 0.1f, 0, 1024)) {
+                                    if (s_crit_bl_icon_cols < 0) s_crit_bl_icon_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button("Apply Icon Pos. to selected")) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                        auto &c = advancement.criteria[idx];
+                                        int x_mult = (s_crit_bl_icon_cols >= 1) ? (n % s_crit_bl_icon_cols) : n;
+                                        int y_mult = (s_crit_bl_icon_cols >= 1) ? (n / s_crit_bl_icon_cols) : n;
+                                        c.icon_pos.is_set = s_crit_bl_icon_set;
+                                        c.icon_pos.is_hidden_in_layout = s_crit_bl_icon_hide;
+                                        c.icon_pos.x = fminf(fmaxf(roundf(s_crit_bl_icon_x + x_mult * s_crit_bl_icon_xs),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        c.icon_pos.y = fminf(fmaxf(roundf(s_crit_bl_icon_y + y_mult * s_crit_bl_icon_ys),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        c.icon_pos.anchor = (AnchorPoint)s_crit_bl_icon_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
+
+                                ImGui::Separator();
+
+                                ImGui::PushID("crit_bulk_layout_text");
+                                ImGui::Checkbox("Text Pos.", &s_crit_bl_text_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide##crit_bl_text", &s_crit_bl_text_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", &s_crit_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_text_x = fminf(fmaxf(roundf(s_crit_bl_text_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", &s_crit_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_text_xs = fminf(fmaxf(roundf(s_crit_bl_text_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", &s_crit_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_text_y = fminf(fmaxf(roundf(s_crit_bl_text_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", &s_crit_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_crit_bl_text_ys = fminf(fmaxf(roundf(s_crit_bl_text_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", &s_crit_bl_text_cols, 0.1f, 0, 1024)) {
+                                    if (s_crit_bl_text_cols < 0) s_crit_bl_text_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button("Apply Text Pos. to selected")) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                        auto &c = advancement.criteria[idx];
+                                        int x_mult = (s_crit_bl_text_cols >= 1) ? (n % s_crit_bl_text_cols) : n;
+                                        int y_mult = (s_crit_bl_text_cols >= 1) ? (n / s_crit_bl_text_cols) : n;
+                                        c.text_pos.is_set = s_crit_bl_text_set;
+                                        c.text_pos.is_hidden_in_layout = s_crit_bl_text_hide;
+                                        c.text_pos.x = fminf(fmaxf(roundf(s_crit_bl_text_x + x_mult * s_crit_bl_text_xs),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        c.text_pos.y = fminf(fmaxf(roundf(s_crit_bl_text_y + y_mult * s_crit_bl_text_ys),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        c.text_pos.anchor = (AnchorPoint)s_crit_bl_text_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
+
+                                ImGui::Separator();
+                                if (ImGui::Button("Close##crit_bulk_layout")) ImGui::CloseCurrentPopup();
+                                ImGui::EndPopup();
                             }
 
-                            ImGui::SameLine();
-                            if (ImGui::SmallButton("Delete Selected")) {
-                                ImGui::OpenPopup("crit_bulk_delete_confirm");
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tip[256];
-                                snprintf(tip, sizeof(tip), "Remove all selected criteria. Requires confirmation.");
-                                ImGui::SetTooltip("%s", tip);
-                            }
                             if (ImGui::BeginPopup("crit_bulk_delete_confirm")) {
                                 ImGui::Text("Delete %d selected criteria?", (int)s_crit_selection.size());
                                 if (ImGui::Button("Delete##crit_bulk_confirm")) {
@@ -6481,74 +6666,44 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::EndPopup();
                             }
 
-                            static char s_new_group_buffer[64] = "";
-                            if (advancement.groups_enabled) {
-                                ImGui::SameLine();
-                                if (ImGui::SmallButton("Add selection to group")) {
-                                    crit_auto_name_group(advancement, s_new_group_buffer);
-                                    ImGui::OpenPopup("crit_add_to_group_popup");
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[320];
-                                    snprintf(tip, sizeof(tip),
-                                             "Assign every selected criterion to a group.\n"
-                                             "Either click an existing group, or type a new name.\n"
-                                             "Criteria sharing a group collapse into one progress unit.");
-                                    ImGui::SetTooltip("%s", tip);
-                                }
-                                if (ImGui::BeginPopup("crit_add_to_group_popup")) {
-                                    std::vector<std::string> existing = crit_collect_group_ids(advancement);
-                                    if (!existing.empty()) {
-                                        ImGui::TextDisabled("Existing groups");
-                                        for (const auto &id : existing) {
-                                            char row[128];
-                                            snprintf(row, sizeof(row), "%s##existing", id.c_str());
-                                            if (ImGui::Selectable(row)) {
-                                                for (int idx : s_crit_selection) {
-                                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                                    strncpy(advancement.criteria[idx].group, id.c_str(),
-                                                            sizeof(advancement.criteria[idx].group) - 1);
-                                                    advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
-                                                }
-                                                save_message_type = MSG_NONE;
-                                                ImGui::CloseCurrentPopup();
+                            if (ImGui::BeginPopup("crit_add_to_group_popup")) {
+                                std::vector<std::string> existing = crit_collect_group_ids(advancement);
+                                if (!existing.empty()) {
+                                    ImGui::TextDisabled("Existing groups");
+                                    for (const auto &id : existing) {
+                                        char row[128];
+                                        snprintf(row, sizeof(row), "%s##existing", id.c_str());
+                                        if (ImGui::Selectable(row)) {
+                                            for (int idx : s_crit_selection) {
+                                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                                strncpy(advancement.criteria[idx].group, id.c_str(),
+                                                        sizeof(advancement.criteria[idx].group) - 1);
+                                                advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
                                             }
+                                            save_message_type = MSG_NONE;
+                                            ImGui::CloseCurrentPopup();
                                         }
-                                        ImGui::Separator();
                                     }
-                                    ImGui::TextDisabled("New group");
-                                    ImGui::SetNextItemWidth(160.0f);
-                                    bool submit_enter = ImGui::InputText("##new_group", s_new_group_buffer,
-                                                                         sizeof(s_new_group_buffer),
-                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
-                                    ImGui::SameLine();
-                                    bool submit_button = ImGui::Button("Apply##new_group");
-                                    if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
-                                        for (int idx : s_crit_selection) {
-                                            if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                            strncpy(advancement.criteria[idx].group, s_new_group_buffer,
-                                                    sizeof(advancement.criteria[idx].group) - 1);
-                                            advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
-                                        }
-                                        save_message_type = MSG_NONE;
-                                        ImGui::CloseCurrentPopup();
-                                    }
-                                    ImGui::EndPopup();
+                                    ImGui::Separator();
                                 }
-
+                                ImGui::TextDisabled("New group");
+                                ImGui::SetNextItemWidth(160.0f);
+                                bool submit_enter = ImGui::InputText("##new_group", s_new_group_buffer,
+                                                                     sizeof(s_new_group_buffer),
+                                                                     ImGuiInputTextFlags_EnterReturnsTrue);
                                 ImGui::SameLine();
-                                if (ImGui::SmallButton("Ungroup selection")) {
+                                bool submit_button = ImGui::Button("Apply##new_group");
+                                if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
                                     for (int idx : s_crit_selection) {
                                         if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                        advancement.criteria[idx].group[0] = '\0';
+                                        strncpy(advancement.criteria[idx].group, s_new_group_buffer,
+                                                sizeof(advancement.criteria[idx].group) - 1);
+                                        advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
                                     }
                                     save_message_type = MSG_NONE;
+                                    ImGui::CloseCurrentPopup();
                                 }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[160];
-                                    snprintf(tip, sizeof(tip), "Clear the group ID on every selected criterion.");
-                                    ImGui::SetTooltip("%s", tip);
-                                }
+                                ImGui::EndPopup();
                             }
 
                             ImGui::SameLine();
@@ -7352,17 +7507,91 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (!s_stat_selection.empty()) {
                         static char s_stat_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...##stat_bulk")) {
+
+                        static bool s_stat_bl_icon_set = true;
+                        static bool s_stat_bl_icon_hide = false;
+                        static float s_stat_bl_icon_x = 100.0f, s_stat_bl_icon_y = 100.0f;
+                        static float s_stat_bl_icon_xs = 0.0f, s_stat_bl_icon_ys = 0.0f;
+                        static int s_stat_bl_icon_cols = 0;
+                        static int s_stat_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_stat_bl_text_set = true;
+                        static bool s_stat_bl_text_hide = false;
+                        static float s_stat_bl_text_x = 100.0f, s_stat_bl_text_y = 100.0f;
+                        static float s_stat_bl_text_xs = 0.0f, s_stat_bl_text_ys = 0.0f;
+                        static int s_stat_bl_text_cols = 0;
+                        static int s_stat_bl_text_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_stat_bl_prog_set = true;
+                        static bool s_stat_bl_prog_hide = false;
+                        static float s_stat_bl_prog_x = 100.0f, s_stat_bl_prog_y = 100.0f;
+                        static float s_stat_bl_prog_xs = 0.0f, s_stat_bl_prog_ys = 0.0f;
+                        static int s_stat_bl_prog_cols = 0;
+                        static int s_stat_bl_prog_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##stat")) {
+                            ImGui::OpenPopup("stat_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected stats at once.");
+                        }
+
+                        if (ImGui::BeginPopup("stat_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected %s",
+                                     (int)s_stat_selection.size(),
+                                     s_stat_selection.size() == 1 ? "stat" : "stats");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##stat_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Apply the same icon path to every selected stat.");
+                            if (ImGui::Selectable("Toggle Hidden##stat_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Hidden on every selected stat.\n"
+                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Layout Coordinates...##stat_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected stat.\n"
+                                "Each X and Y supports an optional stride that distributes\n"
+                                "values across the selection in template order.");
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##stat_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected stats. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                if (current_template_data.stats[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_stat_selection.size());
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                current_template_data.stats[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_stat_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("stat_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected stat.\n"
-                                     "Type a path under resources/icons/, or click Browse.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("stat_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("stat_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("stat_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected stats", (int)s_stat_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
@@ -7392,37 +7621,98 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden##stat_bulk")) {
-                            int hidden_count = 0;
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
-                                if (current_template_data.stats[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("stat_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected stats", (int)s_stat_selection.size());
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_stat_selection.begin(), s_stat_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            struct {
+                                const char *id;
+                                const char *label;
+                                const char *anchor_id;
+                                const char *apply_label;
+                                bool *p_set;
+                                bool *p_hide;
+                                float *p_x, *p_y, *p_xs, *p_ys;
+                                int *p_cols, *p_anchor;
+                            } sections[3] = {
+                                {"stat_bulk_layout_icon", "Icon Pos.", "Anchor##stat_bl_icon", "Apply Icon Pos. to selected",
+                                 &s_stat_bl_icon_set, &s_stat_bl_icon_hide,
+                                 &s_stat_bl_icon_x, &s_stat_bl_icon_y, &s_stat_bl_icon_xs, &s_stat_bl_icon_ys,
+                                 &s_stat_bl_icon_cols, &s_stat_bl_icon_anchor},
+                                {"stat_bulk_layout_text", "Text Pos.", "Anchor##stat_bl_text", "Apply Text Pos. to selected",
+                                 &s_stat_bl_text_set, &s_stat_bl_text_hide,
+                                 &s_stat_bl_text_x, &s_stat_bl_text_y, &s_stat_bl_text_xs, &s_stat_bl_text_ys,
+                                 &s_stat_bl_text_cols, &s_stat_bl_text_anchor},
+                                {"stat_bulk_layout_prog", "Progress Pos.", "Anchor##stat_bl_prog", "Apply Progress Pos. to selected",
+                                 &s_stat_bl_prog_set, &s_stat_bl_prog_hide,
+                                 &s_stat_bl_prog_x, &s_stat_bl_prog_y, &s_stat_bl_prog_xs, &s_stat_bl_prog_ys,
+                                 &s_stat_bl_prog_cols, &s_stat_bl_prog_anchor},
+                            };
+                            for (int si = 0; si < 3; ++si) {
+                                auto &s = sections[si];
+                                if (si > 0) ImGui::Separator();
+                                ImGui::PushID(s.id);
+                                ImGui::Checkbox(s.label, s.p_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide", s.p_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                    if (*s.p_cols < 0) *s.p_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button(s.apply_label)) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                        auto &st = current_template_data.stats[idx];
+                                        ManualPos *target = (si == 0) ? &st.icon_pos : (si == 1) ? &st.text_pos : &st.progress_pos;
+                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        target->is_set = *s.p_set;
+                                        target->is_hidden_in_layout = *s.p_hide;
+                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_stat_selection.size());
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
-                                current_template_data.stats[idx].is_hidden = target_hidden;
-                            }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected stat.\n"
-                                     "If most are visible they all become hidden, and vice versa.");
-                            ImGui::SetTooltip("%s", tip);
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##stat_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected##stat_bulk")) {
-                            ImGui::OpenPopup("stat_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected stats. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("stat_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected stats?", (int)s_stat_selection.size());
                             if (ImGui::Button("Delete##stat_bulk_confirm")) {
@@ -8368,29 +8658,94 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool bulk_delete_sub = false;
 
                             if (!s_sub_selection.empty()) {
-                                ImGuiStyle &style = ImGui::GetStyle();
-                                float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
-                                float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
-                                float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                                float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                                float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
-                                float avail = ImGui::GetContentRegionAvail().x;
-                                if (avail > total_w) {
-                                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                                static char s_sub_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+
+                                static bool s_sub_bl_icon_set = true;
+                                static bool s_sub_bl_icon_hide = false;
+                                static float s_sub_bl_icon_x = 100.0f, s_sub_bl_icon_y = 100.0f;
+                                static float s_sub_bl_icon_xs = 0.0f, s_sub_bl_icon_ys = 0.0f;
+                                static int s_sub_bl_icon_cols = 0;
+                                static int s_sub_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                                static bool s_sub_bl_text_set = true;
+                                static bool s_sub_bl_text_hide = false;
+                                static float s_sub_bl_text_x = 100.0f, s_sub_bl_text_y = 100.0f;
+                                static float s_sub_bl_text_xs = 0.0f, s_sub_bl_text_ys = 0.0f;
+                                static int s_sub_bl_text_cols = 0;
+                                static int s_sub_bl_text_anchor = ANCHOR_TOP_LEFT;
+                                static bool s_sub_bl_prog_set = true;
+                                static bool s_sub_bl_prog_hide = false;
+                                static float s_sub_bl_prog_x = 100.0f, s_sub_bl_prog_y = 100.0f;
+                                static float s_sub_bl_prog_xs = 0.0f, s_sub_bl_prog_ys = 0.0f;
+                                static int s_sub_bl_prog_cols = 0;
+                                static int s_sub_bl_prog_anchor = ANCHOR_TOP_LEFT;
+
+                                bool ba_open_icon = false;
+                                bool ba_open_layout = false;
+                                bool ba_open_delete = false;
+                                bool ba_do_toggle_hidden = false;
+
+                                float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                                 ImGui::GetStyle().FramePadding.x * 2.0f;
+                                float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                                   ImGui::GetStyle().FramePadding.x * 2.0f;
+                                float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                                ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                                     ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                                if (ImGui::SmallButton("Bulk Actions...##sub")) {
+                                    ImGui::OpenPopup("sub_bulk_actions_menu");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Actions to apply to all selected sub-stats at once.");
                                 }
 
-                                static char s_sub_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                                if (ImGui::SmallButton("Set Icon...##sub")) {
+                                if (ImGui::BeginPopup("sub_bulk_actions_menu")) {
+                                    char hdr[160];
+                                    snprintf(hdr, sizeof(hdr), "%d selected sub-stat%s",
+                                             (int)s_sub_selection.size(),
+                                             s_sub_selection.size() == 1 ? "" : "s");
+                                    ImGui::TextDisabled("%s", hdr);
+                                    ImGui::Separator();
+                                    if (ImGui::Selectable("Set Icon...##sub_ba")) ba_open_icon = true;
+                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                        "Apply the same icon path to every selected sub-stat.");
+                                    if (ImGui::Selectable("Toggle Hidden##sub_ba")) ba_do_toggle_hidden = true;
+                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                        "Flip Hidden on every selected sub-stat.\n"
+                                        "If most are visible they all become hidden, and vice versa.");
+                                    if (ImGui::Selectable("Layout Coordinates...##sub_ba")) ba_open_layout = true;
+                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                        "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected sub-stat.\n"
+                                        "Each X and Y supports an optional stride that distributes\n"
+                                        "values across the selection in template order.");
+                                    ImGui::Separator();
+                                    if (ImGui::Selectable("Delete Selected...##sub_ba")) ba_open_delete = true;
+                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                        "Remove all selected sub-stats. Requires confirmation.");
+                                    ImGui::EndPopup();
+                                }
+
+                                if (ba_do_toggle_hidden) {
+                                    int hidden_count = 0;
+                                    for (int idx : s_sub_selection) {
+                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                        if (stat_cat.criteria[idx].is_hidden) hidden_count++;
+                                    }
+                                    bool target_hidden = (hidden_count * 2 < (int)s_sub_selection.size());
+                                    for (int idx : s_sub_selection) {
+                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                        stat_cat.criteria[idx].is_hidden = target_hidden;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+
+                                if (ba_open_icon) {
                                     s_sub_bulk_icon_buf[0] = '\0';
                                     ImGui::OpenPopup("sub_bulk_icon_popup");
                                 }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[256];
-                                    snprintf(tip, sizeof(tip),
-                                             "Apply the same icon path to every selected sub-stat.\n"
-                                             "Type a path under resources/icons/, or click Browse.");
-                                    ImGui::SetTooltip("%s", tip);
-                                }
+                                if (ba_open_layout) ImGui::OpenPopup("sub_bulk_layout_popup");
+                                if (ba_open_delete) ImGui::OpenPopup("sub_bulk_delete_confirm");
+
                                 if (ImGui::BeginPopup("sub_bulk_icon_popup")) {
                                     ImGui::TextDisabled("Icon path for %d selected sub-stats", (int)s_sub_selection.size());
                                     ImGui::SetNextItemWidth(280.0f);
@@ -8420,37 +8775,98 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::EndPopup();
                                 }
 
-                                ImGui::SameLine();
-                                if (ImGui::SmallButton("Toggle Hidden##sub")) {
-                                    int hidden_count = 0;
-                                    for (int idx : s_sub_selection) {
-                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
-                                        if (stat_cat.criteria[idx].is_hidden) hidden_count++;
+                                if (ImGui::BeginPopup("sub_bulk_layout_popup")) {
+                                    ImGui::TextDisabled("Layout coordinates for %d selected sub-stats", (int)s_sub_selection.size());
+                                    ImGui::TextDisabled("Strides distribute values in template order.");
+                                    ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                                    ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                                    ImGui::Separator();
+
+                                    std::vector<int> bulk_layout_sorted(s_sub_selection.begin(), s_sub_selection.end());
+                                    std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                                    struct {
+                                        const char *id;
+                                        const char *label;
+                                        const char *anchor_id;
+                                        const char *apply_label;
+                                        bool *p_set;
+                                        bool *p_hide;
+                                        float *p_x, *p_y, *p_xs, *p_ys;
+                                        int *p_cols, *p_anchor;
+                                    } sections[3] = {
+                                        {"sub_bulk_layout_icon", "Icon Pos.", "Anchor##sub_bl_icon", "Apply Icon Pos. to selected",
+                                         &s_sub_bl_icon_set, &s_sub_bl_icon_hide,
+                                         &s_sub_bl_icon_x, &s_sub_bl_icon_y, &s_sub_bl_icon_xs, &s_sub_bl_icon_ys,
+                                         &s_sub_bl_icon_cols, &s_sub_bl_icon_anchor},
+                                        {"sub_bulk_layout_text", "Text Pos.", "Anchor##sub_bl_text", "Apply Text Pos. to selected",
+                                         &s_sub_bl_text_set, &s_sub_bl_text_hide,
+                                         &s_sub_bl_text_x, &s_sub_bl_text_y, &s_sub_bl_text_xs, &s_sub_bl_text_ys,
+                                         &s_sub_bl_text_cols, &s_sub_bl_text_anchor},
+                                        {"sub_bulk_layout_prog", "Progress Pos.", "Anchor##sub_bl_prog", "Apply Progress Pos. to selected",
+                                         &s_sub_bl_prog_set, &s_sub_bl_prog_hide,
+                                         &s_sub_bl_prog_x, &s_sub_bl_prog_y, &s_sub_bl_prog_xs, &s_sub_bl_prog_ys,
+                                         &s_sub_bl_prog_cols, &s_sub_bl_prog_anchor},
+                                    };
+                                    for (int si = 0; si < 3; ++si) {
+                                        auto &s = sections[si];
+                                        if (si > 0) ImGui::Separator();
+                                        ImGui::PushID(s.id);
+                                        ImGui::Checkbox(s.label, s.p_set);
+                                        ImGui::SameLine();
+                                        ImGui::Checkbox("Hide", s.p_hide);
+                                        ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                            *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                            *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                            *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                            *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                        ImGui::SetNextItemWidth(140);
+                                        ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                            if (*s.p_cols < 0) *s.p_cols = 0;
+                                        }
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                            "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                            "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                        if (ImGui::Button(s.apply_label)) {
+                                            int n = 0;
+                                            for (int idx : bulk_layout_sorted) {
+                                                if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                                auto &c = stat_cat.criteria[idx];
+                                                ManualPos *target = (si == 0) ? &c.icon_pos : (si == 1) ? &c.text_pos : &c.progress_pos;
+                                                int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                                int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                                target->is_set = *s.p_set;
+                                                target->is_hidden_in_layout = *s.p_hide;
+                                                target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                target->anchor = (AnchorPoint)*s.p_anchor;
+                                                n++;
+                                            }
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        ImGui::PopID();
                                     }
-                                    bool target_hidden = (hidden_count * 2 < (int)s_sub_selection.size());
-                                    for (int idx : s_sub_selection) {
-                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
-                                        stat_cat.criteria[idx].is_hidden = target_hidden;
-                                    }
-                                    save_message_type = MSG_NONE;
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[256];
-                                    snprintf(tip, sizeof(tip),
-                                             "Flip Hidden on every selected sub-stat.\n"
-                                             "If most are visible they all become hidden, and vice versa.");
-                                    ImGui::SetTooltip("%s", tip);
+
+                                    ImGui::Separator();
+                                    if (ImGui::Button("Close##sub_bulk_layout")) ImGui::CloseCurrentPopup();
+                                    ImGui::EndPopup();
                                 }
 
-                                ImGui::SameLine();
-                                if (ImGui::SmallButton("Delete Selected##sub")) {
-                                    ImGui::OpenPopup("sub_bulk_delete_confirm");
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[256];
-                                    snprintf(tip, sizeof(tip), "Remove all selected sub-stats. Requires confirmation.");
-                                    ImGui::SetTooltip("%s", tip);
-                                }
                                 if (ImGui::BeginPopup("sub_bulk_delete_confirm")) {
                                     ImGui::Text("Delete %d selected sub-stats?", (int)s_sub_selection.size());
                                     if (ImGui::Button("Delete##sub_bulk_confirm")) {
@@ -9142,29 +9558,88 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     bool bulk_delete_unlocks = false;
 
                     if (!s_unlocks_selection.empty()) {
-                        ImGuiStyle &style = ImGui::GetStyle();
-                        float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
-                        float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
-                        float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                        float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                        float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
-                        float avail = ImGui::GetContentRegionAvail().x;
-                        if (avail > total_w) {
-                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                        static char s_unlocks_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+
+                        static bool s_unl_bl_icon_set = true;
+                        static bool s_unl_bl_icon_hide = false;
+                        static float s_unl_bl_icon_x = 100.0f, s_unl_bl_icon_y = 100.0f;
+                        static float s_unl_bl_icon_xs = 0.0f, s_unl_bl_icon_ys = 0.0f;
+                        static int s_unl_bl_icon_cols = 0;
+                        static int s_unl_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_unl_bl_text_set = true;
+                        static bool s_unl_bl_text_hide = false;
+                        static float s_unl_bl_text_x = 100.0f, s_unl_bl_text_y = 100.0f;
+                        static float s_unl_bl_text_xs = 0.0f, s_unl_bl_text_ys = 0.0f;
+                        static int s_unl_bl_text_cols = 0;
+                        static int s_unl_bl_text_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##unlocks")) {
+                            ImGui::OpenPopup("unlocks_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected unlocks at once.");
                         }
 
-                        static char s_unlocks_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...")) {
+                        if (ImGui::BeginPopup("unlocks_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected unlock%s",
+                                     (int)s_unlocks_selection.size(),
+                                     s_unlocks_selection.size() == 1 ? "" : "s");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##unlocks_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Apply the same icon path to every selected unlock.");
+                            if (ImGui::Selectable("Toggle Hidden##unlocks_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Hidden on every selected unlock.\n"
+                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Layout Coordinates...##unlocks_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Bulk-set Icon Pos. and Text Pos. for every selected unlock.\n"
+                                "Each X and Y supports an optional stride that distributes\n"
+                                "values across the selection in template order.");
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##unlocks_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected unlocks. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                if (current_template_data.unlocks[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_unlocks_selection.size());
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                current_template_data.unlocks[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_unlocks_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("unlocks_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected unlock.\n"
-                                     "Type a path under resources/icons/, or click Browse.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("unlocks_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("unlocks_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("unlocks_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected unlocks", (int)s_unlocks_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
@@ -9194,37 +9669,94 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden")) {
-                            int hidden_count = 0;
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
-                                if (current_template_data.unlocks[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("unlocks_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected unlocks", (int)s_unlocks_selection.size());
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_unlocks_selection.begin(), s_unlocks_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            struct {
+                                const char *id;
+                                const char *label;
+                                const char *anchor_id;
+                                const char *apply_label;
+                                bool *p_set;
+                                bool *p_hide;
+                                float *p_x, *p_y, *p_xs, *p_ys;
+                                int *p_cols, *p_anchor;
+                            } sections[2] = {
+                                {"unl_bulk_layout_icon", "Icon Pos.", "Anchor##unl_bl_icon", "Apply Icon Pos. to selected",
+                                 &s_unl_bl_icon_set, &s_unl_bl_icon_hide,
+                                 &s_unl_bl_icon_x, &s_unl_bl_icon_y, &s_unl_bl_icon_xs, &s_unl_bl_icon_ys,
+                                 &s_unl_bl_icon_cols, &s_unl_bl_icon_anchor},
+                                {"unl_bulk_layout_text", "Text Pos.", "Anchor##unl_bl_text", "Apply Text Pos. to selected",
+                                 &s_unl_bl_text_set, &s_unl_bl_text_hide,
+                                 &s_unl_bl_text_x, &s_unl_bl_text_y, &s_unl_bl_text_xs, &s_unl_bl_text_ys,
+                                 &s_unl_bl_text_cols, &s_unl_bl_text_anchor},
+                            };
+                            for (int si = 0; si < 2; ++si) {
+                                auto &s = sections[si];
+                                if (si > 0) ImGui::Separator();
+                                ImGui::PushID(s.id);
+                                ImGui::Checkbox(s.label, s.p_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide", s.p_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                    if (*s.p_cols < 0) *s.p_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button(s.apply_label)) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                        auto &u = current_template_data.unlocks[idx];
+                                        ManualPos *target = (si == 0) ? &u.icon_pos : &u.text_pos;
+                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        target->is_set = *s.p_set;
+                                        target->is_hidden_in_layout = *s.p_hide;
+                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_unlocks_selection.size());
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
-                                current_template_data.unlocks[idx].is_hidden = target_hidden;
-                            }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected unlock.\n"
-                                     "If most are visible they all become hidden, and vice versa.");
-                            ImGui::SetTooltip("%s", tip);
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##unlocks_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected")) {
-                            ImGui::OpenPopup("unlocks_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected unlocks. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("unlocks_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected unlocks?", (int)s_unlocks_selection.size());
                             if (ImGui::Button("Delete##unlocks_bulk_confirm")) {
@@ -9773,29 +10305,88 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     bool bulk_delete_custom = false;
 
                     if (!s_custom_selection.empty()) {
-                        ImGuiStyle &style = ImGui::GetStyle();
-                        float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
-                        float w_hide = ImGui::CalcTextSize("Toggle Hidden").x + style.FramePadding.x * 2.0f;
-                        float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                        float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                        float total_w = w_icon + w_hide + w_del + w_des + style.ItemSpacing.x * 3.0f;
-                        float avail = ImGui::GetContentRegionAvail().x;
-                        if (avail > total_w) {
-                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                        static char s_custom_bulk_icon_buf[MAX_PATH_LENGTH] = "";
+
+                        static bool s_cg_bl_icon_set = true;
+                        static bool s_cg_bl_icon_hide = false;
+                        static float s_cg_bl_icon_x = 100.0f, s_cg_bl_icon_y = 100.0f;
+                        static float s_cg_bl_icon_xs = 0.0f, s_cg_bl_icon_ys = 0.0f;
+                        static int s_cg_bl_icon_cols = 0;
+                        static int s_cg_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_cg_bl_text_set = true;
+                        static bool s_cg_bl_text_hide = false;
+                        static float s_cg_bl_text_x = 100.0f, s_cg_bl_text_y = 100.0f;
+                        static float s_cg_bl_text_xs = 0.0f, s_cg_bl_text_ys = 0.0f;
+                        static int s_cg_bl_text_cols = 0;
+                        static int s_cg_bl_text_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##custom")) {
+                            ImGui::OpenPopup("custom_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected custom goals at once.");
                         }
 
-                        static char s_custom_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...##custom")) {
+                        if (ImGui::BeginPopup("custom_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected custom goal%s",
+                                     (int)s_custom_selection.size(),
+                                     s_custom_selection.size() == 1 ? "" : "s");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##custom_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Apply the same icon path to every selected custom goal.");
+                            if (ImGui::Selectable("Toggle Hidden##custom_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Hidden on every selected custom goal.\n"
+                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Layout Coordinates...##custom_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Bulk-set Icon Pos. and Text Pos. for every selected custom goal.\n"
+                                "Each X and Y supports an optional stride that distributes\n"
+                                "values across the selection in template order.");
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##custom_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected custom goals. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                if (current_template_data.custom_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_custom_selection.size());
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                current_template_data.custom_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_custom_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("custom_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected custom goal.\n"
-                                     "Type a path under resources/icons/, or click Browse.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("custom_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("custom_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("custom_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected custom goals", (int)s_custom_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
@@ -9825,37 +10416,94 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden##custom")) {
-                            int hidden_count = 0;
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
-                                if (current_template_data.custom_goals[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("custom_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected custom goals", (int)s_custom_selection.size());
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_custom_selection.begin(), s_custom_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            struct {
+                                const char *id;
+                                const char *label;
+                                const char *anchor_id;
+                                const char *apply_label;
+                                bool *p_set;
+                                bool *p_hide;
+                                float *p_x, *p_y, *p_xs, *p_ys;
+                                int *p_cols, *p_anchor;
+                            } sections[2] = {
+                                {"cg_bulk_layout_icon", "Icon Pos.", "Anchor##cg_bl_icon", "Apply Icon Pos. to selected",
+                                 &s_cg_bl_icon_set, &s_cg_bl_icon_hide,
+                                 &s_cg_bl_icon_x, &s_cg_bl_icon_y, &s_cg_bl_icon_xs, &s_cg_bl_icon_ys,
+                                 &s_cg_bl_icon_cols, &s_cg_bl_icon_anchor},
+                                {"cg_bulk_layout_text", "Text Pos.", "Anchor##cg_bl_text", "Apply Text Pos. to selected",
+                                 &s_cg_bl_text_set, &s_cg_bl_text_hide,
+                                 &s_cg_bl_text_x, &s_cg_bl_text_y, &s_cg_bl_text_xs, &s_cg_bl_text_ys,
+                                 &s_cg_bl_text_cols, &s_cg_bl_text_anchor},
+                            };
+                            for (int si = 0; si < 2; ++si) {
+                                auto &s = sections[si];
+                                if (si > 0) ImGui::Separator();
+                                ImGui::PushID(s.id);
+                                ImGui::Checkbox(s.label, s.p_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide", s.p_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                    if (*s.p_cols < 0) *s.p_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button(s.apply_label)) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                        auto &g = current_template_data.custom_goals[idx];
+                                        ManualPos *target = (si == 0) ? &g.icon_pos : &g.text_pos;
+                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        target->is_set = *s.p_set;
+                                        target->is_hidden_in_layout = *s.p_hide;
+                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_custom_selection.size());
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
-                                current_template_data.custom_goals[idx].is_hidden = target_hidden;
-                            }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected custom goal.\n"
-                                     "If most are visible they all become hidden, and vice versa.");
-                            ImGui::SetTooltip("%s", tip);
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##custom_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected##custom")) {
-                            ImGui::OpenPopup("custom_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected custom goals. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("custom_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected custom goals?", (int)s_custom_selection.size());
                             if (ImGui::Button("Delete##custom_bulk_confirm")) {
@@ -10674,17 +11322,93 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (!s_msg_selection.empty()) {
                         static char s_msg_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...##msg_bulk")) {
+
+                        static bool s_msg_bl_icon_set = true;
+                        static bool s_msg_bl_icon_hide = false;
+                        static float s_msg_bl_icon_x = 100.0f, s_msg_bl_icon_y = 100.0f;
+                        static float s_msg_bl_icon_xs = 0.0f, s_msg_bl_icon_ys = 0.0f;
+                        static int s_msg_bl_icon_cols = 0;
+                        static int s_msg_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_msg_bl_text_set = true;
+                        static bool s_msg_bl_text_hide = false;
+                        static float s_msg_bl_text_x = 100.0f, s_msg_bl_text_y = 100.0f;
+                        static float s_msg_bl_text_xs = 0.0f, s_msg_bl_text_ys = 0.0f;
+                        static int s_msg_bl_text_cols = 0;
+                        static int s_msg_bl_text_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_msg_bl_prog_set = true;
+                        static bool s_msg_bl_prog_hide = false;
+                        static float s_msg_bl_prog_x = 100.0f, s_msg_bl_prog_y = 100.0f;
+                        static float s_msg_bl_prog_xs = 0.0f, s_msg_bl_prog_ys = 0.0f;
+                        static int s_msg_bl_prog_cols = 0;
+                        static int s_msg_bl_prog_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##msg")) {
+                            ImGui::OpenPopup("msg_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected multi-stage goals at once.");
+                        }
+
+                        if (ImGui::BeginPopup("msg_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected multi-stage goal%s",
+                                     (int)s_msg_selection.size(),
+                                     s_msg_selection.size() == 1 ? "" : "s");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##msg_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Apply the same icon path to every selected multi-stage goal.");
+                            if (ImGui::Selectable("Toggle Hidden##msg_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Hidden on every selected multi-stage goal.\n"
+                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Layout Coordinates...##msg_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected multi-stage goal.\n"
+                                "Each X and Y supports an optional stride that distributes\n"
+                                "values across the selection in template order.");
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##msg_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected multi-stage goals. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                if (current_template_data.multi_stage_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_msg_selection.size());
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                current_template_data.multi_stage_goals[idx].is_hidden = target_hidden;
+                            }
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_msg_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("msg_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected multi-stage goal.\n"
-                                     "Type a path under resources/icons/, or click Browse.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("msg_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("msg_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("msg_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected goals", (int)s_msg_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
@@ -10715,38 +11439,99 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden##msg_bulk")) {
-                            int hidden_count = 0;
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
-                                if (current_template_data.multi_stage_goals[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("msg_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected multi-stage goals", (int)s_msg_selection.size());
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_msg_selection.begin(), s_msg_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            struct {
+                                const char *id;
+                                const char *label;
+                                const char *anchor_id;
+                                const char *apply_label;
+                                bool *p_set;
+                                bool *p_hide;
+                                float *p_x, *p_y, *p_xs, *p_ys;
+                                int *p_cols, *p_anchor;
+                            } sections[3] = {
+                                {"msg_bulk_layout_icon", "Icon Pos.", "Anchor##msg_bl_icon", "Apply Icon Pos. to selected",
+                                 &s_msg_bl_icon_set, &s_msg_bl_icon_hide,
+                                 &s_msg_bl_icon_x, &s_msg_bl_icon_y, &s_msg_bl_icon_xs, &s_msg_bl_icon_ys,
+                                 &s_msg_bl_icon_cols, &s_msg_bl_icon_anchor},
+                                {"msg_bulk_layout_text", "Text Pos.", "Anchor##msg_bl_text", "Apply Text Pos. to selected",
+                                 &s_msg_bl_text_set, &s_msg_bl_text_hide,
+                                 &s_msg_bl_text_x, &s_msg_bl_text_y, &s_msg_bl_text_xs, &s_msg_bl_text_ys,
+                                 &s_msg_bl_text_cols, &s_msg_bl_text_anchor},
+                                {"msg_bulk_layout_prog", "Progress Pos.", "Anchor##msg_bl_prog", "Apply Progress Pos. to selected",
+                                 &s_msg_bl_prog_set, &s_msg_bl_prog_hide,
+                                 &s_msg_bl_prog_x, &s_msg_bl_prog_y, &s_msg_bl_prog_xs, &s_msg_bl_prog_ys,
+                                 &s_msg_bl_prog_cols, &s_msg_bl_prog_anchor},
+                            };
+                            for (int si = 0; si < 3; ++si) {
+                                auto &s = sections[si];
+                                if (si > 0) ImGui::Separator();
+                                ImGui::PushID(s.id);
+                                ImGui::Checkbox(s.label, s.p_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide", s.p_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                    if (*s.p_cols < 0) *s.p_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button(s.apply_label)) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                        auto &g = current_template_data.multi_stage_goals[idx];
+                                        ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
+                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        target->is_set = *s.p_set;
+                                        target->is_hidden_in_layout = *s.p_hide;
+                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        n++;
+                                    }
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_msg_selection.size());
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
-                                current_template_data.multi_stage_goals[idx].is_hidden = target_hidden;
-                            }
-                            ms_goal_data_changed = true;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected multi-stage goal.\n"
-                                     "If most are visible they all become hidden, and vice versa.");
-                            ImGui::SetTooltip("%s", tip);
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##msg_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected##msg_bulk")) {
-                            ImGui::OpenPopup("msg_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected multi-stage goals. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("msg_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected multi-stage goals?", (int)s_msg_selection.size());
                             if (ImGui::Button("Delete##msg_bulk_confirm")) {
@@ -11524,72 +12309,85 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool bulk_delete_stages = false;
 
                         if (!s_stage_selection.empty()) {
-                            ImGuiStyle &style = ImGui::GetStyle();
-                            float w_icon = ImGui::CalcTextSize("Set Icon...").x + style.FramePadding.x * 2.0f;
-                            float w_del  = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                            float w_des  = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                            int btn_count = 2;
-                            float total_w = w_del + w_des;
-                            if (goal.use_stage_icons) { total_w += w_icon; btn_count++; }
-                            total_w += style.ItemSpacing.x * (btn_count - 1);
-                            float avail = ImGui::GetContentRegionAvail().x;
-                            if (avail > total_w) {
-                                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
-                            }
+                            static char s_stage_bulk_icon_buf[MAX_PATH_LENGTH] = "";
 
-                            if (goal.use_stage_icons) {
-                                static char s_stage_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                                if (ImGui::SmallButton("Set Icon...##stage")) {
-                                    s_stage_bulk_icon_buf[0] = '\0';
-                                    ImGui::OpenPopup("stage_bulk_icon_popup");
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tip[256];
-                                    snprintf(tip, sizeof(tip),
-                                             "Apply the same icon path to every selected stage.\n"
-                                             "Type a path under resources/icons/, or click Browse.");
-                                    ImGui::SetTooltip("%s", tip);
-                                }
-                                if (ImGui::BeginPopup("stage_bulk_icon_popup")) {
-                                    ImGui::TextDisabled("Icon path for %d selected stages", (int)s_stage_selection.size());
-                                    ImGui::SetNextItemWidth(280.0f);
-                                    bool submit_enter = ImGui::InputText("##stage_bulk_icon_path", s_stage_bulk_icon_buf,
-                                                                         sizeof(s_stage_bulk_icon_buf),
-                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("Browse##stage_bulk_icon")) {
-                                        char new_path[MAX_PATH_LENGTH];
-                                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                                            strncpy(s_stage_bulk_icon_buf, new_path, sizeof(s_stage_bulk_icon_buf) - 1);
-                                            s_stage_bulk_icon_buf[sizeof(s_stage_bulk_icon_buf) - 1] = '\0';
-                                        }
-                                    }
-                                    bool submit_apply = ImGui::Button("Apply##stage_bulk_icon");
-                                    if ((submit_enter || submit_apply) && s_stage_bulk_icon_buf[0] != '\0') {
-                                        for (int idx : s_stage_selection) {
-                                            if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
-                                            strncpy(goal.stages[idx].icon_path, s_stage_bulk_icon_buf,
-                                                    sizeof(goal.stages[idx].icon_path) - 1);
-                                            goal.stages[idx].icon_path[
-                                                sizeof(goal.stages[idx].icon_path) - 1] = '\0';
-                                        }
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                        ImGui::CloseCurrentPopup();
-                                    }
-                                    ImGui::EndPopup();
-                                }
-                                ImGui::SameLine();
-                            }
+                            bool ba_open_icon = false;
+                            bool ba_open_delete = false;
 
-                            if (ImGui::SmallButton("Delete Selected##stage")) {
-                                ImGui::OpenPopup("stage_bulk_delete_confirm");
+                            float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                             ImGui::GetStyle().FramePadding.x * 2.0f;
+                            float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                               ImGui::GetStyle().FramePadding.x * 2.0f;
+                            float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                                 ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                            if (ImGui::SmallButton("Bulk Actions...##stage")) {
+                                ImGui::OpenPopup("stage_bulk_actions_menu");
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tip[256];
-                                snprintf(tip, sizeof(tip), "Remove all selected stages. Requires confirmation.");
-                                ImGui::SetTooltip("%s", tip);
+                                ImGui::SetTooltip("%s", "Actions to apply to all selected stages at once.");
                             }
+
+                            if (ImGui::BeginPopup("stage_bulk_actions_menu")) {
+                                char hdr[160];
+                                snprintf(hdr, sizeof(hdr), "%d selected stage%s",
+                                         (int)s_stage_selection.size(),
+                                         s_stage_selection.size() == 1 ? "" : "s");
+                                ImGui::TextDisabled("%s", hdr);
+                                ImGui::Separator();
+                                if (goal.use_stage_icons) {
+                                    if (ImGui::Selectable("Set Icon...##stage_ba")) ba_open_icon = true;
+                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                        "Apply the same icon path to every selected stage.");
+                                } else {
+                                    ImGui::BeginDisabled();
+                                    ImGui::Selectable("Set Icon... (enable Per-Stage Icons first)##stage_ba_dis");
+                                    ImGui::EndDisabled();
+                                }
+                                ImGui::Separator();
+                                if (ImGui::Selectable("Delete Selected...##stage_ba")) ba_open_delete = true;
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Remove all selected stages. Requires confirmation.");
+                                ImGui::EndPopup();
+                            }
+
+                            if (ba_open_icon) {
+                                s_stage_bulk_icon_buf[0] = '\0';
+                                ImGui::OpenPopup("stage_bulk_icon_popup");
+                            }
+                            if (ba_open_delete) ImGui::OpenPopup("stage_bulk_delete_confirm");
+
+                            if (ImGui::BeginPopup("stage_bulk_icon_popup")) {
+                                ImGui::TextDisabled("Icon path for %d selected stages", (int)s_stage_selection.size());
+                                ImGui::SetNextItemWidth(280.0f);
+                                bool submit_enter = ImGui::InputText("##stage_bulk_icon_path", s_stage_bulk_icon_buf,
+                                                                     sizeof(s_stage_bulk_icon_buf),
+                                                                     ImGuiInputTextFlags_EnterReturnsTrue);
+                                ImGui::SameLine();
+                                if (ImGui::Button("Browse##stage_bulk_icon")) {
+                                    char new_path[MAX_PATH_LENGTH];
+                                    if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                        strncpy(s_stage_bulk_icon_buf, new_path, sizeof(s_stage_bulk_icon_buf) - 1);
+                                        s_stage_bulk_icon_buf[sizeof(s_stage_bulk_icon_buf) - 1] = '\0';
+                                    }
+                                }
+                                bool submit_apply = ImGui::Button("Apply##stage_bulk_icon");
+                                if ((submit_enter || submit_apply) && s_stage_bulk_icon_buf[0] != '\0') {
+                                    for (int idx : s_stage_selection) {
+                                        if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
+                                        strncpy(goal.stages[idx].icon_path, s_stage_bulk_icon_buf,
+                                                sizeof(goal.stages[idx].icon_path) - 1);
+                                        goal.stages[idx].icon_path[
+                                            sizeof(goal.stages[idx].icon_path) - 1] = '\0';
+                                    }
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::EndPopup();
+                            }
+
                             if (ImGui::BeginPopup("stage_bulk_delete_confirm")) {
                                 ImGui::Text("Delete %d selected stages?", (int)s_stage_selection.size());
                                 if (ImGui::Button("Delete##stage_bulk_confirm")) {
@@ -12542,17 +13340,92 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (!s_ctr_selection.empty()) {
                         static char s_ctr_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...##ctr_bulk")) {
+
+                        static bool s_ctr_bl_icon_set = true;
+                        static bool s_ctr_bl_icon_hide = false;
+                        static float s_ctr_bl_icon_x = 100.0f, s_ctr_bl_icon_y = 100.0f;
+                        static float s_ctr_bl_icon_xs = 0.0f, s_ctr_bl_icon_ys = 0.0f;
+                        static int s_ctr_bl_icon_cols = 0;
+                        static int s_ctr_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_ctr_bl_text_set = true;
+                        static bool s_ctr_bl_text_hide = false;
+                        static float s_ctr_bl_text_x = 100.0f, s_ctr_bl_text_y = 100.0f;
+                        static float s_ctr_bl_text_xs = 0.0f, s_ctr_bl_text_ys = 0.0f;
+                        static int s_ctr_bl_text_cols = 0;
+                        static int s_ctr_bl_text_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_ctr_bl_prog_set = true;
+                        static bool s_ctr_bl_prog_hide = false;
+                        static float s_ctr_bl_prog_x = 100.0f, s_ctr_bl_prog_y = 100.0f;
+                        static float s_ctr_bl_prog_xs = 0.0f, s_ctr_bl_prog_ys = 0.0f;
+                        static int s_ctr_bl_prog_cols = 0;
+                        static int s_ctr_bl_prog_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##ctr")) {
+                            ImGui::OpenPopup("ctr_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected counters at once.");
+                        }
+
+                        if (ImGui::BeginPopup("ctr_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected counter%s",
+                                     (int)s_ctr_selection.size(),
+                                     s_ctr_selection.size() == 1 ? "" : "s");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##ctr_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Apply the same icon path to every selected counter.");
+                            if (ImGui::Selectable("Toggle Hidden##ctr_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Hidden on every selected counter.\n"
+                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Layout Coordinates...##ctr_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected counter.\n"
+                                "Each X and Y supports an optional stride that distributes\n"
+                                "values across the selection in template order.");
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##ctr_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected counters. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                if (current_template_data.counter_goals[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_ctr_selection.size());
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                current_template_data.counter_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_ctr_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("ctr_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected counter.\n"
-                                     "Type a path under resources/icons/, or click Browse.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("ctr_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("ctr_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("ctr_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected counters", (int)s_ctr_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
@@ -12582,37 +13455,98 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden##ctr_bulk")) {
-                            int hidden_count = 0;
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
-                                if (current_template_data.counter_goals[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("ctr_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected counters", (int)s_ctr_selection.size());
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_ctr_selection.begin(), s_ctr_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            struct {
+                                const char *id;
+                                const char *label;
+                                const char *anchor_id;
+                                const char *apply_label;
+                                bool *p_set;
+                                bool *p_hide;
+                                float *p_x, *p_y, *p_xs, *p_ys;
+                                int *p_cols, *p_anchor;
+                            } sections[3] = {
+                                {"ctr_bulk_layout_icon", "Icon Pos.", "Anchor##ctr_bl_icon", "Apply Icon Pos. to selected",
+                                 &s_ctr_bl_icon_set, &s_ctr_bl_icon_hide,
+                                 &s_ctr_bl_icon_x, &s_ctr_bl_icon_y, &s_ctr_bl_icon_xs, &s_ctr_bl_icon_ys,
+                                 &s_ctr_bl_icon_cols, &s_ctr_bl_icon_anchor},
+                                {"ctr_bulk_layout_text", "Text Pos.", "Anchor##ctr_bl_text", "Apply Text Pos. to selected",
+                                 &s_ctr_bl_text_set, &s_ctr_bl_text_hide,
+                                 &s_ctr_bl_text_x, &s_ctr_bl_text_y, &s_ctr_bl_text_xs, &s_ctr_bl_text_ys,
+                                 &s_ctr_bl_text_cols, &s_ctr_bl_text_anchor},
+                                {"ctr_bulk_layout_prog", "Progress Pos.", "Anchor##ctr_bl_prog", "Apply Progress Pos. to selected",
+                                 &s_ctr_bl_prog_set, &s_ctr_bl_prog_hide,
+                                 &s_ctr_bl_prog_x, &s_ctr_bl_prog_y, &s_ctr_bl_prog_xs, &s_ctr_bl_prog_ys,
+                                 &s_ctr_bl_prog_cols, &s_ctr_bl_prog_anchor},
+                            };
+                            for (int si = 0; si < 3; ++si) {
+                                auto &s = sections[si];
+                                if (si > 0) ImGui::Separator();
+                                ImGui::PushID(s.id);
+                                ImGui::Checkbox(s.label, s.p_set);
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide", s.p_hide);
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
+                                    if (*s.p_cols < 0) *s.p_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::Button(s.apply_label)) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                        auto &g = current_template_data.counter_goals[idx];
+                                        ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
+                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
+                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        target->is_set = *s.p_set;
+                                        target->is_hidden_in_layout = *s.p_hide;
+                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_ctr_selection.size());
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
-                                current_template_data.counter_goals[idx].is_hidden = target_hidden;
-                            }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected counter.\n"
-                                     "If most are visible they all become hidden, and vice versa.");
-                            ImGui::SetTooltip("%s", tip);
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##ctr_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected##ctr_bulk")) {
-                            ImGui::OpenPopup("ctr_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected counters. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("ctr_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected counters?", (int)s_ctr_selection.size());
                             if (ImGui::Button("Delete##ctr_bulk_confirm")) {
@@ -13339,23 +14273,38 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     bool bulk_delete_decos = false;
 
                     if (!s_deco_selection.empty()) {
-                        ImGuiStyle &style = ImGui::GetStyle();
-                        float w_del = ImGui::CalcTextSize("Delete Selected").x + style.FramePadding.x * 2.0f;
-                        float w_des = ImGui::CalcTextSize("Deselect all").x + style.FramePadding.x * 2.0f;
-                        float total_w = w_del + w_des + style.ItemSpacing.x;
-                        float avail = ImGui::GetContentRegionAvail().x;
-                        if (avail > total_w) {
-                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
-                        }
+                        bool ba_open_delete = false;
 
-                        if (ImGui::SmallButton("Delete Selected##deco")) {
-                            ImGui::OpenPopup("deco_bulk_delete_confirm");
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##deco")) {
+                            ImGui::OpenPopup("deco_bulk_actions_menu");
                         }
                         if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip), "Remove all selected decorations. Requires confirmation.");
-                            ImGui::SetTooltip("%s", tip);
+                            ImGui::SetTooltip("%s", "Actions to apply to all selected decorations at once.");
                         }
+
+                        if (ImGui::BeginPopup("deco_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected decoration%s",
+                                     (int)s_deco_selection.size(),
+                                     s_deco_selection.size() == 1 ? "" : "s");
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##deco_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Remove all selected decorations. Requires confirmation.");
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_open_delete) ImGui::OpenPopup("deco_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("deco_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected decorations?", (int)s_deco_selection.size());
                             if (ImGui::Button("Delete##deco_bulk_confirm")) {

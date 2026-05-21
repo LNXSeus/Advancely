@@ -793,16 +793,17 @@ Opening a template reveals a tabbed interface where you can define every goal.
   confirmation). For advancement criteria the menu also gets `Add selection to group` / `Ungroup selection` when groups
   are enabled. The row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only
   expose `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden
-  field so their menu shows only delete.
-    * `Layout Coordinates...` opens a sub-popup that mirrors the per-goal `Layout Coordinates` collapsible header
-      (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` where the goal type has one). Each coordinate exposes the
-      usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X` / `+Y` stride next to
-      each base. The stride distributes values across the selection in template/list order. The neighbouring `Columns`
-      field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on both axes, useful for
-      rows, columns, and diagonals), while `1` or higher wraps into a grid (`X` uses `N mod Columns`, `Y` uses
-      `N div Columns`). Each section has its own `Apply ... to selected` button so you can tune Icon Pos. without
-      touching Text Pos. (or vice versa). Currently shipped on the **Advancements** tab; rolling out to the other tabs
-      next.
+  field so their menu only shows `Delete Selected...`.
+  * `Layout Coordinates...` opens a sub-popup that mirrors the per-goal `Layout Coordinates` collapsible header
+    (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` for stats, sub-stats, multi-stage goals, and counters). Each
+    coordinate exposes the usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X`
+    / `+Y` stride next to each base. The stride distributes values across the selection in template/list order. The
+    neighbouring `Columns` field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on
+    both axes, useful for rows, columns, and diagonals), while `1` or higher wraps into a grid (`X` uses
+    `N mod Columns`, `Y` uses `N div Columns`). Each section has its own `Apply ... to selected` button so you can
+    tune Icon Pos. without touching Text Pos. (or vice versa). Available wherever the goal type has at least one
+    `ManualPos` field; stages and decorations are excluded (stages have no `ManualPos`; decoration shapes have
+    type-specific endpoint geometry that doesn't bulk-stride cleanly).
 * **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and
 the **stream overlay**. Separately, when a goal has manual positions set (for use with Manual Layout mode), each
 position (icon, text, progress) gains its own `Hide` checkbox that controls visibility on the **manual layout**
