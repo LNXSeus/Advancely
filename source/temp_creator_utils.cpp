@@ -1644,19 +1644,43 @@ cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, si
     return root;
 }
 
-cJSON *read_lang_json_from_zip(const char *zip_path) {
+// Returns the language flag encoded in a lang filename, or empty string for the default file.
+// Returns std::string with value {nullopt-equivalent: returns "<NOMATCH>"} when the name is not a lang file.
+// Caller compares result against "<NOMATCH>" sentinel.
+static std::string lang_flag_from_filename(const char *name) {
+    const char *base = strrchr(name, '/');
+    base = base ? base + 1 : name;
+    const char *dot = strstr(base, ".json");
+    if (!dot) return "<NOMATCH>";
+    // Walk backwards to find "_lang" or "_lang_<flag>" before .json
+    // We look for "_lang" substring; the matched one must end at dot or be followed by "_<flag>".
+    const char *lang_marker = nullptr;
+    for (const char *p = base; p < dot - 4; p++) {
+        if (strncmp(p, "_lang", 5) == 0) {
+            const char *after = p + 5;
+            if (after == dot) { lang_marker = p; break; } // _lang.json
+            if (*after == '_' && after < dot) { lang_marker = p; break; } // _lang_<flag>.json
+        }
+    }
+    if (!lang_marker) return "<NOMATCH>";
+    const char *after = lang_marker + 5;
+    if (after == dot) return std::string(); // default
+    // after starts with '_'; flag is between after+1 and dot
+    return std::string(after + 1, dot - (after + 1));
+}
+
+cJSON *read_lang_json_from_zip(const char *zip_path, const char *flag) {
     mz_zip_archive zip = {};
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return nullptr;
+    std::string want_flag = (flag ? flag : "");
     int lang_index = -1;
     mz_uint num_files = mz_zip_reader_get_num_files(&zip);
     for (mz_uint i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat fs;
         if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
-        const char *name = fs.m_filename;
-        const char *lang_suffix = strstr(name, "_lang.json");
-        if (!lang_suffix) continue;
-        // Prefer the no-flag default language file: matches "_lang.json" at the end.
-        if (strcmp(lang_suffix, "_lang.json") != 0) continue;
+        std::string got = lang_flag_from_filename(fs.m_filename);
+        if (got == "<NOMATCH>") continue;
+        if (got != want_flag) continue;
         lang_index = (int) i;
         break;
     }
@@ -1667,6 +1691,24 @@ cJSON *read_lang_json_from_zip(const char *zip_path) {
     cJSON *root = parse_zip_entry_as_json(&zip, (mz_uint) lang_index);
     mz_zip_reader_end(&zip);
     return root;
+}
+
+std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
+    std::vector<std::string> out;
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return out;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        std::string got = lang_flag_from_filename(fs.m_filename);
+        if (got == "<NOMATCH>") continue;
+        bool dup = false;
+        for (const auto &f: out) if (f == got) { dup = true; break; }
+        if (!dup) out.push_back(std::move(got));
+    }
+    mz_zip_reader_end(&zip);
+    return out;
 }
 
 int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::string> &icon_paths) {

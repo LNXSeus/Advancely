@@ -27,6 +27,7 @@
 </p>
 
 # [Watch the full tutorial video here!](https://www.youtube.com/watch?v=Rxd1RJqg2WQ)
+### [Watch all of the Advancely Devlogs here!](https://www.youtube.com/playlist?list=PLniMta_NW_NYfA5M6xzrVOuxsj9amRdP4)
 
 ***
 
@@ -920,8 +921,13 @@ options:
   advancements, criteria, stats, sub-stats, unlocks, custom goals, counters and multi-stage goal stages) are
   extracted from the zip's `icons/` directory into `resources/icons/` automatically, skipping any file that
   already exists. Duplicate root names (or decoration ids) are detected up-front and the import is refused,
-  exactly like the player-file flow. The popup supports `Ctrl+F` / `Cmd+F` to focus the search, Shift+Click
-  to toggle a checkbox range, and shows a clear message when the source template has nothing of that type.
+  exactly like the player-file flow. A `Language` dropdown at the top picks which language file from the source
+  zip provides the display names for the items you import; selections are kept when you change it. Any
+  `linked_goals` / arrow endpoints / multi-stage `parent_advancement` refs that won't resolve after the import
+  (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
+  are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /
+  `Cmd+F` to focus the search, Shift+Click to toggle a checkbox range, and shows a clear message when the
+  source template has nothing of that type.
   A `Layout positions` checkbox decides whether the source's manual layout positions (icon / text / progress
   for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
   auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
@@ -953,9 +959,9 @@ sense at a finer grain:
 #### Template update helpers (advancement and achievement import)
 
 When upgrading a large template across Minecraft versions (or downgrading to an older one), the `Select...` dropdown
-in the import popup offers per-purpose helpers. Each opens a nested modal that previews changes. Nothing is written
-to the template until you press `Confirm Import`, and every change lands as a normal unsaved editor edit you can
-discard like any other.
+in the import popup offers per-purpose helpers. Each opens a nested modal that previews changes; every preview has
+its own search bar (focus with `Ctrl+F` / `Cmd+F`). Nothing is written to the template until you press
+`Confirm Import`, and every change lands as a normal unsaved editor edit you can discard like any other.
 
 - `...all visible`: bulk-select every entry currently visible in the import list (respects the search bar and the
   `Include Crit.` checkbox).
@@ -972,7 +978,8 @@ discard like any other.
   deleted name. Useful when downgrading to an older version that lacks those entries.
 - `...criteria differences` (`1.7+`): for every entry present on both sides whose criteria sets differ, list new
   criteria (`[+]`) and stale ones (`[-]`). Pick what to stage on each row, then `Confirm Import` adds the new
-  criteria (with placeholder display/icon) and removes the stale ones with link scrubbing. Also available inside
+  criteria (with placeholder display/icon) and removes the stale ones with link scrubbing. The search bar has
+  a `Crit. Search` toggle that flips its scope between parent and criterion names. Also available inside
   the per-advancement criteria import popup, scoped to that single entry.
 
 Staged changes show up in a panel at the top of the import popup with a per-row `Revert` button. The right-aligned

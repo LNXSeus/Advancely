@@ -387,12 +387,20 @@ bool zip_contains_icons(const char *zip_path);
 cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, size_t msg_size);
 
 /**
- * @brief Reads the default-language JSON (file ending in _lang.json) inside the zip and
- * returns the parsed cJSON tree. Returns nullptr when no such file exists (not an error).
+ * @brief Reads a language JSON inside the zip and returns the parsed cJSON tree.
+ * Pass an empty/null @p flag to load the default _lang.json. A non-empty flag matches
+ * a _lang_<flag>.json file. Returns nullptr when no such file exists (not an error).
  * @param zip_path Path to the zip.
+ * @param flag Optional language flag (e.g. "ger"). Empty/null means the default file.
  * @return Parsed cJSON root (caller must cJSON_Delete) or nullptr.
  */
-cJSON *read_lang_json_from_zip(const char *zip_path);
+cJSON *read_lang_json_from_zip(const char *zip_path, const char *flag = nullptr);
+
+/**
+ * @brief Lists every language flag present in the zip. The default _lang.json (no flag)
+ * is reported as an empty string. The returned vector preserves zip-iteration order.
+ */
+std::vector<std::string> list_lang_flags_in_zip(const char *zip_path);
 
 /**
  * @brief Extracts the named icons from a zip's icons/ directory to resources/icons/.

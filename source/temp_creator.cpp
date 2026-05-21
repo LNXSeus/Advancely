@@ -2826,6 +2826,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool s_show_template_import_popup = false;
     static ImportFromTemplateScope s_template_import_scope = IFTS_ADVANCEMENTS;
     static EditorTemplate s_template_import_data;
+    static std::vector<std::string> s_template_import_lang_flags;
+    static int s_template_import_lang_index = 0;
     static std::vector<bool> s_template_import_selected;
     static char s_template_import_zip_path[MAX_PATH_LENGTH] = "";
     static char s_template_import_search[256] = "";
@@ -2838,21 +2840,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorMultiStageGoal *s_template_import_target_ms = nullptr;
     static int s_template_import_parent_index = -1;
 
-    auto open_template_import = [&](ImportFromTemplateScope scope) {
-        const char *zip_filter[1] = {"*.zip"};
-        const char *file = tinyfd_openFileDialog("Select Template Zip", "", 1, zip_filter,
-                                                  "Template Zip (*.zip)", 0);
-        if (!file) return;
-
+    auto reparse_template_import_data = [&]() -> bool {
         char err[256];
-        cJSON *root_json = read_template_json_from_zip(file, err, sizeof(err));
+        cJSON *root_json = read_template_json_from_zip(s_template_import_zip_path, err, sizeof(err));
         if (!root_json) {
             save_message_type = MSG_ERROR;
             strncpy(status_message, err, sizeof(status_message) - 1);
             status_message[sizeof(status_message) - 1] = '\0';
-            return;
+            return false;
         }
-        cJSON *lang_json = read_lang_json_from_zip(file);
+        const char *flag_cstr = nullptr;
+        if (s_template_import_lang_index >= 0 &&
+            s_template_import_lang_index < (int) s_template_import_lang_flags.size()) {
+            flag_cstr = s_template_import_lang_flags[s_template_import_lang_index].c_str();
+        }
+        cJSON *lang_json = read_lang_json_from_zip(s_template_import_zip_path, flag_cstr);
         if (!lang_json) lang_json = cJSON_CreateObject();
 
         s_template_import_data.advancements.clear();
@@ -2880,9 +2882,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         cJSON_Delete(root_json);
         cJSON_Delete(lang_json);
+        return true;
+    };
+
+    auto open_template_import = [&](ImportFromTemplateScope scope) {
+        const char *zip_filter[1] = {"*.zip"};
+        const char *file = tinyfd_openFileDialog("Select Template Zip", "", 1, zip_filter,
+                                                  "Template Zip (*.zip)", 0);
+        if (!file) return;
 
         strncpy(s_template_import_zip_path, file, sizeof(s_template_import_zip_path) - 1);
         s_template_import_zip_path[sizeof(s_template_import_zip_path) - 1] = '\0';
+        s_template_import_lang_flags = list_lang_flags_in_zip(file);
+        // Always include the default ("") even if not present, so the dropdown is non-empty.
+        bool has_default = false;
+        for (const auto &f: s_template_import_lang_flags) if (f.empty()) { has_default = true; break; }
+        if (!has_default) s_template_import_lang_flags.insert(s_template_import_lang_flags.begin(), std::string());
+        s_template_import_lang_index = 0;
+
+        if (!reparse_template_import_data()) return;
+
         s_template_import_scope = scope;
         s_template_import_search[0] = '\0';
         s_template_import_error[0] = '\0';
@@ -2991,6 +3010,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     const char *advancements_label_singular_lower = (creator_selected_version <= MC_VERSION_1_11_2)
                                                         ? "achievement"
                                                         : "advancement";
+
+    // Stop persistent re-opening popups from stealing the popup stack while the quit dialog is up.
+    if (t && t->quit_popup_active) {
+        show_create_lang_popup = false;
+        show_copy_lang_popup = false;
+        show_import_lang_popup = false;
+        show_export_options_popup = false;
+        show_import_advancements_popup = false;
+        show_import_stats_popup = false;
+        show_import_unlocks_popup = false;
+        s_show_template_import_popup = false;
+        show_goal_selector_popup = false;
+    }
 
     // LOGIC
 
@@ -15468,8 +15500,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // inner popup's identical shortcuts don't cascade out to the parent.
         bool inner_helper_active_this_frame = false;
 
-        // Hotkey logic for search bar
-        if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+        // Hotkey logic for search bar. Skip when a nested helper popup is open so the
+        // hotkey lands in the inner popup's search bar instead of the outer one's.
+        bool any_inner_open =
+            ImGui::IsPopupOpen("###import_new_advancements_popup") ||
+            ImGui::IsPopupOpen("###import_match_renames_popup") ||
+            ImGui::IsPopupOpen("###import_stale_advs_popup") ||
+            ImGui::IsPopupOpen("###import_add_criteria_popup");
+        if (!any_inner_open &&
+            (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
             focus_import_search = true;
         }
@@ -15568,12 +15607,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static bool s_new_advs_show_recipes = false;
             static bool s_new_advs_needs_recompute = true;
             static int s_new_advs_last_clicked = -1;
+            static char s_new_advs_search[256] = "";
+            static bool s_new_advs_focus_search = false;
 
             static bool s_open_rename_popup = false;
             static std::vector<RenameRow> s_rename_rows;
             static std::vector<int> s_rename_row_selection;
             static bool s_rename_show_recipes = false;
             static bool s_rename_needs_recompute = true;
+            static char s_rename_search[256] = "";
+            static bool s_rename_focus_search = false;
 
             static bool s_open_criteria_popup = false;
             static std::vector<CriteriaDeltaRow> s_criteria_rows;
@@ -15581,6 +15624,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static bool s_criteria_needs_recompute = true;
             static int s_criteria_last_row = -1;
             static int s_criteria_last_delta = -1;
+            static char s_criteria_search[256] = "";
+            static bool s_criteria_focus_search = false;
+            static bool s_criteria_search_crits_only = false;
 
             static bool s_open_stale_popup = false;
             static std::vector<int> s_stale_indices;
@@ -15588,6 +15634,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static bool s_stale_show_recipes = false;
             static bool s_stale_needs_recompute = true;
             static int s_stale_last_clicked = -1;
+            static char s_stale_search[256] = "";
+            static bool s_stale_focus_search = false;
 
             if (ImGui::BeginPopup("import_select_dropdown")) {
                 if (ImGui::Selectable("...all visible")) {
@@ -15743,6 +15791,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_new_adv_local_selected.clear();
                 s_new_advs_needs_recompute = true;
                 s_new_advs_last_clicked = -1;
+                s_new_advs_search[0] = '\0';
+                s_new_advs_focus_search = true;
                 ImGui::OpenPopup(new_advs_popup_title);
                 s_open_new_advs_popup = false;
             }
@@ -15750,6 +15800,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginPopupModal(new_advs_popup_title, nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
                 inner_helper_active_this_frame = true;
+                if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                    ImGui::IsKeyPressed(ImGuiKey_F)) {
+                    s_new_advs_focus_search = true;
+                }
                 if (s_new_advs_needs_recompute) {
                     std::vector<std::string> template_roots;
                     template_roots.reserve(current_template_data.advancements.size());
@@ -15828,12 +15882,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SetTooltip("%s", tip);
                 }
 
+                {
+                    const float sw = 200.0f;
+                    const float cw = ImGui::GetFrameHeight();
+                    const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
+                    if (s_new_advs_search[0] != '\0') {
+                        if (ImGui::Button("X##new_advs_clear", ImVec2(cw, 0))) s_new_advs_search[0] = '\0';
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
+                    } else {
+                        ImGui::Dummy(ImVec2(cw, 0));
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(sw);
+                    if (s_new_advs_focus_search) {
+                        ImGui::SetKeyboardFocusHere();
+                        s_new_advs_focus_search = false;
+                    }
+                    ImGui::InputTextWithHint("##new_advs_search", "Search...",
+                                             s_new_advs_search, sizeof(s_new_advs_search));
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Filter the list by root name (case-insensitive).\n\n"
+                                          "Press Ctrl+F or Cmd+F to focus.");
+                    }
+                }
+
                 ImGui::Separator();
                 ImGui::BeginChild("##new_advs_list_scroll", ImVec2(520.0f, 320.0f), true);
                 for (size_t i = 0; i < s_new_adv_indices.size(); i++) {
                     int idx = s_new_adv_indices[i];
                     if (idx < 0 || idx >= (int) importable_advancements.size()) continue;
                     const auto &adv = importable_advancements[idx];
+                    if (s_new_advs_search[0] != '\0' &&
+                        !str_contains_insensitive(adv.root_name.c_str(), s_new_advs_search)) continue;
                     bool sel = s_new_adv_local_selected[i];
                     ImGui::PushID((int) i);
                     if (ImGui::Checkbox(adv.root_name.c_str(), &sel)) {
@@ -15905,6 +15987,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_rename_rows.clear();
                 s_rename_row_selection.clear();
                 s_rename_needs_recompute = true;
+                s_rename_search[0] = '\0';
+                s_rename_focus_search = true;
                 ImGui::OpenPopup(rename_popup_title);
                 s_open_rename_popup = false;
             }
@@ -15912,6 +15996,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginPopupModal(rename_popup_title, nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
                 inner_helper_active_this_frame = true;
+                if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                    ImGui::IsKeyPressed(ImGuiKey_F)) {
+                    s_rename_focus_search = true;
+                }
                 if (s_rename_needs_recompute) {
                     std::unordered_map<std::string, std::string> pending_map;
                     for (const auto &p: s_pending_renames) pending_map[p.first] = p.second;
@@ -16015,6 +16103,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SetTooltip("%s", tip);
                 }
 
+                {
+                    const float sw = 200.0f;
+                    const float cw = ImGui::GetFrameHeight();
+                    const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
+                    if (s_rename_search[0] != '\0') {
+                        if (ImGui::Button("X##rename_clear", ImVec2(cw, 0))) s_rename_search[0] = '\0';
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
+                    } else {
+                        ImGui::Dummy(ImVec2(cw, 0));
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(sw);
+                    if (s_rename_focus_search) {
+                        ImGui::SetKeyboardFocusHere();
+                        s_rename_focus_search = false;
+                    }
+                    ImGui::InputTextWithHint("##rename_search", "Search...",
+                                             s_rename_search, sizeof(s_rename_search));
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Filter rows by template root name or candidate root name (case-insensitive).\n\n"
+                                          "Press Ctrl+F or Cmd+F to focus.");
+                    }
+                }
+
                 ImGui::Separator();
                 ImGui::BeginChild("##rename_list_scroll", ImVec2(640.0f, 360.0f), true);
                 for (size_t i = 0; i < s_rename_rows.size(); i++) {
@@ -16022,6 +16136,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (row.template_index < 0 ||
                         row.template_index >= (int) current_template_data.advancements.size()) continue;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
+                    if (s_rename_search[0] != '\0') {
+                        bool match = str_contains_insensitive(tmpl_adv.root_name, s_rename_search);
+                        if (!match) {
+                            for (const auto &cand: row.candidates) {
+                                if (cand.import_index < 0 ||
+                                    cand.import_index >= (int) importable_advancements.size()) continue;
+                                if (str_contains_insensitive(importable_advancements[cand.import_index].root_name.c_str(),
+                                                              s_rename_search)) {
+                                    match = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!match) continue;
+                    }
 
                     char header[320];
                     int sel = s_rename_row_selection[i];
@@ -16156,12 +16285,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_stale_selected.clear();
                 s_stale_needs_recompute = true;
                 s_stale_last_clicked = -1;
+                s_stale_search[0] = '\0';
+                s_stale_focus_search = true;
                 ImGui::OpenPopup(stale_popup_title);
                 s_open_stale_popup = false;
             }
 
             if (ImGui::BeginPopupModal(stale_popup_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                 inner_helper_active_this_frame = true;
+                if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                    ImGui::IsKeyPressed(ImGuiKey_F)) {
+                    s_stale_focus_search = true;
+                }
                 if (s_stale_needs_recompute) {
                     std::unordered_set<std::string> import_set;
                     for (const auto &a: importable_advancements) import_set.insert(a.root_name);
@@ -16259,6 +16394,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SetTooltip("%s", tip);
                 }
 
+                {
+                    const float sw = 200.0f;
+                    const float cw = ImGui::GetFrameHeight();
+                    const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
+                    if (s_stale_search[0] != '\0') {
+                        if (ImGui::Button("X##stale_clear", ImVec2(cw, 0))) s_stale_search[0] = '\0';
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
+                    } else {
+                        ImGui::Dummy(ImVec2(cw, 0));
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(sw);
+                    if (s_stale_focus_search) {
+                        ImGui::SetKeyboardFocusHere();
+                        s_stale_focus_search = false;
+                    }
+                    ImGui::InputTextWithHint("##stale_search", "Search...",
+                                             s_stale_search, sizeof(s_stale_search));
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Filter the list by root name (case-insensitive).\n\n"
+                                          "Press Ctrl+F or Cmd+F to focus.");
+                    }
+                }
+
                 ImGui::Separator();
                 ImGui::BeginChild("##stale_list_scroll", ImVec2(560.0f, 320.0f), true);
                 for (size_t k = 0; k < s_stale_indices.size(); k++) {
@@ -16269,6 +16430,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &p: s_pending_renames) {
                         if (p.first == a.root_name) { post_rename = p.second; break; }
                     }
+                    if (s_stale_search[0] != '\0' &&
+                        !str_contains_insensitive(a.root_name, s_stale_search) &&
+                        !str_contains_insensitive(post_rename.c_str(), s_stale_search)) continue;
                     char label[384];
                     if (post_rename != a.root_name) {
                         snprintf(label, sizeof(label), "%s -> %s", a.root_name, post_rename.c_str());
@@ -16362,6 +16526,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (s_open_criteria_popup) {
                 s_criteria_rows.clear();
                 s_criteria_needs_recompute = true;
+                s_criteria_search[0] = '\0';
+                s_criteria_focus_search = true;
                 ImGui::OpenPopup(criteria_popup_title);
                 s_open_criteria_popup = false;
             }
@@ -16369,6 +16535,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginPopupModal(criteria_popup_title, nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
                 inner_helper_active_this_frame = true;
+                if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                    ImGui::IsKeyPressed(ImGuiKey_F)) {
+                    s_criteria_focus_search = true;
+                }
                 if (s_criteria_needs_recompute) {
                     std::unordered_map<std::string, std::string> rename_map;
                     for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
@@ -16509,6 +16679,43 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SetTooltip("%s", tip);
                 }
 
+                {
+                    const float sw = 200.0f;
+                    const float cw = ImGui::GetFrameHeight();
+                    const char *scope_label = "Crit. Search";
+                    const float scope_w = ImGui::CalcTextSize(scope_label).x + ImGui::GetFrameHeightWithSpacing();
+                    const float right_block = sw + cw + scope_w + ImGui::GetStyle().ItemSpacing.x * 2;
+                    ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
+                    ImGui::Checkbox(scope_label, &s_criteria_search_crits_only);
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Changes the scope of the search bar.\n\n"
+                                          "CHECKED: Search only criterion names.\n"
+                                          "UNCHECKED: Search advancement (parent) names.");
+                    }
+                    ImGui::SameLine();
+                    if (s_criteria_search[0] != '\0') {
+                        if (ImGui::Button("X##criteria_clear", ImVec2(cw, 0))) s_criteria_search[0] = '\0';
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
+                    } else {
+                        ImGui::Dummy(ImVec2(cw, 0));
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(sw);
+                    if (s_criteria_focus_search) {
+                        ImGui::SetKeyboardFocusHere();
+                        s_criteria_focus_search = false;
+                    }
+                    ImGui::InputTextWithHint("##criteria_search", "Search...",
+                                             s_criteria_search, sizeof(s_criteria_search));
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Filter rows by advancement or criterion name (case-insensitive).\n"
+                                          "Use the checkbox to the left to toggle search scope.\n\n"
+                                          "Press Ctrl+F or Cmd+F to focus.");
+                    }
+                }
+
                 ImGui::Separator();
                 ImGui::BeginChild("##criteria_list_scroll", ImVec2(640.0f, 360.0f), true);
                 for (size_t i = 0; i < s_criteria_rows.size(); i++) {
@@ -16519,6 +16726,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     std::string shadow_root = tmpl_adv.root_name;
                     for (const auto &p: s_pending_renames) {
                         if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
+                    }
+                    if (s_criteria_search[0] != '\0') {
+                        if (s_criteria_search_crits_only) {
+                            bool any = false;
+                            for (const auto &d: row.deltas) {
+                                if (str_contains_insensitive(d.root_name.c_str(), s_criteria_search)) {
+                                    any = true; break;
+                                }
+                            }
+                            if (!any) continue;
+                        } else {
+                            if (!str_contains_insensitive(tmpl_adv.root_name, s_criteria_search) &&
+                                !str_contains_insensitive(shadow_root.c_str(), s_criteria_search)) continue;
+                        }
                     }
 
                     int n_new = 0, n_stale = 0;
@@ -16538,6 +16759,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::TreeNodeEx(header, ImGuiTreeNodeFlags_DefaultOpen)) {
                         for (size_t j = 0; j < row.deltas.size(); j++) {
                             auto &d = row.deltas[j];
+                            if (s_criteria_search[0] != '\0' && s_criteria_search_crits_only &&
+                                !str_contains_insensitive(d.root_name.c_str(), s_criteria_search)) continue;
                             char label[256];
                             snprintf(label, sizeof(label), "%s %s##criteria_delta_%d_%d",
                                      d.is_new ? "[+]" : "[-]", d.root_name.c_str(),
@@ -18442,6 +18665,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_template_import_focus_search = true;
             }
 
+            // Language file picker. Display names of imported items will be sourced from this lang file.
+            if (!s_template_import_lang_flags.empty()) {
+                auto lang_label = [&](int i) -> const char * {
+                    if (i < 0 || i >= (int) s_template_import_lang_flags.size()) return "?";
+                    return s_template_import_lang_flags[i].empty() ? "(default)"
+                                                                    : s_template_import_lang_flags[i].c_str();
+                };
+                ImGui::SetNextItemWidth(220.0f);
+                if (ImGui::BeginCombo("Language", lang_label(s_template_import_lang_index))) {
+                    for (int i = 0; i < (int) s_template_import_lang_flags.size(); i++) {
+                        bool sel = (i == s_template_import_lang_index);
+                        ImGui::PushID(i);
+                        if (ImGui::Selectable(lang_label(i), sel)) {
+                            if (i != s_template_import_lang_index) {
+                                s_template_import_lang_index = i;
+                                reparse_template_import_data();
+                            }
+                        }
+                        if (sel) ImGui::SetItemDefaultFocus();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Pick which language file inside the source template provides the\n"
+                                      "display names for imported items. '(default)' is the un-flagged\n"
+                                      "_lang.json. Changing this re-reads the source data; your current\n"
+                                      "selections are kept.");
+                }
+                ImGui::Separator();
+            }
+
             if (is_parented_scope()) {
                 int pcount = parent_count_in_scope();
                 if (pcount == 0) {
@@ -18630,6 +18886,173 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             int sel_count = 0;
             for (bool b: s_template_import_selected) if (b) sel_count++;
+
+            // Surface linked-goal references that will not resolve after this import.
+            // Imported items keep their links as-is; this is a heads-up, not a rejection.
+            auto unresolved_links = [&]() -> std::vector<std::string> {
+                std::vector<std::string> out;
+                if (sel_count == 0) return out;
+                std::unordered_set<std::string> will_exist;
+                for (const auto &a: current_template_data.advancements) will_exist.insert(a.root_name);
+                for (const auto &a: current_template_data.stats) will_exist.insert(a.root_name);
+                for (const auto &a: current_template_data.unlocks) will_exist.insert(a.root_name);
+                for (const auto &a: current_template_data.custom_goals) will_exist.insert(a.root_name);
+                for (const auto &a: current_template_data.counter_goals) will_exist.insert(a.root_name);
+                for (const auto &a: current_template_data.multi_stage_goals) will_exist.insert(a.root_name);
+
+                auto add_top_imports = [&](auto &vec) {
+                    for (int i = 0; i < item_count; i++) {
+                        if (!s_template_import_selected[i]) continue;
+                        if (i < 0 || i >= (int) vec.size()) continue;
+                        will_exist.insert(vec[i].root_name);
+                    }
+                };
+                switch (s_template_import_scope) {
+                    case IFTS_ADVANCEMENTS: add_top_imports(s_template_import_data.advancements); break;
+                    case IFTS_STATS: add_top_imports(s_template_import_data.stats); break;
+                    case IFTS_UNLOCKS: add_top_imports(s_template_import_data.unlocks); break;
+                    case IFTS_CUSTOM_GOALS: add_top_imports(s_template_import_data.custom_goals); break;
+                    case IFTS_COUNTERS: add_top_imports(s_template_import_data.counter_goals); break;
+                    case IFTS_MS_GOALS: add_top_imports(s_template_import_data.multi_stage_goals); break;
+                    default: break;
+                }
+
+                auto check_lg = [&](const std::vector<EditorCounterLinkedGoal> &lgs, const char *origin) {
+                    for (const auto &lg: lgs) {
+                        if (lg.root_name[0] == '\0') continue;
+                        if (will_exist.count(lg.root_name)) continue;
+                        char buf[512];
+                        snprintf(buf, sizeof(buf), "%s -> %s", origin, lg.root_name);
+                        out.emplace_back(buf);
+                    }
+                };
+                auto check_stage = [&](const EditorSubGoal &st, const char *goal_root) {
+                    if (st.type == SUBGOAL_CRITERION && st.parent_advancement[0] &&
+                        !will_exist.count(st.parent_advancement)) {
+                        char buf[512];
+                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s parent -> %s", goal_root, st.stage_id, st.parent_advancement);
+                        else snprintf(buf, sizeof(buf), "%s parent -> %s", st.stage_id, st.parent_advancement);
+                        out.emplace_back(buf);
+                    }
+                    if ((st.type == SUBGOAL_ADVANCEMENT || st.type == SUBGOAL_STAT ||
+                         st.type == SUBGOAL_UNLOCK || st.type == SUBGOAL_CRITERION) &&
+                        st.root_name[0] && !will_exist.count(st.root_name)) {
+                        // For SUBGOAL_CRITERION root_name names the criterion under parent_advancement; only warn if parent is unknown OR we can't introspect.
+                        if (st.type == SUBGOAL_CRITERION) {
+                            // Skip if parent is in destination - we can't easily verify the criterion exists under it without scanning.
+                            // To keep this simple, only warn when even the parent is missing (already covered above).
+                            return;
+                        }
+                        char buf[512];
+                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s root -> %s", goal_root, st.stage_id, st.root_name);
+                        else snprintf(buf, sizeof(buf), "%s root -> %s", st.stage_id, st.root_name);
+                        out.emplace_back(buf);
+                    }
+                };
+
+                switch (s_template_import_scope) {
+                    case IFTS_STATS:
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            const auto &s = s_template_import_data.stats[i];
+                            check_lg(s.linked_goals, s.root_name);
+                            for (const auto &c: s.criteria) {
+                                char origin[256];
+                                snprintf(origin, sizeof(origin), "%s/%s", s.root_name, c.root_name);
+                                check_lg(c.linked_goals, origin);
+                            }
+                        }
+                        break;
+                    case IFTS_CUSTOM_GOALS:
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            const auto &c = s_template_import_data.custom_goals[i];
+                            check_lg(c.linked_goals, c.root_name);
+                        }
+                        break;
+                    case IFTS_COUNTERS:
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            const auto &c = s_template_import_data.counter_goals[i];
+                            check_lg(c.linked_goals, c.root_name);
+                        }
+                        break;
+                    case IFTS_MS_GOALS:
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            const auto &g = s_template_import_data.multi_stage_goals[i];
+                            for (const auto &st: g.stages) check_stage(st, g.root_name);
+                        }
+                        break;
+                    case IFTS_DECORATIONS:
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            const auto &d = s_template_import_data.decorations[i];
+                            if (d.type == DECORATION_ARROW) {
+                                if (d.start_goal_root[0] && !will_exist.count(d.start_goal_root)) {
+                                    char buf[512];
+                                    snprintf(buf, sizeof(buf), "[Arrow %s] start -> %s", d.id, d.start_goal_root);
+                                    out.emplace_back(buf);
+                                }
+                                if (d.end_goal_root[0] && !will_exist.count(d.end_goal_root)) {
+                                    char buf[512];
+                                    snprintf(buf, sizeof(buf), "[Arrow %s] end -> %s", d.id, d.end_goal_root);
+                                    out.emplace_back(buf);
+                                }
+                            } else if (d.type == DECORATION_TEXT_HEADER) {
+                                char origin[128];
+                                snprintf(origin, sizeof(origin), "[Text %s]", d.id);
+                                check_lg(d.linked_goals, origin);
+                            }
+                        }
+                        break;
+                    case IFTS_TEMPLATE_SUB_STATS: {
+                        int p = s_template_import_parent_index;
+                        if (p >= 0 && p < (int) s_template_import_data.stats.size()) {
+                            const auto &src_stat = s_template_import_data.stats[p];
+                            for (int i = 0; i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                if (i < 0 || i >= (int) src_stat.criteria.size()) continue;
+                                const auto &c = src_stat.criteria[i];
+                                check_lg(c.linked_goals, c.root_name);
+                            }
+                        }
+                        break;
+                    }
+                    case IFTS_TEMPLATE_STAGES: {
+                        int p = s_template_import_parent_index;
+                        if (p >= 0 && p < (int) s_template_import_data.multi_stage_goals.size()) {
+                            const auto &src_goal = s_template_import_data.multi_stage_goals[p];
+                            for (int i = 0; i < item_count; i++) {
+                                if (!s_template_import_selected[i]) continue;
+                                if (entry_is_final_stage(i)) continue;
+                                if (i < 0 || i >= (int) src_goal.stages.size()) continue;
+                                check_stage(src_goal.stages[i], nullptr);
+                            }
+                        }
+                        break;
+                    }
+                    default: break;
+                }
+
+                return out;
+            }();
+
+            if (!unresolved_links.empty()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f),
+                                   "Warning: %d linked reference(s) will be unresolved after import:",
+                                   (int) unresolved_links.size());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Selected items reference goals that won't exist in this template\n"
+                                      "after import (and aren't included in the current selection). The\n"
+                                      "links are kept as-is; you can fix them by importing the missing\n"
+                                      "goals afterward, or by removing the dangling links manually.");
+                }
+                ImGui::BeginChild("##tpl_import_warns", ImVec2(620.0f, 80.0f), true);
+                for (const auto &w: unresolved_links) ImGui::BulletText("%s", w.c_str());
+                ImGui::EndChild();
+            }
 
             if (s_template_import_error[0] != '\0') {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", s_template_import_error);
