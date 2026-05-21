@@ -786,13 +786,23 @@ Opening a template reveals a tabbed interface where you can define every goal.
   order.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
-  selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected a compact
-  action bar appears with `Set Icon...` (apply the same icon path to every selected row), `Toggle Hidden` (flip the
-  Hidden flag, majority-rule for the target state), `Delete Selected` (with confirmation), and `Deselect all`. For
-  advancement criteria the bar also shows `Add selection to group` / `Ungroup selection` when groups are enabled. The
-  row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only expose
-  `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden field so
-  their bar shows only delete and deselect.
+  selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
+  right-aligned `Bulk Actions...` button appears next to a `Deselect all` button. The dropdown groups every action that
+  runs across the whole selection: `Set Icon...` (apply the same icon path to every selected row), `Toggle Hidden`
+  (flip the Hidden flag, majority-rule for the target state), `Layout Coordinates...`, and `Delete Selected...` (with
+  confirmation). For advancement criteria the menu also gets `Add selection to group` / `Ungroup selection` when groups
+  are enabled. The row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only
+  expose `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden
+  field so their menu shows only delete.
+    * `Layout Coordinates...` opens a sub-popup that mirrors the per-goal `Layout Coordinates` collapsible header
+      (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` where the goal type has one). Each coordinate exposes the
+      usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X` / `+Y` stride next to
+      each base. The stride distributes values across the selection in template/list order. The neighbouring `Columns`
+      field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on both axes, useful for
+      rows, columns, and diagonals), while `1` or higher wraps into a grid (`X` uses `N mod Columns`, `Y` uses
+      `N div Columns`). Each section has its own `Apply ... to selected` button so you can tune Icon Pos. without
+      touching Text Pos. (or vice versa). Currently shipped on the **Advancements** tab; rolling out to the other tabs
+      next.
 * **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and
 the **stream overlay**. Separately, when a goal has manual positions set (for use with Manual Layout mode), each
 position (icon, text, progress) gains its own `Hide` checkbox that controls visibility on the **manual layout**

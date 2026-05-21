@@ -5241,18 +5241,112 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (!s_adv_selection.empty()) {
                         static char s_adv_bulk_icon_buf[MAX_PATH_LENGTH] = "";
-                        if (ImGui::SmallButton("Set Icon...##adv")) {
+
+                        static bool s_adv_bl_icon_set = true;
+                        static bool s_adv_bl_icon_hide = false;
+                        static float s_adv_bl_icon_x = 100.0f, s_adv_bl_icon_y = 100.0f;
+                        static float s_adv_bl_icon_xs = 0.0f, s_adv_bl_icon_ys = 0.0f;
+                        static int s_adv_bl_icon_cols = 0;
+                        static int s_adv_bl_icon_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_adv_bl_text_set = true;
+                        static bool s_adv_bl_text_hide = false;
+                        static float s_adv_bl_text_x = 100.0f, s_adv_bl_text_y = 100.0f;
+                        static float s_adv_bl_text_xs = 0.0f, s_adv_bl_text_ys = 0.0f;
+                        static int s_adv_bl_text_cols = 0;
+                        static int s_adv_bl_text_anchor = ANCHOR_TOP_LEFT;
+
+                        bool ba_open_icon = false;
+                        bool ba_open_layout = false;
+                        bool ba_open_delete = false;
+                        bool ba_do_toggle_hidden = false;
+
+                        float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
+                                         ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
+                                           ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
+
+                        if (ImGui::SmallButton("Bulk Actions...##adv")) {
+                            ImGui::OpenPopup("adv_bulk_actions_menu");
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tip[256];
+                            snprintf(tip, sizeof(tip),
+                                     "Actions to apply to all selected %s at once.",
+                                     advancements_label_plural_lower);
+                            ImGui::SetTooltip("%s", tip);
+                        }
+
+                        if (ImGui::BeginPopup("adv_bulk_actions_menu")) {
+                            char hdr[160];
+                            snprintf(hdr, sizeof(hdr), "%d selected %s",
+                                     (int)s_adv_selection.size(),
+                                     s_adv_selection.size() == 1
+                                         ? advancements_label_singular_lower
+                                         : advancements_label_plural_lower);
+                            ImGui::TextDisabled("%s", hdr);
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Set Icon...##adv_ba")) ba_open_icon = true;
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Apply the same icon path to every selected %s.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::Selectable("Toggle Hidden##adv_ba")) ba_do_toggle_hidden = true;
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Flip Hidden on every selected %s.\n"
+                                         "If most are visible they all become hidden, and vice versa.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::Selectable("Layout Coordinates...##adv_ba")) ba_open_layout = true;
+                            if (ImGui::IsItemHovered()) {
+                                char tip[320];
+                                snprintf(tip, sizeof(tip),
+                                         "Bulk-set Icon Pos. and Text Pos. for every selected %s.\n"
+                                         "Each X and Y supports an optional stride that distributes\n"
+                                         "values across the selection in template order.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            ImGui::Separator();
+                            if (ImGui::Selectable("Delete Selected...##adv_ba")) ba_open_delete = true;
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Remove all selected %s. Requires confirmation.",
+                                         advancements_label_plural_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            ImGui::EndPopup();
+                        }
+
+                        if (ba_do_toggle_hidden) {
+                            int hidden_count = 0;
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                if (current_template_data.advancements[idx].is_hidden) hidden_count++;
+                            }
+                            bool target_hidden = (hidden_count * 2 < (int)s_adv_selection.size());
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                current_template_data.advancements[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_open_icon) {
                             s_adv_bulk_icon_buf[0] = '\0';
                             ImGui::OpenPopup("adv_bulk_icon_popup");
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[384];
-                            snprintf(tip, sizeof(tip),
-                                     "Apply the same icon path to every selected %s.\n"
-                                     "Type a path under resources/icons/, or click Browse.",
-                                     advancements_label_singular_lower);
-                            ImGui::SetTooltip("%s", tip);
-                        }
+                        if (ba_open_layout) ImGui::OpenPopup("adv_bulk_layout_popup");
+                        if (ba_open_delete) ImGui::OpenPopup("adv_bulk_delete_confirm");
+
                         if (ImGui::BeginPopup("adv_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected %s",
                                                 (int)s_adv_selection.size(),
@@ -5284,40 +5378,173 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Toggle Hidden##adv")) {
-                            int hidden_count = 0;
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
-                                if (current_template_data.advancements[idx].is_hidden) hidden_count++;
+                        if (ImGui::BeginPopup("adv_bulk_layout_popup")) {
+                            ImGui::TextDisabled("Layout coordinates for %d selected %s",
+                                                (int)s_adv_selection.size(),
+                                                s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                            ImGui::TextDisabled("Strides distribute values in template order.");
+                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            ImGui::Separator();
+
+                            std::vector<int> bulk_layout_sorted(s_adv_selection.begin(), s_adv_selection.end());
+                            std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
+
+                            ImGui::PushID("adv_bulk_layout_icon");
+                            ImGui::Checkbox("Icon Pos.", &s_adv_bl_icon_set);
+                            if (ImGui::IsItemHovered()) {
+                                char t1[160];
+                                snprintf(t1, sizeof(t1), "Enable or disable manual icon positioning on every selected %s.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", t1);
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_adv_selection.size());
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
-                                current_template_data.advancements[idx].is_hidden = target_hidden;
+                            ImGui::SameLine();
+                            ImGui::Checkbox("Hide##adv_bl_icon", &s_adv_bl_icon_hide);
+                            if (ImGui::IsItemHovered()) {
+                                char t2[160];
+                                snprintf(t2, sizeof(t2), "Set the Hide-in-layout flag for the icon on every selected %s.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", t2);
                             }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Flip Hidden on every selected %s.\n"
-                                     "If most are visible they all become hidden, and vice versa.",
-                                     advancements_label_singular_lower);
-                            ImGui::SetTooltip("%s", tip);
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("X", &s_adv_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_icon_x = fminf(fmaxf(roundf(s_adv_bl_icon_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("+X", &s_adv_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_icon_xs = fminf(fmaxf(roundf(s_adv_bl_icon_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("Y", &s_adv_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_icon_y = fminf(fmaxf(roundf(s_adv_bl_icon_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("+Y", &s_adv_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_icon_ys = fminf(fmaxf(roundf(s_adv_bl_icon_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                            }
+                            ImGui::SetNextItemWidth(140);
+                            ImGui::Combo("Anchor##adv_bl_icon", &s_adv_bl_icon_anchor, anchor_point_labels,
+                                         IM_ARRAYSIZE(anchor_point_labels));
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragInt("Columns", &s_adv_bl_icon_cols, 0.1f, 0, 1024)) {
+                                if (s_adv_bl_icon_cols < 0) s_adv_bl_icon_cols = 0;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                            }
+                            if (ImGui::Button("Apply Icon Pos. to selected")) {
+                                int n = 0;
+                                for (int idx : bulk_layout_sorted) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                    auto &a = current_template_data.advancements[idx];
+                                    int x_mult = (s_adv_bl_icon_cols >= 1) ? (n % s_adv_bl_icon_cols) : n;
+                                    int y_mult = (s_adv_bl_icon_cols >= 1) ? (n / s_adv_bl_icon_cols) : n;
+                                    a.icon_pos.is_set = s_adv_bl_icon_set;
+                                    a.icon_pos.is_hidden_in_layout = s_adv_bl_icon_hide;
+                                    a.icon_pos.x = fminf(fmaxf(roundf(s_adv_bl_icon_x + x_mult * s_adv_bl_icon_xs),
+                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    a.icon_pos.y = fminf(fmaxf(roundf(s_adv_bl_icon_y + y_mult * s_adv_bl_icon_ys),
+                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    a.icon_pos.anchor = (AnchorPoint)s_adv_bl_icon_anchor;
+                                    n++;
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            ImGui::PopID();
+
+                            ImGui::Separator();
+
+                            ImGui::PushID("adv_bulk_layout_text");
+                            ImGui::Checkbox("Text Pos.", &s_adv_bl_text_set);
+                            if (ImGui::IsItemHovered()) {
+                                char t1[160];
+                                snprintf(t1, sizeof(t1), "Enable or disable manual text positioning on every selected %s.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", t1);
+                            }
+                            ImGui::SameLine();
+                            ImGui::Checkbox("Hide##adv_bl_text", &s_adv_bl_text_hide);
+                            if (ImGui::IsItemHovered()) {
+                                char t2[160];
+                                snprintf(t2, sizeof(t2), "Set the Hide-in-layout flag for the text on every selected %s.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", t2);
+                            }
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("X", &s_adv_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_text_x = fminf(fmaxf(roundf(s_adv_bl_text_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("+X", &s_adv_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_text_xs = fminf(fmaxf(roundf(s_adv_bl_text_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("Y", &s_adv_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_text_y = fminf(fmaxf(roundf(s_adv_bl_text_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragFloat("+Y", &s_adv_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                s_adv_bl_text_ys = fminf(fmaxf(roundf(s_adv_bl_text_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                            }
+                            ImGui::SetNextItemWidth(140);
+                            ImGui::Combo("Anchor##adv_bl_text", &s_adv_bl_text_anchor, anchor_point_labels,
+                                         IM_ARRAYSIZE(anchor_point_labels));
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(70);
+                            if (ImGui::DragInt("Columns", &s_adv_bl_text_cols, 0.1f, 0, 1024)) {
+                                if (s_adv_bl_text_cols < 0) s_adv_bl_text_cols = 0;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s",
+                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                            }
+                            if (ImGui::Button("Apply Text Pos. to selected")) {
+                                int n = 0;
+                                for (int idx : bulk_layout_sorted) {
+                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                    auto &a = current_template_data.advancements[idx];
+                                    int x_mult = (s_adv_bl_text_cols >= 1) ? (n % s_adv_bl_text_cols) : n;
+                                    int y_mult = (s_adv_bl_text_cols >= 1) ? (n / s_adv_bl_text_cols) : n;
+                                    a.text_pos.is_set = s_adv_bl_text_set;
+                                    a.text_pos.is_hidden_in_layout = s_adv_bl_text_hide;
+                                    a.text_pos.x = fminf(fmaxf(roundf(s_adv_bl_text_x + x_mult * s_adv_bl_text_xs),
+                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    a.text_pos.y = fminf(fmaxf(roundf(s_adv_bl_text_y + y_mult * s_adv_bl_text_ys),
+                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    a.text_pos.anchor = (AnchorPoint)s_adv_bl_text_anchor;
+                                    n++;
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            ImGui::PopID();
+
+                            ImGui::Separator();
+                            if (ImGui::Button("Close##adv_bulk_layout")) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("Delete Selected##adv")) {
-                            ImGui::OpenPopup("adv_bulk_delete_confirm");
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tip[256];
-                            snprintf(tip, sizeof(tip),
-                                     "Remove all selected %s. Requires confirmation.",
-                                     advancements_label_plural_lower);
-                            ImGui::SetTooltip("%s", tip);
-                        }
                         if (ImGui::BeginPopup("adv_bulk_delete_confirm")) {
                             ImGui::Text("Delete %d selected %s?", (int)s_adv_selection.size(),
                                         s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
@@ -5388,7 +5615,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(sel_tip, sizeof(sel_tip),
                                          "Select for bulk actions on multiple %s at once:\n"
                                          "reordering (drag any selected row), setting the same icon,\n"
-                                         "toggling Hidden, and deletion.\n"
+                                         "toggling Hidden, bulk layout coordinates, and deletion.\n"
                                          "Shift+Click to range-select or -deselect.",
                                          advancements_label_plural_lower);
                                 ImGui::SetTooltip("%s", sel_tip);
