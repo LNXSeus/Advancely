@@ -17065,7 +17065,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char tip[256];
                                 snprintf(tip, sizeof(tip),
                                          "Criteria differences for this rename are already staged via\n"
-                                         "'...add new criteria'.");
+                                         "'...criteria differences'.");
                                 ImGui::SetTooltip("%s", tip);
                             }
                         } else {
@@ -17081,7 +17081,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char tip[320];
                                 snprintf(tip, sizeof(tip),
                                          "This rename's target has criteria that differ from the import\n"
-                                         "side. Open '...add new criteria' from the Select dropdown to\n"
+                                         "side. Open '...criteria differences' from the Select dropdown to\n"
                                          "review and stage them in the same import session.");
                                 ImGui::SetTooltip("%s", tip);
                             }
