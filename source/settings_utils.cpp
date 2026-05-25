@@ -478,6 +478,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
+    settings->invert_hiding_mode = DEFAULT_INVERT_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
 
     // Overlay Defaults
@@ -827,6 +828,14 @@ bool settings_load(AppSettings *settings) {
             } else {
                 settings->goal_hiding_mode = HIDE_ALL_COMPLETED; // Default value
             }
+            defaults_were_used = true;
+        }
+
+        const cJSON *invert_hiding = cJSON_GetObjectItem(general_settings, "invert_hiding_mode");
+        if (invert_hiding && cJSON_IsBool(invert_hiding)) {
+            settings->invert_hiding_mode = cJSON_IsTrue(invert_hiding);
+        } else {
+            settings->invert_hiding_mode = DEFAULT_INVERT_HIDING_MODE;
             defaults_were_used = true;
         }
 
@@ -1605,6 +1614,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         // Save the new goal hiding mode as a number
         cJSON_DeleteItemFromObject(general_obj, "goal_hiding_mode");
         cJSON_AddItemToObject(general_obj, "goal_hiding_mode", cJSON_CreateNumber(settings->goal_hiding_mode));
+        cJSON_DeleteItemFromObject(general_obj, "invert_hiding_mode");
+        cJSON_AddItemToObject(general_obj, "invert_hiding_mode", cJSON_CreateBool(settings->invert_hiding_mode));
         // Remove the old key to keep the settings file clean
         cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
         cJSON_DeleteItemFromObject(general_obj, "print_debug_status");

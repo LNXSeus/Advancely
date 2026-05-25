@@ -594,6 +594,18 @@ Advancely has two separate hiding systems that target different layout modes:
 In `Hide All Completed` mode, completed goals fully disappear from the manual layout. In `Hide Template-Hidden Only`
 mode, completed goals are greyed out but remain visible.
 
+**Invert Hiding Mode:**
+
+The `Invert Hiding Mode` checkbox flips the completion behaviour of whichever mode is selected:
+
+* **`Hide All Completed`** (warning): hides every goal that is **not yet completed** instead of the completed ones
+  (template-hidden goals stay hidden). Your tracker starts almost completely empty and goals appear as you complete
+  them. Section counters still show remaining/total as usual.
+* **`Hide Template-Hidden Only`**: shows everything (template-hidden goals stay hidden), but **incomplete** goals are
+  greyed out and lower transparency instead of completed ones. Goals snap to full transparency once completed.
+* **`Show All`**: same inverted greying as above, and template-hidden goals are revealed too, including in the manual
+  layout.
+
 ### The Player Dropdown (Co-op)
 
 When a co-op lobby is active (either as Host or Receiver), the tracker shows a **Player Dropdown** with entries for

@@ -110,6 +110,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_GOAL_HIDING_MODE HIDE_ALL_COMPLETED
+#define DEFAULT_INVERT_HIDING_MODE false
 #define DEFAULT_PRINT_DEBUG_STATUS false
 
 // Overlay Settings
@@ -285,6 +286,7 @@ struct AppSettings {
     bool print_debug_status;
     float overlay_scroll_speed; // The speed and direction of the scrolling animation in the overlay.
     GoalHidingMode goal_hiding_mode; // 3 Stages of hiding goals
+    bool invert_hiding_mode; // Inverts each hiding mode: hide/fade incomplete instead of completed
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1

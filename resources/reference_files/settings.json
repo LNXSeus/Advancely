@@ -14,6 +14,7 @@
 		"overlay_fps":	60,
 		"always_on_top":	true,
 		"goal_hiding_mode":	0,
+		"invert_hiding_mode":	false,
 		"print_debug_status":	false,
 		"enable_overlay":	false,
 		"overlay_scroll_speed":	1,

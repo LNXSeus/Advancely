@@ -84,6 +84,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_fps != b->overlay_fps ||
         a->tracker_always_on_top != b->tracker_always_on_top ||
         a->goal_hiding_mode != b->goal_hiding_mode ||
+        a->invert_hiding_mode != b->invert_hiding_mode ||
         a->print_debug_status != b->print_debug_status ||
 
         // Overlay settings
@@ -1397,6 +1398,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Section counters will count every single item defined in the template\n"
                          "for that section e.g., (5/10 - 12/20) or (5/10).\n\n"
                          "Both \"Hidden\" checkboxes and per-position \"Hide\" checkboxes are ignored in this mode.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            ImGui::Checkbox("Invert Hiding Mode", &temp_settings.invert_hiding_mode);
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[1024];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Flips the meaning of the selected hiding mode so it reacts to completion in reverse.\n\n"
+                         "\"Hide All Completed\": WARNING - hides every goal that is NOT yet completed (still hiding\n"
+                         "template-hidden goals). Your tracker starts almost entirely empty and goals appear as you\n"
+                         "complete them. Section counters still show remaining/total as usual.\n\n"
+                         "\"Hide Template-Hidden Only\": shows everything (template-hidden goals stay hidden), but\n"
+                         "incomplete goals are greyed out and lower transparency instead of completed ones. Goals snap\n"
+                         "to full transparency once completed.\n\n"
+                         "\"Show All\": same greying as above, and template-hidden goals are revealed too, including in\n"
+                         "the manual layout.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 

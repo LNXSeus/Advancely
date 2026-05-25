@@ -5623,6 +5623,42 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 }
 
 /**
+ * @brief Decides whether an item should be hidden purely from the hiding mode + template/completion state.
+ *
+ * Centralizes the per-mode logic so the "Invert Hiding Mode" setting can flip the completion test in one place.
+ * When inverted, "Hide All Completed" hides items that are NOT yet completed instead of the completed ones.
+ *
+ * @param settings The app settings.
+ * @param is_template_hidden True if the item is marked "Hidden" in the template.
+ * @param is_done True if the item is considered completed.
+ */
+static inline bool tracker_should_hide_by_mode(const AppSettings *settings, bool is_template_hidden, bool is_done) {
+    bool template_hidden = !settings->use_manual_layout && is_template_hidden;
+    switch (settings->goal_hiding_mode) {
+        case HIDE_ALL_COMPLETED:
+            return template_hidden || (settings->invert_hiding_mode ? !is_done : is_done);
+        case HIDE_ONLY_TEMPLATE_HIDDEN:
+            return template_hidden;
+        case SHOW_ALL:
+        default:
+            return false;
+    }
+}
+
+/**
+ * @brief Decides whether an item should be drawn faded (greyed out / lower transparency).
+ *
+ * Normally completed items are faded. With "Invert Hiding Mode" enabled the fade applies to
+ * incomplete items instead, so completed goals pop to full transparency.
+ *
+ * @param settings The app settings.
+ * @param is_done True if the item is considered completed.
+ */
+static inline bool tracker_is_faded_by_mode(const AppSettings *settings, bool is_done) {
+    return settings->invert_hiding_mode ? !is_done : is_done;
+}
+
+/**
  * @brief Helper to draw a separator line with a title and completion counters for a new section.
  *
  * @param t The tracker instance.
@@ -5860,18 +5896,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Determine if parent should be hidden based *only* on hiding mode + template hidden status
         bool should_hide_parent_based_on_mode = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_parent_based_on_mode =
-                        (!settings->use_manual_layout && cat->is_hidden) || is_category_considered_complete;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_parent_based_on_mode = !settings->use_manual_layout && cat->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_parent_based_on_mode = false;
-                break;
-        }
+        should_hide_parent_based_on_mode = tracker_should_hide_by_mode(settings, cat->is_hidden, is_category_considered_complete);
 
         // Skip entire category if hidden by mode
         if (should_hide_parent_based_on_mode) continue;
@@ -5891,18 +5916,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Determine if child should be hidden based *only* on hiding mode + template hidden status
                 bool should_hide_child_based_on_mode = false;
-                switch (settings->goal_hiding_mode) {
-                    case HIDE_ALL_COMPLETED:
-                        should_hide_child_based_on_mode =
-                                (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                        break;
-                    case HIDE_ONLY_TEMPLATE_HIDDEN:
-                        should_hide_child_based_on_mode = !settings->use_manual_layout && crit->is_hidden;
-                        break;
-                    case SHOW_ALL:
-                        should_hide_child_based_on_mode = false;
-                        break;
-                }
+                should_hide_child_based_on_mode = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
 
                 if (should_hide_child_based_on_mode) continue; // Skip hidden child
 
@@ -5966,18 +5980,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                         cat->criteria_count == 0 && cat->done));
 
         bool should_hide_parent_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_parent_render = (!settings->use_manual_layout && cat->is_hidden) ||
-                                            is_considered_complete_render;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_parent_render = !settings->use_manual_layout && cat->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_parent_render = false;
-                break;
-        }
+        should_hide_parent_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
 
         if (should_hide_parent_render) continue; // Skip if parent hidden based on mode
 
@@ -5992,16 +5995,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (!crit) continue;
 
                 bool should_hide_crit_render = false;
-                switch (settings->goal_hiding_mode) {
-                    case HIDE_ALL_COMPLETED: should_hide_crit_render =
-                                             (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                        break;
-                    case HIDE_ONLY_TEMPLATE_HIDDEN:
-                        should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
-                        break;
-                    case SHOW_ALL: should_hide_crit_render = false;
-                        break;
-                }
+                should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
 
                 if (should_hide_crit_render) continue;
 
@@ -6091,18 +6085,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                             cat->criteria_count == 0 && cat->done));
 
             bool parent_should_hide_render = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    parent_should_hide_render = (!settings->use_manual_layout && cat->is_hidden) ||
-                                                is_considered_complete_render;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    parent_should_hide_render = !settings->use_manual_layout && cat->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    parent_should_hide_render = false;
-                    break;
-            }
+            parent_should_hide_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
             if (parent_should_hide_render) continue;
 
             // Search Filter (for rendering visibility)
@@ -6117,17 +6100,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Apply the same hiding logic here as in the rendering pass
                     bool crit_should_hide_render = false;
-                    switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED:
-                            crit_should_hide_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                            break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            crit_should_hide_render = !settings->use_manual_layout && crit->is_hidden;
-                            break;
-                        case SHOW_ALL:
-                            crit_should_hide_render = false;
-                            break;
-                    }
+                    crit_should_hide_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
 
                     if (crit_should_hide_render) continue;
 
@@ -6191,17 +6164,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     TrackableItem *crit = cat->criteria[j];
                     // Child Hiding Logic (for width calculation)
                     bool crit_should_hide_width = false;
-                    switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED:
-                            crit_should_hide_width = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                            break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            crit_should_hide_width = !settings->use_manual_layout && crit->is_hidden;
-                            break;
-                        case SHOW_ALL:
-                            crit_should_hide_width = false;
-                            break;
-                    }
+                    crit_should_hide_width = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
 
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
@@ -6303,18 +6266,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             bool should_hide_parent_render = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    should_hide_parent_render = (!settings->use_manual_layout && cat->is_hidden) ||
-                                                is_considered_complete_render;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_parent_render = !settings->use_manual_layout && cat->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    should_hide_parent_render = false;
-                    break;
-            }
+            should_hide_parent_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
             if (should_hide_parent_render) continue;
 
             // --- Search Filtering (for rendering) ---
@@ -6329,16 +6281,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (!crit) continue;
 
                     bool should_hide_crit_render = false;
-                    switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED:
-                            should_hide_crit_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                            break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
-                            break;
-                        case SHOW_ALL: should_hide_crit_render = false;
-                            break;
-                    }
+                    should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
 
                     if (should_hide_crit_render) continue;
 
@@ -6364,16 +6307,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     TrackableItem *crit = cat->criteria[j];
                     if (!crit) continue;
                     bool should_hide_crit_render = false;
-                    switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED:
-                            should_hide_crit_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
-                            break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
-                            break;
-                        case SHOW_ALL: should_hide_crit_render = false;
-                            break;
-                    }
+                    should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
                     if (!should_hide_crit_render) children_to_render.push_back(crit);
                 }
             } else {
@@ -6731,7 +6665,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 float main_font_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
 
-                ImU32 current_text_color = is_considered_complete_render ? text_color_faded : text_color;
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_considered_complete_render) ? text_color_faded : text_color;
 
                 if (settings->use_manual_layout && cat->text_pos.is_set) {
                     ImVec2 text_anchor_off = get_anchor_offset(cat->text_pos.anchor, text_size.x, text_size.y);
@@ -6929,7 +6863,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 // Final top-left for drawing
                                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                                 // Final bottom-right for drawing
-                                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE; // Apply fade if done
+                                ImU32 icon_tint = tracker_is_faded_by_mode(settings, crit->done) ? icon_tint_faded : IM_COL32_WHITE; // Apply fade if done
                                 draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0),
                                                     ImVec2(1, 1),
                                                     icon_tint);
@@ -7197,7 +7131,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // LOD: Check if zoom level is sufficient for sub-text
                         // Render Child Text and Progress
                         if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD && !hide_crit_text_in_layout) {
-                            ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
+                            ImU32 current_child_text_color = tracker_is_faded_by_mode(settings, crit->done) ? text_color_faded : text_color;
 
                             float scale_factor = (settings->tracker_font_size > 0.0f)
                                                      ? (settings->tracker_sub_font_size / settings->tracker_font_size)
@@ -7635,18 +7569,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // Determine visibility based on hiding mode
         bool should_hide_based_on_mode = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = (!settings->use_manual_layout && item->is_hidden) ||
-                                            is_item_considered_complete;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_based_on_mode = false;
-                break;
-        }
+        should_hide_based_on_mode = tracker_should_hide_by_mode(settings, item->is_hidden, is_item_considered_complete);
 
         // Apply Search Filter for counting
         bool matches_search = item_matches_search(item, t->search_buffer)
@@ -7672,17 +7595,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         if (!item) continue;
 
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Combine hiding and search filter
         if (!should_hide_render && (item_matches_search(item, t->search_buffer)
@@ -7735,17 +7648,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             // Apply rendering hiding logic
             bool should_hide_width = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    should_hide_width = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = !settings->use_manual_layout && item->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    should_hide_width = false;
-                    break;
-            }
+            should_hide_width = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
             // Apply search filter
             bool matches_search_width = item_matches_search(item, t->search_buffer)
@@ -7789,17 +7692,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // Apply rendering hiding logic
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Apply search filter
         bool matches_search_render = item_matches_search(item, t->search_buffer)
@@ -7994,7 +7887,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done) ? text_color_faded : text_color; // Fade if done
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -8071,18 +7964,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // Determine visibility based on hiding mode
         bool should_hide_based_on_mode = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = (!settings->use_manual_layout && item->is_hidden) ||
-                                            is_item_considered_complete;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_based_on_mode = false;
-                break;
-        }
+        should_hide_based_on_mode = tracker_should_hide_by_mode(settings, item->is_hidden, is_item_considered_complete);
 
         // Apply Search Filter for counting
         bool matches_search = item_matches_search(item, t->search_buffer)
@@ -8108,17 +7990,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         if (!item) continue;
 
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Combine hiding and search filter
         if (!should_hide_render && (item_matches_search(item, t->search_buffer)
@@ -8178,17 +8050,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
             // Apply rendering hiding logic
             bool should_hide_width = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    should_hide_width = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = !settings->use_manual_layout && item->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    should_hide_width = false;
-                    break;
-            }
+            should_hide_width = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
             // Apply search filter
             bool matches_search_width = item_matches_search(item, t->search_buffer)
@@ -8250,17 +8112,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // Apply rendering hiding logic
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Apply search filter
         bool matches_search_render = item_matches_search(item, t->search_buffer)
@@ -8507,7 +8359,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done) ? text_color_faded : text_color; // Fade if done
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -8737,17 +8589,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         if (!goal) continue;
 
         bool should_hide_based_on_mode = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_based_on_mode = false;
-                break;
-        }
+        should_hide_based_on_mode = tracker_should_hide_by_mode(settings, goal->is_hidden, goal->done);
 
         bool matches_search = counter_matches_search(goal, t->search_buffer)
                               || s_linked_top.count(goal->root_name);
@@ -8764,17 +8606,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         if (!goal) continue;
 
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, goal->is_hidden, goal->done);
 
         if (!should_hide_render && (counter_matches_search(goal, t->search_buffer)
                                     || s_linked_top.count(goal->root_name))) {
@@ -8813,17 +8645,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             if (!goal) continue;
 
             bool should_hide_width = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    should_hide_width = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = !settings->use_manual_layout && goal->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    should_hide_width = false;
-                    break;
-            }
+            should_hide_width = tracker_should_hide_by_mode(settings, goal->is_hidden, goal->done);
             if (should_hide_width || !(counter_matches_search(goal, t->search_buffer)
                                        || s_linked_top.count(goal->root_name)))
                 continue;
@@ -8861,17 +8683,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         if (!goal) continue;
 
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, goal->is_hidden, goal->done);
         if (should_hide_render || !(counter_matches_search(goal, t->search_buffer)
                                     || s_linked_top.count(goal->root_name)))
             continue;
@@ -9030,7 +8842,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_goal_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = goal->done ? text_color_faded : text_color;
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, goal->done) ? text_color_faded : text_color;
 
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
@@ -9125,18 +8937,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Determine visibility of the main goal based on hiding mode
         bool should_hide_based_on_mode = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = (!settings->use_manual_layout && goal->is_hidden) ||
-                                            is_goal_considered_complete;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_based_on_mode = false;
-                break;
-        }
+        should_hide_based_on_mode = tracker_should_hide_by_mode(settings, goal->is_hidden, is_goal_considered_complete);
 
         // Apply Search Filter for counting (check main name AND active stage)
         SubGoal *active_stage_count = goal->stages[goal->current_stage];
@@ -9186,17 +8987,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Apply rendering hiding logic
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || is_done_render;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, goal->is_hidden, is_done_render);
 
         // Apply search filter (check main name and current stage text)
         SubGoal *active_stage_render = goal->stages[goal->current_stage];
@@ -9257,17 +9048,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // Apply rendering hiding logic for width calculation
             bool should_hide_width = false;
-            switch (settings->goal_hiding_mode) {
-                case HIDE_ALL_COMPLETED:
-                    should_hide_width = (!settings->use_manual_layout && goal->is_hidden) || is_done_width;
-                    break;
-                case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = !settings->use_manual_layout && goal->is_hidden;
-                    break;
-                case SHOW_ALL:
-                    should_hide_width = false;
-                    break;
-            }
+            should_hide_width = tracker_should_hide_by_mode(settings, goal->is_hidden, is_done_width);
 
             // Apply search filter for width calculation
             SubGoal *active_stage_width = goal->stages[goal->current_stage];
@@ -9335,17 +9116,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Apply rendering hiding logic
         bool should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || is_done_render;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_render = false;
-                break;
-        }
+        should_hide_render = tracker_should_hide_by_mode(settings, goal->is_hidden, is_done_render);
 
         // Apply search filter
         SubGoal *active_stage_render = goal->stages[goal->current_stage];
@@ -9554,7 +9325,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Render Text (Main Name and Current Stage Text)
             float main_font_size = settings->tracker_font_size;
             float sub_font_size = settings->tracker_sub_font_size;
-            ImU32 current_text_color = is_done_render ? text_color_faded : text_color; // Fade if done
+            ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_done_render) ? text_color_faded : text_color; // Fade if done
 
             // --- TEXT CENTERING AND POSITIONING ---
             float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -9917,9 +9688,10 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                 bool end_completed = is_goal_completed_by_root(t->template_data, elem->end_goal_root,
                                                                elem->end_goal_stage, nullptr);
 
-                // Hide arrow if end goal is completed and hiding mode is HIDE_ALL_COMPLETED
-                if (end_completed && elem->end_goal_root[0] != '\0' &&
-                    settings->goal_hiding_mode == HIDE_ALL_COMPLETED) {
+                // Hide arrow if its end goal is hidden by HIDE_ALL_COMPLETED (or its inverse, which hides
+                // goals that are not yet completed).
+                if (elem->end_goal_root[0] != '\0' && settings->goal_hiding_mode == HIDE_ALL_COMPLETED &&
+                    (settings->invert_hiding_mode ? !end_completed : end_completed)) {
                     break;
                 }
 
