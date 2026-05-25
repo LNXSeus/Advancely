@@ -506,6 +506,13 @@ void settings_set_defaults(AppSettings *settings) {
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
     settings->lock_category_display_name = DEFAULT_LOCK_CATEGORY_DISPLAY_NAME;
 
+    // Run Completion Threshold
+    settings->completion_use_adv_threshold = DEFAULT_COMPLETION_USE_ADV_THRESHOLD;
+    settings->completion_adv_threshold = DEFAULT_COMPLETION_ADV_THRESHOLD;
+    settings->completion_use_percent_threshold = DEFAULT_COMPLETION_USE_PERCENT_THRESHOLD;
+    settings->completion_percent_threshold = DEFAULT_COMPLETION_PERCENT_THRESHOLD;
+    settings->completion_threshold_require_both = DEFAULT_COMPLETION_THRESHOLD_REQUIRE_BOTH;
+
     strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
     settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
 
@@ -728,6 +735,50 @@ bool settings_load(AppSettings *settings) {
         settings->lang_flag[sizeof(settings->lang_flag) - 1] = '\0';
     } else {
         settings->lang_flag[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    // Run Completion Threshold
+    const cJSON *comp_use_adv = cJSON_GetObjectItem(json, "completion_use_adv_threshold");
+    if (comp_use_adv && cJSON_IsBool(comp_use_adv)) {
+        settings->completion_use_adv_threshold = cJSON_IsTrue(comp_use_adv);
+    } else {
+        settings->completion_use_adv_threshold = DEFAULT_COMPLETION_USE_ADV_THRESHOLD;
+        defaults_were_used = true;
+    }
+
+    const cJSON *comp_adv = cJSON_GetObjectItem(json, "completion_adv_threshold");
+    if (comp_adv && cJSON_IsNumber(comp_adv)) {
+        settings->completion_adv_threshold = comp_adv->valueint < 1 ? 1 : comp_adv->valueint;
+    } else {
+        settings->completion_adv_threshold = DEFAULT_COMPLETION_ADV_THRESHOLD;
+        defaults_were_used = true;
+    }
+
+    const cJSON *comp_use_pct = cJSON_GetObjectItem(json, "completion_use_percent_threshold");
+    if (comp_use_pct && cJSON_IsBool(comp_use_pct)) {
+        settings->completion_use_percent_threshold = cJSON_IsTrue(comp_use_pct);
+    } else {
+        settings->completion_use_percent_threshold = DEFAULT_COMPLETION_USE_PERCENT_THRESHOLD;
+        defaults_were_used = true;
+    }
+
+    const cJSON *comp_pct = cJSON_GetObjectItem(json, "completion_percent_threshold");
+    if (comp_pct && cJSON_IsNumber(comp_pct)) {
+        float v = (float) comp_pct->valuedouble;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 100.0f) v = 100.0f;
+        settings->completion_percent_threshold = v;
+    } else {
+        settings->completion_percent_threshold = DEFAULT_COMPLETION_PERCENT_THRESHOLD;
+        defaults_were_used = true;
+    }
+
+    const cJSON *comp_both = cJSON_GetObjectItem(json, "completion_threshold_require_both");
+    if (comp_both && cJSON_IsBool(comp_both)) {
+        settings->completion_threshold_require_both = cJSON_IsTrue(comp_both);
+    } else {
+        settings->completion_threshold_require_both = DEFAULT_COMPLETION_THRESHOLD_REQUIRE_BOTH;
         defaults_were_used = true;
     }
 
@@ -1574,6 +1625,23 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateBool(settings->lock_category_display_name));
         cJSON_DeleteItemFromObject(root, "lang_flag");
         cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
+
+        // Run Completion Threshold
+        cJSON_DeleteItemFromObject(root, "completion_use_adv_threshold");
+        cJSON_AddItemToObject(root, "completion_use_adv_threshold",
+                              cJSON_CreateBool(settings->completion_use_adv_threshold));
+        cJSON_DeleteItemFromObject(root, "completion_adv_threshold");
+        cJSON_AddItemToObject(root, "completion_adv_threshold",
+                              cJSON_CreateNumber(settings->completion_adv_threshold));
+        cJSON_DeleteItemFromObject(root, "completion_use_percent_threshold");
+        cJSON_AddItemToObject(root, "completion_use_percent_threshold",
+                              cJSON_CreateBool(settings->completion_use_percent_threshold));
+        cJSON_DeleteItemFromObject(root, "completion_percent_threshold");
+        cJSON_AddItemToObject(root, "completion_percent_threshold",
+                              cJSON_CreateNumber(settings->completion_percent_threshold));
+        cJSON_DeleteItemFromObject(root, "completion_threshold_require_both");
+        cJSON_AddItemToObject(root, "completion_threshold_require_both",
+                              cJSON_CreateBool(settings->completion_threshold_require_both));
 
         // Update General Settings
         cJSON *general_obj = get_or_create_object(root, "general");

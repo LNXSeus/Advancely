@@ -161,6 +161,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_DISPLAY_CATEGORY "All Advancements"
 #define DEFAULT_LOCK_CATEGORY_DISPLAY_NAME false // Fixing Display name when changing templates
 
+// Run Completion Threshold defaults (reset whenever the selected template changes)
+#define DEFAULT_COMPLETION_USE_ADV_THRESHOLD false
+#define DEFAULT_COMPLETION_ADV_THRESHOLD 1
+#define DEFAULT_COMPLETION_USE_PERCENT_THRESHOLD false
+#define DEFAULT_COMPLETION_PERCENT_THRESHOLD 100.0f
+#define DEFAULT_COMPLETION_THRESHOLD_REQUIRE_BOTH false // false = either target (OR), true = both (AND)
+
 #define DEFAULT_TRACKER_FONT "Minecraft.ttf" // The overlay also uses this font
 #define DEFAULT_TRACKER_FONT_SIZE 16.0f
 #define DEFAULT_TRACKER_SUB_FONT_SIZE 14.0f // (DEFAULT_TRACKER_FONT_SIZE * 0.875f)
@@ -259,6 +266,15 @@ struct AppSettings {
     char category_display_name[MAX_PATH_LENGTH]; // The user-configurable display name for the category.
     bool lock_category_display_name; // If true, the category display name cannot be changed
     char lang_flag[64]; // Selected language flag (e.g., "eng", "pl") empty for default
+
+    // --- Run Completion Threshold (per active template; reset on template change) ---
+    // Optional early-completion criteria (e.g. Half%). When neither toggle is enabled the
+    // run only completes at full 100% (default behaviour).
+    bool completion_use_adv_threshold; // Enable the advancement/achievement count target
+    int completion_adv_threshold; // Completed advancements needed (clamped 1..template goal count)
+    bool completion_use_percent_threshold; // Enable the overall progress percentage target
+    float completion_percent_threshold; // Overall progress percentage needed (0.00..100.00)
+    bool completion_threshold_require_both; // true = both targets required (AND), false = either (OR)
 
     // --- Section Order ---
     int section_order[SECTION_COUNT]; // Stores the display order of the tracker sections.

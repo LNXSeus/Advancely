@@ -64,6 +64,39 @@ static void update_coop_template_sync(const AppSettings *s) {
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
+// Counts the non-recipe advancements/achievements in the template selected by the
+// given settings (version/category/optional_flag). Used to clamp the completion
+// advancement-count threshold to a valid maximum. Returns 0 if the template file
+// is missing or has no advancements.
+static int count_template_advancement_goals(const AppSettings *s) {
+    if (!s || s->version_str[0] == '\0' || s->category[0] == '\0') return 0;
+
+    char version_filename[64];
+    strncpy(version_filename, s->version_str, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char template_path[MAX_PATH_LENGTH];
+    snprintf(template_path, sizeof(template_path), "%s/templates/%s/%s/%s_%s%s.json",
+             get_resources_path(), s->version_str, s->category,
+             version_filename, s->category, s->optional_flag);
+
+    cJSON *json = cJSON_from_file(template_path);
+    if (!json) return 0;
+
+    int count = 0;
+    cJSON *advancements = cJSON_GetObjectItem(json, "advancements");
+    if (advancements && cJSON_IsObject(advancements)) {
+        cJSON *adv = nullptr;
+        cJSON_ArrayForEach(adv, advancements) {
+            cJSON *recipe = cJSON_GetObjectItem(adv, "is_recipe");
+            if (!(recipe && cJSON_IsTrue(recipe))) count++;
+        }
+    }
+    cJSON_Delete(json);
+    return count;
+}
+
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
 static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
@@ -77,6 +110,11 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->category_display_name, b->category_display_name) != 0 ||
         a->lock_category_display_name != b->lock_category_display_name ||
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
+        a->completion_use_adv_threshold != b->completion_use_adv_threshold ||
+        a->completion_adv_threshold != b->completion_adv_threshold ||
+        a->completion_use_percent_threshold != b->completion_use_percent_threshold ||
+        a->completion_percent_threshold != b->completion_percent_threshold ||
+        a->completion_threshold_require_both != b->completion_threshold_require_both ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
         a->using_hermes != b->using_hermes ||
@@ -1275,6 +1313,144 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("Prevent the Display Name from changing automatically when switching templates or languages.");
                 }
+            }
+
+            // --- Run Completion Threshold ---
+            // Optional early-completion criteria (e.g. Half%). These reset to defaults
+            // whenever the selected template changes, and the advancement-count maximum
+            // tracks the currently selected template's goal count.
+            {
+                static char completion_last_template_sig[512] = {0};
+                static int completion_template_goal_count = 0;
+
+                char completion_sig[512];
+                snprintf(completion_sig, sizeof(completion_sig), "%s|%s|%s",
+                         temp_settings.version_str, temp_settings.category, temp_settings.optional_flag);
+
+                if (just_opened) {
+                    // Adopt the current selection on open without wiping the saved thresholds.
+                    strncpy(completion_last_template_sig, completion_sig,
+                            sizeof(completion_last_template_sig) - 1);
+                    completion_last_template_sig[sizeof(completion_last_template_sig) - 1] = '\0';
+                    completion_template_goal_count = count_template_advancement_goals(&temp_settings);
+                } else if (strcmp(completion_sig, completion_last_template_sig) != 0) {
+                    // Template changed: reset thresholds to defaults, refresh the count maximum.
+                    strncpy(completion_last_template_sig, completion_sig,
+                            sizeof(completion_last_template_sig) - 1);
+                    completion_last_template_sig[sizeof(completion_last_template_sig) - 1] = '\0';
+                    completion_template_goal_count = count_template_advancement_goals(&temp_settings);
+                    temp_settings.completion_use_adv_threshold = DEFAULT_COMPLETION_USE_ADV_THRESHOLD;
+                    temp_settings.completion_adv_threshold = DEFAULT_COMPLETION_ADV_THRESHOLD;
+                    temp_settings.completion_use_percent_threshold = DEFAULT_COMPLETION_USE_PERCENT_THRESHOLD;
+                    temp_settings.completion_percent_threshold = DEFAULT_COMPLETION_PERCENT_THRESHOLD;
+                    temp_settings.completion_threshold_require_both = DEFAULT_COMPLETION_THRESHOLD_REQUIRE_BOTH;
+                }
+
+                int max_adv = completion_template_goal_count > 0 ? completion_template_goal_count : 1;
+                // Keep the stored count within valid bounds for the current template.
+                if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
+                if (temp_settings.completion_adv_threshold > max_adv)
+                    temp_settings.completion_adv_threshold = max_adv;
+
+                const char *goal_word = (selected_version <= MC_VERSION_1_6_4) ? "achievements" : "advancements";
+
+                // Niche feature tucked behind a collapsing header (collapsed by default).
+                bool run_completion_open = ImGui::CollapsingHeader("Run Completion (Stopping Criteria)");
+                if (ImGui::IsItemHovered()) {
+                    char run_completion_tooltip_buffer[1024];
+                    snprintf(run_completion_tooltip_buffer, sizeof(run_completion_tooltip_buffer),
+                             "Optionally end the run (and freeze the IGT timer) before full 100%% completion.\n"
+                             "Useful for categories like Half%% where only a fraction of the goals completes the run.\n\n"
+                             "Enable a target %s count and/or a target overall progress percentage.\n"
+                             "When neither is enabled the run only completes at full 100%%.\n\n"
+                             "These settings reset to defaults whenever you change the selected template.",
+                             goal_word);
+                    ImGui::SetTooltip("%s", run_completion_tooltip_buffer);
+                }
+
+                if (run_completion_open) {
+                // Target advancement/achievement count
+                char adv_threshold_label[64];
+                snprintf(adv_threshold_label, sizeof(adv_threshold_label), "Complete at %s count", goal_word);
+                ImGui::Checkbox(adv_threshold_label, &temp_settings.completion_use_adv_threshold);
+                if (ImGui::IsItemHovered()) {
+                    char adv_threshold_tooltip_buffer[512];
+                    snprintf(adv_threshold_tooltip_buffer, sizeof(adv_threshold_tooltip_buffer),
+                             "When enabled, the run completes once this many %s are done.\n"
+                             "The maximum (%d) is the number of %s in the selected template.",
+                             goal_word, max_adv, goal_word);
+                    ImGui::SetTooltip("%s", adv_threshold_tooltip_buffer);
+                }
+
+                // Inline count input, shown only while the checkbox is ticked.
+                if (temp_settings.completion_use_adv_threshold) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(120.0f);
+                    if (ImGui::InputInt("##completion_target_count", &temp_settings.completion_adv_threshold)) {
+                        if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
+                        if (temp_settings.completion_adv_threshold > max_adv)
+                            temp_settings.completion_adv_threshold = max_adv;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char target_count_tooltip_buffer[256];
+                        snprintf(target_count_tooltip_buffer, sizeof(target_count_tooltip_buffer),
+                                 "Number of completed %s required (1 to %d).", goal_word, max_adv);
+                        ImGui::SetTooltip("%s", target_count_tooltip_buffer);
+                    }
+                }
+
+                // Target overall progress percentage
+                ImGui::Checkbox("Complete at progress percentage", &temp_settings.completion_use_percent_threshold);
+                if (ImGui::IsItemHovered()) {
+                    char pct_threshold_tooltip_buffer[512];
+                    snprintf(pct_threshold_tooltip_buffer, sizeof(pct_threshold_tooltip_buffer),
+                             "When enabled, the run completes once overall progress reaches this percentage.\n"
+                             "This is the same overall progress shown in the tracker and overlay\n"
+                             "(every goal type except advancements contributes to it).");
+                    ImGui::SetTooltip("%s", pct_threshold_tooltip_buffer);
+                }
+
+                // Inline percentage input, shown only while the checkbox is ticked.
+                if (temp_settings.completion_use_percent_threshold) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(120.0f);
+                    if (ImGui::InputFloat("##completion_target_percentage",
+                                          &temp_settings.completion_percent_threshold, 0.0f, 0.0f, "%.2f")) {
+                        if (temp_settings.completion_percent_threshold < 0.0f)
+                            temp_settings.completion_percent_threshold = 0.0f;
+                        if (temp_settings.completion_percent_threshold > 100.0f)
+                            temp_settings.completion_percent_threshold = 100.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char target_pct_tooltip_buffer[256];
+                        snprintf(target_pct_tooltip_buffer, sizeof(target_pct_tooltip_buffer),
+                                 "Overall progress percentage required (0.00 to 100.00).");
+                        ImGui::SetTooltip("%s", target_pct_tooltip_buffer);
+                    }
+                }
+
+                // AND/OR logic, only meaningful when both targets are enabled
+                bool both_targets_enabled = temp_settings.completion_use_adv_threshold &&
+                                            temp_settings.completion_use_percent_threshold;
+                if (!both_targets_enabled) ImGui::BeginDisabled();
+                ImGui::Checkbox("Require both targets (AND)", &temp_settings.completion_threshold_require_both);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    char require_both_tooltip_buffer[512];
+                    if (!both_targets_enabled) {
+                        snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
+                                 "Disabled because only one (or no) target is enabled.\n"
+                                 "Enable BOTH the %s count and the progress percentage targets above\n"
+                                 "to choose whether both must be met (AND) or just either one (OR).",
+                                 goal_word);
+                    } else {
+                        snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
+                                 "Checked: the run completes only when BOTH targets are met (AND).\n"
+                                 "Unchecked: the run completes as soon as EITHER target is met (OR).");
+                    }
+                    ImGui::SetTooltip("%s", require_both_tooltip_buffer);
+                }
+                if (!both_targets_enabled) ImGui::EndDisabled();
+                } // end run_completion_open
             }
 
             if (show_template_not_found_error) {

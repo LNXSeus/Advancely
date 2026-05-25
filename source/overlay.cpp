@@ -576,9 +576,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             first_item_added = true;
         };
 
-        // Check if the run is 100% complete
-        bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
-                               t->template_data->overall_progress_percentage >= 100.0f;
+        // Use the latched completion flag synced from the tracker (honors the
+        // optional per-template completion thresholds).
+        bool is_run_complete = t->template_data->run_completed;
 
         if (is_run_complete) {
             char formatted_time[64];
@@ -828,9 +828,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         static std::vector<SupporterRenderInfo> static_supporter_render_list;
         static bool run_was_complete_last_frame = false;
 
-        bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->
-                               advancement_goal_count &&
-                               t->template_data->overall_progress_percentage >= 100.0f;
+        // Latched completion flag synced from the tracker (honors the optional
+        // per-template completion thresholds).
+        bool is_run_complete = t->template_data->run_completed;
 
         // If the run has just been completed, generate the randomized list ONCE.
         if (is_run_complete && !run_was_complete_last_frame) {

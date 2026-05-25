@@ -200,6 +200,21 @@ bool str_contains_insensitive(const char *haystack, const char *needle);
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings);
 
 /**
+ * @brief Determines whether a run counts as completed, honoring the optional
+ * per-template completion thresholds in settings (advancement count and/or
+ * overall progress percentage). When neither threshold is enabled the run is
+ * only complete at full 100% (advancements done and progress at 100%).
+ *
+ * This is the single source of truth for run completion; the latched
+ * run_completed flag (frozen IGT, overlay "RUN COMPLETED" screen) derives from it.
+ *
+ * @param td A pointer to the TemplateData with the current progress counts.
+ * @param settings A pointer to the AppSettings holding the threshold config (may be NULL).
+ * @return true if the run meets the active completion criteria.
+ */
+bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *settings);
+
+/**
  * @brief Loads an SDL_Texture from a file and sets its scale mode.
  * @param renderer The SDL_Renderer to use.
  * @param path The path to the image file.

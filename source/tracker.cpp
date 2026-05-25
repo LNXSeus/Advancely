@@ -3174,9 +3174,32 @@ static bool tracker_update_stat_linked_goals(Tracker *t) {
     return any_changed;
 }
 
+bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *settings) {
+    if (!td) return false;
+
+    const bool adv_on = settings && settings->completion_use_adv_threshold;
+    const bool pct_on = settings && settings->completion_use_percent_threshold;
+
+    // No custom threshold active: require full 100% completion (default behaviour).
+    if (!adv_on && !pct_on) {
+        return td->advancements_completed_count >= td->advancement_count &&
+               td->overall_progress_percentage >= 100.0f;
+    }
+
+    const bool adv_met = td->advancements_completed_count >= settings->completion_adv_threshold;
+    // Small epsilon so a target of e.g. 50.00% isn't missed by float rounding.
+    const bool pct_met = td->overall_progress_percentage >= settings->completion_percent_threshold - 0.001f;
+
+    if (settings->completion_threshold_require_both) {
+        // AND: every enabled target must be met.
+        return (!adv_on || adv_met) && (!pct_on || pct_met);
+    }
+    // OR: any enabled target being met completes the run.
+    return (adv_on && adv_met) || (pct_on && pct_met);
+}
+
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
-    (void) settings;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // calculate the total number of "steps"
@@ -3248,9 +3271,9 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
         t->template_data->overall_progress_percentage = 100.0f;
     }
 
-    // Freeze the IGT the first time the run reaches 100% completion
-    bool is_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
-                       t->template_data->overall_progress_percentage >= 100.0f;
+    // Freeze the IGT the first time the run reaches its completion criteria
+    // (full 100% by default, or the configured advancement/percentage thresholds).
+    bool is_complete = tracker_run_meets_completion(t->template_data, settings);
     if (is_complete && !t->template_data->run_completed) {
         t->template_data->run_completed = true;
         t->template_data->frozen_play_time_ticks = t->template_data->play_time_ticks;
@@ -10283,9 +10306,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     char info_sep[24];
     snprintf(info_sep, sizeof(info_sep), "  %s  ", info_sep_char);
 
-    // Check if the run is 100% complete.
-    bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
-                           t->template_data->overall_progress_percentage >= 100.0f;
+    // Use the latched completion flag (honors the optional completion thresholds).
+    bool is_run_complete = t->template_data->run_completed;
 
     // Use frozen IGT for the info window when the run is completed
     long long display_ticks = is_run_complete
@@ -12714,9 +12736,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    // Check if the run is completed, check both advancement and overall progress
-    bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
-                           t->template_data->overall_progress_percentage >= 100.0f;
+    // Use the latched completion flag (honors the optional completion thresholds).
+    bool is_run_complete = t->template_data->run_completed;
 
     // Format the time to DD:HH:MM:SS.MS — use frozen time when the run is completed
     char formatted_time[128];
