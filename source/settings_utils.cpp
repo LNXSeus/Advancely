@@ -17,6 +17,7 @@
 #include "global_event_handler.h"
 #include "main.h"
 #include "format_utils.h"
+#include "coop_net.h" // g_coop_ctx for ghost-player prune exemption
 
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
@@ -234,6 +235,18 @@ void settings_prune_stale_coop_progress(const AppSettings *settings) {
                         in_roster = true;
                         break;
                     }
+                }
+                // Exempt ghost players: a disconnected / not-in-lobby player still
+                // on disk is a live contributor, not a stale removed roster entry.
+                if (!in_roster && g_coop_ctx) {
+                    SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                    for (int i = 0; i < g_coop_ctx->ghost_player_count; i++) {
+                        if (strcmp(uuid_key, g_coop_ctx->ghost_players[i].uuid) == 0) {
+                            in_roster = true;
+                            break;
+                        }
+                    }
+                    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
                 }
                 if (!in_roster) {
                     cJSON_DeleteItemFromObject(section, uuid_key);
@@ -597,6 +610,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Co-op Defaults
     settings->coop_enabled = DEFAULT_COOP_ENABLED;
     settings->coop_auto_accept = DEFAULT_COOP_AUTO_ACCEPT;
+    settings->coop_read_all_save_files = DEFAULT_COOP_READ_ALL_SAVE_FILES;
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_transport = DEFAULT_COOP_TRANSPORT;
     settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
@@ -1389,6 +1403,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *read_all_save_files = cJSON_GetObjectItem(coop_settings, "read_all_save_files");
+        if (read_all_save_files && cJSON_IsBool(read_all_save_files))
+            settings->coop_read_all_save_files = cJSON_IsTrue(read_all_save_files);
+        else {
+            settings->coop_read_all_save_files = DEFAULT_COOP_READ_ALL_SAVE_FILES;
+            defaults_were_used = true;
+        }
+
         const cJSON *net_mode = cJSON_GetObjectItem(coop_settings, "network_mode");
         if (net_mode && cJSON_IsString(net_mode))
             settings->network_mode = string_to_network_mode(net_mode->valuestring);
@@ -1759,6 +1781,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         cJSON_DeleteItemFromObject(coop_obj, "auto_accept");
         cJSON_AddItemToObject(coop_obj, "auto_accept", cJSON_CreateBool(settings->coop_auto_accept));
+
+        cJSON_DeleteItemFromObject(coop_obj, "read_all_save_files");
+        cJSON_AddItemToObject(coop_obj, "read_all_save_files", cJSON_CreateBool(settings->coop_read_all_save_files));
 
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",

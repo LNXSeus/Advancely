@@ -11,6 +11,7 @@
 #define PATH_UTILS_H
 
 #include <cstddef>
+#include <cstdint>
 #include "main.h" // For MAX_PATH_LENGTH
 #include "data_structures.h" // For MC_Version enum and PathMode enum
 
@@ -105,6 +106,36 @@ void find_player_data_files_for_uuid(
     char *out_stats_path,
     char *out_unlocks_path,
     size_t max_len
+);
+
+/**
+ * @brief Discovers player UUIDs present in a world's save folder (co-op ghost tracking).
+ *
+ * Scans the world's advancements, stats, and (craftmine) unlocks subfolders for
+ * `<uuid>.json` files, unions the UUIDs found, and keeps only those whose newest
+ * backing file was modified within the last `max_age_days` days. Used by the host
+ * to surface players who left the lobby mid-run or never joined via Advancely.
+ *
+ * Modern/mid/hybrid only. Legacy (<= 1.6.4) uses username-based global .dat files
+ * with no UUID to discover, so this returns 0 for those versions.
+ *
+ * @param saves_path The full path to the .minecraft/saves directory.
+ * @param version The Minecraft version enum (selects subfolder naming).
+ * @param world_name The already-determined world name.
+ * @param max_age_days Only files touched within this many days are reported (e.g. 7).
+ * @param out_uuids Output array of hyphenated UUID strings (each at least 48 bytes).
+ * @param out_mtimes_ms Output array receiving each UUID's newest file mtime in unix ms.
+ * @param max_out Capacity of the output arrays.
+ * @return The number of UUIDs written (0 on legacy/unknown paths or empty folders).
+ */
+int discover_save_folder_player_uuids(
+    const char *saves_path,
+    MC_Version version,
+    const char *world_name,
+    int max_age_days,
+    char out_uuids[][48],
+    uint64_t *out_mtimes_ms,
+    int max_out
 );
 
 /**

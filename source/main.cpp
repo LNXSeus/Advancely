@@ -2516,15 +2516,21 @@ int main(int argc, char *argv[]) {
                         }
 
                         int pc = app_settings.coop_player_count;
-                        if (pc > 0) {
-                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
-                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+                        int gn = tracker->coop_ghost_snapshot_count;
+                        int total = pc + gn;
+                        if (total > 0) {
+                            char **pp_bufs = (char **) calloc(total, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(total, sizeof(size_t));
                             if (pp_bufs && pp_sizes) {
                                 for (int pi = 0; pi < pc; pi++) {
                                     pp_bufs[pi] = tracker->coop_player_snapshots[pi];
                                     pp_sizes[pi] = tracker->coop_player_snapshot_sizes[pi];
                                 }
-                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+                                for (int gi = 0; gi < gn; gi++) {
+                                    pp_bufs[pc + gi] = tracker->coop_ghost_snapshots[gi];
+                                    pp_sizes[pc + gi] = tracker->coop_ghost_snapshot_sizes[gi];
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, total);
                             }
                             free(pp_bufs);
                             free(pp_sizes);
@@ -2644,12 +2650,14 @@ int main(int argc, char *argv[]) {
             // --- Co-op Receiver: consume state updates from host ---
             if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx) {
                 static int rcv_last_applied_player_idx = -1;
+                static int rcv_last_applied_ghost_idx = -1;
 
                 SDL_LockMutex(g_coop_ctx->recv_mutex);
 
                 bool new_data = g_coop_ctx->recv_data_ready;
                 bool new_player_data = g_coop_ctx->recv_player_data_ready;
-                bool player_view_changed = (tracker->selected_coop_player_idx != rcv_last_applied_player_idx);
+                bool player_view_changed = (tracker->selected_coop_player_idx != rcv_last_applied_player_idx) ||
+                                           (tracker->selected_coop_ghost_idx != rcv_last_applied_ghost_idx);
                 // After a template reinit (settings Apply), template_data has been
                 // rebuilt from scratch and lost the merged-in progress. Force a
                 // re-apply of the cached snapshot so counts/checkboxes come back
@@ -2670,13 +2678,22 @@ int main(int argc, char *argv[]) {
                     const char *apply_buf = nullptr;
                     size_t apply_size = 0;
                     int sel = tracker->selected_coop_player_idx;
+                    // A selected ghost lives at wire index (roster count + ghost idx),
+                    // matching how the host appended ghost snapshots after the roster.
+                    // Use the host's authoritative lobby count (what the host actually
+                    // based the ghost indices on), not the locally-derived
+                    // coop_player_count which can momentarily diverge.
+                    int roster_n = g_coop_ctx->lobby_player_count;
+                    int eff = (tracker->selected_coop_ghost_idx >= 0)
+                                  ? roster_n + tracker->selected_coop_ghost_idx
+                                  : sel;
 
-                    if (sel >= 0 && sel < g_coop_ctx->recv_player_snapshot_count &&
-                        g_coop_ctx->recv_player_buffers[sel] &&
-                        g_coop_ctx->recv_player_buffer_sizes[sel] >= sizeof(TemplateData)) {
-                        // Apply per-player snapshot
-                        apply_buf = g_coop_ctx->recv_player_buffers[sel];
-                        apply_size = g_coop_ctx->recv_player_buffer_sizes[sel];
+                    if (eff >= 0 && eff < g_coop_ctx->recv_player_snapshot_count &&
+                        g_coop_ctx->recv_player_buffers[eff] &&
+                        g_coop_ctx->recv_player_buffer_sizes[eff] >= sizeof(TemplateData)) {
+                        // Apply per-player (or per-ghost) snapshot
+                        apply_buf = g_coop_ctx->recv_player_buffers[eff];
+                        apply_size = g_coop_ctx->recv_player_buffer_sizes[eff];
                     } else if (g_coop_ctx->recv_merged_snapshot &&
                                g_coop_ctx->recv_merged_snapshot_size >= sizeof(TemplateData)) {
                         // Fall back to merged snapshot
@@ -2714,10 +2731,12 @@ int main(int argc, char *argv[]) {
                             SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             rcv_last_applied_player_idx = sel;
+                            rcv_last_applied_ghost_idx = tracker->selected_coop_ghost_idx;
                             tracker->coop_recv_resync_needed = 0;
                             log_message(LOG_INFO, "[COOP] Receiver: applied %s state. "
                                         "overall_progress=%.1f%% (timer_mirrored=%s)\n",
-                                        sel >= 0 ? "per-player" : "merged",
+                                        (tracker->selected_coop_ghost_idx >= 0) ? "per-ghost"
+                                                                                : (sel >= 0 ? "per-player" : "merged"),
                                         tracker->template_data->overall_progress_percentage,
                                         fresh_from_host ? "yes" : "no");
                         } else {
@@ -2753,17 +2772,39 @@ int main(int argc, char *argv[]) {
                 tracker->template_data) {
                 tracker->coop_view_dirty = 0;
                 int sel = tracker->selected_coop_player_idx;
+                bool ghost_view = (tracker->selected_coop_ghost_idx >= 0 &&
+                                   tracker->selected_coop_ghost_uuid[0] != '\0');
                 const char *buf = nullptr;
                 size_t sz = 0;
-                if (sel >= 0 && sel < MAX_COOP_PLAYERS && tracker->coop_player_snapshots[sel]) {
+                // view_rebuilt = template_data was already rebuilt directly from disk
+                // (no cached snapshot needed). The cached snapshots only exist when
+                // clients are connected; when hosting alone we must re-derive from
+                // disk for every view switch, otherwise switching away from a ghost
+                // would keep the previous view's progress.
+                bool view_rebuilt = false;
+                if (ghost_view) {
+                    // Ghosts have no broadcast snapshot; rebuild the display straight
+                    // from the ghost's on-disk files (they're local, so this is cheap).
+                    tracker_update_coop_single_player_by_uuid(tracker, &app_settings,
+                                                              tracker->selected_coop_ghost_uuid, "");
+                    view_rebuilt = true;
+                } else if (sel >= 0 && sel < MAX_COOP_PLAYERS && tracker->coop_player_snapshots[sel]) {
                     buf = tracker->coop_player_snapshots[sel];
                     sz = tracker->coop_player_snapshot_sizes[sel];
+                } else if (sel >= 0 && sel < app_settings.coop_player_count) {
+                    // Individual player, hosting alone: no cached snapshot, rebuild from disk.
+                    tracker_update_coop_single_player(tracker, &app_settings, sel);
+                    view_rebuilt = true;
                 } else if (tracker->coop_merged_snapshot) {
                     buf = tracker->coop_merged_snapshot;
                     sz = tracker->coop_merged_snapshot_size;
+                } else {
+                    // All Players, hosting alone: no cached merged snapshot, rebuild from disk.
+                    tracker_update_coop_merged(tracker, &app_settings);
+                    view_rebuilt = true;
                 }
-                if (buf && sz >= sizeof(TemplateData)) {
-                    merge_coop_progress(buf, tracker->template_data);
+                if (view_rebuilt || (buf && sz >= sizeof(TemplateData))) {
+                    if (buf) merge_coop_progress(buf, tracker->template_data);
                     tracker_recalculate_progress(tracker, &app_settings);
                     tracker_update_title(tracker, &app_settings);
                     SDL_SetAtomicInt(&g_game_data_changed, 1); // push view to overlay via IPC
@@ -3025,6 +3066,21 @@ int main(int argc, char *argv[]) {
                         }
                     }
 
+                    // Ghost players: refresh from on-disk save files independently
+                    // of client count. Ghosts exist precisely when nobody is
+                    // connected (mid-run disconnects, players who never joined via
+                    // Advancely), so this must run even with 0 clients and on relay.
+                    // The function no-ops unless host mode + the toggle is on.
+                    tracker_refresh_ghost_players(tracker, &app_settings, version);
+
+                    // When the ghost roster changes, re-broadcast the player list so
+                    // receiver dropdowns mirror the host's ghost entries. (Live-lobby
+                    // changes are broadcast by the net thread; ghost discovery runs
+                    // here on the main thread, so it must push the update itself.)
+                    if (g_coop_ctx && coop_net_ghosts_changed(g_coop_ctx)) {
+                        coop_net_broadcast_player_list(g_coop_ctx);
+                    }
+
                     // Co-op Host: merge all players' data and broadcast
                     if (app_settings.network_mode == NETWORK_HOST &&
                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
@@ -3080,8 +3136,29 @@ int main(int argc, char *argv[]) {
                         // (disk files only update when the game actually saves).
                         {
                             int pc = app_settings.coop_player_count;
-                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
-                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+
+                            // Snapshot the ghost roster (UUIDs) so each ghost's
+                            // individual progress is broadcast too. They occupy wire
+                            // indices [pc .. pc+gn), matching the order ghosts appear
+                            // in the player-list JSON, so the receiver maps a selected
+                            // ghost to (coop_player_count + ghost_idx).
+                            char ghost_uuids[COOP_MAX_LOBBY][48];
+                            int gn = 0;
+                            if (g_coop_ctx) {
+                                SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                                gn = g_coop_ctx->ghost_player_count;
+                                if (pc + gn > COOP_MAX_LOBBY) gn = COOP_MAX_LOBBY - pc;
+                                if (gn < 0) gn = 0;
+                                for (int gi = 0; gi < gn; gi++) {
+                                    strncpy(ghost_uuids[gi], g_coop_ctx->ghost_players[gi].uuid, 47);
+                                    ghost_uuids[gi][47] = '\0';
+                                }
+                                SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+                            }
+
+                            int total = pc + gn;
+                            char **pp_bufs = (char **) calloc(total, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(total, sizeof(size_t));
                             char *pp_work = (char *) malloc(4 * 1024 * 1024);
                             if (pp_bufs && pp_sizes && pp_work) {
                                 for (int pi = 0; pi < pc; pi++) {
@@ -3093,10 +3170,24 @@ int main(int argc, char *argv[]) {
                                         pp_sizes[pi] = sz;
                                     }
                                 }
-                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+                                for (int gi = 0; gi < gn; gi++) {
+                                    tracker_update_coop_single_player_by_uuid(tracker, &app_settings,
+                                                                              ghost_uuids[gi], "");
+                                    size_t sz = serialize_template_data(tracker->template_data, pp_work);
+                                    pp_bufs[pc + gi] = (char *) malloc(sz);
+                                    if (pp_bufs[pc + gi]) {
+                                        memcpy(pp_bufs[pc + gi], pp_work, sz);
+                                        pp_sizes[pc + gi] = sz;
+                                    }
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, total);
 
                                 // Move per-player snapshots into the tracker cache
-                                // (replacing any previous copies). Slots beyond pc are cleared.
+                                // (replacing any previous copies). Both roster and ghost
+                                // snapshots are cached so the lighter-weight broadcast
+                                // paths can re-send the full set (roster + ghosts) without
+                                // re-reading disk — otherwise a roster-only re-broadcast
+                                // would wipe the ghost snapshots on receivers.
                                 for (int pi = 0; pi < MAX_COOP_PLAYERS; pi++) {
                                     if (tracker->coop_player_snapshots[pi]) {
                                         free(tracker->coop_player_snapshots[pi]);
@@ -3104,14 +3195,31 @@ int main(int argc, char *argv[]) {
                                     }
                                     tracker->coop_player_snapshot_sizes[pi] = 0;
                                 }
-                                for (int pi = 0; pi < pc; pi++) {
+                                for (int gi = 0; gi < COOP_MAX_LOBBY; gi++) {
+                                    if (tracker->coop_ghost_snapshots[gi]) {
+                                        free(tracker->coop_ghost_snapshots[gi]);
+                                        tracker->coop_ghost_snapshots[gi] = nullptr;
+                                    }
+                                    tracker->coop_ghost_snapshot_sizes[gi] = 0;
+                                }
+                                for (int pi = 0; pi < pc && pi < MAX_COOP_PLAYERS; pi++) {
                                     tracker->coop_player_snapshots[pi] = pp_bufs[pi];
                                     tracker->coop_player_snapshot_sizes[pi] = pp_sizes[pi];
                                     pp_bufs[pi] = nullptr; // ownership transferred
                                 }
+                                for (int gi = 0; gi < gn; gi++) {
+                                    tracker->coop_ghost_snapshots[gi] = pp_bufs[pc + gi];
+                                    tracker->coop_ghost_snapshot_sizes[gi] = pp_sizes[pc + gi];
+                                    pp_bufs[pc + gi] = nullptr; // ownership transferred
+                                }
+                                tracker->coop_ghost_snapshot_count = gn;
 
-                                // Restore host's display: either single player or merged
-                                if (tracker->selected_coop_player_idx >= 0 &&
+                                // Restore host's display: ghost, single player, or merged.
+                                if (tracker->selected_coop_ghost_idx >= 0 &&
+                                    tracker->selected_coop_ghost_uuid[0] != '\0') {
+                                    tracker_update_coop_single_player_by_uuid(
+                                        tracker, &app_settings, tracker->selected_coop_ghost_uuid, "");
+                                } else if (tracker->selected_coop_player_idx >= 0 &&
                                     tracker->selected_coop_player_idx < pc &&
                                     tracker->coop_player_snapshots[tracker->selected_coop_player_idx]) {
                                     int sel = tracker->selected_coop_player_idx;
@@ -3143,17 +3251,49 @@ int main(int argc, char *argv[]) {
                         // anything changed so receivers get the corrected view.
                         tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
                     } else {
-                        // Singleplayer or host with no clients: normal update
-                        tracker_update(tracker, &app_settings);
-                        tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
-                        // Host alone in a lobby: the singleplayer rebuild doesn't
-                        // stamp contributor UUIDs, so post-stamp the local player
-                        // so faces still render in the All Players view.
+                        // A host with the ghost toggle on and ghosts discovered must
+                        // still run the merge path even with nobody connected, so
+                        // disconnected / offline players' progress counts toward the
+                        // group total. Check the live ghost count (refreshed above).
+                        int ghost_n = 0;
                         if (app_settings.network_mode == NETWORK_HOST &&
-                            g_coop_ctx &&
-                            coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
-                            app_settings.local_player.uuid[0] != '\0') {
-                            tracker_stamp_solo_coop_contributor(tracker, app_settings.local_player.uuid);
+                            app_settings.coop_read_all_save_files && g_coop_ctx) {
+                            SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                            ghost_n = g_coop_ctx->ghost_player_count;
+                            SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+                        }
+
+                        if (ghost_n > 0) {
+                            // Merge local roster + ghosts (no broadcast: nobody connected).
+                            tracker_update_coop_merged(tracker, &app_settings);
+                            tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+
+                            // The merge above leaves the All-Players view in template_data.
+                            // If the dropdown has an individual player or ghost selected,
+                            // re-derive that single view so the selection persists across
+                            // game-file updates (rebuilds from local disk, which is cheap).
+                            if (tracker->selected_coop_ghost_idx >= 0 &&
+                                tracker->selected_coop_ghost_uuid[0] != '\0') {
+                                tracker_update_coop_single_player_by_uuid(
+                                    tracker, &app_settings, tracker->selected_coop_ghost_uuid, "");
+                            } else if (tracker->selected_coop_player_idx >= 0 &&
+                                       tracker->selected_coop_player_idx < app_settings.coop_player_count) {
+                                tracker_update_coop_single_player(
+                                    tracker, &app_settings, tracker->selected_coop_player_idx);
+                            }
+                        } else {
+                            // Singleplayer or host with no clients and no ghosts: normal update
+                            tracker_update(tracker, &app_settings);
+                            tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+                            // Host alone in a lobby: the singleplayer rebuild doesn't
+                            // stamp contributor UUIDs, so post-stamp the local player
+                            // so faces still render in the All Players view.
+                            if (app_settings.network_mode == NETWORK_HOST &&
+                                g_coop_ctx &&
+                                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                                app_settings.local_player.uuid[0] != '\0') {
+                                tracker_stamp_solo_coop_contributor(tracker, app_settings.local_player.uuid);
+                            }
                         }
                     }
                 }
@@ -3260,15 +3400,21 @@ int main(int argc, char *argv[]) {
                     // from the last disk save.
                     {
                         int pc = app_settings.coop_player_count;
-                        if (pc > 0) {
-                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
-                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+                        int gn = tracker->coop_ghost_snapshot_count;
+                        int total = pc + gn;
+                        if (total > 0) {
+                            char **pp_bufs = (char **) calloc(total, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(total, sizeof(size_t));
                             if (pp_bufs && pp_sizes) {
                                 for (int pi = 0; pi < pc; pi++) {
                                     pp_bufs[pi] = tracker->coop_player_snapshots[pi];
                                     pp_sizes[pi] = tracker->coop_player_snapshot_sizes[pi];
                                 }
-                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+                                for (int gi = 0; gi < gn; gi++) {
+                                    pp_bufs[pc + gi] = tracker->coop_ghost_snapshots[gi];
+                                    pp_sizes[pc + gi] = tracker->coop_ghost_snapshot_sizes[gi];
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, total);
                             }
                             free(pp_bufs);
                             free(pp_sizes);

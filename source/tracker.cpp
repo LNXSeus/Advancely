@@ -34,6 +34,7 @@
 #include "temp_creator_utils.h"
 #include "coop_net.h"
 #include "skin_cache.h"
+#include "mojang_api.h"
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
@@ -760,6 +761,12 @@ static cJSON *get_per_uuid_progress_obj(cJSON *settings_json, const char *sectio
 // Returns the UUID currently shown in the dropdown, or nullptr for "All Players".
 static const char *tracker_current_view_uuid(const Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return nullptr;
+    // A selected ghost is never the local player, so returning its UUID makes the
+    // view correctly read-only (it's "another player"), exactly like a roster
+    // player that isn't you.
+    if (t->selected_coop_ghost_idx >= 0 && t->selected_coop_ghost_uuid[0] != '\0') {
+        return t->selected_coop_ghost_uuid;
+    }
     int idx = t->selected_coop_player_idx;
     if (idx < 0 || idx >= settings->coop_player_count) return nullptr;
     return settings->coop_players[idx].uuid;
@@ -3256,8 +3263,7 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
     for (int i = 0; i < t->template_data->counter_goal_count; i++) {
         if (t->template_data->counter_goals[i]->done) completed_steps++;
     }
-
-    log_message(LOG_INFO, "Total steps: %d, completed steps: %d\n", total_steps, completed_steps);
+    log_message(LOG_INFO, "[TRACKER] Total steps: %d, completed steps: %d\n", total_steps, completed_steps);
 
     // Store total steps
     t->template_data->total_progress_steps = total_steps;
@@ -3617,6 +3623,8 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->focus_search_box_requested = false;
     t->focus_tc_search_box = false; // CURRENTLY UNUSED
     t->selected_coop_player_idx = -1; // Default: "All Players" (merged view)
+    t->selected_coop_ghost_idx = -1;
+    t->selected_coop_ghost_uuid[0] = '\0';
     t->is_temp_creator_focused = false;
     t->notes_widget_id_counter = 0;
 
@@ -4638,6 +4646,329 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     cJSON_Delete(settings_json);
 }
 
+// Merge one player's on-disk save files (by UUID) into the group template.
+// Shared by the live-roster loop and the ghost loop in tracker_update_coop_merged.
+// The merge functions key on `uuid` for contributor stamping, so ghosts flow
+// through the same pipeline as connected players. `username` is only used for
+// legacy (<= 1.6.4) .dat filenames; ghosts are never legacy (discovery skips it).
+// single_player_unlocks: false for the All-Players AND-merge (caller pre-inits all
+// unlocks to true, each player ANDs theirs in); true for an individual-player view
+// (craftmine), where the unlocks are applied as that one player's state directly.
+static void coop_merge_one_player_from_disk(Tracker *t, const AppSettings *settings,
+                                            MC_Version version, const char *uuid,
+                                            const char *username,
+                                            std::unordered_map<std::string, int> *hermes_cache,
+                                            bool single_player_unlocks) {
+    // Find this player's data files by UUID
+    char player_adv_path[MAX_PATH_LENGTH];
+    char player_stats_path[MAX_PATH_LENGTH];
+    char player_unlocks_path[MAX_PATH_LENGTH];
+
+    find_player_data_files_for_uuid(
+        t->saves_path, version, settings->using_stats_per_world_legacy,
+        t->world_name, uuid, username,
+        player_adv_path, player_stats_path, player_unlocks_path, MAX_PATH_LENGTH
+    );
+
+    // Parse the player's JSON files
+    cJSON *player_adv_json = (player_adv_path[0] != '\0') ? cJSON_from_file(player_adv_path) : nullptr;
+    cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
+    cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
+
+    // LEGACY (<=1.6.4) ONLY: for non-host players, override the stats JSON with
+    // whatever the receiver uploaded over the wire. Legacy stats live outside
+    // the world folder (per-launcher), so the on-disk file here belongs to the
+    // host and can't represent any receiver's progress.
+    void *uploaded_bytes = nullptr;
+    if (version <= MC_VERSION_1_6_4 && g_coop_ctx &&
+        strcmp(uuid, settings->local_player.uuid) != 0) {
+        uint32_t uploaded_size = 0;
+        if (coop_net_get_legacy_stats_upload(g_coop_ctx, uuid,
+                                             &uploaded_bytes, &uploaded_size,
+                                             nullptr, 0)) {
+            cJSON *parsed = cJSON_ParseWithLength((const char *) uploaded_bytes,
+                                                  (size_t) uploaded_size);
+            if (parsed) {
+                cJSON_Delete(player_stats_json);
+                player_stats_json = parsed;
+            }
+        }
+    }
+
+    // Merge advancements/achievements
+    if (version <= MC_VERSION_1_6_4) {
+        coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, uuid);
+        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr, uuid);
+    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+        coop_merge_achievements_mid(t->template_data, player_stats_json, uuid);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, uuid);
+    } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
+        coop_merge_advancements_modern(t->template_data, player_adv_json, uuid);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, uuid);
+    } else if (version >= MC_VERSION_1_13) {
+        coop_merge_advancements_modern(t->template_data, player_adv_json, uuid);
+        coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version, uuid);
+    }
+
+    // CRAFTMINE ONLY: combined view AND-merges into the group result; an
+    // individual-player view applies this player's unlocks as-is.
+    if (version == MC_VERSION_25W14CRAFTMINE) {
+        if (single_player_unlocks) {
+            coop_apply_unlocks_single_player(t->template_data, player_unlocks_json);
+        } else {
+            coop_merge_unlocks_and(t->template_data, player_unlocks_json);
+        }
+    }
+
+    // Merge multi-stage goals (global — any player any stage)
+    coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
+                           player_unlocks_json, version);
+
+    // Seed the Hermes per-player stat cache with this player's current values.
+    // This prevents double-counting when the first Hermes event arrives after
+    // a file-based merge — without seeding, old_value would be 0 and the entire
+    // file-based value would be added as a delta on top of the merged total.
+    if (hermes_cache && settings->using_hermes &&
+        settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
+        player_stats_json && uuid[0] != '\0') {
+        std::string uuid_prefix = uuid;
+        uuid_prefix += ':';
+
+        if (version >= MC_VERSION_1_13) {
+            // Modern: stats → { "minecraft:custom": { "minecraft:play_time": 123, ... }, ... }
+            cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+            if (stats_obj) {
+                for (int i = 0; i < t->template_data->stat_count; i++) {
+                    TrackableCategory *sc = t->template_data->stats[i];
+                    for (int j = 0; j < sc->criteria_count; j++) {
+                        TrackableItem *sub = sc->criteria[j];
+                        if (sub->stat_category_key[0] == '\0') continue;
+                        cJSON *cat_obj = cJSON_GetObjectItem(stats_obj, sub->stat_category_key);
+                        if (!cat_obj) continue;
+                        cJSON *val = cJSON_GetObjectItem(cat_obj, sub->stat_item_key);
+                        if (cJSON_IsNumber(val)) {
+                            // Build the Hermes-format key: "minecraft.picked_up:minecraft.oak_log"
+                            // Hermes uses dots where the JSON has colons in the category/item prefix
+                            char hermes_key[384];
+                            char h_cat[192], h_item[192];
+                            strncpy(h_cat, sub->stat_category_key, sizeof(h_cat) - 1);
+                            h_cat[sizeof(h_cat) - 1] = '\0';
+                            strncpy(h_item, sub->stat_item_key, sizeof(h_item) - 1);
+                            h_item[sizeof(h_item) - 1] = '\0';
+                            // Convert "minecraft:picked_up" → "minecraft.picked_up"
+                            char *colon_pos = strchr(h_cat, ':');
+                            if (colon_pos) *colon_pos = '.';
+                            colon_pos = strchr(h_item, ':');
+                            if (colon_pos) *colon_pos = '.';
+                            snprintf(hermes_key, sizeof(hermes_key), "%s:%s", h_cat, h_item);
+                            (*hermes_cache)[uuid_prefix + hermes_key] = val->valueint;
+                        }
+                    }
+                }
+            }
+        } else {
+            // Legacy/mid-era: flat JSON with stat keys at top level
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                TrackableCategory *sc = t->template_data->stats[i];
+                for (int j = 0; j < sc->criteria_count; j++) {
+                    TrackableItem *sub = sc->criteria[j];
+                    cJSON *val = cJSON_GetObjectItem(player_stats_json, sub->root_name);
+                    if (cJSON_IsNumber(val)) {
+                        (*hermes_cache)[uuid_prefix + sub->root_name] = val->valueint;
+                    }
+                }
+            }
+        }
+    }
+
+    // Clean up this player's JSON
+    cJSON_Delete(player_adv_json);
+    cJSON_Delete(player_stats_json);
+    cJSON_Delete(player_unlocks_json);
+    free(uploaded_bytes); // LEGACY cache copy; no-op if not used.
+}
+
+// Background resolver state for ghost usernames. Only one resolver runs at a
+// time; the worker snapshots unresolved ghost UUIDs, looks each up via Mojang
+// off the main thread, then writes names back (matched by UUID under lobby_mutex).
+static SDL_AtomicInt g_ghost_name_resolver_busy;
+
+static int SDLCALL ghost_name_resolver_thread(void *) {
+    if (!g_coop_ctx) {
+        SDL_SetAtomicInt(&g_ghost_name_resolver_busy, 0);
+        return 0;
+    }
+
+    // Snapshot the UUIDs that still need a name.
+    char todo[COOP_MAX_LOBBY][48];
+    int todo_n = 0;
+    SDL_LockMutex(g_coop_ctx->lobby_mutex);
+    for (int i = 0; i < g_coop_ctx->ghost_player_count && todo_n < COOP_MAX_LOBBY; i++) {
+        if (!g_coop_ctx->ghost_players[i].name_resolved) {
+            strncpy(todo[todo_n], g_coop_ctx->ghost_players[i].uuid, 47);
+            todo[todo_n][47] = '\0';
+            todo_n++;
+        }
+    }
+    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+
+    for (int i = 0; i < todo_n; i++) {
+        char name[64] = {0};
+        bool ok = mojang_fetch_username_by_uuid(todo[i], name, sizeof(name));
+
+        // Write the result back, matched by UUID (the index may have shifted).
+        SDL_LockMutex(g_coop_ctx->lobby_mutex);
+        for (int g = 0; g < g_coop_ctx->ghost_player_count; g++) {
+            if (strcmp(g_coop_ctx->ghost_players[g].uuid, todo[i]) != 0) continue;
+            if (ok) {
+                strncpy(g_coop_ctx->ghost_players[g].username, name,
+                        sizeof(g_coop_ctx->ghost_players[g].username) - 1);
+                g_coop_ctx->ghost_players[g].username[sizeof(g_coop_ctx->ghost_players[g].username) - 1] = '\0';
+                strncpy(g_coop_ctx->ghost_players[g].display_name, name,
+                        sizeof(g_coop_ctx->ghost_players[g].display_name) - 1);
+                g_coop_ctx->ghost_players[g].display_name[sizeof(g_coop_ctx->ghost_players[g].display_name) - 1] = '\0';
+            }
+            // Mark resolved either way: success fills the name, a 404/offline
+            // account keeps the UUID-prefix fallback. Both stop further retries.
+            g_coop_ctx->ghost_players[g].name_resolved = true;
+            g_coop_ctx->ghosts_changed = true;
+            break;
+        }
+        SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+    }
+
+    SDL_SetAtomicInt(&g_ghost_name_resolver_busy, 0);
+    return 0;
+}
+
+// Kick the background username resolver if any ghost still lacks a real name and
+// no resolver is already running. Cheap to call every refresh; it self-gates.
+static void tracker_kick_ghost_name_resolver(void) {
+    if (!g_coop_ctx) return;
+    bool has_unresolved = false;
+    SDL_LockMutex(g_coop_ctx->lobby_mutex);
+    for (int i = 0; i < g_coop_ctx->ghost_player_count; i++) {
+        if (!g_coop_ctx->ghost_players[i].name_resolved) { has_unresolved = true; break; }
+    }
+    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+    if (!has_unresolved) return;
+
+    if (SDL_CompareAndSwapAtomicInt(&g_ghost_name_resolver_busy, 0, 1)) {
+        SDL_Thread *th = SDL_CreateThread(ghost_name_resolver_thread, "GhostNameResolver", nullptr);
+        if (th) {
+            SDL_DetachThread(th);
+        } else {
+            SDL_SetAtomicInt(&g_ghost_name_resolver_busy, 0); // spawn failed; allow retry
+        }
+    }
+}
+
+// Host-only: scan the world save folder for player UUIDs that aren't in the
+// live roster (settings->coop_players[]) and publish them as "ghost" players in
+// g_coop_ctx->ghost_players[]. Covers mid-run disconnects and players who never
+// joined via Advancely. Combined count (roster + ghosts) is capped at
+// COOP_MAX_LOBBY, freshest files winning. Names start as a UUID-prefix fallback;
+// a background worker resolves real usernames via Mojang.
+void tracker_refresh_ghost_players(Tracker *t, const AppSettings *settings, MC_Version version) {
+    if (!g_coop_ctx) return;
+
+    // Receivers get their ghost roster from the host over the network (parsed into
+    // ghost_players[] by parse_lobby_json); never run disk discovery or clear it here.
+    if (settings->network_mode != NETWORK_HOST) return;
+
+    // Ghosts only exist while actively hosting a lobby. COOP_NET_LISTENING covers
+    // both direct and relay hosting (coop_net.cpp sets it for both). Outside that
+    // — coop disabled or not connected — clear any ghosts so they never leak into
+    // the combined progress when there is no lobby to explain them.
+    bool actively_hosting = (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING);
+    if (!actively_hosting || !settings->coop_read_all_save_files) {
+        SDL_LockMutex(g_coop_ctx->lobby_mutex);
+        if (g_coop_ctx->ghost_player_count != 0) {
+            g_coop_ctx->ghost_player_count = 0;
+            g_coop_ctx->ghosts_changed = true;
+        }
+        SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+        return;
+    }
+
+    char disc_uuids[COOP_MAX_LOBBY][48];
+    uint64_t disc_mtimes[COOP_MAX_LOBBY];
+    int disc_count = discover_save_folder_player_uuids(
+        t->saves_path, version, t->world_name, 7,
+        disc_uuids, disc_mtimes, COOP_MAX_LOBBY);
+
+    // Drop any discovered UUID that is already a live roster player.
+    // Sort the survivors by mtime (newest first) so the combined cap keeps the
+    // freshest files when there are more candidates than free slots.
+    std::vector<int> keep;
+    keep.reserve(disc_count);
+    for (int i = 0; i < disc_count; i++) {
+        bool in_roster = false;
+        for (int p = 0; p < settings->coop_player_count; p++) {
+            if (strcmp(settings->coop_players[p].uuid, disc_uuids[i]) == 0) { in_roster = true; break; }
+        }
+        if (!in_roster) keep.push_back(i);
+    }
+    std::sort(keep.begin(), keep.end(), [&](int a, int b) { return disc_mtimes[a] > disc_mtimes[b]; });
+
+    int free_slots = COOP_MAX_LOBBY - settings->coop_player_count;
+    if (free_slots < 0) free_slots = 0;
+
+    SDL_LockMutex(g_coop_ctx->lobby_mutex);
+    int new_count = 0;
+    for (size_t k = 0; k < keep.size() && new_count < free_slots; k++) {
+        int i = keep[k];
+        CoopGhostPlayer *g = &g_coop_ctx->ghost_players[new_count];
+
+        // Preserve a prior entry's resolved name/skin if we've already looked it up.
+        bool prev_resolved = false;
+        char prev_username[64] = {0};
+        char prev_display[64] = {0};
+        bool prev_offline = false;
+        for (int e = 0; e < g_coop_ctx->ghost_player_count; e++) {
+            if (strcmp(g_coop_ctx->ghost_players[e].uuid, disc_uuids[i]) == 0) {
+                prev_resolved = g_coop_ctx->ghost_players[e].name_resolved;
+                strncpy(prev_username, g_coop_ctx->ghost_players[e].username, sizeof(prev_username) - 1);
+                strncpy(prev_display, g_coop_ctx->ghost_players[e].display_name, sizeof(prev_display) - 1);
+                prev_offline = g_coop_ctx->ghost_players[e].is_offline;
+                break;
+            }
+        }
+
+        memset(g, 0, sizeof(*g));
+        strncpy(g->uuid, disc_uuids[i], sizeof(g->uuid) - 1);
+        g->last_file_mtime_ms = disc_mtimes[i];
+        g->name_resolved = prev_resolved;
+        g->is_offline = prev_offline;
+        if (prev_resolved) {
+            strncpy(g->username, prev_username, sizeof(g->username) - 1);
+            strncpy(g->display_name, prev_display, sizeof(g->display_name) - 1);
+        } else {
+            // UUID-prefix fallback until Mojang/Hermes resolution fills it in.
+            char prefix[16];
+            snprintf(prefix, sizeof(prefix), "%.8s", disc_uuids[i]);
+            snprintf(g->username, sizeof(g->username), "%s", prefix);
+            snprintf(g->display_name, sizeof(g->display_name), "%s", prefix);
+        }
+        new_count++;
+    }
+
+    bool changed = (new_count != g_coop_ctx->ghost_player_count);
+    g_coop_ctx->ghost_player_count = new_count;
+    if (changed) g_coop_ctx->ghosts_changed = true;
+    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+
+    log_message(LOG_INFO, "[TRACKER] Ghost discovery: %d on-disk UUID(s), %d ghost(s) after roster filter + cap.\n",
+                disc_count, new_count);
+    for (int i = 0; i < new_count; i++) {
+        log_message(LOG_INFO, "[TRACKER]   ghost[%d] uuid=%s name=%s\n",
+                    i, g_coop_ctx->ghost_players[i].uuid, g_coop_ctx->ghost_players[i].display_name);
+    }
+
+    // Resolve UUID-prefix placeholder names into real usernames in the background.
+    tracker_kick_ghost_name_resolver();
+}
+
 void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data || !settings) return;
 
@@ -4677,129 +5008,37 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     // 2. Iterate over all players in the roster and merge their data
     for (int p = 0; p < settings->coop_player_count; p++) {
         const CoopPlayer *player = &settings->coop_players[p];
+        coop_merge_one_player_from_disk(t, settings, version, player->uuid, player->username, hermes_cache, false);
+    }
 
-        // Find this player's data files by UUID
-        char player_adv_path[MAX_PATH_LENGTH];
-        char player_stats_path[MAX_PATH_LENGTH];
-        char player_unlocks_path[MAX_PATH_LENGTH];
+    // 2b. Merge ghost players (disconnected / non-Advancely UUIDs found on disk).
+    // Snapshot the ghost roster under lobby_mutex into a local array first, then
+    // merge outside the lock (the merge reads files and is not lock-sensitive).
+    // Skip any ghost UUID that also appears in the live roster to avoid double
+    // counting (the roster loop above already merged it).
+    if (settings->coop_read_all_save_files && g_coop_ctx) {
+        struct GhostMergeEntry { char uuid[48]; char username[64]; };
+        GhostMergeEntry ghost_snapshot[COOP_MAX_LOBBY];
+        int ghost_n = 0;
+        SDL_LockMutex(g_coop_ctx->lobby_mutex);
+        for (int gi = 0; gi < g_coop_ctx->ghost_player_count && ghost_n < COOP_MAX_LOBBY; gi++) {
+            strncpy(ghost_snapshot[ghost_n].uuid, g_coop_ctx->ghost_players[gi].uuid, 47);
+            ghost_snapshot[ghost_n].uuid[47] = '\0';
+            strncpy(ghost_snapshot[ghost_n].username, g_coop_ctx->ghost_players[gi].username, 63);
+            ghost_snapshot[ghost_n].username[63] = '\0';
+            ghost_n++;
+        }
+        SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
 
-        find_player_data_files_for_uuid(
-            t->saves_path, version, settings->using_stats_per_world_legacy,
-            t->world_name, player->uuid, player->username,
-            player_adv_path, player_stats_path, player_unlocks_path, MAX_PATH_LENGTH
-        );
-
-        // Parse the player's JSON files
-        cJSON *player_adv_json = (player_adv_path[0] != '\0') ? cJSON_from_file(player_adv_path) : nullptr;
-        cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
-        cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
-
-        // LEGACY (<=1.6.4) ONLY: for non-host players, override the stats JSON with
-        // whatever the receiver uploaded over the wire. Legacy stats live outside
-        // the world folder (per-launcher), so the on-disk file here belongs to the
-        // host and can't represent any receiver's progress.
-        void *uploaded_bytes = nullptr;
-        if (version <= MC_VERSION_1_6_4 && g_coop_ctx &&
-            strcmp(player->uuid, settings->local_player.uuid) != 0) {
-            uint32_t uploaded_size = 0;
-            if (coop_net_get_legacy_stats_upload(g_coop_ctx, player->uuid,
-                                                 &uploaded_bytes, &uploaded_size,
-                                                 nullptr, 0)) {
-                cJSON *parsed = cJSON_ParseWithLength((const char *) uploaded_bytes,
-                                                      (size_t) uploaded_size);
-                if (parsed) {
-                    cJSON_Delete(player_stats_json);
-                    player_stats_json = parsed;
-                }
+        for (int gi = 0; gi < ghost_n; gi++) {
+            bool in_roster = false;
+            for (int p = 0; p < settings->coop_player_count; p++) {
+                if (strcmp(settings->coop_players[p].uuid, ghost_snapshot[gi].uuid) == 0) { in_roster = true; break; }
             }
+            if (in_roster) continue;
+            coop_merge_one_player_from_disk(t, settings, version,
+                                            ghost_snapshot[gi].uuid, ghost_snapshot[gi].username, hermes_cache, false);
         }
-
-        // Merge advancements/achievements
-        if (version <= MC_VERSION_1_6_4) {
-            coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, player->uuid);
-            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr, player->uuid);
-        } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
-            coop_merge_achievements_mid(t->template_data, player_stats_json, player->uuid);
-            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
-        } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
-            coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
-        } else if (version >= MC_VERSION_1_13) {
-            coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-            coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version, player->uuid);
-        }
-
-        // CRAFTMINE ONLY: AND-merge this player's unlocks into the group result.
-        if (version == MC_VERSION_25W14CRAFTMINE) {
-            coop_merge_unlocks_and(t->template_data, player_unlocks_json);
-        }
-
-        // Merge multi-stage goals (global — any player any stage)
-        coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
-                               player_unlocks_json, version);
-
-        // Seed the Hermes per-player stat cache with this player's current values.
-        // This prevents double-counting when the first Hermes event arrives after
-        // a file-based merge — without seeding, old_value would be 0 and the entire
-        // file-based value would be added as a delta on top of the merged total.
-        if (hermes_cache && settings->using_hermes &&
-            settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
-            player_stats_json && player->uuid[0] != '\0') {
-            std::string uuid_prefix = player->uuid;
-            uuid_prefix += ':';
-
-            if (version >= MC_VERSION_1_13) {
-                // Modern: stats → { "minecraft:custom": { "minecraft:play_time": 123, ... }, ... }
-                cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
-                if (stats_obj) {
-                    for (int i = 0; i < t->template_data->stat_count; i++) {
-                        TrackableCategory *sc = t->template_data->stats[i];
-                        for (int j = 0; j < sc->criteria_count; j++) {
-                            TrackableItem *sub = sc->criteria[j];
-                            if (sub->stat_category_key[0] == '\0') continue;
-                            cJSON *cat_obj = cJSON_GetObjectItem(stats_obj, sub->stat_category_key);
-                            if (!cat_obj) continue;
-                            cJSON *val = cJSON_GetObjectItem(cat_obj, sub->stat_item_key);
-                            if (cJSON_IsNumber(val)) {
-                                // Build the Hermes-format key: "minecraft.picked_up:minecraft.oak_log"
-                                // Hermes uses dots where the JSON has colons in the category/item prefix
-                                char hermes_key[384];
-                                char h_cat[192], h_item[192];
-                                strncpy(h_cat, sub->stat_category_key, sizeof(h_cat) - 1);
-                                h_cat[sizeof(h_cat) - 1] = '\0';
-                                strncpy(h_item, sub->stat_item_key, sizeof(h_item) - 1);
-                                h_item[sizeof(h_item) - 1] = '\0';
-                                // Convert "minecraft:picked_up" → "minecraft.picked_up"
-                                char *colon_pos = strchr(h_cat, ':');
-                                if (colon_pos) *colon_pos = '.';
-                                colon_pos = strchr(h_item, ':');
-                                if (colon_pos) *colon_pos = '.';
-                                snprintf(hermes_key, sizeof(hermes_key), "%s:%s", h_cat, h_item);
-                                (*hermes_cache)[uuid_prefix + hermes_key] = val->valueint;
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Legacy/mid-era: flat JSON with stat keys at top level
-                for (int i = 0; i < t->template_data->stat_count; i++) {
-                    TrackableCategory *sc = t->template_data->stats[i];
-                    for (int j = 0; j < sc->criteria_count; j++) {
-                        TrackableItem *sub = sc->criteria[j];
-                        cJSON *val = cJSON_GetObjectItem(player_stats_json, sub->root_name);
-                        if (cJSON_IsNumber(val)) {
-                            (*hermes_cache)[uuid_prefix + sub->root_name] = val->valueint;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Clean up this player's JSON
-        cJSON_Delete(player_adv_json);
-        cJSON_Delete(player_stats_json);
-        cJSON_Delete(player_unlocks_json);
-        free(uploaded_bytes); // LEGACY cache copy; no-op if not used.
     }
 
     // 3. Finalize after all players are merged
@@ -4947,6 +5186,40 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
         t->coop_latched_frozen_ticks[slot] = t->template_data->frozen_play_time_ticks;
     }
 
+    cJSON_Delete(settings_json);
+}
+
+void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *settings,
+                                               const char *uuid, const char *username) {
+    if (!t || !t->template_data || !settings || !uuid || uuid[0] == '\0') return;
+
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+
+    coop_reset_template_progress(t->template_data);
+
+    // Merge just this UUID. Pass nullptr for the Hermes cache: this is a transient
+    // display rebuild, and seeding the cumulative cache here would corrupt the
+    // All-Players merged view's per-UUID deltas.
+    coop_merge_one_player_from_disk(t, settings, version, uuid, username ? username : "", nullptr, true);
+
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+    coop_finalize_advancements(t->template_data);
+    coop_finalize_stats(t->template_data, settings_json, uuid);
+    coop_finalize_multi_stage(t->template_data);
+    if (version == MC_VERSION_25W14CRAFTMINE) coop_finalize_unlocks(t->template_data);
+
+    tracker_update_custom_progress(t, settings_json, settings, uuid);
+    {
+        bool changed;
+        int guard = 0;
+        do {
+            changed = tracker_update_custom_goal_linked_goals(t);
+            changed |= tracker_update_stat_linked_goals(t);
+            changed |= tracker_update_counter_goals(t);
+        } while (changed && ++guard < 32);
+    }
+
+    tracker_calculate_overall_progress(t, version, settings);
     cJSON_Delete(settings_json);
 }
 
@@ -6627,7 +6900,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
                 if (face_uuid &&
                     settings->coop_show_contributor_faces &&
-                    t->selected_coop_player_idx == -1 && !hide_icon_in_layout &&
+                    t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 && !hide_icon_in_layout &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                     t->zoom_level > settings->coop_face_lod_threshold) {
                     CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
@@ -6932,7 +7205,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // alongside stat_face_follows_text below).
                         bool adv_crit_face_eligible = !is_stat_section &&
                                                       settings->coop_show_contributor_faces &&
-                                                      t->selected_coop_player_idx == -1 &&
+                                                      t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
                                                       g_coop_ctx &&
                                                       coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                       cat->first_contributor_uuid[0] != '\0' &&
@@ -6977,7 +7250,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             if (crit->is_manually_completed &&
                                 crit->manual_completer_uuid[0] != '\0' &&
                                 settings->coop_show_contributor_faces &&
-                                t->selected_coop_player_idx == -1 &&
+                                t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
                                 g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                                 CoopLobbyPlayer mc_lobby[COOP_MAX_LOBBY];
                                 int mc_lc = coop_net_get_lobby_players(g_coop_ctx, mc_lobby, COOP_MAX_LOBBY);
@@ -7120,7 +7393,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         bool stat_face_eligible = is_stat_section && cat->criteria_count > 1 &&
                                                   settings->coop_show_contributor_faces &&
                                                   settings->coop_stat_merge == COOP_STAT_HIGHEST &&
-                                                  t->selected_coop_player_idx == -1 &&
+                                                  t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
                                                   g_coop_ctx &&
                                                   coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                   crit->highest_contributor_uuid[0] != '\0' &&
@@ -7424,7 +7697,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (cat->is_manually_completed &&
                         cat->manual_completer_uuid[0] != '\0' &&
                         settings->coop_show_contributor_faces &&
-                        t->selected_coop_player_idx == -1 &&
+                        t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
                         g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                         CoopLobbyPlayer mcp_lobby[COOP_MAX_LOBBY];
                         int mcp_lc = coop_net_get_lobby_players(g_coop_ctx, mcp_lobby, COOP_MAX_LOBBY);
@@ -8337,7 +8610,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // manual checkboxes (goal == 0) show their face under the checkbox.
             if (item->goal != 0 && item->custom_contributor_uuid[0] != '\0' &&
                 settings->coop_show_contributor_faces &&
-                t->selected_coop_player_idx == -1 && !hide_item_icon_in_layout &&
+                t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 && !hide_item_icon_in_layout &&
                 g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                 t->zoom_level > settings->coop_face_lod_threshold) {
                 CoopLobbyPlayer cg_lobby[COOP_MAX_LOBBY];
@@ -8465,7 +8738,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 if (item->is_manually_completed &&
                     item->manual_completer_uuid[0] != '\0' &&
                     settings->coop_show_contributor_faces &&
-                    t->selected_coop_player_idx == -1 &&
+                    t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                     CoopLobbyPlayer cg_mc_lobby[COOP_MAX_LOBBY];
                     int cg_mc_lc = coop_net_get_lobby_players(g_coop_ctx, cg_mc_lobby, COOP_MAX_LOBBY);
@@ -10632,12 +10905,28 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     {
         CoopNetState player_dd_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
         bool in_coop = (player_dd_state == COOP_NET_LISTENING || player_dd_state == COOP_NET_CONNECTED);
-        if (in_coop && settings->coop_player_count > 0) {
+
+        // Snapshot the ghost roster (host-side, disconnected / not-in-lobby players)
+        // so they can be listed and selected alongside the live roster.
+        CoopGhostPlayer dd_ghosts[COOP_MAX_LOBBY];
+        int dd_ghost_count = 0;
+        if (g_coop_ctx) {
+            SDL_LockMutex(g_coop_ctx->lobby_mutex);
+            dd_ghost_count = g_coop_ctx->ghost_player_count;
+            if (dd_ghost_count > COOP_MAX_LOBBY) dd_ghost_count = COOP_MAX_LOBBY;
+            for (int gi = 0; gi < dd_ghost_count; gi++) dd_ghosts[gi] = g_coop_ctx->ghost_players[gi];
+            SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+        }
+
+        if (in_coop && (settings->coop_player_count > 0 || dd_ghost_count > 0)) {
             ImGui::SameLine();
 
             // Build preview label
             const char *preview = "All Players";
-            if (t->selected_coop_player_idx >= 0 && t->selected_coop_player_idx < settings->coop_player_count) {
+            if (t->selected_coop_ghost_idx >= 0 && t->selected_coop_ghost_idx < dd_ghost_count) {
+                const CoopGhostPlayer *selg = &dd_ghosts[t->selected_coop_ghost_idx];
+                preview = selg->display_name[0] != '\0' ? selg->display_name : selg->username;
+            } else if (t->selected_coop_player_idx >= 0 && t->selected_coop_player_idx < settings->coop_player_count) {
                 const CoopPlayer *sel = &settings->coop_players[t->selected_coop_player_idx];
                 preview = sel->display_name[0] != '\0' ? sel->display_name : sel->username;
             }
@@ -10650,12 +10939,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 int dd_lobby_count = coop_net_get_lobby_players(g_coop_ctx, dd_lobby, COOP_MAX_LOBBY);
 
                 // "All Players" entry
-                bool is_all = (t->selected_coop_player_idx == -1);
+                bool is_all = (t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1);
                 ImGui::Dummy(ImVec2(16, 16));
                 ImGui::SameLine();
                 if (ImGui::Selectable("All Players", is_all)) {
                     if (!is_all) {
                         t->selected_coop_player_idx = -1;
+                        t->selected_coop_ghost_idx = -1;
                         // Apply the cached snapshot on the next frame instead of
                         // triggering a full disk reload — remote players may not
                         // have saved their files for several minutes.
@@ -10690,10 +10980,47 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                     if (ImGui::Selectable(player_label, is_selected)) {
                         if (!is_selected) {
                             t->selected_coop_player_idx = pi;
+                            t->selected_coop_ghost_idx = -1;
                             t->coop_view_dirty = 1;
                         }
                     }
                     if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+
+                // Ghost players (disconnected / not currently in the lobby). Listed
+                // after a faint separator so it's clear these aren't live members
+                // but are still contributing to the combined progress.
+                if (dd_ghost_count > 0) {
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Not in lobby");
+                    for (int gi = 0; gi < dd_ghost_count; gi++) {
+                        const CoopGhostPlayer *g = &dd_ghosts[gi];
+                        const char *label = g->display_name[0] != '\0' ? g->display_name : g->username;
+
+                        AccountType acc_type = g->is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                        SDL_Texture *face = skin_cache_get_face(g->uuid, acc_type);
+                        if (face) {
+                            ImGui::Image((ImTextureID) face, ImVec2(16, 16));
+                        } else {
+                            ImGui::Dummy(ImVec2(16, 16));
+                        }
+                        ImGui::SameLine();
+
+                        char ghost_label[128];
+                        snprintf(ghost_label, sizeof(ghost_label), "%s##ghost_%d", label, gi);
+                        bool is_selected = (t->selected_coop_ghost_idx == gi);
+                        if (ImGui::Selectable(ghost_label, is_selected)) {
+                            if (!is_selected) {
+                                t->selected_coop_ghost_idx = gi;
+                                t->selected_coop_player_idx = -1;
+                                strncpy(t->selected_coop_ghost_uuid, g->uuid,
+                                        sizeof(t->selected_coop_ghost_uuid) - 1);
+                                t->selected_coop_ghost_uuid[sizeof(t->selected_coop_ghost_uuid) - 1] = '\0';
+                                t->coop_view_dirty = 1;
+                            }
+                        }
+                        if (is_selected) ImGui::SetItemDefaultFocus();
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -10712,6 +11039,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         } else {
             // Reset to All Players when not in coop
             t->selected_coop_player_idx = -1;
+            t->selected_coop_ghost_idx = -1;
+        }
+
+        // A previously selected ghost can vanish between frames (player reconnects
+        // and gets promoted, toggle turned off, files age out). If so, fall back to
+        // All Players so the view doesn't dangle on a stale index.
+        if (t->selected_coop_ghost_idx >= 0 && t->selected_coop_ghost_idx >= dd_ghost_count) {
+            t->selected_coop_ghost_idx = -1;
+            t->coop_view_dirty = 1;
         }
     }
 
@@ -10962,6 +11298,14 @@ void tracker_clear_coop_snapshot_cache(Tracker *t) {
         }
         t->coop_player_snapshot_sizes[i] = 0;
     }
+    for (int i = 0; i < COOP_MAX_LOBBY; i++) {
+        if (t->coop_ghost_snapshots[i]) {
+            free(t->coop_ghost_snapshots[i]);
+            t->coop_ghost_snapshots[i] = nullptr;
+        }
+        t->coop_ghost_snapshot_sizes[i] = 0;
+    }
+    t->coop_ghost_snapshot_count = 0;
     if (t->coop_merged_snapshot) {
         free(t->coop_merged_snapshot);
         t->coop_merged_snapshot = nullptr;
@@ -11652,7 +11996,8 @@ extern bool merge_coop_progress(const char *buffer, TemplateData *target);
 // per-player state; template_data is just a display buffer rebuilt from them.
 static bool hermes_apply_event_to_coop_snapshots(
     Tracker *t, const AppSettings *settings,
-    int player_idx, const char *event_type, const cJSON *data,
+    int player_idx, int ghost_idx, const char *source_uuid,
+    const char *event_type, const cJSON *data,
     char *workbuf, size_t workbuf_size) {
     if (!t || !t->template_data || !settings || !workbuf) return false;
 
@@ -11662,29 +12007,35 @@ static bool hermes_apply_event_to_coop_snapshots(
 
     bool any_changed = false;
 
+    // Select the source player's snapshot slot — a live roster player or a ghost.
+    char **src_snap = nullptr;
+    size_t *src_snap_size = nullptr;
+    if (ghost_idx >= 0 && ghost_idx < COOP_MAX_LOBBY) {
+        src_snap = &t->coop_ghost_snapshots[ghost_idx];
+        src_snap_size = &t->coop_ghost_snapshot_sizes[ghost_idx];
+    } else if (player_idx >= 0 && player_idx < MAX_COOP_PLAYERS) {
+        src_snap = &t->coop_player_snapshots[player_idx];
+        src_snap_size = &t->coop_player_snapshot_sizes[player_idx];
+    }
+
     // 1. Per-player snapshot: single-player semantics (highest-wins for stats).
-    if (player_idx >= 0 && player_idx < MAX_COOP_PLAYERS &&
-        t->coop_player_snapshots[player_idx] &&
-        t->coop_player_snapshot_sizes[player_idx] >= sizeof(TemplateData)) {
-        if (merge_coop_progress(t->coop_player_snapshots[player_idx], t->template_data)) {
+    if (src_snap && *src_snap && *src_snap_size >= sizeof(TemplateData)) {
+        if (merge_coop_progress(*src_snap, t->template_data)) {
             bool changed = false;
             if (is_stat) {
                 changed = hermes_apply_stat_event(t, data, false);
             } else {
-                const char *own_uuid = (player_idx >= 0 && player_idx < settings->coop_player_count)
-                                           ? settings->coop_players[player_idx].uuid
-                                           : nullptr;
-                changed = hermes_apply_advancement_event(t, data, own_uuid);
+                changed = hermes_apply_advancement_event(t, data, source_uuid);
             }
             if (changed) {
                 tracker_recalculate_progress(t, settings);
                 size_t new_size = serialize_template_data(t->template_data, workbuf);
                 if (new_size > 0 && new_size <= workbuf_size) {
-                    char *new_buf = (char *) realloc(t->coop_player_snapshots[player_idx], new_size);
+                    char *new_buf = (char *) realloc(*src_snap, new_size);
                     if (new_buf) {
                         memcpy(new_buf, workbuf, new_size);
-                        t->coop_player_snapshots[player_idx] = new_buf;
-                        t->coop_player_snapshot_sizes[player_idx] = new_size;
+                        *src_snap = new_buf;
+                        *src_snap_size = new_size;
                         any_changed = true;
                     }
                 }
@@ -11698,9 +12049,7 @@ static bool hermes_apply_event_to_coop_snapshots(
     if (t->coop_merged_snapshot && t->coop_merged_snapshot_size >= sizeof(TemplateData)) {
         if (merge_coop_progress(t->coop_merged_snapshot, t->template_data)) {
             bool changed = false;
-            const char *ev_uuid = (player_idx >= 0 && player_idx < settings->coop_player_count)
-                                      ? settings->coop_players[player_idx].uuid
-                                      : nullptr;
+            const char *ev_uuid = source_uuid;
             if (is_stat) {
                 if (settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
                     changed = hermes_apply_stat_event_cumulative(t, data, ev_uuid, false);
@@ -11730,7 +12079,7 @@ static bool hermes_apply_event_to_coop_snapshots(
 
                     // Overwrite the OR-merged criteria with the "player with most criteria wins" rule
                     int best_count = -1;
-                    int best_player_idx = -1;
+                    char best_uuid[48] = {0};
                     bool best_done = false;
                     bool best_all_met = false;
                     bool *best_crit_done = (bool *) malloc(adv->criteria_count * sizeof(bool));
@@ -11738,23 +12087,40 @@ static bool hermes_apply_event_to_coop_snapshots(
                     if (best_crit_done) {
                         for (int j = 0; j < adv->criteria_count; j++) best_crit_done[j] = false;
 
-                        for (int p = 0; p < settings->coop_player_count; p++) {
-                            if (t->coop_player_snapshots[p] && t->coop_player_snapshot_sizes[p] >= sizeof(
-                                    TemplateData)) {
-                                merge_coop_progress(t->coop_player_snapshots[p], t->template_data);
-                                TrackableCategory *p_adv = t->template_data->advancements[adv_idx];
-                                if (p_adv->completed_criteria_count > best_count) {
-                                    best_count = p_adv->completed_criteria_count;
-                                    best_player_idx = p;
-                                    best_done = p_adv->done;
-                                    best_all_met = p_adv->all_template_criteria_met;
-                                    for (int j = 0; j < p_adv->criteria_count; j++) {
-                                        best_crit_done[j] = p_adv->criteria[j]->done;
-                                    }
-                                } else if (p_adv->done && !best_done) {
-                                    best_done = true;
-                                    best_all_met = true;
+                        // Scan both live roster snapshots and ghost snapshots: the
+                        // "player with the most criteria" wins the grouped advancement,
+                        // and a ghost can be that winner too.
+                        const int roster_n = settings->coop_player_count;
+                        const int ghost_n = t->coop_ghost_snapshot_count;
+                        for (int s = 0; s < roster_n + ghost_n; s++) {
+                            bool is_ghost = (s >= roster_n);
+                            int local = is_ghost ? (s - roster_n) : s;
+                            char *snap = is_ghost ? t->coop_ghost_snapshots[local]
+                                                  : t->coop_player_snapshots[local];
+                            size_t snap_sz = is_ghost ? t->coop_ghost_snapshot_sizes[local]
+                                                      : t->coop_player_snapshot_sizes[local];
+                            if (!snap || snap_sz < sizeof(TemplateData)) continue;
+                            merge_coop_progress(snap, t->template_data);
+                            TrackableCategory *p_adv = t->template_data->advancements[adv_idx];
+                            if (p_adv->completed_criteria_count > best_count) {
+                                best_count = p_adv->completed_criteria_count;
+                                best_done = p_adv->done;
+                                best_all_met = p_adv->all_template_criteria_met;
+                                for (int j = 0; j < p_adv->criteria_count; j++) {
+                                    best_crit_done[j] = p_adv->criteria[j]->done;
                                 }
+                                best_uuid[0] = '\0';
+                                if (!is_ghost) {
+                                    strncpy(best_uuid, settings->coop_players[local].uuid, sizeof(best_uuid) - 1);
+                                } else if (g_coop_ctx) {
+                                    SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                                    if (local < g_coop_ctx->ghost_player_count)
+                                        strncpy(best_uuid, g_coop_ctx->ghost_players[local].uuid, sizeof(best_uuid) - 1);
+                                    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+                                }
+                            } else if (p_adv->done && !best_done) {
+                                best_done = true;
+                                best_all_met = true;
                             }
                         }
 
@@ -11768,13 +12134,10 @@ static bool hermes_apply_event_to_coop_snapshots(
                         for (int j = 0; j < adv->criteria_count; j++) {
                             adv->criteria[j]->done = best_crit_done[j];
                         }
-                        if (best_player_idx >= 0 && best_count > 0) {
-                            const char *winner_uuid = settings->coop_players[best_player_idx].uuid;
-                            if (winner_uuid && winner_uuid[0] != '\0') {
-                                strncpy(adv->first_contributor_uuid, winner_uuid,
-                                        sizeof(adv->first_contributor_uuid) - 1);
-                                adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
-                            }
+                        if (best_uuid[0] != '\0' && best_count > 0) {
+                            strncpy(adv->first_contributor_uuid, best_uuid,
+                                    sizeof(adv->first_contributor_uuid) - 1);
+                            adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
                         }
 
                         free(best_crit_done);
@@ -11814,8 +12177,11 @@ static bool hermes_apply_event_to_coop_snapshots(
 
     // 3. Restore the currently-displayed view so the UI reflects the update.
     int sel = t->selected_coop_player_idx;
+    int gsel = t->selected_coop_ghost_idx;
     const char *restore_buf = nullptr;
-    if (sel >= 0 && sel < MAX_COOP_PLAYERS && t->coop_player_snapshots[sel]) {
+    if (gsel >= 0 && gsel < COOP_MAX_LOBBY && t->coop_ghost_snapshots[gsel]) {
+        restore_buf = t->coop_ghost_snapshots[gsel];
+    } else if (sel >= 0 && sel < MAX_COOP_PLAYERS && t->coop_player_snapshots[sel]) {
         restore_buf = t->coop_player_snapshots[sel];
     } else if (t->coop_merged_snapshot) {
         restore_buf = t->coop_merged_snapshot;
@@ -11869,6 +12235,7 @@ static bool hermes_process_decrypted_line(
     // UUID match first (authoritative, case-insensitive), then username.
     const char *event_player_uuid = nullptr;
     int matched_player_idx = -1;
+    int matched_ghost_idx = -1;
     cJSON *player_json = cJSON_GetObjectItem(data, "player");
     if (cJSON_IsObject(player_json)) {
         cJSON *uuid_json = cJSON_GetObjectItem(player_json, "uuid");
@@ -11891,10 +12258,27 @@ static bool hermes_process_decrypted_line(
                 if (!player_match && ev_name && rp->username[0] != '\0' &&
                     strcasecmp(ev_name, rp->username) == 0) {
                     player_match = true;
-                    event_player_uuid = ev_uuid; // may be null, that's OK
+                    // Use the authoritative roster UUID (the event may omit it).
+                    event_player_uuid = rp->uuid[0] != '\0' ? rp->uuid : ev_uuid;
                     matched_player_idx = p;
                     break;
                 }
+            }
+            // Ghost players (disconnected / not-in-lobby but actively playing on the
+            // shared world) also emit Hermes events. Accept them so their live
+            // progress flows into the merged view, just like a connected player.
+            if (!player_match && g_coop_ctx && ev_uuid) {
+                SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                for (int gi = 0; gi < g_coop_ctx->ghost_player_count; gi++) {
+                    if (g_coop_ctx->ghost_players[gi].uuid[0] != '\0' &&
+                        strcasecmp(ev_uuid, g_coop_ctx->ghost_players[gi].uuid) == 0) {
+                        player_match = true;
+                        event_player_uuid = ev_uuid;
+                        matched_ghost_idx = gi;
+                        break;
+                    }
+                }
+                SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
             }
         } else {
             if (settings->local_player.uuid[0] != '\0' && ev_uuid) {
@@ -11916,20 +12300,24 @@ static bool hermes_process_decrypted_line(
     // --- Dispatch event ---
     bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
                          t->hermes_coop_stat_cache);
-    bool have_snapshots = (matched_player_idx >= 0 &&
-                           matched_player_idx < MAX_COOP_PLAYERS &&
-                           t->coop_player_snapshots[matched_player_idx] &&
-                           t->coop_merged_snapshot);
+    bool have_roster_snap = (matched_player_idx >= 0 &&
+                             matched_player_idx < MAX_COOP_PLAYERS &&
+                             t->coop_player_snapshots[matched_player_idx]);
+    bool have_ghost_snap = (matched_ghost_idx >= 0 &&
+                            matched_ghost_idx < COOP_MAX_LOBBY &&
+                            t->coop_ghost_snapshots[matched_ghost_idx]);
+    bool have_snapshots = (have_roster_snap || have_ghost_snap) && t->coop_merged_snapshot;
 
     bool any_changed = false;
 
     if (is_coop_host && have_snapshots &&
         (strcmp(type, "stat") == 0 || strcmp(type, "advancement") == 0)) {
-        // Per-player isolation path: update the source player's snapshot and
-        // the merged snapshot, then restore the selected view.
+        // Per-player isolation path: update the source player's (or ghost's)
+        // snapshot and the merged snapshot, then restore the selected view.
         if (!*workbuf_ptr) *workbuf_ptr = (char *) malloc(workbuf_size);
         if (*workbuf_ptr &&
             hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
+                                                 matched_ghost_idx, event_player_uuid,
                                                  type, data, *workbuf_ptr, workbuf_size)) {
             any_changed = true;
             if (snapshots_changed) *snapshots_changed = true;

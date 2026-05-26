@@ -469,6 +469,21 @@ static char *build_lobby_json(CoopNetContext *ctx) {
                                 ctx->lobby_players[i].is_offline ? "offline" : "online");
         cJSON_AddItemToArray(arr, obj);
     }
+    // Append ghost players (host-side, disconnected / not-in-lobby) so receiver
+    // dropdowns can list them too. Marked with "is_ghost" so the receiver routes
+    // them into ghost_players[] rather than the live lobby. Order matters: it must
+    // match the order ghost snapshots are broadcast in (see broadcast block).
+    for (int i = 0; i < ctx->ghost_player_count; i++) {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(obj, "username", ctx->ghost_players[i].username);
+        cJSON_AddStringToObject(obj, "uuid", ctx->ghost_players[i].uuid);
+        cJSON_AddStringToObject(obj, "display_name", ctx->ghost_players[i].display_name);
+        cJSON_AddBoolToObject(obj, "is_host", false);
+        cJSON_AddStringToObject(obj, "account_type",
+                                ctx->ghost_players[i].is_offline ? "offline" : "online");
+        cJSON_AddBoolToObject(obj, "is_ghost", true);
+        cJSON_AddItemToArray(arr, obj);
+    }
     SDL_UnlockMutex(ctx->lobby_mutex);
 
     char *json_str = cJSON_PrintUnformatted(arr);
@@ -486,24 +501,42 @@ static void parse_lobby_json(CoopNetContext *ctx, const char *json_str) {
 
     SDL_LockMutex(ctx->lobby_mutex);
     ctx->lobby_player_count = 0;
+    ctx->ghost_player_count = 0;
     cJSON *item;
     cJSON_ArrayForEach(item, arr) {
-        if (ctx->lobby_player_count >= COOP_MAX_LOBBY) break;
+        cJSON *id = cJSON_GetObjectItem(item, "uuid");
+        cJSON *u = cJSON_GetObjectItem(item, "username");
+        cJSON *d = cJSON_GetObjectItem(item, "display_name");
+        cJSON *at = cJSON_GetObjectItem(item, "account_type");
+        bool is_offline = (at && cJSON_IsString(at) && strcmp(at->valuestring, "offline") == 0);
+        cJSON *ghost = cJSON_GetObjectItem(item, "is_ghost");
+
+        if (ghost && cJSON_IsTrue(ghost)) {
+            // Ghost entry -> ghost_players[] (receiver mirror of the host's roster).
+            if (ctx->ghost_player_count >= COOP_MAX_LOBBY) continue;
+            CoopGhostPlayer *g = &ctx->ghost_players[ctx->ghost_player_count++];
+            memset(g, 0, sizeof(*g));
+            if (u && cJSON_IsString(u)) strncpy(g->username, u->valuestring, sizeof(g->username) - 1);
+            if (id && cJSON_IsString(id)) strncpy(g->uuid, id->valuestring, sizeof(g->uuid) - 1);
+            if (d && cJSON_IsString(d)) strncpy(g->display_name, d->valuestring, sizeof(g->display_name) - 1);
+            g->is_offline = is_offline;
+            g->name_resolved = true; // host already resolved it; don't re-fetch on the receiver
+            continue;
+        }
+
+        if (ctx->lobby_player_count >= COOP_MAX_LOBBY) continue;
         CoopLobbyPlayer *entry = &ctx->lobby_players[ctx->lobby_player_count++];
         memset(entry, 0, sizeof(CoopLobbyPlayer));
 
-        cJSON *u = cJSON_GetObjectItem(item, "username");
         if (u && cJSON_IsString(u)) strncpy(entry->username, u->valuestring, sizeof(entry->username) - 1);
-        cJSON *id = cJSON_GetObjectItem(item, "uuid");
         if (id && cJSON_IsString(id)) strncpy(entry->uuid, id->valuestring, sizeof(entry->uuid) - 1);
-        cJSON *d = cJSON_GetObjectItem(item, "display_name");
         if (d && cJSON_IsString(d)) strncpy(entry->display_name, d->valuestring, sizeof(entry->display_name) - 1);
         cJSON *h = cJSON_GetObjectItem(item, "is_host");
         entry->is_host = (h && cJSON_IsTrue(h));
-        cJSON *at = cJSON_GetObjectItem(item, "account_type");
-        entry->is_offline = (at && cJSON_IsString(at) && strcmp(at->valuestring, "offline") == 0);
+        entry->is_offline = is_offline;
     }
     ctx->lobby_changed = true;
+    ctx->ghosts_changed = true;
     SDL_UnlockMutex(ctx->lobby_mutex);
 
     cJSON_Delete(arr);
@@ -1858,9 +1891,9 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                         reason && reason[0] ? reason : "no reason captured");
             set_state(ctx, COOP_NET_DISCONNECTED);
             if (reason && reason[0])
-                set_status(ctx, "Relay connection lost: %s", reason);
+                set_status(ctx, "Server connection lost: %s", reason);
             else
-                set_status(ctx, "Relay connection lost");
+                set_status(ctx, "Server connection lost");
             return 1;
         }
         if (join_rc == 0) {
@@ -1924,7 +1957,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
     }
 
     set_state(ctx, COOP_NET_CONNECTED);
-    set_status(ctx, "Connected via relay (room %s)", ctx->relay_room_code);
+    set_status(ctx, "Connected via server (room %s)", ctx->relay_room_code);
     log_message(LOG_INFO, "[COOP NET] Joined relay room %s.\n", ctx->relay_room_code);
 
     // Periodic read timeout so we can wake to send heartbeats and check
@@ -1951,7 +1984,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
             const char *reason = relay_last_error();
             Uint32 since_inbound = SDL_GetTicks() - last_inbound_ms;
             log_message(LOG_ERROR,
-                        "[COOP NET] Relay connection lost (receiver): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                        "[COOP NET] Server connection lost (receiver): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
                         reason && reason[0] ? reason : "no reason captured",
                         since_inbound,
                         (unsigned long long) frames_in,
@@ -2137,16 +2170,16 @@ static int SDLCALL host_relay_thread_func(void *data) {
             const char *reason = relay_last_error();
             Uint32 since_inbound = SDL_GetTicks() - last_inbound_ms;
             log_message(LOG_ERROR,
-                        "[COOP NET] Relay connection lost (host): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                        "[COOP NET] Server connection lost (host): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
                         reason && reason[0] ? reason : "no reason captured",
                         since_inbound,
                         (unsigned long long) frames_in,
                         (unsigned long long) frames_out);
             set_state(ctx, COOP_NET_DISCONNECTED);
             if (reason && reason[0])
-                set_status(ctx, "Relay connection lost: %s", reason);
+                set_status(ctx, "Server connection lost: %s", reason);
             else
-                set_status(ctx, "Relay connection lost");
+                set_status(ctx, "Server connection lost");
             break;
         }
         if (rc == 0) {
@@ -2170,9 +2203,9 @@ static int SDLCALL host_relay_thread_func(void *data) {
                                 (unsigned long long) frames_out);
                     set_state(ctx, COOP_NET_DISCONNECTED);
                     if (reason && reason[0])
-                        set_status(ctx, "Relay connection lost: %s", reason);
+                        set_status(ctx, "Server connection lost: %s", reason);
                     else
-                        set_status(ctx, "Relay connection lost");
+                        set_status(ctx, "Server connection lost");
                     break;
                 }
                 frames_out++;
@@ -2827,15 +2860,15 @@ bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
     }
 
     set_state(ctx, COOP_NET_CONNECTING);
-    set_status(ctx, "Connecting to relay...");
+    set_status(ctx, "Connecting to server...");
     SDL_SetAtomicInt(&ctx->should_stop, 0);
 
     char err[256];
     ctx->relay_conn = relay_connect(err, sizeof(err));
     if (!ctx->relay_conn) {
-        log_message(LOG_ERROR, "[COOP NET] Relay connect failed: %s\n", err);
+        log_message(LOG_ERROR, "[COOP NET] Server connect failed: %s\n", err);
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Relay connect failed: %s", err);
+        set_status(ctx, "Server connect failed: %s", err);
         return false;
     }
 
@@ -2850,7 +2883,7 @@ bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Failed to create room on relay");
+        set_status(ctx, "Failed to create room on server");
         return false;
     }
     free(enc);
@@ -2863,7 +2896,7 @@ bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Relay did not respond");
+        set_status(ctx, "Server did not respond");
         return false;
     }
     if (resp_type != COOP_MSG_RELAY_ROOM_CREATED ||
@@ -2873,14 +2906,14 @@ bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Relay rejected room creation");
+        set_status(ctx, "Server rejected room creation");
         return false;
     }
     free(resp_payload);
 
     log_message(LOG_INFO, "[COOP NET] Relay room created: %s\n", ctx->relay_room_code);
     set_state(ctx, COOP_NET_LISTENING);
-    set_status(ctx, "Hosting via relay (room %s)", ctx->relay_room_code);
+    set_status(ctx, "Hosting via server (room %s)", ctx->relay_room_code);
 
     ctx->thread = SDL_CreateThread(host_relay_thread_func, "CoopHostRelay", ctx);
     if (!ctx->thread) {
@@ -2962,15 +2995,15 @@ bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
     SDL_UnlockMutex(ctx->lobby_mutex);
 
     set_state(ctx, COOP_NET_CONNECTING);
-    set_status(ctx, "Connecting to relay...");
+    set_status(ctx, "Connecting to server...");
     SDL_SetAtomicInt(&ctx->should_stop, 0);
 
     char err[256];
     ctx->relay_conn = relay_connect(err, sizeof(err));
     if (!ctx->relay_conn) {
-        log_message(LOG_ERROR, "[COOP NET] Relay connect failed: %s\n", err);
+        log_message(LOG_ERROR, "[COOP NET] Server connect failed: %s\n", err);
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Relay connect failed: %s", err);
+        set_status(ctx, "Server connect failed: %s", err);
         return false;
     }
 
@@ -2983,7 +3016,7 @@ bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Failed to send join request to relay");
+        set_status(ctx, "Failed to send join request to server");
         return false;
     }
     free(enc);
@@ -2995,7 +3028,7 @@ bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Relay did not respond");
+        set_status(ctx, "Server did not respond");
         return false;
     }
     if (resp_type == COOP_MSG_RELAY_JOIN_ROOM_DENIED) {
@@ -3017,7 +3050,7 @@ bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Unexpected relay response");
+        set_status(ctx, "Unexpected server response");
         return false;
     }
     free(resp_payload);
@@ -3220,6 +3253,19 @@ bool coop_net_lobby_changed(CoopNetContext *ctx) {
     ctx->lobby_changed = false;
     SDL_UnlockMutex(ctx->lobby_mutex);
     return changed;
+}
+
+bool coop_net_ghosts_changed(CoopNetContext *ctx) {
+    SDL_LockMutex(ctx->lobby_mutex);
+    bool changed = ctx->ghosts_changed;
+    ctx->ghosts_changed = false;
+    SDL_UnlockMutex(ctx->lobby_mutex);
+    return changed;
+}
+
+void coop_net_broadcast_player_list(CoopNetContext *ctx) {
+    if (coop_net_get_state(ctx) != COOP_NET_LISTENING) return;
+    broadcast_player_list(ctx);
 }
 
 int coop_net_get_pending_requests(CoopNetContext *ctx, CoopJoinRequest *out_requests, int max_requests) {

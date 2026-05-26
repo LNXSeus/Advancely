@@ -201,6 +201,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         // Co-op settings
         a->coop_enabled != b->coop_enabled ||
         a->coop_auto_accept != b->coop_auto_accept ||
+        a->coop_read_all_save_files != b->coop_read_all_save_files ||
         a->network_mode != b->network_mode ||
         a->coop_transport != b->coop_transport ||
         a->coop_stat_merge != b->coop_stat_merge ||
@@ -2965,7 +2966,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 } else {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Enable cooperative multiplayer tracking.\n"
-                             "Defaults to the Advancely relay server (no port forwarding required).\n"
+                             "Defaults to the Advancely server (no port forwarding required).\n"
                              "Toggle 'Host locally (LAN / VPN)' below to opt into direct hosting instead.");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
@@ -3073,7 +3074,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Disconnect before changing the transport.");
                             } else {
                                 snprintf(tt, sizeof(tt),
-                                         "Off (default): connect through the Advancely relay server (hosted in New York).\n"
+                                         "Off (default): connect through the Advancely server (hosted in New York).\n"
                                          "On: classic LAN / VPN hosting with a direct IP + port.\n"
                                          "Use this if everyone is on the same network or VPN.");
                             }
@@ -3114,9 +3115,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                                 ImGui::SetTooltip("%s", aa_tip);
                             }
-                        } else {
-                            ImGui::TextDisabled(
-                                "Auto-accept is always on for relay hosting. The password is the gate.");
+                        }
+                        ImGui::Spacing();
+
+                        // Ghost players: keep reading save files for UUIDs that
+                        // aren't in the live lobby (mid-run disconnects, or players
+                        // who never joined via Advancely). Host-local file behavior,
+                        // so it applies on both transports and can be toggled live.
+                        ImGui::Checkbox("Track disconnected / offline players (ghosts)",
+                                        &temp_settings.coop_read_all_save_files);
+                        if (ImGui::IsItemHovered()) {
+                            char ghost_tip[448];
+                            snprintf(ghost_tip, sizeof(ghost_tip),
+                                     "When enabled, the host keeps reading player files in the\n"
+                                     "world save for UUIDs that aren't in the live lobby. This\n"
+                                     "covers players who disconnect mid-run or who never joined\n"
+                                     "via Advancely, so their progress still counts toward 100%%.\n"
+                                     "Only files touched within the last 7 days are picked up.\n"
+                                     "Works on modern, mid, and hybrid versions (not legacy).");
+                            ImGui::SetTooltip("%s", ghost_tip);
                         }
                         ImGui::Spacing();
 
@@ -3320,7 +3337,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 char tt[320];
                                 snprintf(tt, sizeof(tt),
                                          "Optional password for the room.\n"
-                                         "Hashed locally before being sent to the relay.\n"
+                                         "Hashed locally before being sent to the server.\n"
                                          "Leave empty to allow anyone with the room code in.");
                                 ImGui::SetTooltip("%s", tt);
                             }
@@ -3639,7 +3656,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
                                 } else if (relay_outdated) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Update Advancely to %s before hosting a relay lobby.\n"
+                                             "Update Advancely to %s before hosting a server lobby.\n"
                                              "(Direct connections still work on any matching version.)",
                                              g_latest_known_version);
                                 } else if (has_unsaved_changes) {
@@ -3787,7 +3804,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "Password set by the host (if any).\n"
-                                             "Hashed locally before sending to the relay.");
+                                             "Hashed locally before sending to the server.");
                                     ImGui::SetTooltip("%s", tt);
                                 }
                                 ImGui::SameLine();
@@ -3819,7 +3836,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
 
                                 if (!can_join_relay) ImGui::BeginDisabled();
-                                if (ImGui::Button("Join via Relay")) {
+                                if (ImGui::Button("Join via Server")) {
                                     if (g_coop_ctx) {
                                         coop_net_start_receiver_relay(g_coop_ctx,
                                                                       coop_relay_room_code_recv,
@@ -3842,7 +3859,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                      "Apply settings before joining a lobby.");
                                         else if (relay_outdated_recv)
                                             snprintf(tt, sizeof(tt),
-                                                     "Update Advancely to %s before joining a relay lobby.\n"
+                                                     "Update Advancely to %s before joining a server lobby.\n"
                                                      "(Direct connections still work on any matching version.)",
                                                      g_latest_known_version);
                                         else

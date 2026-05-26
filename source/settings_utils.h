@@ -143,6 +143,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // Co-op Defaults
 #define DEFAULT_COOP_ENABLED false
 #define DEFAULT_COOP_AUTO_ACCEPT false
+#define DEFAULT_COOP_READ_ALL_SAVE_FILES true
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
 #define DEFAULT_COOP_TRANSPORT COOP_TRANSPORT_RELAY
 #define DEFAULT_COOP_STAT_MERGE COOP_STAT_CUMULATIVE
@@ -396,6 +397,7 @@ struct AppSettings {
     // --- Co-op Settings ---
     bool coop_enabled; // Master toggle for co-op mode
     bool coop_auto_accept; // Host: auto-approve incoming join requests without showing an approval prompt
+    bool coop_read_all_save_files; // Host: keep reading on-disk player files for UUIDs not in the live lobby (ghost players)
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopTransport coop_transport; // RELAY (default, via relay server) or DIRECT (LAN/VPN)
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative

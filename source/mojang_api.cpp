@@ -202,6 +202,65 @@ bool mojang_fetch_skin_url(const char *uuid, char *out_url, size_t url_max_len) 
     return success;
 }
 
+bool mojang_fetch_username_by_uuid(const char *uuid, char *out_name, size_t name_max_len) {
+    if (!uuid || !out_name || name_max_len < 2) return false;
+    out_name[0] = '\0';
+
+    char raw_uuid[33];
+    strip_uuid_hyphens(uuid, raw_uuid);
+    if (strlen(raw_uuid) != 32) return false;
+
+    char url[256];
+    snprintf(url, sizeof(url),
+             "https://sessionserver.mojang.com/session/minecraft/profile/%s",
+             raw_uuid);
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return false;
+
+    std::string body;
+    bool success = false;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Advancely/1.0");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mojang_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        log_message(LOG_ERROR, "[MOJANG API] username fetch failed for %s: %s\n",
+                    uuid, curl_easy_strerror(res));
+        return false;
+    }
+    if (http_code == 404) {
+        log_message(LOG_INFO, "[MOJANG API] UUID %s not found (404, likely offline account).\n", uuid);
+        return false;
+    }
+    if (http_code != 200) {
+        log_message(LOG_ERROR, "[MOJANG API] username fetch HTTP %ld for %s.\n", http_code, uuid);
+        return false;
+    }
+
+    cJSON *json = cJSON_Parse(body.c_str());
+    if (!json) return false;
+    const cJSON *name_json = cJSON_GetObjectItem(json, "name");
+    if (cJSON_IsString(name_json) && name_json->valuestring && name_json->valuestring[0] != '\0') {
+        strncpy(out_name, name_json->valuestring, name_max_len - 1);
+        out_name[name_max_len - 1] = '\0';
+        success = true;
+        log_message(LOG_INFO, "[MOJANG API] Resolved UUID %s -> '%s'.\n", uuid, out_name);
+    }
+    cJSON_Delete(json);
+    return success;
+}
+
 struct DownloadAccumulator {
     unsigned char *data;
     size_t size;

@@ -49,6 +49,22 @@ bool mojang_fetch_uuid(const char *username, char *out_uuid, size_t uuid_max_len
 bool mojang_fetch_skin_url(const char *uuid, char *out_url, size_t url_max_len);
 
 /**
+ * @brief Resolves a player UUID to their current Minecraft username.
+ *
+ * Calls https://sessionserver.mojang.com/session/minecraft/profile/<uuid> and
+ * reads the "name" field. Used by co-op ghost tracking to turn a discovered
+ * save-file UUID into a display name. Synchronous; call from a background worker.
+ * Returns false on 404 (offline/unregistered account -> caller falls back to a
+ * UUID-prefix name), network failure, or malformed response.
+ *
+ * @param uuid Hyphenated or unhyphenated UUID string.
+ * @param out_name Buffer for the resulting username.
+ * @param name_max_len Size of out_name (at least 17 recommended).
+ * @return true on success, false on any failure.
+ */
+bool mojang_fetch_username_by_uuid(const char *uuid, char *out_name, size_t name_max_len);
+
+/**
  * @brief Downloads a binary blob over HTTPS into a malloc'd buffer.
  *
  * Generic GET helper used by the skin cache to fetch the texture PNG once we

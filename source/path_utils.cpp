@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -988,6 +989,144 @@ void find_player_data_files_for_uuid(
             }
         }
     }
+}
+
+// True if `name` (a directory entry, without path) is "<uuid>.json" where the
+// stem is a canonical hyphenated UUID (36 chars, hyphens at 8/13/18/23). Keeps
+// discovery from picking up stray non-player files in the same folder.
+static bool is_uuid_json_filename(const char *name) {
+    if (!name) return false;
+    size_t len = strlen(name);
+    if (len != 36 + 5) return false; // 36-char uuid + ".json"
+    if (strcmp(name + 36, ".json") != 0) return false;
+    for (int i = 0; i < 36; i++) {
+        char c = name[i];
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (c != '-') return false;
+        } else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Scans one directory for <uuid>.json files, recording each UUID and its file
+// mtime (unix ms) into the dedup vectors. If a UUID is already present, the
+// newest mtime wins (a player may have files in several subfolders).
+static void discover_scan_one_dir(const char *dir_path,
+                                  std::vector<std::string> &uuids,
+                                  std::vector<uint64_t> &mtimes_ms) {
+#ifdef _WIN32
+    char search[MAX_PATH_LENGTH];
+    snprintf(search, sizeof(search), "%s/*.json", dir_path);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(search, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        if (!is_uuid_json_filename(fd.cFileName)) continue;
+        // FILETIME is 100ns ticks since 1601-01-01; convert to unix ms.
+        ULARGE_INTEGER ft;
+        ft.LowPart = fd.ftLastWriteTime.dwLowDateTime;
+        ft.HighPart = fd.ftLastWriteTime.dwHighDateTime;
+        uint64_t mtime_ms = (ft.QuadPart - 116444736000000000ULL) / 10000ULL;
+        char uuid[48];
+        strncpy(uuid, fd.cFileName, 36);
+        uuid[36] = '\0';
+        bool found = false;
+        for (size_t i = 0; i < uuids.size(); i++) {
+            if (uuids[i] == uuid) {
+                if (mtime_ms > mtimes_ms[i]) mtimes_ms[i] = mtime_ms;
+                found = true;
+                break;
+            }
+        }
+        if (!found) { uuids.emplace_back(uuid); mtimes_ms.push_back(mtime_ms); }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    DIR *dir = opendir(dir_path);
+    if (!dir) return;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (!is_uuid_json_filename(entry->d_name)) continue;
+        char full[MAX_PATH_LENGTH];
+        snprintf(full, sizeof(full), "%s/%s", dir_path, entry->d_name);
+        struct stat st;
+        if (stat(full, &st) != 0) continue;
+        uint64_t mtime_ms = (uint64_t) st.st_mtime * 1000ULL;
+        char uuid[48];
+        strncpy(uuid, entry->d_name, 36);
+        uuid[36] = '\0';
+        bool found = false;
+        for (size_t i = 0; i < uuids.size(); i++) {
+            if (uuids[i] == uuid) {
+                if (mtime_ms > mtimes_ms[i]) mtimes_ms[i] = mtime_ms;
+                found = true;
+                break;
+            }
+        }
+        if (!found) { uuids.emplace_back(uuid); mtimes_ms.push_back(mtime_ms); }
+    }
+    closedir(dir);
+#endif
+}
+
+int discover_save_folder_player_uuids(
+    const char *saves_path,
+    MC_Version version,
+    const char *world_name,
+    int max_age_days,
+    char out_uuids[][48],
+    uint64_t *out_mtimes_ms,
+    int max_out
+) {
+    if (!saves_path || !world_name || world_name[0] == '\0') return 0;
+    if (!out_uuids || !out_mtimes_ms || max_out <= 0) return 0;
+    // Legacy stores global username-based .dat files; nothing to discover here.
+    if (version <= MC_VERSION_1_6_4) return 0;
+
+    const char *stats_subdir = (version >= MC_VERSION_26_1) ? "players/stats" : "stats";
+    const char *adv_subdir = (version >= MC_VERSION_26_1) ? "players/advancements" : "advancements";
+
+    std::vector<std::string> uuids;
+    std::vector<uint64_t> mtimes_ms;
+
+    char dir_path[MAX_PATH_LENGTH];
+
+    // Advancements (1.12+) and stats both hold <uuid>.json; mid-era only has stats.
+    if (version >= MC_VERSION_1_12) {
+        snprintf(dir_path, sizeof(dir_path), "%s/%s/%s", saves_path, world_name, adv_subdir);
+        normalize_path(dir_path);
+        discover_scan_one_dir(dir_path, uuids, mtimes_ms);
+    }
+    snprintf(dir_path, sizeof(dir_path), "%s/%s/%s", saves_path, world_name, stats_subdir);
+    normalize_path(dir_path);
+    discover_scan_one_dir(dir_path, uuids, mtimes_ms);
+
+    if (version == MC_VERSION_25W14CRAFTMINE) {
+        snprintf(dir_path, sizeof(dir_path), "%s/%s/unlocks", saves_path, world_name);
+        normalize_path(dir_path);
+        discover_scan_one_dir(dir_path, uuids, mtimes_ms);
+    }
+
+    // mtime cutoff: keep only files touched within max_age_days.
+    uint64_t now_ms = (uint64_t) time(nullptr) * 1000ULL;
+    uint64_t max_age_ms = (max_age_days > 0)
+                              ? (uint64_t) max_age_days * 24ULL * 60ULL * 60ULL * 1000ULL
+                              : 0ULL;
+
+    int count = 0;
+    for (size_t i = 0; i < uuids.size() && count < max_out; i++) {
+        if (max_age_ms > 0 && now_ms > mtimes_ms[i] && (now_ms - mtimes_ms[i]) > max_age_ms) {
+            continue; // too stale
+        }
+        strncpy(out_uuids[count], uuids[i].c_str(), 47);
+        out_uuids[count][47] = '\0';
+        out_mtimes_ms[count] = mtimes_ms[i];
+        count++;
+    }
+    return count;
 }
 
 bool path_exists(const char *path) {

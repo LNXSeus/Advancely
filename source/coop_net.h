@@ -92,6 +92,21 @@ typedef struct {
     bool is_offline; // True if the player uses an offline account (skip Mojang skin fetch -> Notch face)
 } CoopLobbyPlayer;
 
+// A "ghost" player: a UUID found in the world save folder that is NOT in the
+// live lobby (mid-run disconnect, or a player who never joined via Advancely).
+// Host-only. Kept in a SEPARATE array from lobby_players[] so the network
+// send loops never have to guard against entries that have no socket. The
+// merge pipeline keys on UUID, so ghost contributions flow through it the same
+// way live-player contributions do; identities are broadcast to receivers too.
+typedef struct {
+    char username[64];
+    char uuid[48];
+    char display_name[64];
+    bool is_offline;            // Parity with lobby player; skin still resolves by UUID
+    bool name_resolved;         // Mojang/Hermes lookup done (false = UUID-prefix fallback name)
+    Uint64 last_file_mtime_ms;  // mtime of the discovered <uuid>.json (cap drop-order + staleness)
+} CoopGhostPlayer;
+
 // Custom goal/stat checkbox modification actions (Receiver -> Host)
 enum CoopGoalModAction {
     COOP_MOD_TOGGLE = 0, // Toggle a checkbox (custom goal or stat)
@@ -199,6 +214,15 @@ typedef struct {
     CoopLobbyPlayer lobby_players[COOP_MAX_LOBBY];
     int lobby_player_count;
     bool lobby_changed;
+
+    // -- Ghost player roster (host only, guarded by lobby_mutex) --
+    // UUIDs discovered on disk that have no live socket. Written by the main
+    // thread (save-folder discovery pass), read by UI + broadcast. The combined
+    // count (lobby_player_count + ghost_player_count) is capped at COOP_MAX_LOBBY;
+    // live lobby players take priority when the cap is reached.
+    CoopGhostPlayer ghost_players[COOP_MAX_LOBBY];
+    int ghost_player_count;
+    bool ghosts_changed;
 
     // -- Pending join requests (host only, mutex-protected via lobby_mutex) --
     CoopJoinRequest pending_requests[COOP_MAX_CLIENTS];
@@ -327,6 +351,15 @@ int coop_net_get_lobby_players(CoopNetContext *ctx, CoopLobbyPlayer *out_players
 
 // Check if the lobby list has changed since last call (check-and-clear).
 bool coop_net_lobby_changed(CoopNetContext *ctx);
+
+// Check if the ghost roster changed since last call (check-and-clear). The host
+// calls this to know when to re-broadcast the player list (which now carries
+// ghost identities) to receivers.
+bool coop_net_ghosts_changed(CoopNetContext *ctx);
+
+// Host: (re)broadcast the current player list (live lobby + ghosts) to all
+// approved clients. Safe to call from the main thread; no-op if not hosting.
+void coop_net_broadcast_player_list(CoopNetContext *ctx);
 
 // Get a thread-safe snapshot of pending join requests (Host only). Returns count.
 int coop_net_get_pending_requests(CoopNetContext *ctx, CoopJoinRequest *out_requests, int max_requests);

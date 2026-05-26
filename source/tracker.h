@@ -119,6 +119,9 @@ struct Tracker {
     bool focus_search_box_requested; // Flag for Ctrl+F hotkey of tracker
     bool focus_tc_search_box; // CURRENTLY UNUSED Flag for Ctrl+F hotkey in the template creator
     int selected_coop_player_idx; // -1 = "All Players" (merged), 0..N-1 = individual player view
+    int selected_coop_ghost_idx;  // -1 = none; >=0 = a ghost (g_coop_ctx->ghost_players[idx]) is the selected view.
+                                  // When >=0, selected_coop_player_idx is forced to -1; "All Players" = both -1.
+    char selected_coop_ghost_uuid[48]; // UUID of the selected ghost (index is unstable across refreshes; match by UUID)
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
     // Host-side cache of serialized per-player and merged snapshots. Populated
@@ -127,6 +130,12 @@ struct Tracker {
     // that haven't written their save files in the last 5 min).
     char *coop_player_snapshots[MAX_COOP_PLAYERS];
     size_t coop_player_snapshot_sizes[MAX_COOP_PLAYERS];
+    // Parallel cache of ghost per-player snapshots (in ghost_players[] order), so
+    // every broadcast path can re-send them alongside the roster snapshots without
+    // re-reading disk. Receivers map a ghost to wire index (roster_count + ghost_idx).
+    char *coop_ghost_snapshots[COOP_MAX_LOBBY];
+    size_t coop_ghost_snapshot_sizes[COOP_MAX_LOBBY];
+    int coop_ghost_snapshot_count;
     char *coop_merged_snapshot;
     size_t coop_merged_snapshot_size;
     int coop_view_dirty; // set when the dropdown changes; main loop re-applies the cached snapshot
@@ -494,10 +503,30 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
 void tracker_update_coop_merged(Tracker *t, const AppSettings *settings);
 
 /**
+ * @brief Host-only: refresh the ghost-player roster from on-disk save files.
+ *
+ * Scans the world folder for player UUIDs not in the live roster and publishes
+ * them to g_coop_ctx->ghost_players[]. Must run independently of client count
+ * (ghosts exist precisely when nobody is connected), so it is called from the
+ * regular host update path, not from tracker_update_coop_merged. No-op unless
+ * network_mode == NETWORK_HOST and the coop_read_all_save_files toggle is on.
+ */
+void tracker_refresh_ghost_players(Tracker *t, const AppSettings *settings, MC_Version version);
+
+/**
  * @brief Updates the tracker with a single player's progress (for individual player view in coop).
  * Same merge logic as tracker_update_coop_merged but only processes one player.
  */
 void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, int player_idx);
+
+/**
+ * @brief Individual-player view for a ghost (a UUID not in the live roster).
+ * Same single-player merge semantics as tracker_update_coop_single_player but
+ * keyed directly by UUID/username instead of a roster index, and without the
+ * per-slot completion latch. Used when a ghost is selected in the dropdown.
+ */
+void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *settings,
+                                               const char *uuid, const char *username);
 
 /**
  * @brief Post-stamps the given UUID as the contributor on all completed
