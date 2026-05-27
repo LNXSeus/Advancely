@@ -676,13 +676,30 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
     return false;
 }
 
-// Helper: clear arrow goal links and counter linked goals that reference a removed goal.
+// Helper: remove linked goals from a vector that reference a removed goal.
+// If stage is nullptr or empty, removes entries matching root_name with any stage.
+// If stage is provided, removes only entries matching both root_name and stage.
+static void prune_linked_goals(std::vector<EditorCounterLinkedGoal> &linked_goals,
+                               const char *root_name, const char *stage) {
+    linked_goals.erase(
+        std::remove_if(linked_goals.begin(), linked_goals.end(),
+                       [&](const EditorCounterLinkedGoal &lg) {
+                           if (strcmp(lg.root_name, root_name) != 0) return false;
+                           if (stage && stage[0] != '\0') {
+                               return strcmp(lg.stage_id, stage) == 0;
+                           }
+                           return true;
+                       }),
+        linked_goals.end());
+}
+
+// Helper: clear arrow goal links and remove linked goals that reference a removed goal.
+// Prunes across every place that can hold a link (arrows, text headers, counters, stats and
+// their sub-stats, custom goals, and multi-stage goal stages) so no dangling references remain.
 // If stage is nullptr or empty, clears links matching root_name with any stage.
 // If stage is provided, only clears links matching both root_name and stage.
-static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
-                             std::vector<EditorCounterGoal> &counter_goals,
-                             const char *root_name, const char *stage = nullptr) {
-    for (auto &deco: decorations) {
+static void clear_goal_links(EditorTemplate &data, const char *root_name, const char *stage = nullptr) {
+    for (auto &deco: data.decorations) {
         if (deco.type == DECORATION_ARROW) {
             bool clear_start = false;
             bool clear_end = false;
@@ -709,30 +726,25 @@ static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
             }
         }
         if (deco.type == DECORATION_TEXT_HEADER) {
-            deco.linked_goals.erase(
-                std::remove_if(deco.linked_goals.begin(), deco.linked_goals.end(),
-                               [&](const EditorCounterLinkedGoal &lg) {
-                                   if (strcmp(lg.root_name, root_name) != 0) return false;
-                                   if (stage && stage[0] != '\0') {
-                                       return strcmp(lg.stage_id, stage) == 0;
-                                   }
-                                   return true;
-                               }),
-                deco.linked_goals.end());
+            prune_linked_goals(deco.linked_goals, root_name, stage);
         }
     }
-    // Also remove matching linked goals from counters
-    for (auto &counter: counter_goals) {
-        counter.linked_goals.erase(
-            std::remove_if(counter.linked_goals.begin(), counter.linked_goals.end(),
-                           [&](const EditorCounterLinkedGoal &lg) {
-                               if (strcmp(lg.root_name, root_name) != 0) return false;
-                               if (stage && stage[0] != '\0') {
-                                   return strcmp(lg.stage_id, stage) == 0;
-                               }
-                               return true;
-                           }),
-            counter.linked_goals.end());
+    for (auto &counter: data.counter_goals) {
+        prune_linked_goals(counter.linked_goals, root_name, stage);
+    }
+    for (auto &stat: data.stats) {
+        prune_linked_goals(stat.linked_goals, root_name, stage);
+        for (auto &sub: stat.criteria) {
+            prune_linked_goals(sub.linked_goals, root_name, stage);
+        }
+    }
+    for (auto &cg: data.custom_goals) {
+        prune_linked_goals(cg.linked_goals, root_name, stage);
+    }
+    for (auto &msg: data.multi_stage_goals) {
+        for (auto &st: msg.stages) {
+            prune_linked_goals(st.linked_goals, root_name, stage);
+        }
     }
 }
 
@@ -5803,9 +5815,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
                             EditorTrackableCategory *adv_ptr = &current_template_data.advancements[idx];
                             if (selected_advancement == adv_ptr) wipe_selected_ptr = true;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals,
-                                             adv_ptr->root_name);
+                            clear_goal_links(current_template_data, adv_ptr->root_name);
                             current_template_data.advancements.erase(
                                 current_template_data.advancements.begin() + idx);
                         }
@@ -5973,11 +5983,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this advancement or its criteria
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         adv_to_remove->root_name);
+                        clear_goal_links(current_template_data, adv_to_remove->root_name);
                         for (const auto &crit: adv_to_remove->criteria) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                             crit.root_name);
+                            clear_goal_links(current_template_data, crit.root_name);
                         }
 
                         current_template_data.advancements.erase(
@@ -7147,9 +7155,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                             for (int idx : sorted_desc) {
                                 if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
-                                clear_goal_links(current_template_data.decorations,
-                                                 current_template_data.counter_goals,
-                                                 advancement.criteria[idx].root_name);
+                                clear_goal_links(current_template_data, advancement.criteria[idx].root_name);
                                 advancement.criteria.erase(advancement.criteria.begin() + idx);
                             }
                             s_crit_selection.clear();
@@ -7159,8 +7165,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (criterion_to_remove != -1) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                             advancement.criteria[criterion_to_remove].root_name);
+                            clear_goal_links(current_template_data, advancement.criteria[criterion_to_remove].root_name);
                             advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                             // Shift selection indices: drop the removed one, decrement those above it.
                             std::set<int> shifted;
@@ -7947,11 +7952,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
                             EditorTrackableCategory *sp = &current_template_data.stats[idx];
                             if (selected_stat == sp) wipe_selected_ptr = true;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals, sp->root_name);
+                            clear_goal_links(current_template_data, sp->root_name);
                             for (const auto &sub : sp->criteria) {
-                                clear_goal_links(current_template_data.decorations,
-                                                 current_template_data.counter_goals, sub.root_name);
+                                clear_goal_links(current_template_data, sub.root_name);
                             }
                             current_template_data.stats.erase(current_template_data.stats.begin() + idx);
                         }
@@ -8110,11 +8113,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this stat or its sub-stats
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         stat_to_remove->root_name);
+                        clear_goal_links(current_template_data, stat_to_remove->root_name);
                         for (const auto &sub: stat_to_remove->criteria) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                             sub.root_name);
+                            clear_goal_links(current_template_data, sub.root_name);
                         }
 
                         current_template_data.stats.erase(
@@ -9377,9 +9378,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                                 for (int idx : sorted_desc) {
                                     if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
-                                    clear_goal_links(current_template_data.decorations,
-                                                     current_template_data.counter_goals,
-                                                     stat_cat.criteria[idx].root_name);
+                                    clear_goal_links(current_template_data, stat_cat.criteria[idx].root_name);
                                     stat_cat.criteria.erase(stat_cat.criteria.begin() + idx);
                                 }
                                 s_sub_selection.clear();
@@ -9389,8 +9388,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (crit_to_remove != -1) {
-                                clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                                 stat_cat.criteria[crit_to_remove].root_name);
+                                clear_goal_links(current_template_data, stat_cat.criteria[crit_to_remove].root_name);
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
                                 std::set<int> shifted_rm;
                                 for (int idx : s_sub_selection) {
@@ -10135,9 +10133,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                         for (int idx : sorted_desc) {
                             if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals,
-                                             current_template_data.unlocks[idx].root_name);
+                            clear_goal_links(current_template_data, current_template_data.unlocks[idx].root_name);
                             current_template_data.unlocks.erase(current_template_data.unlocks.begin() + idx);
                         }
                         s_unlocks_selection.clear();
@@ -10147,8 +10143,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         current_template_data.unlocks[item_to_remove].root_name);
+                        clear_goal_links(current_template_data, current_template_data.unlocks[item_to_remove].root_name);
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
                         std::set<int> shifted_rm;
                         for (int idx : s_unlocks_selection) {
@@ -11011,9 +11006,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                         for (int idx : sorted_desc) {
                             if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals,
-                                             current_template_data.custom_goals[idx].root_name);
+                            clear_goal_links(current_template_data, current_template_data.custom_goals[idx].root_name);
                             current_template_data.custom_goals.erase(
                                 current_template_data.custom_goals.begin() + idx);
                         }
@@ -11024,8 +11017,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         current_template_data.custom_goals[item_to_remove].root_name);
+                        clear_goal_links(current_template_data, current_template_data.custom_goals[item_to_remove].root_name);
                         current_template_data.custom_goals.erase(
                             current_template_data.custom_goals.begin() + item_to_remove);
                         s_custom_selection.clear();
@@ -11773,8 +11765,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
                             EditorMultiStageGoal *gp = &current_template_data.multi_stage_goals[idx];
                             if (selected_ms_goal == gp) wipe_selected_ptr = true;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals, gp->root_name);
+                            clear_goal_links(current_template_data, gp->root_name);
                             current_template_data.multi_stage_goals.erase(
                                 current_template_data.multi_stage_goals.begin() + idx);
                         }
@@ -11935,8 +11926,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this goal or any of its stages
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         goal_to_remove->root_name);
+                        clear_goal_links(current_template_data, goal_to_remove->root_name);
 
                         current_template_data.multi_stage_goals.erase(
                             std::remove_if(current_template_data.multi_stage_goals.begin(),
@@ -13260,9 +13250,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                             for (int idx : sorted_desc) {
                                 if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
-                                clear_goal_links(current_template_data.decorations,
-                                                 current_template_data.counter_goals,
-                                                 goal.root_name, goal.stages[idx].stage_id);
+                                clear_goal_links(current_template_data, goal.root_name, goal.stages[idx].stage_id);
                                 goal.stages.erase(goal.stages.begin() + idx);
                             }
                             s_stage_selection.clear();
@@ -13273,8 +13261,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (stage_to_remove != -1) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                             goal.root_name,
+                            clear_goal_links(current_template_data, goal.root_name,
                                              goal.stages[stage_to_remove].stage_id);
                             goal.stages.erase(goal.stages.begin() + stage_to_remove);
                             std::set<int> shifted_rm;
@@ -13890,9 +13877,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         for (int idx : sorted_desc) {
                             if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
-                            clear_goal_links(current_template_data.decorations,
-                                             current_template_data.counter_goals,
-                                             current_template_data.counter_goals[idx].root_name);
+                            clear_goal_links(current_template_data, current_template_data.counter_goals[idx].root_name);
                             current_template_data.counter_goals.erase(
                                 current_template_data.counter_goals.begin() + idx);
                         }
@@ -13969,8 +13954,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ctr_to_remove_idx >= 0 && ctr_to_remove_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_remove_idx];
                         int actual_idx = (int) (ptr - &current_template_data.counter_goals[0]);
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                         ptr->root_name);
+                        clear_goal_links(current_template_data, ptr->root_name);
                         current_template_data.counter_goals.erase(
                             current_template_data.counter_goals.begin() + actual_idx);
                         if (selected_counter_index == actual_idx) selected_counter_index = -1;
