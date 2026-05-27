@@ -15970,6 +15970,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_new_advs_needs_recompute = false;
                 }
 
+                auto new_adv_visible = [&](size_t i) -> bool {
+                    if (i >= s_new_adv_indices.size()) return false;
+                    int idx = s_new_adv_indices[i];
+                    if (idx < 0 || idx >= (int) importable_advancements.size()) return false;
+                    if (s_new_advs_search[0] == '\0') return true;
+                    return str_contains_insensitive(importable_advancements[idx].root_name.c_str(), s_new_advs_search);
+                };
+
                 const char *new_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
                                                    ? "new achievements"
                                                    : "new advancements";
@@ -15998,7 +16006,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 if (ImGui::SmallButton("Select all##new_advs_list")) {
-                    std::fill(s_new_adv_local_selected.begin(), s_new_adv_local_selected.end(), true);
+                    for (size_t i = 0; i < s_new_adv_local_selected.size(); i++) {
+                        if (new_adv_visible(i)) s_new_adv_local_selected[i] = true;
+                    }
                     s_new_advs_last_clicked = -1;
                 }
                 if (ImGui::IsItemHovered()) {
@@ -16010,7 +16020,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Deselect all##new_advs_list")) {
-                    std::fill(s_new_adv_local_selected.begin(), s_new_adv_local_selected.end(), false);
+                    for (size_t i = 0; i < s_new_adv_local_selected.size(); i++) {
+                        if (new_adv_visible(i)) s_new_adv_local_selected[i] = false;
+                    }
                     s_new_advs_last_clicked = -1;
                 }
                 if (ImGui::IsItemHovered()) {
@@ -16050,11 +16062,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
                 ImGui::BeginChild("##new_advs_list_scroll", ImVec2(520.0f, 320.0f), true);
                 for (size_t i = 0; i < s_new_adv_indices.size(); i++) {
+                    if (!new_adv_visible(i)) continue;
                     int idx = s_new_adv_indices[i];
-                    if (idx < 0 || idx >= (int) importable_advancements.size()) continue;
                     const auto &adv = importable_advancements[idx];
-                    if (s_new_advs_search[0] != '\0' &&
-                        !str_contains_insensitive(adv.root_name.c_str(), s_new_advs_search)) continue;
                     bool sel = s_new_adv_local_selected[i];
                     ImGui::PushID((int) i);
                     if (ImGui::Checkbox(adv.root_name.c_str(), &sel)) {
@@ -16065,7 +16075,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             int lo = std::min(s_new_advs_last_clicked, (int) i);
                             int hi = std::max(s_new_advs_last_clicked, (int) i);
                             for (int k = lo; k <= hi && k < (int) s_new_adv_local_selected.size(); k++) {
-                                s_new_adv_local_selected[k] = sel;
+                                if (new_adv_visible((size_t) k)) s_new_adv_local_selected[k] = sel;
                             }
                         } else {
                             s_new_adv_local_selected[i] = sel;
@@ -16178,6 +16188,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_rename_needs_recompute = false;
                 }
 
+                auto rename_visible = [&](size_t i) -> bool {
+                    if (i >= s_rename_rows.size()) return false;
+                    const RenameRow &row = s_rename_rows[i];
+                    if (row.template_index < 0 ||
+                        row.template_index >= (int) current_template_data.advancements.size()) return false;
+                    if (s_rename_search[0] == '\0') return true;
+                    const auto &tmpl_adv = current_template_data.advancements[row.template_index];
+                    if (str_contains_insensitive(tmpl_adv.root_name, s_rename_search)) return true;
+                    for (const auto &cand: row.candidates) {
+                        if (cand.import_index < 0 ||
+                            cand.import_index >= (int) importable_advancements.size()) continue;
+                        if (str_contains_insensitive(importable_advancements[cand.import_index].root_name.c_str(),
+                                                     s_rename_search)) return true;
+                    }
+                    return false;
+                };
+
                 const char *adv_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
                                                    ? "achievements" : "advancements";
                 ImGui::Text("%d %s with rename candidates", (int) s_rename_rows.size(), adv_label_plural);
@@ -16205,6 +16232,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (ImGui::SmallButton("Pick best for all##rename_list")) {
                     for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                        if (!rename_visible(i)) continue;
                         s_rename_row_selection[i] = s_rename_rows[i].candidates.empty() ? -1 : 0;
                         int t = s_rename_rows[i].template_index;
                         if (t < 0 || t >= (int) current_template_data.advancements.size()) continue;
@@ -16229,6 +16257,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Clear all##rename_list")) {
                     for (size_t i = 0; i < s_rename_row_selection.size(); i++) {
+                        if (!rename_visible(i)) continue;
                         s_rename_row_selection[i] = -1;
                         int t = s_rename_rows[i].template_index;
                         if (t >= 0 && t < (int) current_template_data.advancements.size()) {
@@ -16271,25 +16300,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
                 ImGui::BeginChild("##rename_list_scroll", ImVec2(640.0f, 360.0f), true);
                 for (size_t i = 0; i < s_rename_rows.size(); i++) {
+                    if (!rename_visible(i)) continue;
                     const RenameRow &row = s_rename_rows[i];
-                    if (row.template_index < 0 ||
-                        row.template_index >= (int) current_template_data.advancements.size()) continue;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
-                    if (s_rename_search[0] != '\0') {
-                        bool match = str_contains_insensitive(tmpl_adv.root_name, s_rename_search);
-                        if (!match) {
-                            for (const auto &cand: row.candidates) {
-                                if (cand.import_index < 0 ||
-                                    cand.import_index >= (int) importable_advancements.size()) continue;
-                                if (str_contains_insensitive(importable_advancements[cand.import_index].root_name.c_str(),
-                                                              s_rename_search)) {
-                                    match = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!match) continue;
-                    }
 
                     char header[320];
                     int sel = s_rename_row_selection[i];
@@ -16494,6 +16507,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
 
+                auto stale_visible = [&](size_t k) -> bool {
+                    if (k >= s_stale_indices.size()) return false;
+                    int idx = s_stale_indices[k];
+                    if (idx < 0 || idx >= (int) current_template_data.advancements.size()) return false;
+                    if (s_stale_search[0] == '\0') return true;
+                    const auto &a = current_template_data.advancements[idx];
+                    std::string post_rename = a.root_name;
+                    for (const auto &p: s_pending_renames) {
+                        if (p.first == a.root_name) { post_rename = p.second; break; }
+                    }
+                    return str_contains_insensitive(a.root_name, s_stale_search) ||
+                           str_contains_insensitive(post_rename.c_str(), s_stale_search);
+                };
+
                 auto stale_record_pick = [&](int k, bool val) {
                     if (k < 0 || k >= (int) s_stale_indices.size()) return;
                     int idx = s_stale_indices[k];
@@ -16508,6 +16535,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (ImGui::SmallButton("Select all##stale_list")) {
                     for (size_t k = 0; k < s_stale_selected.size(); k++) {
+                        if (!stale_visible(k)) continue;
                         s_stale_selected[k] = true;
                         stale_record_pick((int) k, true);
                     }
@@ -16522,6 +16550,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Clear all##stale_list")) {
                     for (size_t k = 0; k < s_stale_selected.size(); k++) {
+                        if (!stale_visible(k)) continue;
                         s_stale_selected[k] = false;
                         stale_record_pick((int) k, false);
                     }
@@ -16562,16 +16591,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
                 ImGui::BeginChild("##stale_list_scroll", ImVec2(560.0f, 320.0f), true);
                 for (size_t k = 0; k < s_stale_indices.size(); k++) {
+                    if (!stale_visible(k)) continue;
                     int idx = s_stale_indices[k];
-                    if (idx < 0 || idx >= (int) current_template_data.advancements.size()) continue;
                     const auto &a = current_template_data.advancements[idx];
                     std::string post_rename = a.root_name;
                     for (const auto &p: s_pending_renames) {
                         if (p.first == a.root_name) { post_rename = p.second; break; }
                     }
-                    if (s_stale_search[0] != '\0' &&
-                        !str_contains_insensitive(a.root_name, s_stale_search) &&
-                        !str_contains_insensitive(post_rename.c_str(), s_stale_search)) continue;
                     char label[384];
                     if (post_rename != a.root_name) {
                         snprintf(label, sizeof(label), "%s -> %s", a.root_name, post_rename.c_str());
@@ -16588,6 +16614,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             int lo = std::min(s_stale_last_clicked, (int) k);
                             int hi = std::max(s_stale_last_clicked, (int) k);
                             for (int j = lo; j <= hi && j < (int) s_stale_selected.size(); j++) {
+                                if (!stale_visible((size_t) j)) continue;
                                 s_stale_selected[j] = sel;
                                 stale_record_pick(j, sel);
                             }
@@ -16751,6 +16778,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_criteria_needs_recompute = false;
                 }
 
+                auto criteria_delta_visible = [&](const auto &d) -> bool {
+                    if (s_criteria_search[0] == '\0' || !s_criteria_search_crits_only) return true;
+                    return str_contains_insensitive(d.root_name.c_str(), s_criteria_search);
+                };
+                auto criteria_row_visible = [&](const CriteriaDeltaRow &row) -> bool {
+                    if (row.template_index < 0 ||
+                        row.template_index >= (int) current_template_data.advancements.size()) return false;
+                    if (s_criteria_search[0] == '\0') return true;
+                    const auto &tmpl_adv = current_template_data.advancements[row.template_index];
+                    std::string shadow_root = tmpl_adv.root_name;
+                    for (const auto &p: s_pending_renames) {
+                        if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
+                    }
+                    if (s_criteria_search_crits_only) {
+                        for (const auto &d: row.deltas) {
+                            if (str_contains_insensitive(d.root_name.c_str(), s_criteria_search)) return true;
+                        }
+                        return false;
+                    }
+                    return str_contains_insensitive(tmpl_adv.root_name, s_criteria_search) ||
+                           str_contains_insensitive(shadow_root.c_str(), s_criteria_search);
+                };
+
                 ImGui::Text("%d %s with criteria differences", (int) s_criteria_rows.size(),
                             advancements_label_plural_lower);
                 if (ImGui::IsItemHovered()) {
@@ -16778,15 +16828,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (ImGui::SmallButton("Select all##criteria_list")) {
                     for (auto &row: s_criteria_rows) {
-                        for (auto &d: row.deltas) d.is_selected = true;
-                        if (row.template_index >= 0 &&
-                            row.template_index < (int) current_template_data.advancements.size()) {
+                        if (!criteria_row_visible(row)) continue;
+                        bool has_remap = row.template_index >= 0 &&
+                                         row.template_index < (int) current_template_data.advancements.size();
+                        std::string shadow_root;
+                        if (has_remap) {
                             const char *tn = current_template_data.advancements[row.template_index].root_name;
-                            std::string shadow_root = tn;
+                            shadow_root = tn;
                             for (const auto &p: s_pending_renames) {
                                 if (p.first == tn) { shadow_root = p.second; break; }
                             }
-                            for (auto &d: row.deltas) s_criteria_user_picks[shadow_root][d.root_name] = true;
+                        }
+                        for (auto &d: row.deltas) {
+                            if (!criteria_delta_visible(d)) continue;
+                            d.is_selected = true;
+                            if (has_remap) s_criteria_user_picks[shadow_root][d.root_name] = true;
                         }
                     }
                 }
@@ -16800,15 +16856,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Clear all##criteria_list")) {
                     for (auto &row: s_criteria_rows) {
-                        for (auto &d: row.deltas) d.is_selected = false;
-                        if (row.template_index >= 0 &&
-                            row.template_index < (int) current_template_data.advancements.size()) {
+                        if (!criteria_row_visible(row)) continue;
+                        bool has_remap = row.template_index >= 0 &&
+                                         row.template_index < (int) current_template_data.advancements.size();
+                        std::string shadow_root;
+                        if (has_remap) {
                             const char *tn = current_template_data.advancements[row.template_index].root_name;
-                            std::string shadow_root = tn;
+                            shadow_root = tn;
                             for (const auto &p: s_pending_renames) {
                                 if (p.first == tn) { shadow_root = p.second; break; }
                             }
-                            for (auto &d: row.deltas) s_criteria_user_picks[shadow_root][d.root_name] = false;
+                        }
+                        for (auto &d: row.deltas) {
+                            if (!criteria_delta_visible(d)) continue;
+                            d.is_selected = false;
+                            if (has_remap) s_criteria_user_picks[shadow_root][d.root_name] = false;
                         }
                     }
                 }
@@ -16859,26 +16921,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("##criteria_list_scroll", ImVec2(640.0f, 360.0f), true);
                 for (size_t i = 0; i < s_criteria_rows.size(); i++) {
                     auto &row = s_criteria_rows[i];
-                    if (row.template_index < 0 ||
-                        row.template_index >= (int) current_template_data.advancements.size()) continue;
+                    if (!criteria_row_visible(row)) continue;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     std::string shadow_root = tmpl_adv.root_name;
                     for (const auto &p: s_pending_renames) {
                         if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
-                    }
-                    if (s_criteria_search[0] != '\0') {
-                        if (s_criteria_search_crits_only) {
-                            bool any = false;
-                            for (const auto &d: row.deltas) {
-                                if (str_contains_insensitive(d.root_name.c_str(), s_criteria_search)) {
-                                    any = true; break;
-                                }
-                            }
-                            if (!any) continue;
-                        } else {
-                            if (!str_contains_insensitive(tmpl_adv.root_name, s_criteria_search) &&
-                                !str_contains_insensitive(shadow_root.c_str(), s_criteria_search)) continue;
-                        }
                     }
 
                     int n_new = 0, n_stale = 0;
@@ -16898,8 +16945,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::TreeNodeEx(header, ImGuiTreeNodeFlags_DefaultOpen)) {
                         for (size_t j = 0; j < row.deltas.size(); j++) {
                             auto &d = row.deltas[j];
-                            if (s_criteria_search[0] != '\0' && s_criteria_search_crits_only &&
-                                !str_contains_insensitive(d.root_name.c_str(), s_criteria_search)) continue;
+                            if (!criteria_delta_visible(d)) continue;
                             char label[256];
                             snprintf(label, sizeof(label), "%s %s##criteria_delta_%d_%d",
                                      d.is_new ? "[+]" : "[-]", d.root_name.c_str(),
@@ -16913,6 +16959,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_criteria_last_delta, (int) j);
                                     int hi = std::max(s_criteria_last_delta, (int) j);
                                     for (int k = lo; k <= hi; k++) {
+                                        if (!criteria_delta_visible(row.deltas[k])) continue;
                                         row.deltas[k].is_selected = d.is_selected;
                                         s_criteria_user_picks[shadow_root][row.deltas[k].root_name] = d.is_selected;
                                     }
@@ -18922,9 +18969,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_template_import_selected.assign(item_count, false);
             }
 
+            auto template_import_visible = [&](int i) -> bool {
+                if (entry_is_final_stage(i)) return false;
+                if (s_template_import_search[0] == '\0') return true;
+                char row_label[384];
+                label_at(i, row_label, sizeof(row_label));
+                return str_contains_insensitive(row_label, s_template_import_search);
+            };
+
             if (ImGui::Button("Select all##template_import")) {
                 for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
-                    if (entry_is_final_stage(i)) continue;
+                    if (!template_import_visible(i)) continue;
                     if (entry_invalid_reason(i)) continue;
                     s_template_import_selected[i] = true;
                 }
@@ -18938,7 +18993,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::SameLine();
             if (ImGui::Button("Clear all##template_import")) {
-                for (size_t i = 0; i < s_template_import_selected.size(); i++) s_template_import_selected[i] = false;
+                for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
+                    if (!template_import_visible(i)) continue;
+                    s_template_import_selected[i] = false;
+                }
                 s_template_import_last_clicked = -1;
             }
             if (ImGui::IsItemHovered()) {
@@ -18985,11 +19043,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             ImGui::BeginChild("##template_import_scroll", ImVec2(620.0f, 360.0f), true);
             for (int i = 0; i < item_count; i++) {
-                if (entry_is_final_stage(i)) continue;
+                if (!template_import_visible(i)) continue;
                 char row_label[384];
                 label_at(i, row_label, sizeof(row_label));
-                if (s_template_import_search[0] != '\0' &&
-                    !str_contains_insensitive(row_label, s_template_import_search)) continue;
                 const char *invalid_reason = entry_invalid_reason(i);
                 if (invalid_reason) s_template_import_selected[i] = false;
                 bool sel = s_template_import_selected[i];
@@ -19003,7 +19059,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int lo = std::min(s_template_import_last_clicked, i);
                         int hi = std::max(s_template_import_last_clicked, i);
                         for (int k = lo; k <= hi; k++) {
-                            if (entry_is_final_stage(k)) continue;
+                            if (!template_import_visible(k)) continue;
                             if (entry_invalid_reason(k)) continue;
                             s_template_import_selected[k] = sel;
                         }
