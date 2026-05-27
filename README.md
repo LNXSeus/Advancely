@@ -826,7 +826,10 @@ Opening a template reveals a tabbed interface where you can define every goal.
   expose `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden
   field so their menu only shows `Delete Selected...`.
   * `Layout Coordinates...` opens a sub-popup that mirrors the per-goal `Layout Coordinates` collapsible header
-    (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` for stats, sub-stats, multi-stage goals, and counters). Each
+    (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` for stats, sub-stats, multi-stage goals, and counters; for
+    advancements `Progress Pos.` appears only when at least one selected advancement has criteria, and applies to
+    those complex advancements only). Simple advancements without criteria still occupy their grid slot (left empty)
+    so the applied progress text stays aligned with Icon Pos. and Text Pos. instead of shifting forward. Each
     coordinate exposes the usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X`
     / `+Y` stride next to each base. The stride distributes values across the selection in template/list order. The
     neighbouring `Columns` field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on

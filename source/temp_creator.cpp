@@ -5338,6 +5338,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         static float s_adv_bl_text_xs = 0.0f, s_adv_bl_text_ys = 0.0f;
                         static int s_adv_bl_text_cols = 0;
                         static int s_adv_bl_text_anchor = ANCHOR_TOP_LEFT;
+                        static bool s_adv_bl_prog_set = true;
+                        static bool s_adv_bl_prog_hide = false;
+                        static float s_adv_bl_prog_x = 100.0f, s_adv_bl_prog_y = 100.0f;
+                        static float s_adv_bl_prog_xs = 0.0f, s_adv_bl_prog_ys = 0.0f;
+                        static int s_adv_bl_prog_cols = 0;
+                        static int s_adv_bl_prog_anchor = ANCHOR_TOP_LEFT;
 
                         bool ba_open_icon = false;
                         bool ba_open_layout = false;
@@ -5393,9 +5399,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char tip[320];
                                 snprintf(tip, sizeof(tip),
                                          "Bulk-set Icon Pos. and Text Pos. for every selected %s.\n"
+                                         "Progress Pos. also appears when at least one selected %s has criteria.\n"
                                          "Each X and Y supports an optional stride that distributes\n"
                                          "values across the selection in template order.",
-                                         advancements_label_singular_lower);
+                                         advancements_label_singular_lower, advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", tip);
                             }
                             ImGui::Separator();
@@ -5623,6 +5630,107 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             ImGui::PopID();
+
+                            bool any_selected_complex = false;
+                            for (int idx : bulk_layout_sorted) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                if (!current_template_data.advancements[idx].criteria.empty()) {
+                                    any_selected_complex = true;
+                                    break;
+                                }
+                            }
+
+                            if (any_selected_complex) {
+                                ImGui::Separator();
+
+                                ImGui::PushID("adv_bulk_layout_prog");
+                                ImGui::Checkbox("Progress Pos.", &s_adv_bl_prog_set);
+                                if (ImGui::IsItemHovered()) {
+                                    char t1[224];
+                                    snprintf(t1, sizeof(t1),
+                                             "Enable or disable manual progress-text positioning on every selected %s\n"
+                                             "that has criteria. Simple %s without criteria are skipped.",
+                                             advancements_label_singular_lower, advancements_label_plural_lower);
+                                    ImGui::SetTooltip("%s", t1);
+                                }
+                                ImGui::SameLine();
+                                ImGui::Checkbox("Hide##adv_bl_prog", &s_adv_bl_prog_hide);
+                                if (ImGui::IsItemHovered()) {
+                                    char t2[160];
+                                    snprintf(t2, sizeof(t2),
+                                             "Set the Hide-in-layout flag for the progress text on every selected %s.",
+                                             advancements_label_singular_lower);
+                                    ImGui::SetTooltip("%s", t2);
+                                }
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("X", &s_adv_bl_prog_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_adv_bl_prog_x = fminf(fmaxf(roundf(s_adv_bl_prog_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", &s_adv_bl_prog_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_adv_bl_prog_xs = fminf(fmaxf(roundf(s_adv_bl_prog_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
+                                }
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", &s_adv_bl_prog_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_adv_bl_prog_y = fminf(fmaxf(roundf(s_adv_bl_prog_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", &s_adv_bl_prog_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    s_adv_bl_prog_ys = fminf(fmaxf(roundf(s_adv_bl_prog_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                }
+                                ImGui::SetNextItemWidth(140);
+                                ImGui::Combo("Anchor##adv_bl_prog", &s_adv_bl_prog_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragInt("Columns", &s_adv_bl_prog_cols, 0.1f, 0, 1024)) {
+                                    if (s_adv_bl_prog_cols < 0) s_adv_bl_prog_cols = 0;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s",
+                                        "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                        "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                }
+                                if (ImGui::Button("Apply Progress Pos. to selected")) {
+                                    int n = 0;
+                                    for (int idx : bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                        auto &a = current_template_data.advancements[idx];
+                                        if (!a.criteria.empty()) {
+                                            int x_mult = (s_adv_bl_prog_cols >= 1) ? (n % s_adv_bl_prog_cols) : n;
+                                            int y_mult = (s_adv_bl_prog_cols >= 1) ? (n / s_adv_bl_prog_cols) : n;
+                                            a.progress_pos.is_set = s_adv_bl_prog_set;
+                                            a.progress_pos.is_hidden_in_layout = s_adv_bl_prog_hide;
+                                            a.progress_pos.x = fminf(fmaxf(roundf(s_adv_bl_prog_x + x_mult * s_adv_bl_prog_xs),
+                                                                           -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            a.progress_pos.y = fminf(fmaxf(roundf(s_adv_bl_prog_y + y_mult * s_adv_bl_prog_ys),
+                                                                           -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            a.progress_pos.anchor = (AnchorPoint)s_adv_bl_prog_anchor;
+                                        }
+                                        n++;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char t3[256];
+                                    snprintf(t3, sizeof(t3),
+                                             "Apply to every selected %s that has criteria.\n"
+                                             "Simple %s without criteria keep their grid slot (it is left\n"
+                                             "empty) so progress text stays aligned with Icon and Text Pos.",
+                                             advancements_label_singular_lower, advancements_label_plural_lower);
+                                    ImGui::SetTooltip("%s", t3);
+                                }
+                                ImGui::PopID();
+                            }
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##adv_bulk_layout")) ImGui::CloseCurrentPopup();
