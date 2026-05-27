@@ -355,6 +355,15 @@ struct SubGoal {
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
     bool coop_completed; // Co-op: true if any player completed this stage (non-stat types)
+    bool game_trigger_met; // True if this stage's natural trigger (advancement/criterion/unlock) is met.
+    // Stored so recalculation paths (e.g. manual custom-goal toggles) that lack player files can re-derive
+    // current_stage from (game trigger OR linked goals) and regress as well as advance. Stat stages instead
+    // re-derive live from current_stat_progress, so this flag is only authoritative for non-stat stages.
+
+    // Auto-completion via linked goals (used for non-final stages, like sub-stats/custom goals)
+    int linked_goal_count;
+    CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals
+    LinkedGoalMode linked_goal_mode; // AND (all) or OR (any) for auto-completion
 
     char icon_path[256];
     SDL_Texture *texture;

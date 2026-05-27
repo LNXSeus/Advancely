@@ -208,6 +208,10 @@ struct EditorSubGoal {
     int required_progress;
     char icon_path[256]; // Icon path for each stage
     int sort_order = 0;
+
+    // Stage auto-completion via linked goals (only used for non-final stages)
+    std::vector<EditorCounterLinkedGoal> linked_goals;
+    LinkedGoalMode linked_goal_mode = LINKED_GOAL_AND;
 };
 
 struct EditorMultiStageGoal {
@@ -314,7 +318,8 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
                                   const char *old_name, const char *new_name,
                                   const char *parent_root = nullptr,
                                   std::vector<EditorTrackableCategory> *stats = nullptr,
-                                  std::vector<EditorTrackableItem> *custom_goals = nullptr) {
+                                  std::vector<EditorTrackableItem> *custom_goals = nullptr,
+                                  std::vector<EditorMultiStageGoal> *multi_stage_goals = nullptr) {
     if (old_name[0] == '\0' || strcmp(old_name, new_name) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type == DECORATION_ARROW) {
@@ -350,6 +355,14 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
             propagate_rename_in_linked_goals(cg.linked_goals, old_name, new_name, parent_root);
         }
     }
+    // Also update multi-stage goal stage linked goals
+    if (multi_stage_goals) {
+        for (auto &msg: *multi_stage_goals) {
+            for (auto &stage: msg.stages) {
+                propagate_rename_in_linked_goals(stage.linked_goals, old_name, new_name, parent_root);
+            }
+        }
+    }
 }
 
 // Helper: when a multi-stage goal's stage_id is renamed, propagate to arrow links, counter linked goals, custom goal linked goals, and stat linked goals
@@ -358,7 +371,8 @@ static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorat
                                    const char *parent_root, const char *old_stage_id,
                                    const char *new_stage_id,
                                    std::vector<EditorTrackableCategory> *stats = nullptr,
-                                   std::vector<EditorTrackableItem> *custom_goals = nullptr) {
+                                   std::vector<EditorTrackableItem> *custom_goals = nullptr,
+                                   std::vector<EditorMultiStageGoal> *multi_stage_goals = nullptr) {
     if (old_stage_id[0] == '\0' || strcmp(old_stage_id, new_stage_id) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type == DECORATION_ARROW) {
@@ -422,6 +436,20 @@ static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorat
                     strcmp(lg.stage_id, old_stage_id) == 0) {
                     strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
                     lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+                }
+            }
+        }
+    }
+    // Also update multi-stage goal stage linked goals
+    if (multi_stage_goals) {
+        for (auto &msg: *multi_stage_goals) {
+            for (auto &stage: msg.stages) {
+                for (auto &lg: stage.linked_goals) {
+                    if (strcmp(lg.root_name, parent_root) == 0 &&
+                        strcmp(lg.stage_id, old_stage_id) == 0) {
+                        strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
+                        lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+                    }
                 }
             }
         }
@@ -552,7 +580,9 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            strcmp(a.parent_advancement, b.parent_advancement) != 0 ||
            strcmp(a.root_name, b.root_name) != 0 ||
            a.required_progress != b.required_progress ||
-           strcmp(a.icon_path, b.icon_path) != 0;
+           strcmp(a.icon_path, b.icon_path) != 0 ||
+           a.linked_goal_mode != b.linked_goal_mode ||
+           are_linked_goals_different(a.linked_goals, b.linked_goals);
 }
 
 // Multi-stage goals
@@ -1531,6 +1561,12 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     else if (strcmp(type->valuestring, "criterion") == 0) new_stage.type = SUBGOAL_CRITERION;
                     else new_stage.type = SUBGOAL_MANUAL;
                 }
+
+                // Parse stage linked goals for auto-completion (non-final stages)
+                if (new_stage.type != SUBGOAL_MANUAL) {
+                    parse_linked_goals(stage_json, new_stage.linked_goals, new_stage.linked_goal_mode);
+                }
+
                 new_goal.stages.push_back(new_stage);
             }
         }
@@ -2013,6 +2049,8 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
             cJSON_AddStringToObject(stage_json, "root_name", stage.root_name);
             if (stage.type != SUBGOAL_MANUAL) {
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
+                // Serialize stage linked goals (non-final stages only)
+                serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
             }
 
             cJSON_AddItemToArray(stages_array, stage_json);
@@ -2952,6 +2990,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int goal_selector_stat_crit_index = -1; // Index of the sub-stat being edited (-1 = category level)
     static int goal_selector_custom_goal_index = -1; // Index of the custom goal being edited (multi-select mode)
     static int goal_selector_header_deco_index = -1; // Index of the text header being edited (multi-select mode)
+    static int goal_selector_msg_index = -1; // Index of the multi-stage goal being edited (multi-select mode)
+    static int goal_selector_msg_stage_index = -1; // Index of the stage within that multi-stage goal
     static std::vector<EditorCounterLinkedGoal> goal_selector_multi_selections; // Multi-select state
     static int goal_selector_last_clicked_flat_index = -1; // For shift-click range selection
     static char goal_selector_target_id[256] = ""; // ID of the goal/decoration being edited, shown in popup title
@@ -6028,7 +6068,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_adv_root,
                                                   advancement.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -6880,7 +6920,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals, focused_crit_root,
                                                       criterion.root_name, advancement.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals);
+                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char root_name_tooltip_buffer[128];
@@ -8158,7 +8198,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_stat_root,
                                                   stat_cat.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -8298,6 +8338,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_counter_index = -1;
                                 goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
+                                goal_selector_msg_index = -1;
+                                goal_selector_msg_stage_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
                                          stat_cat.root_name);
@@ -8418,7 +8460,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals, focused_simple_stat_root,
                                                       simple_crit.root_name, stat_cat.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals);
+                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char stat_root_name_tooltip_buffer[256];
@@ -8974,7 +9016,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           current_template_data.counter_goals, focused_sub_stat_root,
                                                           crit.root_name, stat_cat.root_name,
                                                           &current_template_data.stats,
-                                                          &current_template_data.custom_goals);
+                                                          &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char stat_root_name_tooltip_buffer[256];
@@ -9169,6 +9211,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         goal_selector_counter_index = -1;
                                         goal_selector_custom_goal_index = -1;
                                         goal_selector_deco_index = -1;
+                                        goal_selector_msg_index = -1;
+                                        goal_selector_msg_stage_index = -1;
                                         goal_selector_last_clicked_flat_index = -1;
                                         snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
                                                  crit.root_name);
@@ -9871,7 +9915,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_unlock_root,
                                                   unlock.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -10606,7 +10650,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_cg_root, goal.root_name,
                                                   nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -10686,6 +10730,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_stat_cat_index = -1;
                                 goal_selector_stat_crit_index = -1;
                                 goal_selector_deco_index = -1;
+                                goal_selector_msg_index = -1;
+                                goal_selector_msg_stage_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 goal_selector_custom_goal_index = (int) i;
                                 snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
@@ -11963,7 +12009,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_msg_root, goal.root_name,
                                                   nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -12527,7 +12573,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        goal.root_name, focused_stage_id,
                                                        stage.stage_id,
                                                        &current_template_data.stats,
-                                                       &current_template_data.custom_goals);
+                                                       &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[256];
@@ -12954,6 +13000,109 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
                                 }
+
+                                // --- Stage Linked Goals (Auto-Completion) ---
+                                {
+                                    ImGui::Text("Auto-Complete Goals: %d", (int) stage.linked_goals.size());
+                                    ImGui::SameLine();
+                                    char stage_select_btn_id[128];
+                                    snprintf(stage_select_btn_id, sizeof(stage_select_btn_id),
+                                             "Select Goals##Stage_%s_%zu", goal.root_name, j);
+                                    if (ImGui::Button(stage_select_btn_id)) {
+                                        show_goal_selector_popup = true;
+                                        focus_goal_selector_search = true;
+                                        goal_selector_search_buffer[0] = '\0';
+                                        goal_selector_max_selection = 0;
+                                        goal_selector_counter_index = -1;
+                                        goal_selector_custom_goal_index = -1;
+                                        goal_selector_stat_cat_index = -1;
+                                        goal_selector_stat_crit_index = -1;
+                                        goal_selector_header_deco_index = -1;
+                                        goal_selector_deco_index = -1;
+                                        goal_selector_last_clicked_flat_index = -1;
+                                        snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s [%s]",
+                                                 goal.root_name, stage.stage_id);
+                                        goal_selector_msg_index =
+                                                (int) (&goal - &current_template_data.multi_stage_goals[0]);
+                                        goal_selector_msg_stage_index = (int) j;
+                                        goal_selector_multi_selections.clear();
+                                        for (const auto &lg: stage.linked_goals) {
+                                            goal_selector_multi_selections.push_back(lg);
+                                        }
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[512];
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Select goals that will auto-complete this stage\n"
+                                                 "when the condition (AND/OR) is met.\n"
+                                                 "Hold Shift and click to select a range.\n"
+                                                 "Chains of linked goals fail beyond a depth of 32.");
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+
+                                    if (!stage.linked_goals.empty()) {
+                                        // AND/OR mode toggle
+                                        ImGui::SameLine();
+                                        int stage_mode_int = (int) stage.linked_goal_mode;
+                                        ImGui::SetNextItemWidth(60);
+                                        char stage_combo_id[128];
+                                        snprintf(stage_combo_id, sizeof(stage_combo_id),
+                                                 "##stage_mode_%s_%zu", goal.root_name, j);
+                                        if (ImGui::Combo(stage_combo_id, &stage_mode_int, "AND\0OR\0")) {
+                                            stage.linked_goal_mode = (LinkedGoalMode) stage_mode_int;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        if (ImGui::IsItemHovered()) {
+                                            char tooltip_buffer[256];
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "AND = All selected goals must be completed.\n"
+                                                     "OR = At least one selected goal must be completed.");
+                                            ImGui::SetTooltip("%s", tooltip_buffer);
+                                        }
+
+                                        // Show linked goals list
+                                        char stage_child_id[128];
+                                        snprintf(stage_child_id, sizeof(stage_child_id),
+                                                 "StageLinkedGoals_%s_%zu", goal.root_name, j);
+                                        ImGui::BeginChild(stage_child_id, ImVec2(0, 100), true);
+                                        int stage_remove_idx = -1;
+                                        for (int li = 0; li < (int) stage.linked_goals.size(); li++) {
+                                            auto &lg = stage.linked_goals[li];
+                                            char lg_display[512];
+                                            if (lg.stage_id[0] != '\0') {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
+                                                         lg.root_name, lg.stage_id);
+                                            } else if (lg.parent_root[0] != '\0') {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
+                                                         lg.parent_root, lg.root_name);
+                                            } else {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1,
+                                                         lg.root_name);
+                                            }
+                                            char stage_remove_btn[64];
+                                            snprintf(stage_remove_btn, sizeof(stage_remove_btn),
+                                                     "X##remove_stage_lg_%zu_%d", j, li);
+                                            if (ImGui::SmallButton(stage_remove_btn)) {
+                                                stage_remove_idx = li;
+                                            }
+                                            if (ImGui::IsItemHovered()) {
+                                                char tooltip_buffer[128];
+                                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                         "Remove this linked goal");
+                                                ImGui::SetTooltip("%s", tooltip_buffer);
+                                            }
+                                            ImGui::SameLine();
+                                            ImGui::Text("%s", lg_display);
+                                        }
+                                        if (stage_remove_idx >= 0) {
+                                            stage.linked_goals.erase(stage.linked_goals.begin() + stage_remove_idx);
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        ImGui::EndChild();
+                                    }
+                                }
                             }
 
                             {
@@ -13159,6 +13308,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                             new_stage.type = source_stage.type;
                             new_stage.required_progress = source_stage.required_progress;
+                            new_stage.linked_goals = source_stage.linked_goals;
+                            new_stage.linked_goal_mode = source_stage.linked_goal_mode;
 
                             new_stage.sort_order = 0;
 
@@ -13929,7 +14080,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals,
                                                       focused_counter_root, counter.root_name,
                                                       nullptr, &current_template_data.stats,
-                                                      &current_template_data.custom_goals);
+                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             }
                         }
                         if (ImGui::IsItemHovered()) {
@@ -14022,6 +14173,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             goal_selector_stat_crit_index = -1;
                             goal_selector_custom_goal_index = -1;
                             goal_selector_deco_index = -1;
+                            goal_selector_msg_index = -1;
+                            goal_selector_msg_stage_index = -1;
                             goal_selector_last_clicked_flat_index = -1;
                             snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", counter.root_name);
                             goal_selector_multi_selections.clear();
@@ -14456,6 +14609,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_stat_crit_index = -1;
                                 goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
+                                goal_selector_msg_index = -1;
+                                goal_selector_msg_stage_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", deco.id);
                                 goal_selector_multi_selections.clear();
@@ -17399,7 +17554,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                               current_template_data.counter_goals,
                                               old_name, cat.root_name, nullptr,
                                               &current_template_data.stats,
-                                              &current_template_data.custom_goals);
+                                              &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         committed++;
                         break;
                     }
@@ -17432,7 +17587,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   rm_name.c_str(), "", cat.root_name,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                         crit_rows++;
                         break;
@@ -17455,7 +17610,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   name.c_str(), "", nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             removed++;
                         }
                     }
@@ -17524,7 +17679,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   rm_name.c_str(), "", selected_advancement->root_name,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                         }
                     }
                     s_pending_criteria_changes.clear();
@@ -17621,7 +17776,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   old_name, cat.root_name, nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             committed++;
                             break;
                         }
@@ -17656,7 +17811,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals,
                                                       rm_name.c_str(), "", cat.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals);
+                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             }
                             crit_rows++;
                             break;
@@ -17680,7 +17835,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   name.c_str(), "", nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals);
+                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
                             removed++;
                         }
                     }
@@ -19955,6 +20110,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &target_header = current_template_data.decorations[goal_selector_header_deco_index];
                     target_header.linked_goals = goal_selector_multi_selections;
                     goal_selector_header_deco_index = -1;
+                    save_message_type = MSG_NONE;
+                }
+                // Multi-select: write selections back to a multi-stage goal stage
+                if (goal_selector_msg_index >= 0 &&
+                    goal_selector_msg_index < (int) current_template_data.multi_stage_goals.size()) {
+                    auto &target_msg = current_template_data.multi_stage_goals[goal_selector_msg_index];
+                    if (goal_selector_msg_stage_index >= 0 &&
+                        goal_selector_msg_stage_index < (int) target_msg.stages.size()) {
+                        target_msg.stages[goal_selector_msg_stage_index].linked_goals =
+                                goal_selector_multi_selections;
+                    }
+                    goal_selector_msg_index = -1;
+                    goal_selector_msg_stage_index = -1;
                     save_message_type = MSG_NONE;
                 }
             } else {

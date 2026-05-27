@@ -878,6 +878,11 @@ overlay.
     * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
       biome for "Adventuring Time").
     * **Unlock**: Triggers when a specific player unlock is obtained (read from the `unlocks` folder).
+    * **Auto-Complete via Linked Goals**: Every non-final stage also supports automatic completion through linked goals.
+      Use the `Select Goals` button to pick any combination of advancements, criteria, stats, sub-stats, unlocks, custom
+      goals, or multi-stage goal stages, and choose `AND` mode (all selected goals must be completed) or `OR` mode (at
+      least one) using the dropdown next to the goal list. When the condition is met, the stage advances automatically in
+      addition to its natural trigger. Chains of linked goals fail beyond a depth of 32.
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
       overlay.

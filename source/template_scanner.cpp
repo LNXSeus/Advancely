@@ -534,6 +534,9 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     if (parent && parent->valuestring) hash = fnv1a_str(hash, parent->valuestring);
                     cJSON *starget = cJSON_GetObjectItem(stage, "target");
                     if (starget && cJSON_IsNumber(starget)) hash = fnv1a_int(hash, starget->valueint);
+                    // Stage linked_goals + mode (for auto-completion of non-final stages)
+                    hash = hash_linked_goals(hash, cJSON_GetObjectItem(stage, "linked_goals"));
+                    hash = hash_linked_goal_mode(hash, stage);
                 }
             }
         }

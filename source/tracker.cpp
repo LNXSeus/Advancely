@@ -2244,6 +2244,12 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                         }
                     }
                 }
+                // Parse stage linked goals for auto-completion (non-final stages)
+                if (new_stage->type != SUBGOAL_MANUAL) {
+                    parse_runtime_linked_goals(stage_item_json, &new_stage->linked_goal_count,
+                                               &new_stage->linked_goals, &new_stage->linked_goal_mode);
+                }
+
                 // Add the stage to the goal
                 new_goal->stages[j++] = new_stage;
             }
@@ -2778,6 +2784,108 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
 }
 
 /**
+ * @brief Checks if a goal is completed by root_name, optional stage_id, and optional parent_root.
+ * Used by arrow goal linking, counter goals and automatic stat completion (soon).
+ */
+static bool is_goal_completed_by_root(const TemplateData *td, const char *root_name,
+                                      const char *stage_id, const char *parent_root) {
+    if (!td || !root_name || root_name[0] == '\0') return false;
+
+    // Check advancements
+    for (int j = 0; j < td->advancement_count; j++) {
+        if (!td->advancements[j]) continue;
+        if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
+            (!parent_root || parent_root[0] == '\0'))
+            return td->advancements[j]->done;
+        // Check criteria
+        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
+            if (td->advancements[j]->criteria[k] &&
+                strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0) {
+                // If parent_root is specified, match the parent advancement
+                if (parent_root && parent_root[0] != '\0') {
+                    if (strcmp(td->advancements[j]->root_name, parent_root) != 0) continue;
+                }
+                return td->advancements[j]->criteria[k]->done;
+            }
+        }
+    }
+    // Check stats
+    for (int j = 0; j < td->stat_count; j++) {
+        if (!td->stats[j]) continue;
+        if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
+            (!parent_root || parent_root[0] == '\0'))
+            return td->stats[j]->done;
+        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
+            if (td->stats[j]->criteria[k] &&
+                strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0) {
+                if (parent_root && parent_root[0] != '\0') {
+                    if (strcmp(td->stats[j]->root_name, parent_root) != 0) continue;
+                }
+                return td->stats[j]->criteria[k]->done;
+            }
+        }
+    }
+    // Check unlocks
+    for (int j = 0; j < td->unlock_count; j++) {
+        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
+            return td->unlocks[j]->done;
+    }
+    // Check custom goals
+    for (int j = 0; j < td->custom_goal_count; j++) {
+        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
+            return td->custom_goals[j]->done;
+    }
+    // Check multi-stage goals
+    for (int j = 0; j < td->multi_stage_goal_count; j++) {
+        MultiStageGoal *msg = td->multi_stage_goals[j];
+        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
+        if (!stage_id || stage_id[0] == '\0') {
+            return msg->current_stage >= msg->stage_count - 1;
+        }
+        for (int k = 0; k < msg->stage_count; k++) {
+            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
+                return msg->current_stage > k;
+            }
+        }
+    }
+    // Check counter goals
+    for (int j = 0; j < td->counter_goal_count; j++) {
+        if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
+            return td->counter_goals[j]->done;
+    }
+    return false;
+}
+
+/**
+ * @brief Checks if linked goals are satisfied based on mode (AND/OR).
+ * Returns true if auto-completion should trigger.
+ */
+static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLinkedGoal *linked_goals,
+                                         int linked_goal_count, LinkedGoalMode mode) {
+    if (linked_goal_count <= 0 || !linked_goals) return false;
+
+    if (mode == LINKED_GOAL_AND) {
+        // All linked goals must be completed
+        for (int j = 0; j < linked_goal_count; j++) {
+            if (!is_goal_completed_by_root(td, linked_goals[j].root_name,
+                                           linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                return false; // any goal not completed
+            }
+        }
+        return true; // all completed
+    } else {
+        // At least one linked goal must be completed (OR mode)
+        for (int j = 0; j < linked_goal_count; j++) {
+            if (is_goal_completed_by_root(td, linked_goals[j].root_name,
+                                          linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                return true; // any goal completed
+            }
+        }
+        return false; // none completed
+    }
+}
+
+/**
  * @brief Updates multi-stage goal progress from preloaded cJSON objects.
  * @param t A pointer to the Tracker struct.
  * @param player_adv_json The parsed player advancements JSON file.
@@ -2785,25 +2893,29 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
  * @param player_unlocks_json The parsed player unlocks JSON file.
  * @param version The game version from the MC_Version enum.
  */
-static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
+static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
                                                 MC_Version version, const AppSettings *settings) {
     (void) settings;
-    if (t->template_data->multi_stage_goal_count == 0) return;
+    if (t->template_data->multi_stage_goal_count == 0) return false;
 
     if (!player_adv_json && !player_stats_json) {
         log_message(LOG_INFO,
                     "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
 
-        return;
+        return false;
     }
+
+    bool any_changed = false;
 
     // Iterate through the multi-stage goals
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
 
         // Reset and re-evaluate progress from the start (important for world-changes when tracker is running)
+        int previous_stage = goal->current_stage;
         goal->current_stage = 0;
+        bool still_advancing = true; // Once a stage is unsatisfied, stop advancing but keep populating flags
 
         // Loop through each stage sequentially to determine the current progress
         for (int j = 0; j < goal->stage_count; j++) {
@@ -2956,115 +3068,32 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                     break; // Manual stages are not updated here
             }
 
-            if (stage_completed) {
-                goal->current_stage = j + 1; // Move to the next stage
-            } else {
-                break;
-            }
-        }
-    }
-}
+            // Store the game-trigger result so recalculation paths (which lack player files) can re-derive
+            // current_stage and regress as well as advance.
+            stage_to_check->game_trigger_met = stage_completed;
 
-/**
- * @brief Checks if a goal is completed by root_name, optional stage_id, and optional parent_root.
- * Used by arrow goal linking, counter goals and automatic stat completion (soon).
- */
-static bool is_goal_completed_by_root(const TemplateData *td, const char *root_name,
-                                      const char *stage_id, const char *parent_root) {
-    if (!td || !root_name || root_name[0] == '\0') return false;
-
-    // Check advancements
-    for (int j = 0; j < td->advancement_count; j++) {
-        if (!td->advancements[j]) continue;
-        if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
-            (!parent_root || parent_root[0] == '\0'))
-            return td->advancements[j]->done;
-        // Check criteria
-        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
-            if (td->advancements[j]->criteria[k] &&
-                strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0) {
-                // If parent_root is specified, match the parent advancement
-                if (parent_root && parent_root[0] != '\0') {
-                    if (strcmp(td->advancements[j]->root_name, parent_root) != 0) continue;
+            // current_stage advances only through the leading run of satisfied stages, but we keep looping
+            // so every stage's game_trigger_met gets populated for later recalculation.
+            if (still_advancing) {
+                // Auto-completion via linked goals (non-final stages only; the final stage breaks above).
+                // Chains of linked goals resolve through the fixed-point iteration in the caller.
+                bool stage_satisfied = stage_completed ||
+                                       (stage_to_check->linked_goal_count > 0 &&
+                                        check_linked_goals_satisfied(t->template_data, stage_to_check->linked_goals,
+                                                                     stage_to_check->linked_goal_count,
+                                                                     stage_to_check->linked_goal_mode));
+                if (stage_satisfied) {
+                    goal->current_stage = j + 1; // Move to the next stage
+                } else {
+                    still_advancing = false;
                 }
-                return td->advancements[j]->criteria[k]->done;
             }
         }
-    }
-    // Check stats
-    for (int j = 0; j < td->stat_count; j++) {
-        if (!td->stats[j]) continue;
-        if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
-            (!parent_root || parent_root[0] == '\0'))
-            return td->stats[j]->done;
-        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
-            if (td->stats[j]->criteria[k] &&
-                strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0) {
-                if (parent_root && parent_root[0] != '\0') {
-                    if (strcmp(td->stats[j]->root_name, parent_root) != 0) continue;
-                }
-                return td->stats[j]->criteria[k]->done;
-            }
-        }
-    }
-    // Check unlocks
-    for (int j = 0; j < td->unlock_count; j++) {
-        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
-            return td->unlocks[j]->done;
-    }
-    // Check custom goals
-    for (int j = 0; j < td->custom_goal_count; j++) {
-        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
-            return td->custom_goals[j]->done;
-    }
-    // Check multi-stage goals
-    for (int j = 0; j < td->multi_stage_goal_count; j++) {
-        MultiStageGoal *msg = td->multi_stage_goals[j];
-        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
-        if (!stage_id || stage_id[0] == '\0') {
-            return msg->current_stage >= msg->stage_count - 1;
-        }
-        for (int k = 0; k < msg->stage_count; k++) {
-            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
-                return msg->current_stage > k;
-            }
-        }
-    }
-    // Check counter goals
-    for (int j = 0; j < td->counter_goal_count; j++) {
-        if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
-            return td->counter_goals[j]->done;
-    }
-    return false;
-}
 
-/**
- * @brief Checks if linked goals are satisfied based on mode (AND/OR).
- * Returns true if auto-completion should trigger.
- */
-static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLinkedGoal *linked_goals,
-                                         int linked_goal_count, LinkedGoalMode mode) {
-    if (linked_goal_count <= 0 || !linked_goals) return false;
-
-    if (mode == LINKED_GOAL_AND) {
-        // All linked goals must be completed
-        for (int j = 0; j < linked_goal_count; j++) {
-            if (!is_goal_completed_by_root(td, linked_goals[j].root_name,
-                                           linked_goals[j].stage_id, linked_goals[j].parent_root)) {
-                return false; // any goal not completed
-            }
-        }
-        return true; // all completed
-    } else {
-        // At least one linked goal must be completed (OR mode)
-        for (int j = 0; j < linked_goal_count; j++) {
-            if (is_goal_completed_by_root(td, linked_goals[j].root_name,
-                                          linked_goals[j].stage_id, linked_goals[j].parent_root)) {
-                return true; // any goal completed
-            }
-        }
-        return false; // none completed
+        if (goal->current_stage != previous_stage) any_changed = true;
     }
+
+    return any_changed;
 }
 
 /**
@@ -3177,6 +3206,47 @@ static bool tracker_update_stat_linked_goals(Tracker *t) {
 
         if (stat_cat->done) td->stats_completed_count++;
         td->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
+    return any_changed;
+}
+
+/**
+ * @brief Re-derives every multi-stage goal's current_stage without player files in scope.
+ * Used by recalculation paths (e.g. manual custom-goal toggles). Each stage is considered complete when its
+ * game trigger is met (stat stages: live from current_stat_progress; other stages: the stored game_trigger_met
+ * flag last set by a full update or Hermes event) OR its linked goals are satisfied. Because it fully recomputes
+ * the leading run, it both advances and regresses (so unchecking a linked goal can re-open a stage).
+ * The final stage is never auto-completed. Returns true if any goal changed (used for fixed-point iteration).
+ */
+static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
+    if (!t || !t->template_data) return false;
+    TemplateData *td = t->template_data;
+    bool any_changed = false;
+
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = td->multi_stage_goals[i];
+        if (!goal) continue;
+        int previous_stage = goal->current_stage;
+        goal->current_stage = 0;
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage = goal->stages[j];
+            if (!stage || stage->type == SUBGOAL_MANUAL) break;
+            // Stat stages re-derive live (Hermes/full updates keep current_stat_progress accurate); other
+            // stage types rely on the stored game_trigger_met flag.
+            bool game_met = (stage->type == SUBGOAL_STAT)
+                                ? (stage->current_stat_progress >= stage->required_progress)
+                                : stage->game_trigger_met;
+            bool stage_satisfied = game_met ||
+                                   (stage->linked_goal_count > 0 &&
+                                    check_linked_goals_satisfied(td, stage->linked_goals,
+                                                                 stage->linked_goal_count, stage->linked_goal_mode));
+            if (stage_satisfied) {
+                goal->current_stage = j + 1;
+            } else {
+                break;
+            }
+        }
+        if (goal->current_stage != previous_stage) any_changed = true;
     }
     return any_changed;
 }
@@ -3356,6 +3426,11 @@ static void free_multi_stage_goals(MultiStageGoal **goals, int count) {
                 for (int j = 0; j < goal->stage_count; j++) {
                     // Check if the pointer is valid before freeing
                     if (goal->stages[j]) {
+                        // Free linked goals for stage auto-completion
+                        if (goal->stages[j]->linked_goals) {
+                            free(goal->stages[j]->linked_goals);
+                            goal->stages[j]->linked_goals = nullptr;
+                        }
                         free(goal->stages[j]);
                         goal->stages[j] = nullptr;
                     }
@@ -3833,6 +3908,7 @@ static void coop_reset_template_progress(TemplateData *td) {
         for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
             td->multi_stage_goals[i]->stages[j]->current_stat_progress = 0;
             td->multi_stage_goals[i]->stages[j]->coop_completed = false;
+            td->multi_stage_goals[i]->stages[j]->game_trigger_met = false;
         }
     }
 }
@@ -4367,10 +4443,13 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
     }
 }
 
-static void coop_finalize_multi_stage(TemplateData *td) {
+static bool coop_finalize_multi_stage(TemplateData *td) {
+    bool any_changed = false;
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = td->multi_stage_goals[i];
+        int previous_stage = goal->current_stage;
         goal->current_stage = 0;
+        bool still_advancing = true; // Once a stage is unsatisfied, stop advancing but keep populating flags
 
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
@@ -4384,13 +4463,29 @@ static void coop_finalize_multi_stage(TemplateData *td) {
                 stage_completed = stage->coop_completed;
             }
 
-            if (stage_completed) {
-                goal->current_stage = j + 1;
-            } else {
-                break; // Stages are sequential; stop at first incomplete
+            // Store the game-trigger result so recalculation paths can re-derive current_stage and regress.
+            stage->game_trigger_met = stage_completed;
+
+            if (still_advancing) {
+                // Auto-completion via linked goals (non-final stages only; the final stage breaks above).
+                // Chains of linked goals resolve through the fixed-point iteration in the caller.
+                bool stage_satisfied = stage_completed ||
+                                       (stage->linked_goal_count > 0 &&
+                                        check_linked_goals_satisfied(td, stage->linked_goals,
+                                                                     stage->linked_goal_count,
+                                                                     stage->linked_goal_mode));
+                if (stage_satisfied) {
+                    goal->current_stage = j + 1;
+                } else {
+                    still_advancing = false; // Stages are sequential; stop advancing at first incomplete
+                }
             }
         }
+
+        if (goal->current_stage != previous_stage) any_changed = true;
     }
+
+    return any_changed;
 }
 
 /**
@@ -4635,6 +4730,8 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
+            changed |= tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json,
+                                                           player_unlocks_json, version, settings);
         } while (changed && ++guard < 32);
     }
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
@@ -5066,6 +5163,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
+            changed |= coop_finalize_multi_stage(t->template_data);
         } while (changed && ++guard < 32);
     }
 
@@ -5168,6 +5266,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
+            changed |= coop_finalize_multi_stage(t->template_data);
         } while (changed && ++guard < 32);
     }
 
@@ -5216,6 +5315,7 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
+            changed |= coop_finalize_multi_stage(t->template_data);
         } while (changed && ++guard < 32);
     }
 
@@ -11950,6 +12050,9 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
         }
 
         if (stage_completed && goal->current_stage + 1 < goal->stage_count) {
+            // Record the game trigger so a later recalculation (which re-derives current_stage) keeps
+            // this stage complete instead of regressing it.
+            stage->game_trigger_met = true;
             goal->current_stage++;
             changed = true;
             log_message(LOG_INFO,
@@ -11971,6 +12074,7 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
+            changed |= tracker_update_multi_stage_linked_goals(t);
         } while (changed && ++guard < 32);
     }
     tracker_calculate_overall_progress(t, version, settings);
