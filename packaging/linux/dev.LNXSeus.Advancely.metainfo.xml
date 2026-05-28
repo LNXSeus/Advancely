@@ -15,6 +15,20 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.5.1" date="2026-05-28">
+      <description>
+        <ul>
+          <li>Ghost players: contributors who appear in the world's advancements/stats/unlocks folder but aren't connected to the lobby still count toward combined progress, and can be selected from the player dropdown.</li>
+          <li>Auto-completion / linked goals now extend to multi-stage goal stages, with shells and trims wired up across all templates. Removing a goal that's linked from a stat also clears the link cleanly.</li>
+          <li>Inverted goal hiding mode: goals can fade in or brighten as they're completed instead of disappearing.</li>
+          <li>Custom completion threshold for the run (handy for Half% and similar categories).</li>
+          <li>Bulk-layout positions are now individually adjustable, and Progress Pos. is available in bulk selection once any complex advancement/achievement is picked.</li>
+          <li>"Use Game Capture" hint next to the Enable Overlay checkbox is now highlighted in orange for visibility.</li>
+          <li>"Syncing for &lt;Player&gt;" now also shows for offline/ghost players and works on the host side, not just the receiver.</li>
+          <li>Fixes: Hermes log file is redetected properly on new world creation; nested import popups' Select/Deselect All now respect the active search filter; renamed 1.14 and 1.15 all_advancements templates to their _optimized variants.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.0" date="2026-05-21">
       <description>
         <ul>
