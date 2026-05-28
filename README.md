@@ -835,7 +835,11 @@ Opening a template reveals a tabbed interface where you can define every goal.
     neighbouring `Columns` field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on
     both axes, useful for rows, columns, and diagonals), while `1` or higher wraps into a grid (`X` uses
     `N mod Columns`, `Y` uses `N div Columns`). Each section has its own `Apply ... to selected` button so you can
-    tune Icon Pos. without touching Text Pos. (or vice versa). Available wherever the goal type has at least one
+    tune Icon Pos. without touching Text Pos. (or vice versa). The Apply button is also field-aware: it only writes
+    the buckets (`Enable`, `Hide`, `Position` (X/Y/stride/columns), or `Anchor`) you actually changed since opening
+    the popup, leaving the rest untouched on each selected goal, and its label updates to show what will be applied
+    (for example `Apply Text Pos. (Hide)`). Change nothing, or change all four buckets, and it applies everything
+    (labelled `(Everything)`), which is also how you stamp the default values onto a selection. Available wherever the goal type has at least one
     `ManualPos` field; stages and decorations are excluded (stages have no `ManualPos`; decoration shapes have
     type-specific endpoint geometry that doesn't bulk-stride cleanly).
 * **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and

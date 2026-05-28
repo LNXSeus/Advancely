@@ -2598,6 +2598,37 @@ static bool render_layout_coordinates_header(const char *goal_type_name, bool fo
     return open;
 }
 
+// Decides which ManualPos fields a bulk-layout "Apply" button writes, based on which control
+// buckets were touched since the popup opened, and builds the button's dynamic label.
+// No bucket touched (or all four touched) means apply everything.
+static void bulk_layout_apply_decide(const char *section_label, const char *id,
+                                     bool t_enable, bool t_hide, bool t_pos, bool t_anchor,
+                                     bool &w_enable, bool &w_hide, bool &w_pos, bool &w_anchor,
+                                     char *out_label, size_t out_cap) {
+    int touched_count = (t_enable ? 1 : 0) + (t_hide ? 1 : 0) + (t_pos ? 1 : 0) + (t_anchor ? 1 : 0);
+    bool apply_all = (touched_count == 0) || (touched_count == 4);
+    w_enable = apply_all || t_enable;
+    w_hide = apply_all || t_hide;
+    w_pos = apply_all || t_pos;
+    w_anchor = apply_all || t_anchor;
+    if (apply_all) {
+        snprintf(out_label, out_cap, "Apply %s (Everything)##%s", section_label, id);
+        return;
+    }
+    char parts[96];
+    size_t p = 0;
+    parts[0] = '\0';
+    auto add_part = [&](const char *w) {
+        if (p > 0) p += snprintf(parts + p, sizeof(parts) - p, " + ");
+        p += snprintf(parts + p, sizeof(parts) - p, "%s", w);
+    };
+    if (t_enable) add_part("Enable");
+    if (t_hide) add_part("Hide");
+    if (t_pos) add_part("Position");
+    if (t_anchor) add_part("Anchor");
+    snprintf(out_label, out_cap, "Apply %s (%s)##%s", section_label, parts, id);
+}
+
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false,
@@ -5481,6 +5512,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             std::vector<int> bulk_layout_sorted(s_adv_selection.begin(), s_adv_selection.end());
                             std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
 
+                            static bool s_adv_bl_base_set[3], s_adv_bl_base_hide[3];
+                            static float s_adv_bl_base_x[3], s_adv_bl_base_y[3], s_adv_bl_base_xs[3], s_adv_bl_base_ys[3];
+                            static int s_adv_bl_base_cols[3], s_adv_bl_base_anchor[3];
+                            if (ImGui::IsWindowAppearing()) {
+                                s_adv_bl_base_set[0] = s_adv_bl_icon_set; s_adv_bl_base_hide[0] = s_adv_bl_icon_hide;
+                                s_adv_bl_base_x[0] = s_adv_bl_icon_x; s_adv_bl_base_y[0] = s_adv_bl_icon_y;
+                                s_adv_bl_base_xs[0] = s_adv_bl_icon_xs; s_adv_bl_base_ys[0] = s_adv_bl_icon_ys;
+                                s_adv_bl_base_cols[0] = s_adv_bl_icon_cols; s_adv_bl_base_anchor[0] = s_adv_bl_icon_anchor;
+                                s_adv_bl_base_set[1] = s_adv_bl_text_set; s_adv_bl_base_hide[1] = s_adv_bl_text_hide;
+                                s_adv_bl_base_x[1] = s_adv_bl_text_x; s_adv_bl_base_y[1] = s_adv_bl_text_y;
+                                s_adv_bl_base_xs[1] = s_adv_bl_text_xs; s_adv_bl_base_ys[1] = s_adv_bl_text_ys;
+                                s_adv_bl_base_cols[1] = s_adv_bl_text_cols; s_adv_bl_base_anchor[1] = s_adv_bl_text_anchor;
+                                s_adv_bl_base_set[2] = s_adv_bl_prog_set; s_adv_bl_base_hide[2] = s_adv_bl_prog_hide;
+                                s_adv_bl_base_x[2] = s_adv_bl_prog_x; s_adv_bl_base_y[2] = s_adv_bl_prog_y;
+                                s_adv_bl_base_xs[2] = s_adv_bl_prog_xs; s_adv_bl_base_ys[2] = s_adv_bl_prog_ys;
+                                s_adv_bl_base_cols[2] = s_adv_bl_prog_cols; s_adv_bl_base_anchor[2] = s_adv_bl_prog_anchor;
+                            }
+
                             ImGui::PushID("adv_bulk_layout_icon");
                             ImGui::Checkbox("Icon Pos.", &s_adv_bl_icon_set);
                             if (ImGui::IsItemHovered()) {
@@ -5535,24 +5584,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                             }
-                            if (ImGui::Button("Apply Icon Pos. to selected")) {
+                            bool icon_t_en = (s_adv_bl_icon_set != s_adv_bl_base_set[0]);
+                            bool icon_t_hi = (s_adv_bl_icon_hide != s_adv_bl_base_hide[0]);
+                            bool icon_t_po = (s_adv_bl_icon_x != s_adv_bl_base_x[0]) || (s_adv_bl_icon_y != s_adv_bl_base_y[0]) ||
+                                             (s_adv_bl_icon_xs != s_adv_bl_base_xs[0]) || (s_adv_bl_icon_ys != s_adv_bl_base_ys[0]) ||
+                                             (s_adv_bl_icon_cols != s_adv_bl_base_cols[0]);
+                            bool icon_t_an = (s_adv_bl_icon_anchor != s_adv_bl_base_anchor[0]);
+                            bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
+                            char icon_applabel[96];
+                            bulk_layout_apply_decide("Icon Pos.", "adv_bulk_layout_icon",
+                                                     icon_t_en, icon_t_hi, icon_t_po, icon_t_an,
+                                                     icon_w_en, icon_w_hi, icon_w_po, icon_w_an,
+                                                     icon_applabel, sizeof(icon_applabel));
+                            if (ImGui::Button(icon_applabel)) {
                                 int n = 0;
                                 for (int idx : bulk_layout_sorted) {
                                     if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
                                     int x_mult = (s_adv_bl_icon_cols >= 1) ? (n % s_adv_bl_icon_cols) : n;
                                     int y_mult = (s_adv_bl_icon_cols >= 1) ? (n / s_adv_bl_icon_cols) : n;
-                                    a.icon_pos.is_set = s_adv_bl_icon_set;
-                                    a.icon_pos.is_hidden_in_layout = s_adv_bl_icon_hide;
-                                    a.icon_pos.x = fminf(fmaxf(roundf(s_adv_bl_icon_x + x_mult * s_adv_bl_icon_xs),
-                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                    a.icon_pos.y = fminf(fmaxf(roundf(s_adv_bl_icon_y + y_mult * s_adv_bl_icon_ys),
-                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                    a.icon_pos.anchor = (AnchorPoint)s_adv_bl_icon_anchor;
+                                    if (icon_w_en) a.icon_pos.is_set = s_adv_bl_icon_set;
+                                    if (icon_w_hi) a.icon_pos.is_hidden_in_layout = s_adv_bl_icon_hide;
+                                    if (icon_w_po) {
+                                        a.icon_pos.x = fminf(fmaxf(roundf(s_adv_bl_icon_x + x_mult * s_adv_bl_icon_xs),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        a.icon_pos.y = fminf(fmaxf(roundf(s_adv_bl_icon_y + y_mult * s_adv_bl_icon_ys),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    }
+                                    if (icon_w_an) a.icon_pos.anchor = (AnchorPoint)s_adv_bl_icon_anchor;
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Applies only the buckets you changed since opening this popup.\n"
+                                "Change nothing (or all four) to apply everything.\n"
+                                "Untouched fields are left as-is on each selected advancement.");
                             ImGui::PopID();
 
                             ImGui::Separator();
@@ -5611,24 +5678,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                             }
-                            if (ImGui::Button("Apply Text Pos. to selected")) {
+                            bool text_t_en = (s_adv_bl_text_set != s_adv_bl_base_set[1]);
+                            bool text_t_hi = (s_adv_bl_text_hide != s_adv_bl_base_hide[1]);
+                            bool text_t_po = (s_adv_bl_text_x != s_adv_bl_base_x[1]) || (s_adv_bl_text_y != s_adv_bl_base_y[1]) ||
+                                             (s_adv_bl_text_xs != s_adv_bl_base_xs[1]) || (s_adv_bl_text_ys != s_adv_bl_base_ys[1]) ||
+                                             (s_adv_bl_text_cols != s_adv_bl_base_cols[1]);
+                            bool text_t_an = (s_adv_bl_text_anchor != s_adv_bl_base_anchor[1]);
+                            bool text_w_en, text_w_hi, text_w_po, text_w_an;
+                            char text_applabel[96];
+                            bulk_layout_apply_decide("Text Pos.", "adv_bulk_layout_text",
+                                                     text_t_en, text_t_hi, text_t_po, text_t_an,
+                                                     text_w_en, text_w_hi, text_w_po, text_w_an,
+                                                     text_applabel, sizeof(text_applabel));
+                            if (ImGui::Button(text_applabel)) {
                                 int n = 0;
                                 for (int idx : bulk_layout_sorted) {
                                     if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
                                     int x_mult = (s_adv_bl_text_cols >= 1) ? (n % s_adv_bl_text_cols) : n;
                                     int y_mult = (s_adv_bl_text_cols >= 1) ? (n / s_adv_bl_text_cols) : n;
-                                    a.text_pos.is_set = s_adv_bl_text_set;
-                                    a.text_pos.is_hidden_in_layout = s_adv_bl_text_hide;
-                                    a.text_pos.x = fminf(fmaxf(roundf(s_adv_bl_text_x + x_mult * s_adv_bl_text_xs),
-                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                    a.text_pos.y = fminf(fmaxf(roundf(s_adv_bl_text_y + y_mult * s_adv_bl_text_ys),
-                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                    a.text_pos.anchor = (AnchorPoint)s_adv_bl_text_anchor;
+                                    if (text_w_en) a.text_pos.is_set = s_adv_bl_text_set;
+                                    if (text_w_hi) a.text_pos.is_hidden_in_layout = s_adv_bl_text_hide;
+                                    if (text_w_po) {
+                                        a.text_pos.x = fminf(fmaxf(roundf(s_adv_bl_text_x + x_mult * s_adv_bl_text_xs),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        a.text_pos.y = fminf(fmaxf(roundf(s_adv_bl_text_y + y_mult * s_adv_bl_text_ys),
+                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                    }
+                                    if (text_w_an) a.text_pos.anchor = (AnchorPoint)s_adv_bl_text_anchor;
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Applies only the buckets you changed since opening this popup.\n"
+                                "Change nothing (or all four) to apply everything.\n"
+                                "Untouched fields are left as-is on each selected advancement.");
                             ImGui::PopID();
 
                             bool any_selected_complex = false;
@@ -5700,7 +5785,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                         "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 }
-                                if (ImGui::Button("Apply Progress Pos. to selected")) {
+                                bool prog_t_en = (s_adv_bl_prog_set != s_adv_bl_base_set[2]);
+                                bool prog_t_hi = (s_adv_bl_prog_hide != s_adv_bl_base_hide[2]);
+                                bool prog_t_po = (s_adv_bl_prog_x != s_adv_bl_base_x[2]) || (s_adv_bl_prog_y != s_adv_bl_base_y[2]) ||
+                                                 (s_adv_bl_prog_xs != s_adv_bl_base_xs[2]) || (s_adv_bl_prog_ys != s_adv_bl_base_ys[2]) ||
+                                                 (s_adv_bl_prog_cols != s_adv_bl_base_cols[2]);
+                                bool prog_t_an = (s_adv_bl_prog_anchor != s_adv_bl_base_anchor[2]);
+                                bool prog_w_en, prog_w_hi, prog_w_po, prog_w_an;
+                                char prog_applabel[96];
+                                bulk_layout_apply_decide("Progress Pos.", "adv_bulk_layout_prog",
+                                                         prog_t_en, prog_t_hi, prog_t_po, prog_t_an,
+                                                         prog_w_en, prog_w_hi, prog_w_po, prog_w_an,
+                                                         prog_applabel, sizeof(prog_applabel));
+                                if (ImGui::Button(prog_applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
@@ -5708,24 +5805,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (!a.criteria.empty()) {
                                             int x_mult = (s_adv_bl_prog_cols >= 1) ? (n % s_adv_bl_prog_cols) : n;
                                             int y_mult = (s_adv_bl_prog_cols >= 1) ? (n / s_adv_bl_prog_cols) : n;
-                                            a.progress_pos.is_set = s_adv_bl_prog_set;
-                                            a.progress_pos.is_hidden_in_layout = s_adv_bl_prog_hide;
-                                            a.progress_pos.x = fminf(fmaxf(roundf(s_adv_bl_prog_x + x_mult * s_adv_bl_prog_xs),
-                                                                           -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            a.progress_pos.y = fminf(fmaxf(roundf(s_adv_bl_prog_y + y_mult * s_adv_bl_prog_ys),
-                                                                           -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            a.progress_pos.anchor = (AnchorPoint)s_adv_bl_prog_anchor;
+                                            if (prog_w_en) a.progress_pos.is_set = s_adv_bl_prog_set;
+                                            if (prog_w_hi) a.progress_pos.is_hidden_in_layout = s_adv_bl_prog_hide;
+                                            if (prog_w_po) {
+                                                a.progress_pos.x = fminf(fmaxf(roundf(s_adv_bl_prog_x + x_mult * s_adv_bl_prog_xs),
+                                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                a.progress_pos.y = fminf(fmaxf(roundf(s_adv_bl_prog_y + y_mult * s_adv_bl_prog_ys),
+                                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            }
+                                            if (prog_w_an) a.progress_pos.anchor = (AnchorPoint)s_adv_bl_prog_anchor;
                                         }
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char t3[256];
+                                    char t3[320];
                                     snprintf(t3, sizeof(t3),
-                                             "Apply to every selected %s that has criteria.\n"
-                                             "Simple %s without criteria keep their grid slot (it is left\n"
-                                             "empty) so progress text stays aligned with Icon and Text Pos.",
+                                             "Applies only the buckets you changed since opening this popup.\n"
+                                             "Change nothing (or all four) to apply everything.\n"
+                                             "Affects every selected %s that has criteria. Simple %s without\n"
+                                             "criteria keep their grid slot (left empty) so progress text stays\n"
+                                             "aligned with Icon and Text Pos.",
                                              advancements_label_singular_lower, advancements_label_plural_lower);
                                     ImGui::SetTooltip("%s", t3);
                                 }
@@ -6732,6 +6833,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 std::vector<int> bulk_layout_sorted(s_crit_selection.begin(), s_crit_selection.end());
                                 std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
 
+                                static bool s_crit_bl_base_set[2], s_crit_bl_base_hide[2];
+                                static float s_crit_bl_base_x[2], s_crit_bl_base_y[2], s_crit_bl_base_xs[2], s_crit_bl_base_ys[2];
+                                static int s_crit_bl_base_cols[2], s_crit_bl_base_anchor[2];
+                                if (ImGui::IsWindowAppearing()) {
+                                    s_crit_bl_base_set[0] = s_crit_bl_icon_set; s_crit_bl_base_hide[0] = s_crit_bl_icon_hide;
+                                    s_crit_bl_base_x[0] = s_crit_bl_icon_x; s_crit_bl_base_y[0] = s_crit_bl_icon_y;
+                                    s_crit_bl_base_xs[0] = s_crit_bl_icon_xs; s_crit_bl_base_ys[0] = s_crit_bl_icon_ys;
+                                    s_crit_bl_base_cols[0] = s_crit_bl_icon_cols; s_crit_bl_base_anchor[0] = s_crit_bl_icon_anchor;
+                                    s_crit_bl_base_set[1] = s_crit_bl_text_set; s_crit_bl_base_hide[1] = s_crit_bl_text_hide;
+                                    s_crit_bl_base_x[1] = s_crit_bl_text_x; s_crit_bl_base_y[1] = s_crit_bl_text_y;
+                                    s_crit_bl_base_xs[1] = s_crit_bl_text_xs; s_crit_bl_base_ys[1] = s_crit_bl_text_ys;
+                                    s_crit_bl_base_cols[1] = s_crit_bl_text_cols; s_crit_bl_base_anchor[1] = s_crit_bl_text_anchor;
+                                }
+
                                 ImGui::PushID("crit_bulk_layout_icon");
                                 ImGui::Checkbox("Icon Pos.", &s_crit_bl_icon_set);
                                 ImGui::SameLine();
@@ -6764,24 +6879,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button("Apply Icon Pos. to selected")) {
+                                bool icon_t_en = (s_crit_bl_icon_set != s_crit_bl_base_set[0]);
+                                bool icon_t_hi = (s_crit_bl_icon_hide != s_crit_bl_base_hide[0]);
+                                bool icon_t_po = (s_crit_bl_icon_x != s_crit_bl_base_x[0]) || (s_crit_bl_icon_y != s_crit_bl_base_y[0]) ||
+                                                 (s_crit_bl_icon_xs != s_crit_bl_base_xs[0]) || (s_crit_bl_icon_ys != s_crit_bl_base_ys[0]) ||
+                                                 (s_crit_bl_icon_cols != s_crit_bl_base_cols[0]);
+                                bool icon_t_an = (s_crit_bl_icon_anchor != s_crit_bl_base_anchor[0]);
+                                bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
+                                char icon_applabel[96];
+                                bulk_layout_apply_decide("Icon Pos.", "crit_bulk_layout_icon",
+                                                         icon_t_en, icon_t_hi, icon_t_po, icon_t_an,
+                                                         icon_w_en, icon_w_hi, icon_w_po, icon_w_an,
+                                                         icon_applabel, sizeof(icon_applabel));
+                                if (ImGui::Button(icon_applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
                                         int x_mult = (s_crit_bl_icon_cols >= 1) ? (n % s_crit_bl_icon_cols) : n;
                                         int y_mult = (s_crit_bl_icon_cols >= 1) ? (n / s_crit_bl_icon_cols) : n;
-                                        c.icon_pos.is_set = s_crit_bl_icon_set;
-                                        c.icon_pos.is_hidden_in_layout = s_crit_bl_icon_hide;
-                                        c.icon_pos.x = fminf(fmaxf(roundf(s_crit_bl_icon_x + x_mult * s_crit_bl_icon_xs),
-                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        c.icon_pos.y = fminf(fmaxf(roundf(s_crit_bl_icon_y + y_mult * s_crit_bl_icon_ys),
-                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        c.icon_pos.anchor = (AnchorPoint)s_crit_bl_icon_anchor;
+                                        if (icon_w_en) c.icon_pos.is_set = s_crit_bl_icon_set;
+                                        if (icon_w_hi) c.icon_pos.is_hidden_in_layout = s_crit_bl_icon_hide;
+                                        if (icon_w_po) {
+                                            c.icon_pos.x = fminf(fmaxf(roundf(s_crit_bl_icon_x + x_mult * s_crit_bl_icon_xs),
+                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.icon_pos.y = fminf(fmaxf(roundf(s_crit_bl_icon_y + y_mult * s_crit_bl_icon_ys),
+                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (icon_w_an) c.icon_pos.anchor = (AnchorPoint)s_crit_bl_icon_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected criterion.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -6818,24 +6951,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button("Apply Text Pos. to selected")) {
+                                bool text_t_en = (s_crit_bl_text_set != s_crit_bl_base_set[1]);
+                                bool text_t_hi = (s_crit_bl_text_hide != s_crit_bl_base_hide[1]);
+                                bool text_t_po = (s_crit_bl_text_x != s_crit_bl_base_x[1]) || (s_crit_bl_text_y != s_crit_bl_base_y[1]) ||
+                                                 (s_crit_bl_text_xs != s_crit_bl_base_xs[1]) || (s_crit_bl_text_ys != s_crit_bl_base_ys[1]) ||
+                                                 (s_crit_bl_text_cols != s_crit_bl_base_cols[1]);
+                                bool text_t_an = (s_crit_bl_text_anchor != s_crit_bl_base_anchor[1]);
+                                bool text_w_en, text_w_hi, text_w_po, text_w_an;
+                                char text_applabel[96];
+                                bulk_layout_apply_decide("Text Pos.", "crit_bulk_layout_text",
+                                                         text_t_en, text_t_hi, text_t_po, text_t_an,
+                                                         text_w_en, text_w_hi, text_w_po, text_w_an,
+                                                         text_applabel, sizeof(text_applabel));
+                                if (ImGui::Button(text_applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
                                         int x_mult = (s_crit_bl_text_cols >= 1) ? (n % s_crit_bl_text_cols) : n;
                                         int y_mult = (s_crit_bl_text_cols >= 1) ? (n / s_crit_bl_text_cols) : n;
-                                        c.text_pos.is_set = s_crit_bl_text_set;
-                                        c.text_pos.is_hidden_in_layout = s_crit_bl_text_hide;
-                                        c.text_pos.x = fminf(fmaxf(roundf(s_crit_bl_text_x + x_mult * s_crit_bl_text_xs),
-                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        c.text_pos.y = fminf(fmaxf(roundf(s_crit_bl_text_y + y_mult * s_crit_bl_text_ys),
-                                                                   -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        c.text_pos.anchor = (AnchorPoint)s_crit_bl_text_anchor;
+                                        if (text_w_en) c.text_pos.is_set = s_crit_bl_text_set;
+                                        if (text_w_hi) c.text_pos.is_hidden_in_layout = s_crit_bl_text_hide;
+                                        if (text_w_po) {
+                                            c.text_pos.x = fminf(fmaxf(roundf(s_crit_bl_text_x + x_mult * s_crit_bl_text_xs),
+                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.text_pos.y = fminf(fmaxf(roundf(s_crit_bl_text_y + y_mult * s_crit_bl_text_ys),
+                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (text_w_an) c.text_pos.anchor = (AnchorPoint)s_crit_bl_text_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected criterion.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -7839,6 +7990,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  &s_stat_bl_prog_x, &s_stat_bl_prog_y, &s_stat_bl_prog_xs, &s_stat_bl_prog_ys,
                                  &s_stat_bl_prog_cols, &s_stat_bl_prog_anchor},
                             };
+                            static bool s_bl_base_set[3], s_bl_base_hide[3];
+                            static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
+                            static int s_bl_base_cols[3], s_bl_base_anchor[3];
+                            if (ImGui::IsWindowAppearing()) {
+                                for (int si = 0; si < 3; ++si) {
+                                    s_bl_base_set[si] = *sections[si].p_set;
+                                    s_bl_base_hide[si] = *sections[si].p_hide;
+                                    s_bl_base_x[si] = *sections[si].p_x;
+                                    s_bl_base_y[si] = *sections[si].p_y;
+                                    s_bl_base_xs[si] = *sections[si].p_xs;
+                                    s_bl_base_ys[si] = *sections[si].p_ys;
+                                    s_bl_base_cols[si] = *sections[si].p_cols;
+                                    s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                }
+                            }
                             for (int si = 0; si < 3; ++si) {
                                 auto &s = sections[si];
                                 if (si > 0) ImGui::Separator();
@@ -7873,7 +8039,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button(s.apply_label)) {
+                                bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                            (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                            (*s.p_cols != s_bl_base_cols[si]);
+                                bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                bool w_en, w_hi, w_po, w_an;
+                                char applabel[96];
+                                bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                         w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                if (ImGui::Button(applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
@@ -7881,15 +8057,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ManualPos *target = (si == 0) ? &st.icon_pos : (si == 1) ? &st.text_pos : &st.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                        target->is_set = *s.p_set;
-                                        target->is_hidden_in_layout = *s.p_hide;
-                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_en) target->is_set = *s.p_set;
+                                        if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                        if (w_po) {
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -8991,6 +9173,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          &s_sub_bl_prog_x, &s_sub_bl_prog_y, &s_sub_bl_prog_xs, &s_sub_bl_prog_ys,
                                          &s_sub_bl_prog_cols, &s_sub_bl_prog_anchor},
                                     };
+                                    static bool s_bl_base_set[3], s_bl_base_hide[3];
+                                    static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
+                                    static int s_bl_base_cols[3], s_bl_base_anchor[3];
+                                    if (ImGui::IsWindowAppearing()) {
+                                        for (int si = 0; si < 3; ++si) {
+                                            s_bl_base_set[si] = *sections[si].p_set;
+                                            s_bl_base_hide[si] = *sections[si].p_hide;
+                                            s_bl_base_x[si] = *sections[si].p_x;
+                                            s_bl_base_y[si] = *sections[si].p_y;
+                                            s_bl_base_xs[si] = *sections[si].p_xs;
+                                            s_bl_base_ys[si] = *sections[si].p_ys;
+                                            s_bl_base_cols[si] = *sections[si].p_cols;
+                                            s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                        }
+                                    }
                                     for (int si = 0; si < 3; ++si) {
                                         auto &s = sections[si];
                                         if (si > 0) ImGui::Separator();
@@ -9025,7 +9222,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                             "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                             "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                        if (ImGui::Button(s.apply_label)) {
+                                        bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                        bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                        bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                                    (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                                    (*s.p_cols != s_bl_base_cols[si]);
+                                        bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                        bool w_en, w_hi, w_po, w_an;
+                                        char applabel[96];
+                                        bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                                 w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                        if (ImGui::Button(applabel)) {
                                             int n = 0;
                                             for (int idx : bulk_layout_sorted) {
                                                 if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
@@ -9033,15 +9240,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 ManualPos *target = (si == 0) ? &c.icon_pos : (si == 1) ? &c.text_pos : &c.progress_pos;
                                                 int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                                 int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                                target->is_set = *s.p_set;
-                                                target->is_hidden_in_layout = *s.p_hide;
-                                                target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                                target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                                target->anchor = (AnchorPoint)*s.p_anchor;
+                                                if (w_en) target->is_set = *s.p_set;
+                                                if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                                if (w_po) {
+                                                    target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                    target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                }
+                                                if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                                 n++;
                                             }
                                             save_message_type = MSG_NONE;
                                         }
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                            "Applies only the buckets you changed since opening this popup.\n"
+                                            "Change nothing (or all four) to apply everything.\n"
+                                            "Untouched fields are left as-is on each selected item.");
                                         ImGui::PopID();
                                     }
 
@@ -9880,6 +10093,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  &s_unl_bl_text_x, &s_unl_bl_text_y, &s_unl_bl_text_xs, &s_unl_bl_text_ys,
                                  &s_unl_bl_text_cols, &s_unl_bl_text_anchor},
                             };
+                            static bool s_bl_base_set[2], s_bl_base_hide[2];
+                            static float s_bl_base_x[2], s_bl_base_y[2], s_bl_base_xs[2], s_bl_base_ys[2];
+                            static int s_bl_base_cols[2], s_bl_base_anchor[2];
+                            if (ImGui::IsWindowAppearing()) {
+                                for (int si = 0; si < 2; ++si) {
+                                    s_bl_base_set[si] = *sections[si].p_set;
+                                    s_bl_base_hide[si] = *sections[si].p_hide;
+                                    s_bl_base_x[si] = *sections[si].p_x;
+                                    s_bl_base_y[si] = *sections[si].p_y;
+                                    s_bl_base_xs[si] = *sections[si].p_xs;
+                                    s_bl_base_ys[si] = *sections[si].p_ys;
+                                    s_bl_base_cols[si] = *sections[si].p_cols;
+                                    s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                }
+                            }
                             for (int si = 0; si < 2; ++si) {
                                 auto &s = sections[si];
                                 if (si > 0) ImGui::Separator();
@@ -9914,7 +10142,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button(s.apply_label)) {
+                                bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                            (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                            (*s.p_cols != s_bl_base_cols[si]);
+                                bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                bool w_en, w_hi, w_po, w_an;
+                                char applabel[96];
+                                bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                         w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                if (ImGui::Button(applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
@@ -9922,15 +10160,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ManualPos *target = (si == 0) ? &u.icon_pos : &u.text_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                        target->is_set = *s.p_set;
-                                        target->is_hidden_in_layout = *s.p_hide;
-                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_en) target->is_set = *s.p_set;
+                                        if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                        if (w_po) {
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -10624,6 +10868,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  &s_cg_bl_text_x, &s_cg_bl_text_y, &s_cg_bl_text_xs, &s_cg_bl_text_ys,
                                  &s_cg_bl_text_cols, &s_cg_bl_text_anchor},
                             };
+                            static bool s_bl_base_set[2], s_bl_base_hide[2];
+                            static float s_bl_base_x[2], s_bl_base_y[2], s_bl_base_xs[2], s_bl_base_ys[2];
+                            static int s_bl_base_cols[2], s_bl_base_anchor[2];
+                            if (ImGui::IsWindowAppearing()) {
+                                for (int si = 0; si < 2; ++si) {
+                                    s_bl_base_set[si] = *sections[si].p_set;
+                                    s_bl_base_hide[si] = *sections[si].p_hide;
+                                    s_bl_base_x[si] = *sections[si].p_x;
+                                    s_bl_base_y[si] = *sections[si].p_y;
+                                    s_bl_base_xs[si] = *sections[si].p_xs;
+                                    s_bl_base_ys[si] = *sections[si].p_ys;
+                                    s_bl_base_cols[si] = *sections[si].p_cols;
+                                    s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                }
+                            }
                             for (int si = 0; si < 2; ++si) {
                                 auto &s = sections[si];
                                 if (si > 0) ImGui::Separator();
@@ -10658,7 +10917,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button(s.apply_label)) {
+                                bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                            (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                            (*s.p_cols != s_bl_base_cols[si]);
+                                bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                bool w_en, w_hi, w_po, w_an;
+                                char applabel[96];
+                                bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                         w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                if (ImGui::Button(applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
@@ -10666,15 +10935,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ManualPos *target = (si == 0) ? &g.icon_pos : &g.text_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                        target->is_set = *s.p_set;
-                                        target->is_hidden_in_layout = *s.p_hide;
-                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_en) target->is_set = *s.p_set;
+                                        if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                        if (w_po) {
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -11650,6 +11925,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  &s_msg_bl_prog_x, &s_msg_bl_prog_y, &s_msg_bl_prog_xs, &s_msg_bl_prog_ys,
                                  &s_msg_bl_prog_cols, &s_msg_bl_prog_anchor},
                             };
+                            static bool s_bl_base_set[3], s_bl_base_hide[3];
+                            static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
+                            static int s_bl_base_cols[3], s_bl_base_anchor[3];
+                            if (ImGui::IsWindowAppearing()) {
+                                for (int si = 0; si < 3; ++si) {
+                                    s_bl_base_set[si] = *sections[si].p_set;
+                                    s_bl_base_hide[si] = *sections[si].p_hide;
+                                    s_bl_base_x[si] = *sections[si].p_x;
+                                    s_bl_base_y[si] = *sections[si].p_y;
+                                    s_bl_base_xs[si] = *sections[si].p_xs;
+                                    s_bl_base_ys[si] = *sections[si].p_ys;
+                                    s_bl_base_cols[si] = *sections[si].p_cols;
+                                    s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                }
+                            }
                             for (int si = 0; si < 3; ++si) {
                                 auto &s = sections[si];
                                 if (si > 0) ImGui::Separator();
@@ -11684,7 +11974,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button(s.apply_label)) {
+                                bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                            (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                            (*s.p_cols != s_bl_base_cols[si]);
+                                bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                bool w_en, w_hi, w_po, w_an;
+                                char applabel[96];
+                                bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                         w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                if (ImGui::Button(applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
@@ -11692,16 +11992,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                        target->is_set = *s.p_set;
-                                        target->is_hidden_in_layout = *s.p_hide;
-                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_en) target->is_set = *s.p_set;
+                                        if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                        if (w_po) {
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                         n++;
                                     }
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -13766,6 +14072,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  &s_ctr_bl_prog_x, &s_ctr_bl_prog_y, &s_ctr_bl_prog_xs, &s_ctr_bl_prog_ys,
                                  &s_ctr_bl_prog_cols, &s_ctr_bl_prog_anchor},
                             };
+                            static bool s_bl_base_set[3], s_bl_base_hide[3];
+                            static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
+                            static int s_bl_base_cols[3], s_bl_base_anchor[3];
+                            if (ImGui::IsWindowAppearing()) {
+                                for (int si = 0; si < 3; ++si) {
+                                    s_bl_base_set[si] = *sections[si].p_set;
+                                    s_bl_base_hide[si] = *sections[si].p_hide;
+                                    s_bl_base_x[si] = *sections[si].p_x;
+                                    s_bl_base_y[si] = *sections[si].p_y;
+                                    s_bl_base_xs[si] = *sections[si].p_xs;
+                                    s_bl_base_ys[si] = *sections[si].p_ys;
+                                    s_bl_base_cols[si] = *sections[si].p_cols;
+                                    s_bl_base_anchor[si] = *sections[si].p_anchor;
+                                }
+                            }
                             for (int si = 0; si < 3; ++si) {
                                 auto &s = sections[si];
                                 if (si > 0) ImGui::Separator();
@@ -13800,7 +14121,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                     "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
                                     "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                if (ImGui::Button(s.apply_label)) {
+                                bool t_en = (*s.p_set != s_bl_base_set[si]);
+                                bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
+                                bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
+                                            (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
+                                            (*s.p_cols != s_bl_base_cols[si]);
+                                bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
+                                bool w_en, w_hi, w_po, w_an;
+                                char applabel[96];
+                                bulk_layout_apply_decide(s.label, s.id, t_en, t_hi, t_po, t_an,
+                                                         w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
+                                if (ImGui::Button(applabel)) {
                                     int n = 0;
                                     for (int idx : bulk_layout_sorted) {
                                         if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
@@ -13808,15 +14139,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
-                                        target->is_set = *s.p_set;
-                                        target->is_hidden_in_layout = *s.p_hide;
-                                        target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                        target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_en) target->is_set = *s.p_set;
+                                        if (w_hi) target->is_hidden_in_layout = *s.p_hide;
+                                        if (w_po) {
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                        }
+                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                    "Applies only the buckets you changed since opening this popup.\n"
+                                    "Change nothing (or all four) to apply everything.\n"
+                                    "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
