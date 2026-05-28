@@ -3,166 +3,196 @@
 		"minecraft:story/mine_stone":	{
 			"icon":	"items/wooden_pickaxe_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/upgrade_tools":	{
 			"icon":	"items/stone_pickaxe_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/iron_tools":	{
 			"icon":	"items/iron_pickaxe_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/smelt_iron":	{
 			"icon":	"items/iron_ingot_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/mine_diamond":	{
 			"icon":	"items/diamond_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/lava_bucket":	{
 			"icon":	"items/lava_bucket_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/form_obsidian":	{
 			"icon":	"blocks/Obsidian_JE3_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enter_the_nether":	{
 			"icon":	"items/flint_and_steel_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/obtain_armor":	{
 			"icon":	"items/iron_chestplate_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/shiny_gear":	{
 			"icon":	"items/diamond_chestplate_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/cure_zombie_villager":	{
 			"icon":	"items/golden_apple_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/root":	{
 			"icon":	"blocks/Grass_Block_JE7_BE6.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/deflect_arrow":	{
 			"icon":	"items/Shield_JE2_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/follow_ender_eye":	{
 			"icon":	"items/ender_eye_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enter_the_end":	{
 			"icon":	"blocks/End_Stone_JE3_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enchant_item":	{
 			"icon":	"items/Enchanted_Book_unoptimized.gif",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/return_to_sender":	{
 			"icon":	"items/fire_charge_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/charge_respawn_anchor":	{
 			"icon":	"blocks/Respawn_Anchor_(0)_JE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/obtain_crying_obsidian":	{
 			"icon":	"blocks/Crying_Obsidian_JE1_BE1.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/loot_bastion":	{
 			"icon":	"blocks/Chest_(S)_JE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/find_bastion":	{
 			"icon":	"blocks/Polished_Blackstone_Bricks_JE2_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/find_fortress":	{
 			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/root":	{
 			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/uneasy_alliance":	{
 			"icon":	"items/ghast_tear_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/fast_travel":	{
 			"icon":	"items/map_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/brew_potion":	{
 			"icon":	"items/Water_Bottle_JE2_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/obtain_blaze_rod":	{
 			"icon":	"items/blaze_rod_1.0.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/distract_piglin":	{
 			"icon":	"items/gold_ingot_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/obtain_ancient_debris":	{
 			"icon":	"blocks/Ancient_Debris_JE1_BE1.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/explore_nether":	{
 			"icon":	"items/netherite_boots_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:nether_wastes":	{
 					"icon":	"neBiomes/26.2+/nether_wastes.png"
@@ -183,224 +213,265 @@
 		},
 		"minecraft:nether/netherite_armor":	{
 			"icon":	"items/netherite_chestplate_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/all_effects":	{
 			"icon":	"items/bucket_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/all_potions":	{
 			"icon":	"items/milk_bucket_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/create_full_beacon":	{
 			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/create_beacon":	{
 			"icon":	"blocks/Beacon_JE6_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/summon_wither":	{
 			"icon":	"items/nether_star_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/get_wither_skull":	{
 			"icon":	"blocks/Wither_Skeleton_Skull.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/ride_strider_in_overworld_lava":	{
 			"icon":	"items/warped_fungus_on_a_stick_1.20.2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/ride_strider":	{
 			"icon":	"items/warped_fungus_on_a_stick_1.20.2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/root":	{
 			"icon":	"blocks/End_Stone_JE3_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/kill_dragon":	{
 			"icon":	"blocks/Dragon_Head.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/dragon_egg":	{
 			"icon":	"blocks/Dragon_Egg_JE5.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/enter_end_gateway":	{
 			"icon":	"items/ender_pearl_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/find_end_city":	{
 			"icon":	"blocks/Purpur_Block_JE2_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/dragon_breath":	{
 			"icon":	"items/dragon_breath_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/respawn_dragon":	{
 			"icon":	"items/end_crystal_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/elytra":	{
 			"icon":	"items/elytra_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/levitate":	{
 			"icon":	"items/shulker_shell_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/root":	{
 			"icon":	"blocks/Hay_Bale_(UD)_JE2_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/place_dried_ghast_in_water":	{
 			"icon":	"blocks/Dried_Ghast_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/plant_seed":	{
 			"icon":	"items/wheat_seeds_1.13.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/breed_an_animal":	{
 			"icon":	"items/wheat_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/tame_an_animal":	{
 			"icon":	"items/lead_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/fishy_business":	{
 			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/tactical_fishing":	{
 			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/axolotl_in_a_bucket":	{
 			"icon":	"items/axolotl_bucket_1.20.2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/kill_axolotl_target":	{
 			"icon":	"items/tropical_fish_bucket_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/make_a_sign_glow":	{
 			"icon":	"items/glow_ink_sac_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/ride_a_boat_with_a_goat":	{
 			"icon":	"items/oak_boat_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/safely_harvest_honey":	{
 			"icon":	"items/honey_bottle_1.15.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/wax_on":	{
 			"icon":	"items/honeycomb_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/wax_off":	{
 			"icon":	"items/stone_axe_25w14craftmine.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/silk_touch_nest":	{
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/repair_wolf_armor":	{
 			"icon":	"items/wolf_armor_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/remove_wolf_armor":	{
 			"icon":	"items/shears_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/allay_deliver_item_to_player":	{
 			"icon":	"items/cookie_25w14craftmine.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/allay_deliver_cake_to_note_block":	{
 			"icon":	"blocks/Note_Block_JE2_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/obtain_sniffer_egg":	{
 			"icon":	"items/sniffer_egg_25w14craftmine.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/feed_snifflet":	{
 			"icon":	"items/torchflower_seeds_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/plant_any_sniffer_seed":	{
 			"icon":	"items/pitcher_pod_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/bred_all_animals":	{
 			"icon":	"items/golden_carrot_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:pig":	{
 					"icon":	"animals/pig.png"
@@ -484,6 +555,7 @@
 		},
 		"minecraft:husbandry/balanced_diet":	{
 			"icon":	"items/apple_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"bread":	{
 					"icon":	"items/bread_3d_shareware_v1.34.png"
@@ -609,6 +681,7 @@
 		},
 		"minecraft:husbandry/complete_catalogue":	{
 			"icon":	"items/cod_1.13.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:jellie":	{
 					"icon":	"cats/jellie.png"
@@ -647,6 +720,7 @@
 		},
 		"minecraft:husbandry/whole_pack":	{
 			"icon":	"items/bone_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:pale":	{
 					"icon":	"wolves/wolf_pale.png"
@@ -679,145 +753,172 @@
 		},
 		"minecraft:husbandry/obtain_netherite_hoe":	{
 			"icon":	"items/netherite_hoe_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/froglights":	{
 			"icon":	"blocks/Verdant_Froglight_(UD)_JE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/leash_all_frog_variants":	{
 			"icon":	"items/lead_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/tadpole_in_a_bucket":	{
 			"icon":	"items/tadpole_bucket_1.20.2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/uh_oh":	{
 			"icon":	"blocks/TNT_JE3_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/root":	{
 			"icon":	"items/map_empty_1.11.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/sleep_in_bed":	{
 			"icon":	"blocks/Red_Bed_(N).png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/kill_a_mob":	{
 			"icon":	"items/iron_sword_1.0.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/shoot_arrow":	{
 			"icon":	"items/bow_1.13.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/sniper_duel":	{
 			"icon":	"items/arrow_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/ol_betsy":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/whos_the_pillager_now":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/trade":	{
 			"icon":	"items/emerald_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/trade_at_world_height":	{
 			"icon":	"items/emerald_1.20.2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/summon_iron_golem":	{
 			"icon":	"blocks/Carved_Pumpkin_(S)_JE5.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/bullseye":	{
 			"icon":	"blocks/Target_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/read_power_of_chiseled_bookshelf":	{
 			"icon":	"blocks/Chiseled_Bookshelf_(S_0)_JE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/two_birds_one_arrow":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/arbalistic":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/spear_many_mobs":	{
 			"icon":	"items/iron_spear_1.21.11.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/fall_from_world_height":	{
 			"icon":	"items/water_bucket_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/play_jukebox_in_meadows":	{
 			"icon":	"blocks/Jukebox_JE2_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/brush_armadillo":	{
 			"icon":	"items/armadillo_scute_24w14potato.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/salvage_sherd":	{
 			"icon":	"items/brush_1.20.2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/craft_decorated_pot_using_only_sherds":	{
 			"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/trim_with_any_armor_pattern":	{
 			"icon":	"items/dune_armor_trim_smithing_template_25w14craftmine.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/trim_with_all_exclusive_armor_patterns":	{
 			"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
 					"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png"
@@ -847,122 +948,145 @@
 		},
 		"minecraft:adventure/spyglass_at_parrot":	{
 			"icon":	"items/spyglass_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/spyglass_at_ghast":	{
 			"icon":	"items/spyglass_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/spyglass_at_dragon":	{
 			"icon":	"items/spyglass_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/heart_transplanter":	{
 			"icon":	"blocks/Creaking_Heart_JE2_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/avoid_vibration":	{
 			"icon":	"blocks/Sculk_Sensor_JE1_unoptimized.gif",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/kill_mob_near_sculk_catalyst":	{
 			"icon":	"blocks/Sculk_Catalyst_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/crafters_crafting_crafters":	{
 			"icon":	"blocks/Crafter_JE4_BE3.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/minecraft_trials_edition":	{
 			"icon":	"blocks/Chiseled_Tuff_Bricks_JE1_BE1.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/lighten_up":	{
 			"icon":	"blocks/Copper_Bulb_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/who_needs_rockets":	{
 			"icon":	"items/wind_charge_24w14potato.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/blowback":	{
 			"icon":	"items/wind_charge_24w14potato.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/under_lock_and_key":	{
 			"icon":	"items/trial_key_24w14potato.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/revaulting":	{
 			"icon":	"items/ominous_trial_key_25w14craftmine.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/overoverkill":	{
 			"icon":	"items/mace_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/totem_of_undying":	{
 			"icon":	"items/totem_of_undying_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/walk_on_powder_snow_with_leather_boots":	{
 			"icon":	"items/Leather_Boots_(item)_JE4_BE3.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/honey_block_slide":	{
 			"icon":	"blocks/Honey_Block_JE1_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/voluntary_exile":	{
 			"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/hero_of_the_village":	{
 			"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/throw_trident":	{
 			"icon":	"items/trident_1.13.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/very_very_frightening":	{
 			"icon":	"items/trident_1.13.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/lightning_rod_with_villager_no_fire":	{
 			"icon":	"blocks/Lightning_Rod_(U)_JE3.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/adventuring_time":	{
 			"icon":	"items/diamond_boots_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:plains":	{
 					"icon":	"ovBiomes/1.21.11+/plains.png"
@@ -1133,6 +1257,7 @@
 		},
 		"minecraft:adventure/kill_all_mobs":	{
 			"icon":	"items/diamond_sword_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:creeper":	{
 					"icon":	"monsters/creeper.png"
@@ -1261,6 +1386,7 @@
 		},
 		"minecraft:adventure/use_lodestone":	{
 			"icon":	"blocks/Lodestone_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			}
 		}
@@ -1363,6 +1489,12 @@
 				}, {
 					"root_name":	"ms_goal:spire"
 				}]
+		},
+		"conduit_crafted_helper":	{
+			"icon":	"blocks/Conduit_JE1_BE1.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:conduit",
+			"target":	1
 		}
 	},
 	"unlocks":	[],
@@ -1470,7 +1602,10 @@
 					"icon":	"items/nautilus_shell_1.20.2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-					"target":	8
+					"target":	8,
+					"linked_goals":	[{
+							"root_name":	"conduit_crafted_helper"
+						}]
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Conduit_JE1_BE1.png",
@@ -1656,7 +1791,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/spire_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1669,7 +1808,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/tide_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1682,7 +1825,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/snout_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1695,7 +1842,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/rib_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1708,7 +1859,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/wayfinder_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1721,7 +1876,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/vex_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1734,7 +1893,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/ward_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1747,7 +1910,11 @@
 					"stage_id":	"1",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/silence_armor_trim_smithing_template",
-					"target":	1
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim",
+							"parent_root":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns"
+						}]
 				}, {
 					"stage_id":	"final",
 					"type":	"final",

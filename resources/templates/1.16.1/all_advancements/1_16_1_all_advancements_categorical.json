@@ -2,6 +2,7 @@
 	"advancements":	{
 		"minecraft:story/upgrade_tools":	{
 			"icon":	"items/stone_pickaxe_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -11,6 +12,7 @@
 		},
 		"minecraft:story/iron_tools":	{
 			"icon":	"items/iron_pickaxe_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -20,6 +22,7 @@
 		},
 		"minecraft:story/lava_bucket":	{
 			"icon":	"items/lava_bucket_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -29,6 +32,7 @@
 		},
 		"minecraft:story/form_obsidian":	{
 			"icon":	"blocks/Obsidian_JE3_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -38,6 +42,7 @@
 		},
 		"minecraft:story/obtain_armor":	{
 			"icon":	"items/iron_chestplate_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -47,6 +52,7 @@
 		},
 		"minecraft:nether/distract_piglin":	{
 			"icon":	"items/gold_ingot_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -56,6 +62,7 @@
 		},
 		"minecraft:nether/charge_respawn_anchor":	{
 			"icon":	"blocks/Respawn_Anchor_(0)_JE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -65,6 +72,7 @@
 		},
 		"minecraft:end/dragon_egg":	{
 			"icon":	"blocks/Dragon_Egg_JE5.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -74,6 +82,7 @@
 		},
 		"minecraft:end/levitate":	{
 			"icon":	"items/shulker_shell_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -83,6 +92,7 @@
 		},
 		"minecraft:story/enchant_item":	{
 			"icon":	"items/Enchanted_Book_unoptimized.gif",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -92,6 +102,7 @@
 		},
 		"minecraft:adventure/summon_iron_golem":	{
 			"icon":	"blocks/Carved_Pumpkin_(S)_JE5.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -101,6 +112,7 @@
 		},
 		"minecraft:adventure/arbalistic":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -110,6 +122,7 @@
 		},
 		"minecraft:adventure/sniper_duel":	{
 			"icon":	"items/arrow_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -119,6 +132,7 @@
 		},
 		"minecraft:story/deflect_arrow":	{
 			"icon":	"items/Shield_JE2_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -129,6 +143,7 @@
 		"minecraft:adventure/very_very_frightening":	{
 			"icon":	"items/trident_1.13.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -138,6 +153,7 @@
 		},
 		"minecraft:adventure/two_birds_one_arrow":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -147,6 +163,7 @@
 		},
 		"minecraft:adventure/sleep_in_bed":	{
 			"icon":	"blocks/Red_Bed_(N).png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -156,6 +173,7 @@
 		},
 		"minecraft:husbandry/fishy_business":	{
 			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -165,6 +183,7 @@
 		},
 		"minecraft:husbandry/tactical_fishing":	{
 			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -174,6 +193,7 @@
 		},
 		"minecraft:husbandry/silk_touch_nest":	{
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -183,6 +203,7 @@
 		},
 		"minecraft:story/cure_zombie_villager":	{
 			"icon":	"items/golden_apple_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -192,6 +213,7 @@
 		},
 		"minecraft:adventure/bullseye":	{
 			"icon":	"blocks/Target_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -201,6 +223,7 @@
 		},
 		"minecraft:nether/fast_travel":	{
 			"icon":	"items/map_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -210,6 +233,7 @@
 		},
 		"minecraft:nether/return_to_sender":	{
 			"icon":	"items/fire_charge_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -219,6 +243,7 @@
 		},
 		"minecraft:nether/use_lodestone":	{
 			"icon":	"blocks/Lodestone_JE1_BE1.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -228,6 +253,7 @@
 		},
 		"minecraft:nether/uneasy_alliance":	{
 			"icon":	"items/ghast_tear_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -237,6 +263,7 @@
 		},
 		"minecraft:nether/ride_strider":	{
 			"icon":	"items/warped_fungus_on_a_stick_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -247,6 +274,7 @@
 		"minecraft:nether/create_full_beacon":	{
 			"icon":	"blocks/Beacon_JE6_BE2.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -256,6 +284,7 @@
 		},
 		"minecraft:nether/netherite_armor":	{
 			"icon":	"items/netherite_chestplate_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -265,6 +294,7 @@
 		},
 		"minecraft:husbandry/obtain_netherite_hoe":	{
 			"icon":	"items/netherite_hoe_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -274,43 +304,48 @@
 		},
 		"minecraft:husbandry/safely_harvest_honey":	{
 			"icon":	"items/honey_bottle_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
 				"x":	35,
-				"y":	905
+				"y":	900
 			}
 		},
 		"minecraft:adventure/honey_block_slide":	{
 			"icon":	"blocks/Honey_Block_JE1_BE2.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
 				"x":	185,
-				"y":	905
+				"y":	900
 			}
 		},
 		"minecraft:adventure/whos_the_pillager_now":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
 				"x":	335,
-				"y":	905
+				"y":	900
 			}
 		},
 		"minecraft:adventure/hero_of_the_village":	{
 			"icon":	"blocks/Ominous_Banner_unoptimized.gif",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
 				"x":	485,
-				"y":	905
+				"y":	900
 			}
 		},
 		"minecraft:nether/all_effects":	{
 			"icon":	"items/bucket_3d_shareware_v1.34.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -320,6 +355,7 @@
 		},
 		"minecraft:adventure/totem_of_undying":	{
 			"icon":	"items/totem_of_undying_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -329,6 +365,7 @@
 		},
 		"minecraft:end/respawn_dragon":	{
 			"icon":	"items/end_crystal_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -338,6 +375,7 @@
 		},
 		"minecraft:end/dragon_breath":	{
 			"icon":	"items/dragon_breath_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -347,6 +385,7 @@
 		},
 		"minecraft:adventure/adventuring_time":	{
 			"icon":	"items/diamond_boots_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:plains":	{
 					"icon":	"ovBiomes/plains.png",
@@ -650,6 +689,7 @@
 		},
 		"minecraft:nether/explore_nether":	{
 			"icon":	"items/netherite_boots_20w14infinite.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:nether_wastes":	{
 					"icon":	"neBiomes/nether_wastes.png",
@@ -694,6 +734,7 @@
 		},
 		"minecraft:adventure/kill_all_mobs":	{
 			"icon":	"items/diamond_sword_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:creeper":	{
 					"icon":	"monsters/creeper.png",
@@ -1099,6 +1140,7 @@
 		},
 		"minecraft:husbandry/balanced_diet":	{
 			"icon":	"items/apple_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"bread":	{
 					"icon":	"items/bread_3d_shareware_v1.34.png",
@@ -1576,6 +1618,7 @@
 		},
 		"minecraft:husbandry/bred_all_animals":	{
 			"icon":	"items/golden_carrot_25w14craftmine.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:pig":	{
 					"icon":	"animals/pig.png",
@@ -1813,6 +1856,7 @@
 		},
 		"minecraft:husbandry/complete_catalogue":	{
 			"icon":	"items/cod_1.13.png",
+			"groups_enabled":	false,
 			"criteria":	{
 				"textures/entity/cat/jellie.png":	{
 					"icon":	"cats/jellie.png",
@@ -1900,6 +1944,7 @@
 		"minecraft:nether/obtain_crying_obsidian":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1916,6 +1961,7 @@
 		"minecraft:end/kill_dragon":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1932,6 +1978,7 @@
 		"minecraft:nether/all_potions":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1948,6 +1995,7 @@
 		"minecraft:husbandry/tame_an_animal":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1964,6 +2012,7 @@
 		"minecraft:nether/create_beacon":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1980,6 +2029,7 @@
 		"minecraft:nether/brew_potion":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -1996,6 +2046,7 @@
 		"minecraft:nether/root":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2012,6 +2063,7 @@
 		"minecraft:nether/get_wither_skull":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2028,6 +2080,7 @@
 		"minecraft:story/mine_stone":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2044,6 +2097,7 @@
 		"minecraft:story/enter_the_nether":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2060,6 +2114,7 @@
 		"minecraft:end/find_end_city":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2076,6 +2131,7 @@
 		"minecraft:end/enter_end_gateway":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2092,6 +2148,7 @@
 		"minecraft:nether/obtain_blaze_rod":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2108,6 +2165,7 @@
 		"minecraft:nether/loot_bastion":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2124,6 +2182,7 @@
 		"minecraft:adventure/shoot_arrow":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2140,6 +2199,7 @@
 		"minecraft:story/smelt_iron":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2156,6 +2216,7 @@
 		"minecraft:story/shiny_gear":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2172,6 +2233,7 @@
 		"minecraft:end/elytra":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2188,6 +2250,7 @@
 		"minecraft:adventure/root":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2204,6 +2267,7 @@
 		"minecraft:adventure/voluntary_exile":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2220,6 +2284,7 @@
 		"minecraft:story/follow_ender_eye":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2236,6 +2301,7 @@
 		"minecraft:end/root":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2252,6 +2318,7 @@
 		"minecraft:adventure/kill_a_mob":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2268,6 +2335,7 @@
 		"minecraft:husbandry/plant_seed":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2284,6 +2352,7 @@
 		"minecraft:nether/find_bastion":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2300,6 +2369,7 @@
 		"minecraft:nether/obtain_ancient_debris":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2316,6 +2386,7 @@
 		"minecraft:nether/summon_wither":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2332,6 +2403,7 @@
 		"minecraft:husbandry/root":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2348,6 +2420,7 @@
 		"minecraft:adventure/trade":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2364,6 +2437,7 @@
 		"minecraft:story/mine_diamond":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2380,6 +2454,7 @@
 		"minecraft:nether/find_fortress":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2396,6 +2471,7 @@
 		"minecraft:adventure/throw_trident":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2412,6 +2488,7 @@
 		"minecraft:story/root":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2428,6 +2505,7 @@
 		"minecraft:adventure/ol_betsy":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2444,6 +2522,7 @@
 		"minecraft:story/enter_the_end":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2460,6 +2539,7 @@
 		"minecraft:husbandry/breed_an_animal":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"groups_enabled":	false,
 			"criteria":	{
 			},
 			"icon_pos":	{
@@ -2535,21 +2615,11 @@
 			"root_name":	"minecraft:picked_up/minecraft:carrot",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"golden_carrot",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
+					"root_name":	"golden_carrots"
 				}, {
-					"root_name":	"carrot",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"minecraft:horse",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:donkey",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:mule",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"carrots_obtained"
 				}],
+			"linked_goal_mode":	"or",
 			"icon_pos":	{
 				"x":	1215,
 				"y":	125
@@ -2705,6 +2775,11 @@
 			"icon_pos":	{
 				"x":	185,
 				"y":	760
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
 			}
 		},
 		"trident":	{
@@ -2720,7 +2795,12 @@
 				}],
 			"icon_pos":	{
 				"x":	1610,
-				"y":	45
+				"y":	70
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
 			}
 		},
 		"sus_stew":	{
@@ -2734,7 +2814,12 @@
 				}],
 			"icon_pos":	{
 				"x":	1885,
-				"y":	135
+				"y":	140
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
 			}
 		},
 		"conduit":	{
@@ -2803,7 +2888,12 @@
 				}],
 			"icon_pos":	{
 				"x":	1760,
-				"y":	135
+				"y":	140
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
 			}
 		},
 		"end_crystals":	{
@@ -2898,6 +2988,81 @@
 			"progress_pos":	{
 				"hidden":	true
 			}
+		},
+		"golden_carrots":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:golden_carrot",
+			"target":	8,
+			"linked_goals":	[{
+					"root_name":	"minecraft:horse",
+					"parent_root":	"minecraft:husbandry/bred_all_animals"
+				}, {
+					"root_name":	"minecraft:donkey",
+					"parent_root":	"minecraft:husbandry/bred_all_animals"
+				}, {
+					"root_name":	"minecraft:mule",
+					"parent_root":	"minecraft:husbandry/bred_all_animals"
+				}, {
+					"root_name":	"golden_carrot",
+					"parent_root":	"minecraft:husbandry/balanced_diet"
+				}, {
+					"root_name":	"minecraft:nether/all_effects"
+				}],
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			}
+		},
+		"carrots_obtained":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:picked_up/minecraft:carrot",
+			"target":	11,
+			"linked_goals":	[{
+					"root_name":	"minecraft:pig",
+					"parent_root":	"minecraft:husbandry/bred_all_animals"
+				}, {
+					"root_name":	"carrot",
+					"parent_root":	"minecraft:husbandry/balanced_diet"
+				}],
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			}
+		},
+		"conduit_crafted_helper":	{
+			"icon":	"blocks/Conduit_JE1_BE1.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:conduit",
+			"target":	1,
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-300,
+				"hidden":	true
+			}
 		}
 	},
 	"unlocks":	[],
@@ -2966,7 +3131,10 @@
 					"icon":	"items/nautilus_shell_25w14craftmine.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-					"target":	8
+					"target":	8,
+					"linked_goals":	[{
+							"root_name":	"conduit_crafted_helper"
+						}]
 				}, {
 					"stage_id":	"2",
 					"icon":	"items/nautilus_shell_25w14craftmine.png",
@@ -4209,8 +4377,7 @@
 					"root_name":	"textures/entity/cat/all_black.png",
 					"parent_root":	"minecraft:husbandry/complete_catalogue"
 				}, {
-					"root_name":	"minecraft:crafted/minecraft:lead",
-					"parent_root":	"leads2"
+					"root_name":	"leads"
 				}],
 			"pos":	{
 				"x":	1760,
@@ -4349,6 +4516,9 @@
 					"root_name":	"minecraft:story/cure_zombie_villager"
 				}, {
 					"root_name":	"minecraft:adventure/bullseye"
+				}, {
+					"root_name":	"minecraft:snowy_tundra",
+					"parent_root":	"minecraft:adventure/adventuring_time"
 				}],
 			"pos":	{
 				"x":	1370,

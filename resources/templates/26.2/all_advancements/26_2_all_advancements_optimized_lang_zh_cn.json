@@ -330,6 +330,7 @@
 	"stat.stat:bee_nests_picked_up":	"蜂巢",
 	"stat.stat:vaults_opened":	"宝库",
 	"stat.stat:chests_opened":	"箱子",
+	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:sniffers.display_name":	"嗅探兽",
 	"multi_stage_goal.ms_goal:sniffers.stage.1":	"获取嗅探兽蛋",
 	"multi_stage_goal.ms_goal:sniffers.stage.2":	"放置嗅探兽蛋",

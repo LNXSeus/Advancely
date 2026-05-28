@@ -2315,6 +2315,23 @@
 				"y":	425,
 				"anchor":	4
 			}
+		},
+		"conduit_crafted_helper":	{
+			"icon":	"blocks/Conduit_JE1_BE1.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:conduit",
+			"target":	1,
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
 		}
 	},
 	"unlocks":	[],
@@ -2388,7 +2405,10 @@
 					"icon":	"items/nautilus_shell_1.20.2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-					"target":	8
+					"target":	8,
+					"linked_goals":	[{
+							"root_name":	"conduit_crafted_helper"
+						}]
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Conduit_JE1_BE1.png",
