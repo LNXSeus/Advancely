@@ -13125,8 +13125,10 @@ bool tracker_build_coop_sync_label(const Tracker *t, const AppSettings *settings
     if (!out || out_size == 0) return false;
     out[0] = '\0';
     if (!t || !settings || !g_coop_ctx) return false;
-    if (settings->network_mode != NETWORK_RECEIVER) return false;
-    if (coop_net_get_state(g_coop_ctx) != COOP_NET_CONNECTED) return false;
+    if (settings->network_mode != NETWORK_RECEIVER &&
+        settings->network_mode != NETWORK_HOST) return false;
+    CoopNetState net_state = coop_net_get_state(g_coop_ctx);
+    if (net_state != COOP_NET_CONNECTED && net_state != COOP_NET_LISTENING) return false;
 
     int sel = t->selected_coop_player_idx;
     if (sel >= 0 && sel < settings->coop_player_count) {
@@ -13135,6 +13137,18 @@ bool tracker_build_coop_sync_label(const Tracker *t, const AppSettings *settings
         snprintf(out, out_size, "Syncing for %s", name);
         return true;
     }
+
+    int gsel = t->selected_coop_ghost_idx;
+    if (gsel >= 0 && gsel < g_coop_ctx->ghost_player_count) {
+        const CoopGhostPlayer *g = &g_coop_ctx->ghost_players[gsel];
+        const char *name = g->display_name[0] != '\0' ? g->display_name : g->username;
+        snprintf(out, out_size, "Syncing for %s", name);
+        return true;
+    }
+
+    // Host viewing All Players: world name already names the host's world, so
+    // a "Syncing with <Host>" label would be redundant. Receiver only past here.
+    if (settings->network_mode != NETWORK_RECEIVER) return false;
 
     // All Players -> show host name
     CoopLobbyPlayer lobby[COOP_MAX_LOBBY];

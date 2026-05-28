@@ -2213,12 +2213,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // General Settings
             ImGui::Text("General");
 
-#ifdef _WIN32
-            ImGui::Checkbox("Enable Overlay (use Game Capture)", &temp_settings.enable_overlay);
-#else
             ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
+            bool enable_overlay_hovered = ImGui::IsItemHovered();
+#ifdef _WIN32
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.0f, 1.0f), " (use Game Capture)");
+            enable_overlay_hovered = enable_overlay_hovered || ImGui::IsItemHovered();
 #endif
-            if (ImGui::IsItemHovered()) {
+            if (enable_overlay_hovered) {
                 char enable_overlay_tooltip_buffer[2048];
                 if (selected_version <= MC_VERSION_1_6_4) {
                     // Legacy
