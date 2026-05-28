@@ -178,6 +178,7 @@ struct Tracker {
     FILE *hermes_play_log; // file handle for the restricted play.log.enc
     long hermes_file_offset; // how far we've already read
     bool hermes_active; // true if Hermes was detected for this world
+    char hermes_world_name[MAX_PATH_LENGTH]; // world the play.log.enc handle was opened for
     bool hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
     void *hermes_coop_stat_cache; // Per-player stat values for CUMULATIVE merge delta tracking
     // (std::unordered_map<std::string, int>*, managed in tracker.cpp)
@@ -367,6 +368,20 @@ void tracker_clear_coop_snapshot_cache(Tracker *t);
  * @param settings A pointer to the application settings to use for path finding.
  */
 void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief (Re)opens the Hermes play.log.enc handle for the current world.
+ *
+ * Closes the existing handle and reopens it whenever the current world differs
+ * from the one the handle was opened for, or when Hermes is enabled but no handle
+ * is active yet (e.g. the file did not exist when the world first loaded). Safe to
+ * call every save-driven update: it is a no-op when the handle already matches the
+ * current world, so the read offset is preserved.
+ *
+ * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings.
+ */
+void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Loads and parses all data from template and language files.

@@ -3070,6 +3070,13 @@ int main(int argc, char *argv[]) {
                         }
                     }
 
+                    // Re-detect the Hermes play.log.enc handle for the current
+                    // world. The world may have changed since the last reinit, or
+                    // the file may not have existed when the world first loaded
+                    // (Hermes creates it lazily). No-op when already attached to
+                    // the current world, so the live read offset is preserved.
+                    tracker_refresh_hermes_log(tracker, &app_settings);
+
                     // Ghost players: refresh from on-disk save files independently
                     // of client count. Ghosts exist precisely when nobody is
                     // connected (mid-run disconnects, players who never joined via

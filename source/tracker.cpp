@@ -3687,6 +3687,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->hermes_play_log = nullptr;
     t->hermes_file_offset = 0;
     t->hermes_active = false;
+    t->hermes_world_name[0] = '\0';
     t->hermes_wants_ipc_flush = false;
     t->hermes_coop_stat_cache = new std::unordered_map<std::string, int>();
 
@@ -11498,6 +11499,56 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     }
 }
 
+void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return;
+
+    // When Hermes is disabled, drop any open handle and reset state.
+    if (!settings->using_hermes) {
+        if (t->hermes_play_log) {
+            fclose(t->hermes_play_log);
+            t->hermes_play_log = nullptr;
+        }
+        t->hermes_file_offset = 0;
+        t->hermes_active = false;
+        t->hermes_world_name[0] = '\0';
+        return;
+    }
+
+    // No world resolved yet: nothing to attach to.
+    if (t->world_name[0] == '\0' || t->saves_path[0] == '\0') return;
+
+    // Already attached to the current world: leave the handle (and read offset)
+    // untouched so the live poll keeps tailing from where it left off.
+    if (t->hermes_active && t->hermes_play_log &&
+        strcmp(t->hermes_world_name, t->world_name) == 0) {
+        return;
+    }
+
+    // World changed (or no handle yet): close the stale handle and re-detect.
+    if (t->hermes_play_log) {
+        fclose(t->hermes_play_log);
+        t->hermes_play_log = nullptr;
+    }
+    t->hermes_file_offset = 0;
+    t->hermes_active = false;
+
+    char hermes_log_path[MAX_PATH_LENGTH];
+    snprintf(hermes_log_path, sizeof(hermes_log_path),
+             "%s/%s/hermes/restricted/play.log.enc", // Encrypted log file
+             t->saves_path, t->world_name);
+    FILE *f = fopen(hermes_log_path, "rb");
+    if (f) {
+        t->hermes_play_log = f;
+        t->hermes_file_offset = 0; // start from beginning on new world, then it appends
+        t->hermes_active = true;
+        strncpy(t->hermes_world_name, t->world_name, MAX_PATH_LENGTH - 1);
+        t->hermes_world_name[MAX_PATH_LENGTH - 1] = '\0';
+        log_message(LOG_INFO, "[TRACKER - HERMES] Detected play.log.enc at: %s\n", hermes_log_path);
+    }
+    // If the file is not there yet (Hermes hasn't created it), leave hermes_active
+    // false and hermes_world_name cleared so the next update retries the open.
+}
+
 void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return;
 
@@ -11534,27 +11585,10 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
             MAX_PATH_LENGTH);
 
         // Hermes Live-Update Detection ---
-        // Close any previously open handle first
-        if (t->hermes_play_log) {
-            fclose(t->hermes_play_log);
-            t->hermes_play_log = nullptr;
-            t->hermes_file_offset = 0;
-            t->hermes_active = false;
-        }
-
-        if (t->world_name[0] != '\0' && t->saves_path[0] != '\0') {
-            char hermes_log_path[MAX_PATH_LENGTH];
-            snprintf(hermes_log_path, sizeof(hermes_log_path),
-                     "%s/%s/hermes/restricted/play.log.enc", // Encrypted log file
-                     t->saves_path, t->world_name);
-            FILE *f = fopen(hermes_log_path, "rb");
-            if (f) {
-                t->hermes_play_log = f;
-                t->hermes_file_offset = 0; // start from beginning on new world, then it appends
-                t->hermes_active = true;
-                log_message(LOG_INFO, "[TRACKER - HERMES] Detected play.log.enc at: %s\n", hermes_log_path);
-            }
-        }
+        // Force a re-detect: clear the remembered world so the helper reopens
+        // even if the world name happens to match a previously open handle.
+        t->hermes_world_name[0] = '\0';
+        tracker_refresh_hermes_log(t, settings);
     } else {
         // Only log at ERROR level once; use INFO for the common "MC not running" case
         // to avoid spam when PATH_MODE_INSTANCE is active with no game open.
@@ -13060,6 +13094,8 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             fclose(t->hermes_play_log);
             t->hermes_play_log = nullptr;
         }
+        t->hermes_active = false;
+        t->hermes_world_name[0] = '\0';
 
         // Free Hermes coop stat cache
         if (t->hermes_coop_stat_cache) {
