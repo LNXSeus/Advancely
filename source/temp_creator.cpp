@@ -1267,6 +1267,7 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
         cJSON *is_recipe_json = cJSON_GetObjectItem(category_json, "is_recipe");
+        cJSON *in_3rd_row = cJSON_GetObjectItem(category_json, "in_3rd_row");
         cJSON *groups_enabled_json = cJSON_GetObjectItem(category_json, "groups_enabled");
 
         if (cJSON_IsString(icon)) {
@@ -1275,6 +1276,7 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(is_recipe_json)) new_cat.is_recipe = cJSON_IsTrue(is_recipe_json);
+        if (cJSON_IsBool(in_3rd_row)) new_cat.in_3rd_row = cJSON_IsTrue(in_3rd_row);
         const bool groups_enabled_key_present = cJSON_IsBool(groups_enabled_json);
         if (groups_enabled_key_present) new_cat.groups_enabled = cJSON_IsTrue(groups_enabled_json);
 
