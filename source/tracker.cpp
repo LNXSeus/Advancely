@@ -10862,6 +10862,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     const bool controls_show_dropdown =
             (controls_coop_state == COOP_NET_LISTENING || controls_coop_state == COOP_NET_CONNECTED) &&
             settings->coop_player_count > 0;
+    // Visibility dropdown (goal hiding mode + invert flag, 6 entries). Same combo
+    // style as the coop player dropdown; width chosen to fit the longest label.
+    const float visibility_dropdown_width = 240.0f;
 
     // Calculate total width using ImGui's ItemSpacing
     float controls_total_width = clear_button_width + button_padding_x +
@@ -10869,6 +10872,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                  lock_checkbox_width + button_padding_x +
                                  reset_checkbox_width + button_padding_x +
                                  manual_layout_checkbox_width + button_padding_x +
+                                 visibility_dropdown_width + button_padding_x +
                                  notes_checkbox_width;
     if (controls_show_dropdown) {
         controls_total_width += player_dropdown_width + button_padding_x;
@@ -11206,6 +11210,68 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  "Repositioning for the manual layout is done through the\n"
                  "Template Editor's Visual Layout Editor.");
         ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+
+    // "Visibility" dropdown - quick switch for goal_hiding_mode + invert_hiding_mode.
+    // Six entries cover every combination of the 3 modes and the invert flag.
+    ImGui::BeginDisabled(!t->template_data);
+    {
+        struct VisibilityOption {
+            const char *label;
+            GoalHidingMode mode;
+            bool inverted;
+        };
+        static const VisibilityOption visibility_options[] = {
+            {"Hide All Completed",                HIDE_ALL_COMPLETED,        false},
+            {"Hide All Incomplete (Inverted)",    HIDE_ALL_COMPLETED,        true},
+            {"Hide Template-Hidden Only",         HIDE_ONLY_TEMPLATE_HIDDEN, false},
+            {"Hide Template-Hidden (Inverted)",   HIDE_ONLY_TEMPLATE_HIDDEN, true},
+            {"Show All",                          SHOW_ALL,                  false},
+            {"Show All (Inverted)",               SHOW_ALL,                  true},
+        };
+        const int visibility_option_count = (int)(sizeof(visibility_options) / sizeof(visibility_options[0]));
+
+        int current_idx = 0;
+        for (int i = 0; i < visibility_option_count; i++) {
+            if (visibility_options[i].mode == settings->goal_hiding_mode &&
+                visibility_options[i].inverted == settings->invert_hiding_mode) {
+                current_idx = i;
+                break;
+            }
+        }
+
+        ImGui::SetNextItemWidth(visibility_dropdown_width);
+        if (ImGui::BeginCombo("##VisibilityMode", visibility_options[current_idx].label)) {
+            for (int i = 0; i < visibility_option_count; i++) {
+                bool is_selected = (i == current_idx);
+                if (ImGui::Selectable(visibility_options[i].label, is_selected)) {
+                    if (i != current_idx) {
+                        settings->goal_hiding_mode = visibility_options[i].mode;
+                        settings->invert_hiding_mode = visibility_options[i].inverted;
+                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                    }
+                }
+                if (is_selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[1024];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Goal Visibility Mode\n"
+                     "Quick switch for the mode + invert combo from the settings dialog.\n\n"
+                     " - Hide All Completed: hides completed AND template-hidden goals.\n"
+                     " - Hide All Incomplete (Inverted): hides incomplete goals instead.\n"
+                     " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
+                     " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
+                     " - Show All: nothing is hidden.\n"
+                     " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n\n"
+                     "Changing this saves immediately and does not restart the overlay.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
     }
     ImGui::EndDisabled();
 
