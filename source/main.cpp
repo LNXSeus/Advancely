@@ -93,7 +93,6 @@ extern "C" {
 SDL_AtomicInt g_needs_update;
 SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
-SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
 SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
@@ -755,27 +754,6 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
         }
     }
 }
-
-dmon_watch_id notes_watcher_id = {0};
-
-static void notes_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
-                                 const char *filepath, const char *oldfilepath, void *user) {
-    (void) watch_id;
-    (void) rootdir;
-    (void) oldfilepath;
-    (void) user;
-
-    // We only care about file modifications
-    if (action == DMON_ACTION_MODIFY) {
-        // The filepath from dmon is just the filename. We need to check if it's our notes file.
-        // We can't access AppSettings here, so we just signal a generic notes change.
-        const char *ext = strrchr(filepath, '.');
-        if (ext && strcmp(ext, ".txt") == 0 && strstr(filepath, "_notes")) {
-            SDL_SetAtomicInt(&g_notes_changed, 1);
-        }
-    }
-}
-
 
 // Renders a welcome message window with the advancely logo and a small tutorial on startup depending on setting
 static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker *tracker, SDL_Texture *logo_texture) {
@@ -1874,7 +1852,6 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_needs_update, 1);
         SDL_SetAtomicInt(&g_settings_changed, 0);
         SDL_SetAtomicInt(&g_game_data_changed, 1);
-        SDL_SetAtomicInt(&g_notes_changed, 0);
         SDL_SetAtomicInt(&g_apply_button_clicked, 0);
         SDL_SetAtomicInt(&g_templates_changed, 0);
 
@@ -2341,7 +2318,6 @@ int main(int argc, char *argv[]) {
                 // IMPORTANT: AFTER dmon_deinit ALL OLD WATCHER IDS ARE INVALID
                 // Reset them to a known empty state
                 saves_watcher_id = {0};
-                notes_watcher_id = {0};
                 dmon_init();
 
                 // Re-watch the config directory first
@@ -2428,29 +2404,10 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                // Also re-watch the new notes file directory
-                if (notes_watcher_id.id > 0) {
-                    notes_watcher_id.id = 0;
-                }
-
-                if (app_settings.notes_path[0] != '\0') {
-                    char notes_dir[MAX_PATH_LENGTH];
-                    if (get_parent_directory(app_settings.notes_path, notes_dir, sizeof(notes_dir), 1)) {
-                        notes_watcher_id = dmon_watch(notes_dir, notes_watch_callback, 0, nullptr);
-                        log_message(LOG_INFO, "[MAIN] Now watching notes directory: %s\n", notes_dir);
-                    }
-                }
-
                 // Force a data update and apply non-critical changes
                 SDL_SetAtomicInt(&g_needs_update, 1);
                 frame_target_time = 1000.0f / app_settings.fps;
                 SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
-            }
-
-            // Check if the notes file has been changed externally
-            if (SDL_SetAtomicInt(&g_notes_changed, 0) == 1) {
-                log_message(LOG_INFO, "[MAIN] Notes file changed. Reloading.\n");
-                tracker_load_notes(tracker, &app_settings);
             }
 
             // ---- Hermes live-update poll ----------------------------------------

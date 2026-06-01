@@ -11357,8 +11357,20 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             // The ImGuiInputTextFlags_CallbackEdit flag tells ImGui to call our function on every modification.
             ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackEdit;
 
+            // ImGui reverts the InputText buffer to its focus-time content when the
+            // user presses ESC, with no flag to disable it. Snapshot the buffer
+            // before the call and restore it if ESC just deactivated the field.
+            static char notes_pre_input_snapshot[sizeof(t->notes_buffer)];
+            memcpy(notes_pre_input_snapshot, t->notes_buffer, sizeof(t->notes_buffer));
+
             ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
                                       editor_size, flags, NotesEditCallback, &callback_data);
+
+            if (ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Escape, false) &&
+                memcmp(notes_pre_input_snapshot, t->notes_buffer, sizeof(t->notes_buffer)) != 0) {
+                memcpy(t->notes_buffer, notes_pre_input_snapshot, sizeof(t->notes_buffer));
+                tracker_save_notes(t, settings);
+            }
 
 
             // --- Controls at the bottom of the window ---
