@@ -1537,65 +1537,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::Text("Goal Visibility");
-
-            ImGui::RadioButton("Hide All Completed", (int *) &temp_settings.goal_hiding_mode, HIDE_ALL_COMPLETED);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[1024];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"Hidden\" in the template.\n"
-                         "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).\n\n"
-                         "Automatic layout & overlay: The \"Hidden\" checkbox in the template editor controls visibility.\n"
-                         "Manual layout: The per-position \"Hide\" checkboxes control visibility instead.\n"
-                         "Completed goals fully disappear from the manual layout in this mode.");
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            ImGui::SameLine();
-            ImGui::RadioButton("Hide Template-Hidden Only", (int *) &temp_settings.goal_hiding_mode,
-                               HIDE_ONLY_TEMPLATE_HIDDEN);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[1024];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Hides goals marked as \"Hidden\" in the template, but keeps all other completed goals visible.\n"
-                         "Section counters will count all items NOT marked as hidden in the template,\n"
-                         "regardless of completion e.g., (5/10 - 12/20) or (5/10).\n\n"
-                         "Automatic layout & overlay: The \"Hidden\" checkbox in the template editor controls visibility.\n"
-                         "Manual layout: The per-position \"Hide\" checkboxes control visibility instead.\n"
-                         "Completed goals are greyed out but remain visible in the manual layout in this mode.");
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            ImGui::SameLine();
-            ImGui::RadioButton("Show All", (int *) &temp_settings.goal_hiding_mode, SHOW_ALL);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[1024];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
-                         "Section counters will count every single item defined in the template\n"
-                         "for that section e.g., (5/10 - 12/20) or (5/10).\n\n"
-                         "Both \"Hidden\" checkboxes and per-position \"Hide\" checkboxes are ignored in this mode.");
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            ImGui::Checkbox("Invert Hiding Mode", &temp_settings.invert_hiding_mode);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[1024];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Flips the meaning of the selected hiding mode so it reacts to completion in reverse.\n\n"
-                         "\"Hide All Completed\": WARNING - hides every goal that is NOT yet completed (still hiding\n"
-                         "template-hidden goals). Your tracker starts almost entirely empty and goals appear as you\n"
-                         "complete them. Section counters still show remaining/total as usual.\n\n"
-                         "\"Hide Template-Hidden Only\": shows everything (template-hidden goals stay hidden), but\n"
-                         "incomplete goals are greyed out and lower transparency instead of completed ones. Goals snap\n"
-                         "to full transparency once completed.\n\n"
-                         "\"Show All\": same greying as above, and template-hidden goals are revealed too, including in\n"
-                         "the manual layout.");
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            ImGui::Separator();
-            ImGui::Spacing();
 
             ImGui::Text("Layout & Spacing");
 

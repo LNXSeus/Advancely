@@ -11217,7 +11217,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // "Visibility" dropdown - quick switch for goal_hiding_mode + invert_hiding_mode.
     // Six entries cover every combination of the 3 modes and the invert flag.
-    ImGui::BeginDisabled(!t->template_data);
+    // Locked while the Visual Layout Editor is active: that mode forces "Show All" so every
+    // goal stays visible while repositioning, so switching the mode here would be misleading.
+    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing);
     {
         struct VisibilityOption {
             const char *label;
@@ -11258,18 +11260,27 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
             ImGui::EndCombo();
         }
-        if (ImGui::IsItemHovered()) {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             char tooltip_buffer[1024];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Goal Visibility Mode\n"
-                     "Quick switch for the mode + invert combo from the settings dialog.\n\n"
-                     " - Hide All Completed: hides completed AND template-hidden goals.\n"
-                     " - Hide All Incomplete (Inverted): hides incomplete goals instead.\n"
-                     " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
-                     " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
-                     " - Show All: nothing is hidden.\n"
-                     " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n\n"
-                     "Changing this saves immediately and does not restart the overlay.");
+            if (t->is_visual_layout_editing) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Goal Visibility Mode\n"
+                         "Locked while the Visual Layout Editor is active.\n"
+                         "Every goal is forced visible (Show All) so you can\n"
+                         "reposition them, regardless of completion or hidden status.\n"
+                         "Close the Visual Layout Editor to change this again.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Goal Visibility Mode\n"
+                         "Quick switch for the mode + invert combo.\n\n"
+                         " - Hide All Completed: hides completed AND template-hidden goals.\n"
+                         " - Hide All Incomplete (Inverted): hides incomplete goals instead.\n"
+                         " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
+                         " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
+                         " - Show All: nothing is hidden.\n"
+                         " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n\n"
+                         "Changing this saves immediately and does not restart the overlay.");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
     }

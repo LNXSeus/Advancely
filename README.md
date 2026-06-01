@@ -544,6 +544,12 @@ You can manipulate the view using several intuitive controls:
   the window, giving you precise control over how many items appear in each row.
 * **Reset Camera**: Click the `Reset Camera` button in the bottom-right corner to instantly reset the pan and zoom to
   their default positions.
+* **Goal Visibility Dropdown**: A dropdown in the bottom controls (next to `Manual Layout`) lets you switch the goal
+  visibility mode on the fly. It exposes all six combinations of the three modes and the invert flag in one list:
+  `Hide All Completed`, `Hide All Incomplete (Inverted)`, `Hide Template-Hidden Only`,
+  `Hide Template-Hidden (Inverted)`, `Show All`, and `Show All (Inverted)`. Changing it saves immediately and applies
+  instantly **without restarting the overlay**. See [The Tracker Window](#the-tracker-window) - open the **Controls & Features** dropdown and scroll
+  to **Section Completion Counters** for exactly how each mode affects what is shown and counted.
 
 ### Searching & Filtering
 
@@ -567,9 +573,12 @@ also dynamically updates the completion counters in the section headers.
 
 ### Section Completion Counters
 
-Each section header (e.g., "Advancements", "Statistics") now displays dynamic counters reflecting the completion status
-based on the currently visible items. These counters respect both the "Goal Visibility" setting and any active search
-filter.
+Each section header (the separator drawn above each section in the automatic layout, e.g., "Advancements",
+"Statistics") displays dynamic counters reflecting the completion status based on the currently visible items. This is
+how the tracker shows, at a glance, the number of completed advancements (or stats, unlocks, etc.) versus the total for
+that section. These counters respect both the current goal visibility mode (set via the **Goal Visibility Dropdown** in
+the bottom controls) and any active search filter. The section header counters are shown in the automatic layout; they
+do not appear in manual layout mode.
 
 **Format:**
 
@@ -603,7 +612,9 @@ mode, completed goals are greyed out but remain visible.
 
 **Invert Hiding Mode:**
 
-The `Invert Hiding Mode` checkbox flips the completion behaviour of whichever mode is selected:
+The inverted variants in the **Goal Visibility Dropdown** (`Hide All Incomplete (Inverted)`,
+`Hide Template-Hidden (Inverted)`, `Show All (Inverted)`) flip the completion behaviour of whichever base mode is
+selected:
 
 * **`Hide All Completed`** (warning): hides every goal that is **not yet completed** instead of the completed ones
   (template-hidden goals stay hidden). Your tracker starts almost completely empty and goals appear as you complete
@@ -919,7 +930,7 @@ tied to any game data. These elements are only visible when "Manual Layout" mode
     * **Start Goal**: Select any goal, sub-goal, or multi-stage goal stage from the template. Before this goal is
       completed the arrow renders at its **Opacity Before** value (default: faded). Once completed, the arrow
       transitions to **Opacity After** (default: fully opaque).
-    * **End Goal**: When this goal is completed and the Goal Visibility setting is set to "Remove Completed Goals",
+    * **End Goal**: When this goal is completed and the goal visibility mode is set to "Hide All Completed",
       the arrow is hidden entirely.
     * Use the **Select Goal** popup (with search via `Ctrl+F` / `Cmd+F`) to pick goals from any tab in the template.
 
@@ -1078,7 +1089,6 @@ templates._
 | Run Completion                                | Optional stopping criteria that end the run (and freeze the IGT timer) before full 100%. Enable `Complete at advancement count` (clamped between 1 and the selected template's number of advancements/achievements) and/or `Complete at progress percentage` (overall progress, two-decimal precision). When both are enabled, `Require both targets (AND)` decides whether the run completes only when both are met (AND) or as soon as either is met (OR). These settings reset to defaults whenever you change the selected template.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **Tracker Visuals**                           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Window & Behavior                             | Set the `Tracker FPS Limit` and keep the tracker `Always On Top`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Goal Visibility                               | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters. The `Invert Hiding Mode` then makes completed goals fully appear or go from faded to fully visible instead of the other way around. Go to [The Tracker Window](#the-tracker-window) for more details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Layout & Spacing                              | Drag and drop to reorder the sections (`Advancements`, `Stats`, `Unlocks`, etc.) in the main tracker window. Adjust the `Tracker Vertical Spacing` (in pixels) between rows of items. You can also enable `Custom Section Item Width` to adjust the horizontal width (in pixels) for *each item* within a specific section (e.g., set "Advancements" to 150px), overriding the dynamic width calculation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Level of Detail & Lists                       | Adjust the zoom thresholds at which elements disappear to declutter the view and improve performance (`Hide Sub-Item Text`, `Hide Main Text/Checkbox`, `Simplify Icons`). Control how long lists are handled by setting the `Scrollable List Threshold` to determine when a list becomes a scrollable box, and adjust the `List Scroll Speed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Fonts & Aesthetics                            | Independently set the font and sizes (`Main`, `Sub`, `UI`) for the Tracker window. Full RGBA color customization for the tracker `background` and `text`. Customize the `Default`, `Half-Done`, and `Done` background textures by selecting `.png` or `.gif` files from the `resources/gui` folder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -1419,10 +1429,11 @@ The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these fa
 the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
 are individually configurable per user. They're local visual preferences, not pushed to other lobby members.
 
-Note that the `Goal Visibility` setting still applies on top of this. In `Remove Completed Goals` mode (the default),
+Note that the goal visibility mode still applies on top of this. In `Hide All Completed` mode (the default),
 goals that have been finished are hidden from the tracker entirely, so their faces disappear with them. This is most
-visible for completed simple advancements and for goals whose only remaining state is a ticked manual checkbox. Set
-`Goal Visibility` to one of the other modes if you want completed goals (and their contributor faces) to stay on screen.
+visible for completed simple advancements and for goals whose only remaining state is a ticked manual checkbox. Use the
+**Goal Visibility Dropdown** in the bottom controls to switch to one of the other modes if you want completed goals
+(and their contributor faces) to stay on screen.
 * **Play Time / IGT:** Taken from the Host's own world. The merged run-completion timer freezes the first time the
   view hits 100% (per-view, so a per-player view and the All Players view each have their own frozen timer - see
   the Player Dropdown section below).
