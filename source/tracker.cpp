@@ -3690,6 +3690,8 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->hermes_world_name[0] = '\0';
     t->hermes_wants_ipc_flush = false;
     t->hermes_coop_stat_cache = new std::unordered_map<std::string, int>();
+    t->hermes_adv_file_mtime_ms = 0;
+    t->hermes_adv_mtime_by_uuid = new std::unordered_map<std::string, uint64_t>();
 
     // Initialize notes state
     t->notes_window_open = false;
@@ -4666,6 +4668,14 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
+    // Capture the last-write time of the advancement/achievement source file so the Hermes
+    // replay can treat the game files as authoritative (see tracker_hermes_replay_window).
+    // 1.12+ stores advancements in their own file; earlier eras keep achievements in the stats file.
+    {
+        const char *adv_src = (version >= MC_VERSION_1_12) ? t->advancements_path : t->stats_path;
+        t->hermes_adv_file_mtime_ms = get_file_mtime_ms(adv_src);
+    }
+
     // Legacy Snapshot Logic
     // ONLY USING SNAPSHOTTING LOGIC IF *NOT* USING StatsPerWorld MOD
     // If StatsPerWorld is enabled, we read directly from per-world stat files (no baseline needed).
@@ -4767,6 +4777,18 @@ static void coop_merge_one_player_from_disk(Tracker *t, const AppSettings *setti
         t->world_name, uuid, username,
         player_adv_path, player_stats_path, player_unlocks_path, MAX_PATH_LENGTH
     );
+
+    // Record this player's advancement/achievement file mtime (unix ms) so the Hermes replay
+    // can leave already-persisted advancement state to the game files (disk authority). 1.12+
+    // keeps advancements in their own file; earlier eras store achievements in the stats file.
+    if (uuid && uuid[0] != '\0') {
+        if (auto *adv_mtimes = static_cast<std::unordered_map<std::string, uint64_t> *>(t->hermes_adv_mtime_by_uuid)) {
+            const char *adv_src = (version >= MC_VERSION_1_12) ? player_adv_path : player_stats_path;
+            std::string key(uuid);
+            for (char &c: key) c = (char) tolower((unsigned char) c);
+            (*adv_mtimes)[key] = get_file_mtime_ms(adv_src);
+        }
+    }
 
     // Parse the player's JSON files
     cJSON *player_adv_json = (player_adv_path[0] != '\0') ? cJSON_from_file(player_adv_path) : nullptr;
@@ -5102,6 +5124,12 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
                              ? static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache)
                              : nullptr;
     if (hermes_cache) hermes_cache->clear();
+
+    // Reset the per-player advancement-file mtimes — repopulated per player below so the
+    // Hermes replay knows how recently each player's game files were written (disk authority).
+    if (auto *adv_mtimes = static_cast<std::unordered_map<std::string, uint64_t> *>(t->hermes_adv_mtime_by_uuid)) {
+        adv_mtimes->clear();
+    }
 
     // 2. Iterate over all players in the roster and merge their data
     for (int p = 0; p < settings->coop_player_count; p++) {
@@ -12069,6 +12097,9 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
  * We deliberately do NOT unmark anything here. Revocations (/advancement revoke)
  * are not applied in-memory from Hermes — they self-correct on the next
  * dmon-triggered game save when tracker_update() does a full re-read from disk.
+ * The replay path additionally refuses to re-apply events the game files have
+ * already persisted (see hermes_process_decrypted_line), so a revoked advancement
+ * stays revoked once Minecraft writes it out.
  *
  * Returns true if at least one in-memory value changed.
  */
@@ -12426,7 +12457,9 @@ static bool hermes_apply_event_to_coop_snapshots(
 // (tracker_hermes_replay_window). Identity filter + apply helpers match
 // exactly - any difference between "live" and "replayed" events must live
 // in the apply helpers (e.g. the negative-delta guard in
-// hermes_apply_stat_event_cumulative), not here.
+// hermes_apply_stat_event_cumulative), not here. The one dispatch-level
+// exception is disk_authoritative: during replay, advancement events the game
+// files have already persisted are skipped so revokes stick (see suppress_adv).
 //
 // *workbuf_ptr is allocated lazily on first snapshot mutation and owned by
 // the caller; *snapshots_changed is OR'd (never cleared) when the per-player
@@ -12436,7 +12469,8 @@ static bool hermes_process_decrypted_line(
     Tracker *t, const AppSettings *settings,
     const std::string &decrypted,
     char **workbuf_ptr, size_t workbuf_size,
-    bool *snapshots_changed) {
+    bool *snapshots_changed,
+    bool disk_authoritative = false) {
     cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
     if (!event) {
         log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n",
@@ -12537,17 +12571,53 @@ static bool hermes_process_decrypted_line(
 
     bool any_changed = false;
 
+    // --- Disk authority for advancements (replay only) ---
+    // The game files are the source of truth. During the post-rebuild replay we must NOT
+    // re-apply an advancement event that the game has already written out: if the player
+    // revoked an advancement, the freshly-read file no longer contains it, and replaying the
+    // old "gained" event would wrongly re-complete it. We compare the event's Hermes timestamp
+    // (unix ms) against the last-write time of that player's advancement file: only events that
+    // happened AFTER the file was last written are genuine not-yet-autosaved gains worth
+    // restoring. The live poll (disk_authoritative == false) always applies events as usual.
+    bool suppress_adv = false;
+    if (disk_authoritative && strcmp(type, "advancement") == 0) {
+        cJSON *time_json = cJSON_GetObjectItem(event, "time");
+        long long ev_time_ms = cJSON_IsNumber(time_json) ? (long long) time_json->valuedouble : 0;
+        uint64_t adv_mtime_ms = 0;
+        bool snapshot_path = is_coop_host && have_snapshots;
+        if (snapshot_path) {
+            // Coop: this player's own advancement file mtime, keyed by lowercase UUID.
+            auto *adv_mtimes = static_cast<std::unordered_map<std::string, uint64_t> *>(t->hermes_adv_mtime_by_uuid);
+            if (adv_mtimes && event_player_uuid && event_player_uuid[0] != '\0') {
+                std::string key(event_player_uuid);
+                for (char &c: key) c = (char) tolower((unsigned char) c);
+                auto it = adv_mtimes->find(key);
+                if (it != adv_mtimes->end()) adv_mtime_ms = it->second;
+            }
+        } else {
+            // Singleplayer / solo-host direct view.
+            adv_mtime_ms = t->hermes_adv_file_mtime_ms;
+        }
+        // mtime 0 = file missing/unknown: nothing persisted yet, so allow the restore.
+        if (adv_mtime_ms != 0 && ev_time_ms != 0 && (uint64_t) ev_time_ms <= adv_mtime_ms) {
+            suppress_adv = true;
+        }
+    }
+
     if (is_coop_host && have_snapshots &&
         (strcmp(type, "stat") == 0 || strcmp(type, "advancement") == 0)) {
         // Per-player isolation path: update the source player's (or ghost's)
         // snapshot and the merged snapshot, then restore the selected view.
-        if (!*workbuf_ptr) *workbuf_ptr = (char *) malloc(workbuf_size);
-        if (*workbuf_ptr &&
-            hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
-                                                 matched_ghost_idx, event_player_uuid,
-                                                 type, data, *workbuf_ptr, workbuf_size)) {
-            any_changed = true;
-            if (snapshots_changed) *snapshots_changed = true;
+        // suppress_adv skips advancements the game files have already persisted.
+        if (!suppress_adv) {
+            if (!*workbuf_ptr) *workbuf_ptr = (char *) malloc(workbuf_size);
+            if (*workbuf_ptr &&
+                hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
+                                                     matched_ghost_idx, event_player_uuid,
+                                                     type, data, *workbuf_ptr, workbuf_size)) {
+                any_changed = true;
+                if (snapshots_changed) *snapshots_changed = true;
+            }
         }
     } else if (strcmp(type, "stat") == 0) {
         if (is_coop_host && settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
@@ -12561,7 +12631,7 @@ static bool hermes_process_decrypted_line(
             if (hermes_apply_stat_event(t, data)) any_changed = true;
         }
     } else if (strcmp(type, "advancement") == 0) {
-        if (hermes_apply_advancement_event(t, data, event_player_uuid)) any_changed = true;
+        if (!suppress_adv && hermes_apply_advancement_event(t, data, event_player_uuid)) any_changed = true;
     }
     // ALL OTHER EVENT TYPES ARE IGNORED - speedrun legal this way.
 
@@ -12653,9 +12723,11 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 // Safety:
 //   - Stats (HIGHEST): hermes_apply_stat_event only accepts new_value > progress.
 //   - Stats (CUMULATIVE): hermes_apply_stat_event_cumulative skips delta<0.
-//   - Advancements: only set done=true. Revocations come from disk only, so
-//     an adv revoked within the window can get re-set by a replayed event.
-//     Acceptable: revocation is rare, and the next disk rebuild corrects it.
+//   - Advancements: the game files win. An advancement event is only replayed when its
+//     Hermes timestamp is newer than the player's advancement-file mtime (hermes_process_
+//     decrypted_line's suppress_adv). So once Minecraft writes the file, a revoke (entry set
+//     to not-done, or removed entirely) stays revoked; only gains newer than that write,
+//     i.e. genuine not-yet-autosaved progress, are restored.
 //   - Manual completions: is_manually_completed gates the done-flip in
 //     hermes_apply_stat_event, so manual state is preserved.
 void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
@@ -12729,8 +12801,11 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
 
     for (auto &e: entries) {
         if (e.time_ms < cutoff) continue;
+        // disk_authoritative = true: this replay runs right after a full disk rebuild, so the
+        // game files win. Advancements the disk records are not re-completed by replayed events.
         if (hermes_process_decrypted_line(t, settings, e.line,
-                                          &workbuf, workbuf_size, &snapshots_changed)) {
+                                          &workbuf, workbuf_size, &snapshots_changed,
+                                          /*disk_authoritative=*/true)) {
             any_changed = true;
         }
         applied++;
@@ -13190,6 +13265,12 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
         if (t->hermes_coop_stat_cache) {
             delete static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache);
             t->hermes_coop_stat_cache = nullptr;
+        }
+
+        // Free Hermes per-player advancement-file mtime cache
+        if (t->hermes_adv_mtime_by_uuid) {
+            delete static_cast<std::unordered_map<std::string, uint64_t> *>(t->hermes_adv_mtime_by_uuid);
+            t->hermes_adv_mtime_by_uuid = nullptr;
         }
 
         if (t->legacy_player_snapshots) {

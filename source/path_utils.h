@@ -172,6 +172,15 @@ void path_to_windows_native(char *path);
 */
 bool get_executable_path(char *out_path, size_t max_len);
 
+/**
+* @brief Gets a file's last-modified time in milliseconds since the Unix epoch (UTC).
+* Used to tell whether the game wrote a save file more recently than a given Hermes
+* event, so the Hermes replay can leave already-persisted state to the game files.
+* @param path The file to stat.
+* @return The mtime in unix ms, or 0 if the file does not exist or cannot be read.
+*/
+uint64_t get_file_mtime_ms(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

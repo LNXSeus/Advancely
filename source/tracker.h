@@ -182,6 +182,14 @@ struct Tracker {
     bool hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
     void *hermes_coop_stat_cache; // Per-player stat values for CUMULATIVE merge delta tracking
     // (std::unordered_map<std::string, int>*, managed in tracker.cpp)
+
+    // Hermes replay disk-authority: last-modified time (unix ms) of the advancement/achievement
+    // source file read during the most recent rebuild. The replay only re-applies an advancement
+    // event whose Hermes timestamp is NEWER than this, so events the game has already persisted
+    // (including /advancement revoke, which removes the entry) are left to the game files.
+    uint64_t hermes_adv_file_mtime_ms; // Singleplayer / direct view: local player's adv file mtime
+    void *hermes_adv_mtime_by_uuid; // Coop: per-player adv file mtime keyed by lowercase UUID
+    // (std::unordered_map<std::string, uint64_t>*, managed in tracker.cpp)
 };
 
 /**

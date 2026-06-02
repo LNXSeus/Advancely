@@ -1140,6 +1140,24 @@ bool path_exists(const char *path) {
 }
 
 
+uint64_t get_file_mtime_ms(const char *path) {
+    if (!path || path[0] == '\0') return 0;
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fad)) return 0;
+    // FILETIME is 100ns ticks since 1601-01-01; convert to unix ms.
+    ULARGE_INTEGER ft;
+    ft.LowPart = fad.ftLastWriteTime.dwLowDateTime;
+    ft.HighPart = fad.ftLastWriteTime.dwHighDateTime;
+    return (uint64_t) ((ft.QuadPart - 116444736000000000ULL) / 10000ULL);
+#else
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (uint64_t) st.st_mtime * 1000ULL;
+#endif
+}
+
+
 bool get_parent_directory(const char *original_path, char *out_path, size_t max_len, int levels) {
     if (!original_path || !out_path || max_len == 0 || levels <= 0) {
         return false;
