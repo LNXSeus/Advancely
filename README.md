@@ -832,7 +832,12 @@ Opening a template reveals a tabbed interface where you can define every goal.
   right-aligned `Bulk Actions...` button appears next to a `Deselect all` button. The dropdown groups every action that
   runs across the whole selection: `Set Icon...` (apply the same icon path to every selected row), `Toggle Hidden`
   (flip the Hidden flag, majority-rule for the target state), `Layout Coordinates...`, and `Delete Selected...` (with
-  confirmation). For advancement criteria the menu also gets `Add selection to group` / `Ungroup selection` when groups
+  confirmation). Beyond `Toggle Hidden`, each menu also exposes the other boolean toggles available for that goal type
+  (all majority-rule like `Toggle Hidden`): advancements add `Toggle Is Recipe` (modern versions only) and `Toggle Row
+  3`; stats add `Toggle Row 2` and `Toggle Multi-Stat Category` (the latter converts each selected stat, keeping only
+  the first sub-stat when switching back to simple); unlocks add `Toggle Row 3`; custom goals and counters add `Toggle
+  Row 2`; multi-stage goals add `Toggle Row 2` and `Toggle Per-Stage Icons`. For advancement criteria the menu also
+  gets `Add selection to group` / `Ungroup selection` when groups
   are enabled. The row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only
   expose `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden
   field so their menu only shows `Delete Selected...`.

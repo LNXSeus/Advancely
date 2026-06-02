@@ -5396,6 +5396,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_recipe = false;
+                        bool ba_do_toggle_row3 = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -5441,6 +5443,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", tip);
                             }
+                            if (creator_selected_version >= MC_VERSION_1_12) {
+                                if (ImGui::Selectable("Toggle Is Recipe##adv_ba")) ba_do_toggle_recipe = true;
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[256];
+                                    snprintf(tip, sizeof(tip),
+                                             "Flip Is Recipe on every selected %s.\n"
+                                             "If most are not recipes they all become recipes, and vice versa.",
+                                             advancements_label_singular_lower);
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                            }
+                            if (ImGui::Selectable("Toggle Row 3##adv_ba")) ba_do_toggle_row3 = true;
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Flip Row 3 on every selected %s.\n"
+                                         "If most are off they all move to the 3rd row, and vice versa.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
                             if (ImGui::Selectable("Layout Coordinates...##adv_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) {
                                 char tip[320];
@@ -5474,6 +5496,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_adv_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
                                 current_template_data.advancements[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_recipe) {
+                            int recipe_count = 0;
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                if (current_template_data.advancements[idx].is_recipe) recipe_count++;
+                            }
+                            bool target_recipe = (recipe_count * 2 < (int)s_adv_selection.size());
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                current_template_data.advancements[idx].is_recipe = target_recipe;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row3) {
+                            int row3_count = 0;
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                if (current_template_data.advancements[idx].in_3rd_row) row3_count++;
+                            }
+                            bool target_row3 = (row3_count * 2 < (int)s_adv_selection.size());
+                            for (int idx : s_adv_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                current_template_data.advancements[idx].in_3rd_row = target_row3;
                             }
                             save_message_type = MSG_NONE;
                         }
@@ -7883,6 +7933,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_row2 = false;
+                        bool ba_do_toggle_multistat = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -7911,6 +7963,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Flip Hidden on every selected stat.\n"
                                 "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Toggle Row 2##stat_ba")) ba_do_toggle_row2 = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Row 2 on every selected stat.\n"
+                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::Selectable("Toggle Multi-Stat Category##stat_ba")) ba_do_toggle_multistat = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Multi-Stat Category on every selected stat.\n"
+                                "If most are simple they all become multi-stat, and vice versa.\n"
+                                "Converting a multi-stat category back to simple keeps only its\n"
+                                "first sub-stat.");
                             if (ImGui::Selectable("Layout Coordinates...##stat_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected stat.\n"
@@ -7933,6 +7995,69 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_stat_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
                                 current_template_data.stats[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row2) {
+                            int row2_count = 0;
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                if (current_template_data.stats[idx].in_2nd_row) row2_count++;
+                            }
+                            bool target_row2 = (row2_count * 2 < (int)s_stat_selection.size());
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                current_template_data.stats[idx].in_2nd_row = target_row2;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_multistat) {
+                            int multi_count = 0;
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                if (!current_template_data.stats[idx].is_simple_stat) multi_count++;
+                            }
+                            bool target_multi = (multi_count * 2 < (int)s_stat_selection.size());
+                            for (int idx : s_stat_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                auto &sc = current_template_data.stats[idx];
+                                bool was_simple_stat = sc.is_simple_stat;
+                                if (was_simple_stat == !target_multi) continue; // already in target state
+                                sc.is_simple_stat = !target_multi;
+
+                                // Ensure at least one criterion exists to avoid errors
+                                if (sc.criteria.empty()) {
+                                    sc.criteria.push_back({});
+                                }
+
+                                // If switching FROM Simple TO Multi-Stat
+                                if (was_simple_stat && !sc.is_simple_stat) {
+                                    // Copy the parent's display name to the first criterion.
+                                    strncpy(sc.criteria[0].display_name, sc.display_name,
+                                            sizeof(sc.criteria[0].display_name) - 1);
+                                    sc.criteria[0].display_name[sizeof(sc.criteria[0].display_name) - 1] = '\0';
+
+                                    // Set a default placeholder icon for the newly visible sub-stat.
+                                    strncpy(sc.criteria[0].icon_path, "blocks/placeholder.png",
+                                            sizeof(sc.criteria[0].icon_path) - 1);
+                                    sc.criteria[0].icon_path[sizeof(sc.criteria[0].icon_path) - 1] = '\0';
+                                }
+                                // If switching FROM Multi-Stat TO Simple Stat
+                                else if (!was_simple_stat && sc.is_simple_stat) {
+                                    // Copy the first criterion's display name up to the parent.
+                                    strncpy(sc.display_name, sc.criteria[0].display_name,
+                                            sizeof(sc.display_name) - 1);
+                                    sc.display_name[sizeof(sc.display_name) - 1] = '\0';
+
+                                    // If there were multiple criteria, keep only the first one.
+                                    if (sc.criteria.size() > 1) {
+                                        EditorTrackableItem first_crit = sc.criteria[0];
+                                        sc.criteria.clear();
+                                        sc.criteria.push_back(first_crit);
+                                    }
+                                }
                             }
                             save_message_type = MSG_NONE;
                         }
@@ -9988,6 +10113,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_row3 = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -10018,6 +10144,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Flip Hidden on every selected unlock.\n"
                                 "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Toggle Row 3##unlocks_ba")) ba_do_toggle_row3 = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Row 3 on every selected unlock.\n"
+                                "If most are off they all move to the 3rd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##unlocks_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Bulk-set Icon Pos. and Text Pos. for every selected unlock.\n"
@@ -10040,6 +10170,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_unlocks_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
                                 current_template_data.unlocks[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row3) {
+                            int row3_count = 0;
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                if (current_template_data.unlocks[idx].in_3rd_row) row3_count++;
+                            }
+                            bool target_row3 = (row3_count * 2 < (int)s_unlocks_selection.size());
+                            for (int idx : s_unlocks_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                current_template_data.unlocks[idx].in_3rd_row = target_row3;
                             }
                             save_message_type = MSG_NONE;
                         }
@@ -10763,6 +10907,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_row2 = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -10793,6 +10938,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Flip Hidden on every selected custom goal.\n"
                                 "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Toggle Row 2##custom_ba")) ba_do_toggle_row2 = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Row 2 on every selected custom goal.\n"
+                                "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##custom_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Bulk-set Icon Pos. and Text Pos. for every selected custom goal.\n"
@@ -10815,6 +10964,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_custom_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
                                 current_template_data.custom_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row2) {
+                            int row2_count = 0;
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                if (current_template_data.custom_goals[idx].in_2nd_row) row2_count++;
+                            }
+                            bool target_row2 = (row2_count * 2 < (int)s_custom_selection.size());
+                            for (int idx : s_custom_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                current_template_data.custom_goals[idx].in_2nd_row = target_row2;
                             }
                             save_message_type = MSG_NONE;
                         }
@@ -11815,6 +11978,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_row2 = false;
+                        bool ba_do_toggle_stage_icons = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -11844,6 +12009,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Flip Hidden on every selected multi-stage goal.\n"
                                 "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Toggle Row 2##msg_ba")) ba_do_toggle_row2 = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Row 2 on every selected multi-stage goal.\n"
+                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::Selectable("Toggle Per-Stage Icons##msg_ba")) ba_do_toggle_stage_icons = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Per-Stage Icons on every selected multi-stage goal.\n"
+                                "If most are off they all enable per-stage icons, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##msg_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected multi-stage goal.\n"
@@ -11866,6 +12039,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_msg_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
                                 current_template_data.multi_stage_goals[idx].is_hidden = target_hidden;
+                            }
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row2) {
+                            int row2_count = 0;
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                if (current_template_data.multi_stage_goals[idx].in_2nd_row) row2_count++;
+                            }
+                            bool target_row2 = (row2_count * 2 < (int)s_msg_selection.size());
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                current_template_data.multi_stage_goals[idx].in_2nd_row = target_row2;
+                            }
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_stage_icons) {
+                            int stage_icons_count = 0;
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                if (current_template_data.multi_stage_goals[idx].use_stage_icons) stage_icons_count++;
+                            }
+                            bool target_stage_icons = (stage_icons_count * 2 < (int)s_msg_selection.size());
+                            for (int idx : s_msg_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                current_template_data.multi_stage_goals[idx].use_stage_icons = target_stage_icons;
                             }
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
@@ -13964,6 +14167,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_open_layout = false;
                         bool ba_open_delete = false;
                         bool ba_do_toggle_hidden = false;
+                        bool ba_do_toggle_row2 = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -13993,6 +14197,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Flip Hidden on every selected counter.\n"
                                 "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::Selectable("Toggle Row 2##ctr_ba")) ba_do_toggle_row2 = true;
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
+                                "Flip Row 2 on every selected counter.\n"
+                                "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##ctr_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
                                 "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected counter.\n"
@@ -14015,6 +14223,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int idx : s_ctr_selection) {
                                 if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
                                 current_template_data.counter_goals[idx].is_hidden = target_hidden;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ba_do_toggle_row2) {
+                            int row2_count = 0;
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                if (current_template_data.counter_goals[idx].in_2nd_row) row2_count++;
+                            }
+                            bool target_row2 = (row2_count * 2 < (int)s_ctr_selection.size());
+                            for (int idx : s_ctr_selection) {
+                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                current_template_data.counter_goals[idx].in_2nd_row = target_row2;
                             }
                             save_message_type = MSG_NONE;
                         }
