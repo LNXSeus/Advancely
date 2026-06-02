@@ -4531,6 +4531,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // Preserve runtime state that is managed outside the settings UI
                 temp_settings.use_manual_layout = app_settings->use_manual_layout;
 
+                // Preserve the goal hiding mode — it's now driven by the tracker's
+                // dropdown, not the settings UI. Without this, Apply Settings reverts
+                // the hiding mode to whatever it was when the window was opened.
+                temp_settings.goal_hiding_mode = app_settings->goal_hiding_mode;
+                temp_settings.invert_hiding_mode = app_settings->invert_hiding_mode;
+
                 // Preserve the coop_players roster — it's managed by the lobby sync in main.cpp,
                 // not the settings UI. Without this, Apply Settings wipes the roster to 0 players
                 // and the host broadcasts empty (0%) progress.
@@ -4646,12 +4652,21 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         WindowRect current_tracker_window = temp_settings.tracker_window;
         WindowRect current_overlay_window = temp_settings.overlay_window;
 
+        // Preserve the goal hiding mode — it's driven by the tracker's dropdown,
+        // not the settings UI, so Reset To Defaults must not touch it.
+        GoalHidingMode current_hiding_mode = temp_settings.goal_hiding_mode;
+        bool current_invert_hiding = temp_settings.invert_hiding_mode;
+
         // Reset the temporary settings struct to the default values
         settings_set_defaults(&temp_settings);
 
         // Restore the preserved window geometry
         temp_settings.tracker_window = current_tracker_window;
         temp_settings.overlay_window = current_overlay_window;
+
+        // Restore the preserved goal hiding mode
+        temp_settings.goal_hiding_mode = current_hiding_mode;
+        temp_settings.invert_hiding_mode = current_invert_hiding;
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
@@ -4668,7 +4683,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Category: %s, Optional Flag: %s, Display Category: %s (lock: %s), Language: Default\n"
                  "[Tracker Visuals]\n"
                  "  - Always On Top: %s; Tracker FPS Limit: %d\n"
-                 "  - Goal Visibility: Hide All Completed\n"
                  "  - Section Order: Counters -> %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Tracker Vertical Spacing: %.1f px; Custom Section Width: %s (%.0f px)\n"
                  "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
@@ -4738,6 +4752,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
         temp_settings.use_manual_layout = app_settings->use_manual_layout;
+        temp_settings.goal_hiding_mode = app_settings->goal_hiding_mode;
+        temp_settings.invert_hiding_mode = app_settings->invert_hiding_mode;
         temp_settings.coop_player_count = app_settings->coop_player_count;
         memcpy(temp_settings.coop_players, app_settings->coop_players,
                sizeof(app_settings->coop_players));
