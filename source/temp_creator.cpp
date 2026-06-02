@@ -152,6 +152,7 @@ struct EditorCounterLinkedGoal {
     char root_name[192] = {};
     char stage_id[64] = {};
     char parent_root[192] = {};
+    LinkedGoalType type = LINK_TYPE_ANY; // Section to resolve in; stamped when the link is added
 };
 
 // In-memory representation of a template for editing
@@ -522,7 +523,8 @@ static bool are_linked_goals_different(const std::vector<EditorCounterLinkedGoal
     for (size_t i = 0; i < a.size(); ++i) {
         if (strcmp(a[i].root_name, b[i].root_name) != 0 ||
             strcmp(a[i].stage_id, b[i].stage_id) != 0 ||
-            strcmp(a[i].parent_root, b[i].parent_root) != 0) {
+            strcmp(a[i].parent_root, b[i].parent_root) != 0 ||
+            a[i].type != b[i].type) {
             return true;
         }
     }
@@ -624,7 +626,8 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
     for (size_t i = 0; i < a.linked_goals.size(); ++i) {
         if (strcmp(a.linked_goals[i].root_name, b.linked_goals[i].root_name) != 0 ||
             strcmp(a.linked_goals[i].stage_id, b.linked_goals[i].stage_id) != 0 ||
-            strcmp(a.linked_goals[i].parent_root, b.linked_goals[i].parent_root) != 0) {
+            strcmp(a.linked_goals[i].parent_root, b.linked_goals[i].parent_root) != 0 ||
+            a.linked_goals[i].type != b.linked_goals[i].type) {
             return true;
         }
     }
@@ -668,7 +671,8 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
         for (size_t i = 0; i < a.linked_goals.size(); ++i) {
             if (strcmp(a.linked_goals[i].root_name, b.linked_goals[i].root_name) != 0 ||
                 strcmp(a.linked_goals[i].stage_id, b.linked_goals[i].stage_id) != 0 ||
-                strcmp(a.linked_goals[i].parent_root, b.linked_goals[i].parent_root) != 0) {
+                strcmp(a.linked_goals[i].parent_root, b.linked_goals[i].parent_root) != 0 ||
+                a.linked_goals[i].type != b.linked_goals[i].type) {
                 return true;
             }
         }
@@ -1186,6 +1190,8 @@ static void parse_linked_goals(cJSON *json_obj, std::vector<EditorCounterLinkedG
                 strncpy(lg.parent_root, lp->valuestring, sizeof(lg.parent_root) - 1);
                 lg.parent_root[sizeof(lg.parent_root) - 1] = '\0';
             }
+            cJSON *lt = cJSON_GetObjectItem(lg_json, "type");
+            lg.type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
             linked_goals.push_back(lg);
         }
     }
@@ -1636,6 +1642,8 @@ static void parse_editor_counter_goals(cJSON *json_array, std::vector<EditorCoun
                 if (cJSON_IsString(lr)) strncpy(lg.root_name, lr->valuestring, sizeof(lg.root_name) - 1);
                 if (cJSON_IsString(ls)) strncpy(lg.stage_id, ls->valuestring, sizeof(lg.stage_id) - 1);
                 if (cJSON_IsString(lp)) strncpy(lg.parent_root, lp->valuestring, sizeof(lg.parent_root) - 1);
+                cJSON *lt = cJSON_GetObjectItem(lg_json, "type");
+                lg.type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
                 goal.linked_goals.push_back(lg);
             }
         }
@@ -1704,6 +1712,8 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
                     if (cJSON_IsString(lr)) strncpy(lg.root_name, lr->valuestring, sizeof(lg.root_name) - 1);
                     if (cJSON_IsString(ls)) strncpy(lg.stage_id, ls->valuestring, sizeof(lg.stage_id) - 1);
                     if (cJSON_IsString(lp)) strncpy(lg.parent_root, lp->valuestring, sizeof(lg.parent_root) - 1);
+                    cJSON *lt = cJSON_GetObjectItem(lg_json, "type");
+                    lg.type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
                     new_elem.linked_goals.push_back(lg);
                 }
             }
@@ -1873,6 +1883,10 @@ static void serialize_linked_goals(cJSON *parent_json, const std::vector<EditorC
         }
         if (lg.parent_root[0] != '\0') {
             cJSON_AddStringToObject(lg_json, "parent_root", lg.parent_root);
+        }
+        const char *type_str = linked_goal_type_to_string(lg.type);
+        if (type_str) {
+            cJSON_AddStringToObject(lg_json, "type", type_str);
         }
         cJSON_AddItemToArray(linked_array, lg_json);
     }
@@ -20201,7 +20215,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Helper: toggle a goal in multi-select, or set in single-select
         auto select_goal = [&](const char *root_name, const char *stage_id,
-                               const char *parent_root, bool checked) {
+                               const char *parent_root, LinkedGoalType type, bool checked) {
             if (is_multi_select) {
                 if (checked) {
                     // Add to selections
@@ -20211,6 +20225,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(lg.stage_id, stage_id, sizeof(lg.stage_id) - 1);
                     if (parent_root && parent_root[0] != '\0')
                         strncpy(lg.parent_root, parent_root, sizeof(lg.parent_root) - 1);
+                    lg.type = type;
                     goal_selector_multi_selections.push_back(lg);
                 } else {
                     // Remove from selections
@@ -20267,6 +20282,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             const char *root_name;
             const char *stage_id;
             const char *parent_root;
+            LinkedGoalType type;
         };
         std::vector<FlatGoalEntry> flat_goal_list;
 
@@ -20278,10 +20294,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &crit: adv.criteria)
                 if (matches_search(crit.root_name, crit.display_name, "Criterion")) any_child = true;
             if (!parent_match && !any_child) continue;
-            if (parent_match) flat_goal_list.push_back({adv.root_name, nullptr, nullptr});
+            if (parent_match) flat_goal_list.push_back({adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT});
             for (const auto &crit: adv.criteria) {
                 if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
-                flat_goal_list.push_back({crit.root_name, nullptr, adv.root_name});
+                flat_goal_list.push_back({crit.root_name, nullptr, adv.root_name, LINK_TYPE_ADVANCEMENT});
             }
         }
         // Stats
@@ -20291,21 +20307,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &sub: stat.criteria)
                 if (matches_search(sub.root_name, sub.display_name, "Sub-Stat")) any_child = true;
             if (!parent_match && !any_child) continue;
-            if (parent_match) flat_goal_list.push_back({stat.root_name, nullptr, nullptr});
+            if (parent_match) flat_goal_list.push_back({stat.root_name, nullptr, nullptr, LINK_TYPE_STAT});
             for (const auto &sub: stat.criteria) {
                 if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
-                flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name});
+                flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT});
             }
         }
         // Unlocks
         for (const auto &unlock: current_template_data.unlocks) {
             if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
-            flat_goal_list.push_back({unlock.root_name, nullptr, nullptr});
+            flat_goal_list.push_back({unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK});
         }
         // Custom Goals
         for (const auto &cg: current_template_data.custom_goals) {
             if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
-            flat_goal_list.push_back({cg.root_name, nullptr, nullptr});
+            flat_goal_list.push_back({cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM});
         }
         // Multi-Stage Goals (skip final stage — it doesn't get completed, so linking against it is invalid)
         for (const auto &msg: current_template_data.multi_stage_goals) {
@@ -20314,24 +20330,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (size_t si = 0; si + 1 < msg.stages.size(); si++)
                 if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage")) any_stage = true;
             if (!parent_match && !any_stage) continue;
-            if (parent_match) flat_goal_list.push_back({msg.root_name, nullptr, nullptr});
+            if (parent_match) flat_goal_list.push_back({msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE});
             for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
                 const auto &stage = msg.stages[si];
                 if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
-                flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr});
+                flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr, LINK_TYPE_MULTI_STAGE});
             }
         }
         // Counters
         for (const auto &counter: current_template_data.counter_goals) {
             if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
-            flat_goal_list.push_back({counter.root_name, nullptr, nullptr});
+            flat_goal_list.push_back({counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER});
         }
 
         int current_flat_index = 0; // Tracks position in flat list during rendering
 
         // Helper lambda to render a checkbox goal entry
         auto render_goal_checkbox = [&](const char *label, const char *root_name, const char *stage_id,
-                                        const char *parent_root, bool indent) {
+                                        const char *parent_root, LinkedGoalType type, bool indent) {
             if (indent) ImGui::Indent();
             bool checked = is_goal_selected(root_name, stage_id, parent_root);
             int my_flat_index = current_flat_index++;
@@ -20344,11 +20360,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         auto &entry = flat_goal_list[ri];
                         bool already = is_goal_selected(entry.root_name, entry.stage_id, entry.parent_root);
                         if (already != checked) {
-                            select_goal(entry.root_name, entry.stage_id, entry.parent_root, checked);
+                            select_goal(entry.root_name, entry.stage_id, entry.parent_root, entry.type, checked);
                         }
                     }
                 } else {
-                    select_goal(root_name, stage_id, parent_root, checked);
+                    select_goal(root_name, stage_id, parent_root, type, checked);
                 }
                 goal_selector_last_clicked_flat_index = my_flat_index;
             }
@@ -20383,14 +20399,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##adv_%s", adv.root_name, adv.root_name);
-                    if (parent_match) render_goal_checkbox(label, adv.root_name, nullptr, nullptr, false);
+                    if (parent_match)
+                        render_goal_checkbox(label, adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT, false);
 
                     for (const auto &crit: adv.criteria) {
                         if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
                         char crit_label[384];
                         snprintf(crit_label, sizeof(crit_label), "%s##crit_%s_%s", crit.root_name, adv.root_name,
                                  crit.root_name);
-                        render_goal_checkbox(crit_label, crit.root_name, nullptr, adv.root_name, true);
+                        render_goal_checkbox(crit_label, crit.root_name, nullptr, adv.root_name,
+                                             LINK_TYPE_ADVANCEMENT, true);
                     }
                 }
             }
@@ -20428,7 +20446,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##stat_%s", stat.root_name, stat.root_name);
-                    if (parent_match) render_goal_checkbox(label, stat.root_name, nullptr, nullptr, false);
+                    if (parent_match)
+                        render_goal_checkbox(label, stat.root_name, nullptr, nullptr, LINK_TYPE_STAT, false);
 
                     // Only show sub-stats for complex (multi-stat) categories
                     if (!stat.is_simple_stat) {
@@ -20437,7 +20456,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char sub_label[384];
                             snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name,
                                      sub.root_name);
-                            render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name, true);
+                            render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name,
+                                                 LINK_TYPE_STAT, true);
                         }
                     }
                 }
@@ -20459,7 +20479,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
                     char label[384];
                     snprintf(label, sizeof(label), "%s##unlock_%s", unlock.root_name, unlock.root_name);
-                    render_goal_checkbox(label, unlock.root_name, nullptr, nullptr, false);
+                    render_goal_checkbox(label, unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK, false);
                 }
             }
         }
@@ -20479,7 +20499,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
                     char label[384];
                     snprintf(label, sizeof(label), "%s##custom_%s", cg.root_name, cg.root_name);
-                    render_goal_checkbox(label, cg.root_name, nullptr, nullptr, false);
+                    render_goal_checkbox(label, cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM, false);
                 }
             }
         }
@@ -20513,7 +20533,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##ms_%s", msg.root_name, msg.root_name);
-                    if (parent_match) render_goal_checkbox(label, msg.root_name, nullptr, nullptr, false);
+                    if (parent_match)
+                        render_goal_checkbox(label, msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE, false);
 
                     for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
                         const auto &stage = msg.stages[si];
@@ -20521,7 +20542,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char stage_label[384];
                         snprintf(stage_label, sizeof(stage_label), "[%s] %s##stage_%s_%s",
                                  stage.stage_id, stage.display_text, msg.root_name, stage.stage_id);
-                        render_goal_checkbox(stage_label, msg.root_name, stage.stage_id, nullptr, true);
+                        render_goal_checkbox(stage_label, msg.root_name, stage.stage_id, nullptr,
+                                             LINK_TYPE_MULTI_STAGE, true);
                     }
                 }
             }
@@ -20542,7 +20564,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
                     char label[384];
                     snprintf(label, sizeof(label), "%s##counter_%s", counter.root_name, counter.root_name);
-                    render_goal_checkbox(label, counter.root_name, nullptr, nullptr, false);
+                    render_goal_checkbox(label, counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER, false);
                 }
             }
         }

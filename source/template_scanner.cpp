@@ -372,7 +372,7 @@ static uint64_t fnv1a_int(uint64_t hash, int value) {
     return fnv1a_bytes(hash, &value, sizeof(value));
 }
 
-// Hash a linked_goals array: each entry has root_name, optional stage_id, optional parent_root
+// Hash a linked_goals array: each entry has root_name, optional stage_id, optional parent_root, optional type
 static uint64_t hash_linked_goals(uint64_t hash, cJSON *linked_goals) {
     if (!linked_goals || !cJSON_IsArray(linked_goals)) return hash;
     cJSON *lg = nullptr;
@@ -383,6 +383,8 @@ static uint64_t hash_linked_goals(uint64_t hash, cJSON *linked_goals) {
         if (sid && sid->valuestring) hash = fnv1a_str(hash, sid->valuestring);
         cJSON *pr = cJSON_GetObjectItem(lg, "parent_root");
         if (pr && pr->valuestring) hash = fnv1a_str(hash, pr->valuestring);
+        cJSON *ty = cJSON_GetObjectItem(lg, "type");
+        if (ty && ty->valuestring) hash = fnv1a_str(hash, ty->valuestring);
     }
     return hash;
 }

@@ -1442,6 +1442,8 @@ static void parse_runtime_linked_goals(cJSON *json_obj, int *out_count, CounterL
             strncpy(lg->parent_root, lp->valuestring, sizeof(lg->parent_root) - 1);
             lg->parent_root[sizeof(lg->parent_root) - 1] = '\0';
         }
+        cJSON *lt = cJSON_GetObjectItem(lg_json, "type");
+        lg->type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
         idx++;
     }
 
@@ -2361,6 +2363,8 @@ static void tracker_parse_counter_goals(Tracker *t, cJSON *counters_json, cJSON 
                         strncpy(lg->parent_root, lp->valuestring, sizeof(lg->parent_root) - 1);
                         lg->parent_root[sizeof(lg->parent_root) - 1] = '\0';
                     }
+                    cJSON *lt = cJSON_GetObjectItem(link_json, "type");
+                    lg->type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
                     li++;
                 }
             }
@@ -2465,6 +2469,8 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
                             strncpy(lg->parent_root, lp->valuestring, sizeof(lg->parent_root) - 1);
                             lg->parent_root[sizeof(lg->parent_root) - 1] = '\0';
                         }
+                        cJSON *lt = cJSON_GetObjectItem(lg_json, "type");
+                        lg->type = cJSON_IsString(lt) ? linked_goal_type_from_string(lt->valuestring) : LINK_TYPE_ANY;
                         li++;
                     }
                 }
@@ -2786,12 +2792,19 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
 /**
  * @brief Checks if a goal is completed by root_name, optional stage_id, and optional parent_root.
  * Used by arrow goal linking, counter goals and automatic stat completion (soon).
+ *
+ * When @p type is LINK_TYPE_ANY the legacy search order is used (advancements, then stats,
+ * then unlocks/custom/multi-stage/counters) and the first matching root_name wins. Any other
+ * value restricts the search to that single section, so identically-named goals in different
+ * sections cannot collide (e.g. a "pufferfish" stat vs. a "pufferfish" advancement criterion).
  */
 static bool is_goal_completed_by_root(const TemplateData *td, const char *root_name,
-                                      const char *stage_id, const char *parent_root) {
+                                      const char *stage_id, const char *parent_root,
+                                      LinkedGoalType type = LINK_TYPE_ANY) {
     if (!td || !root_name || root_name[0] == '\0') return false;
 
     // Check advancements
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_ADVANCEMENT)
     for (int j = 0; j < td->advancement_count; j++) {
         if (!td->advancements[j]) continue;
         if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
@@ -2810,6 +2823,7 @@ static bool is_goal_completed_by_root(const TemplateData *td, const char *root_n
         }
     }
     // Check stats
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_STAT)
     for (int j = 0; j < td->stat_count; j++) {
         if (!td->stats[j]) continue;
         if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
@@ -2826,16 +2840,19 @@ static bool is_goal_completed_by_root(const TemplateData *td, const char *root_n
         }
     }
     // Check unlocks
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_UNLOCK)
     for (int j = 0; j < td->unlock_count; j++) {
         if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
             return td->unlocks[j]->done;
     }
     // Check custom goals
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_CUSTOM)
     for (int j = 0; j < td->custom_goal_count; j++) {
         if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
             return td->custom_goals[j]->done;
     }
     // Check multi-stage goals
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_MULTI_STAGE)
     for (int j = 0; j < td->multi_stage_goal_count; j++) {
         MultiStageGoal *msg = td->multi_stage_goals[j];
         if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
@@ -2849,6 +2866,7 @@ static bool is_goal_completed_by_root(const TemplateData *td, const char *root_n
         }
     }
     // Check counter goals
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_COUNTER)
     for (int j = 0; j < td->counter_goal_count; j++) {
         if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
             return td->counter_goals[j]->done;
@@ -2868,7 +2886,8 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
         // All linked goals must be completed
         for (int j = 0; j < linked_goal_count; j++) {
             if (!is_goal_completed_by_root(td, linked_goals[j].root_name,
-                                           linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                                           linked_goals[j].stage_id, linked_goals[j].parent_root,
+                                           linked_goals[j].type)) {
                 return false; // any goal not completed
             }
         }
@@ -2877,7 +2896,8 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
         // At least one linked goal must be completed (OR mode)
         for (int j = 0; j < linked_goal_count; j++) {
             if (is_goal_completed_by_root(td, linked_goals[j].root_name,
-                                          linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                                          linked_goals[j].stage_id, linked_goals[j].parent_root,
+                                          linked_goals[j].type)) {
                 return true; // any goal completed
             }
         }
@@ -3134,7 +3154,7 @@ static bool tracker_update_counter_goals(Tracker *t) {
         int completed = 0;
         for (int j = 0; j < counter->linked_goal_count; j++) {
             CounterLinkedGoal *lg = &counter->linked_goals[j];
-            if (is_goal_completed_by_root(td, lg->root_name, lg->stage_id, lg->parent_root)) {
+            if (is_goal_completed_by_root(td, lg->root_name, lg->stage_id, lg->parent_root, lg->type)) {
                 completed++;
             }
         }

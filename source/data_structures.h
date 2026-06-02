@@ -14,6 +14,7 @@
 
 
 #include <SDL3/SDL.h>
+#include <string.h>
 
 extern "C" {
 #include <cJSON.h>
@@ -193,6 +194,48 @@ enum LinkedGoalMode {
     LINKED_GOAL_AND = 0, // All linked goals must be completed
     LINKED_GOAL_OR = 1 // At least one linked goal must be completed
 };
+
+// Which template section a linked goal points at. LINK_TYPE_ANY (the default when a
+// link omits the "type" field) preserves the legacy resolution order (advancements first,
+// then stats, etc.) for backwards compatibility. Any other value restricts resolution to
+// that single section so identically-named goals in different sections cannot collide
+// (e.g. the "pufferfish" stat vs. the "pufferfish" balanced_diet advancement criterion).
+enum LinkedGoalType {
+    LINK_TYPE_ANY = 0,
+    LINK_TYPE_ADVANCEMENT,
+    LINK_TYPE_STAT,
+    LINK_TYPE_UNLOCK,
+    LINK_TYPE_CUSTOM,
+    LINK_TYPE_MULTI_STAGE,
+    LINK_TYPE_COUNTER
+};
+
+// Maps a "type" string from a template's linked goal entry to LinkedGoalType.
+// Unknown or missing strings resolve to LINK_TYPE_ANY (legacy behavior).
+inline LinkedGoalType linked_goal_type_from_string(const char *s) {
+    if (!s || s[0] == '\0') return LINK_TYPE_ANY;
+    if (strcmp(s, "advancement") == 0) return LINK_TYPE_ADVANCEMENT;
+    if (strcmp(s, "stat") == 0) return LINK_TYPE_STAT;
+    if (strcmp(s, "unlock") == 0) return LINK_TYPE_UNLOCK;
+    if (strcmp(s, "custom") == 0) return LINK_TYPE_CUSTOM;
+    if (strcmp(s, "multi_stage") == 0) return LINK_TYPE_MULTI_STAGE;
+    if (strcmp(s, "counter") == 0) return LINK_TYPE_COUNTER;
+    return LINK_TYPE_ANY;
+}
+
+// Inverse of linked_goal_type_from_string. Returns nullptr for LINK_TYPE_ANY so callers
+// can omit the "type" field entirely when it carries no disambiguation.
+inline const char *linked_goal_type_to_string(LinkedGoalType t) {
+    switch (t) {
+        case LINK_TYPE_ADVANCEMENT: return "advancement";
+        case LINK_TYPE_STAT: return "stat";
+        case LINK_TYPE_UNLOCK: return "unlock";
+        case LINK_TYPE_CUSTOM: return "custom";
+        case LINK_TYPE_MULTI_STAGE: return "multi_stage";
+        case LINK_TYPE_COUNTER: return "counter";
+        default: return nullptr;
+    }
+}
 
 // Forward declaration (defined below in the counter goals section)
 struct CounterLinkedGoal;
@@ -405,6 +448,7 @@ struct CounterLinkedGoal {
     char root_name[192]; // The root_name of the linked goal
     char stage_id[64]; // For multi-stage goal stages (empty = whole goal)
     char parent_root[192]; // Parent root_name for sub-items (criteria, sub-stats) (empty = top-level)
+    LinkedGoalType type; // Which section to resolve root_name in (LINK_TYPE_ANY = legacy search order)
 };
 
 // Represents a counter goal that tracks how many of a set of goals are completed
