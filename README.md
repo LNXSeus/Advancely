@@ -1527,6 +1527,7 @@ This way templates don't need to be copied for each subversion.
 | `any%`             | 25w14craftmine                                  |                     | Default             |
 | `AMI`              | 25w14craftmine                                  |                     | Default             |
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4     |                     | Default, ger        |
+| `all_achievements` | 1.6.4                                           | `_ssg_keimaseed`    | Default, ger        |
 | `all_achievements` | 1.11                                            |                     | Default             |
 | `all_advancements` | 1.12, 1.13, 25w14craftmine                      |                     | Default             |
 | `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2     |                     | Default, ger, zh_cn |
