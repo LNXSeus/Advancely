@@ -211,6 +211,15 @@ typedef struct {
 
 // CoopLobbyPlayer is defined in coop_net.h (used for lobby display)
 
+// A per-advancement owner assignment for the coop "All Players" merged view.
+// When an advancement is assigned, only the owner's progress drives it in the
+// merged view (instead of the default "player with the most criteria" rule).
+typedef struct {
+    char advancement_root_name[192]; // e.g. "minecraft:adventure/adventuring_time"
+    char owner_uuid[48]; // Roster player UUID that owns this advancement
+} CoopAdvAssignment;
+#define MAX_COOP_ADV_ASSIGNMENTS 1024
+
 typedef struct {
     char target_goal[192];
     char increment_key[32];
@@ -416,6 +425,10 @@ struct AppSettings {
     // --- Player Roster (Host only) ---
     int coop_player_count; // Number of players in the roster
     CoopPlayer coop_players[MAX_COOP_PLAYERS]; // The player roster
+
+    // --- Advancement Assignments (Host only, All-Players merged view) ---
+    int coop_adv_assignment_count; // Number of assigned advancements
+    CoopAdvAssignment coop_adv_assignments[MAX_COOP_ADV_ASSIGNMENTS];
 };
 
 
@@ -426,6 +439,27 @@ struct AppSettings {
  * @return The corresponding MC_Version enum, or MC_VERSION_UNKNOWN.
  */
 MC_Version settings_get_version_from_string(const char *version_str);
+
+/**
+ * @brief Returns the owner UUID assigned to an advancement, or NULL if unassigned.
+ *
+ * In the coop "All Players" merged view, an assigned advancement is driven solely
+ * by the owner's progress instead of the default "player with the most criteria" rule.
+ *
+ * @param settings The application settings holding the assignment list.
+ * @param adv_root_name The advancement root_name to look up.
+ * @return The owner UUID string, or NULL if the advancement has no assignment.
+ */
+const char *coop_get_advancement_owner(const AppSettings *settings, const char *adv_root_name);
+
+/**
+ * @brief Assigns an advancement to a player, or clears the assignment.
+ *
+ * @param settings The application settings holding the assignment list.
+ * @param adv_root_name The advancement root_name to assign.
+ * @param owner_uuid The owner's UUID, or NULL/empty to remove the assignment.
+ */
+void coop_set_advancement_owner(AppSettings *settings, const char *adv_root_name, const char *owner_uuid);
 
 /**
  * @brief Converts a path mode string ("auto" or "manual") to a PathMode enum.

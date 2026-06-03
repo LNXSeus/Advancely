@@ -626,6 +626,54 @@ void settings_set_defaults(AppSettings *settings) {
     settings->host_port[sizeof(settings->host_port) - 1] = '\0';
     settings->coop_player_count = 0;
     memset(settings->coop_players, 0, sizeof(settings->coop_players));
+    settings->coop_adv_assignment_count = 0;
+    memset(settings->coop_adv_assignments, 0, sizeof(settings->coop_adv_assignments));
+}
+
+const char *coop_get_advancement_owner(const AppSettings *settings, const char *adv_root_name) {
+    if (!settings || !adv_root_name || adv_root_name[0] == '\0') return nullptr;
+    for (int i = 0; i < settings->coop_adv_assignment_count; i++) {
+        const CoopAdvAssignment *a = &settings->coop_adv_assignments[i];
+        if (a->owner_uuid[0] != '\0' && strcmp(a->advancement_root_name, adv_root_name) == 0) {
+            return a->owner_uuid;
+        }
+    }
+    return nullptr;
+}
+
+void coop_set_advancement_owner(AppSettings *settings, const char *adv_root_name, const char *owner_uuid) {
+    if (!settings || !adv_root_name || adv_root_name[0] == '\0') return;
+
+    int idx = -1;
+    for (int i = 0; i < settings->coop_adv_assignment_count; i++) {
+        if (strcmp(settings->coop_adv_assignments[i].advancement_root_name, adv_root_name) == 0) {
+            idx = i;
+            break;
+        }
+    }
+
+    bool clear = (owner_uuid == nullptr || owner_uuid[0] == '\0');
+    if (clear) {
+        if (idx >= 0) {
+            // Remove by swapping the last entry into the gap.
+            int last = settings->coop_adv_assignment_count - 1;
+            if (idx != last) settings->coop_adv_assignments[idx] = settings->coop_adv_assignments[last];
+            memset(&settings->coop_adv_assignments[last], 0, sizeof(CoopAdvAssignment));
+            settings->coop_adv_assignment_count--;
+        }
+        return;
+    }
+
+    if (idx < 0) {
+        if (settings->coop_adv_assignment_count >= MAX_COOP_ADV_ASSIGNMENTS) return;
+        idx = settings->coop_adv_assignment_count++;
+        memset(&settings->coop_adv_assignments[idx], 0, sizeof(CoopAdvAssignment));
+        strncpy(settings->coop_adv_assignments[idx].advancement_root_name, adv_root_name,
+                sizeof(settings->coop_adv_assignments[idx].advancement_root_name) - 1);
+    }
+    strncpy(settings->coop_adv_assignments[idx].owner_uuid, owner_uuid,
+            sizeof(settings->coop_adv_assignments[idx].owner_uuid) - 1);
+    settings->coop_adv_assignments[idx].owner_uuid[sizeof(settings->coop_adv_assignments[idx].owner_uuid) - 1] = '\0';
 }
 
 bool settings_load(AppSettings *settings) {
@@ -1541,6 +1589,25 @@ bool settings_load(AppSettings *settings) {
                 settings->coop_player_count++;
             }
         }
+
+        // Load advancement assignments (All-Players merged view)
+        const cJSON *assign_json = cJSON_GetObjectItem(coop_settings, "advancement_assignments");
+        settings->coop_adv_assignment_count = 0;
+        if (cJSON_IsArray(assign_json)) {
+            cJSON *assign_item;
+            cJSON_ArrayForEach(assign_item, assign_json) {
+                if (settings->coop_adv_assignment_count >= MAX_COOP_ADV_ASSIGNMENTS) break;
+                const cJSON *adv = cJSON_GetObjectItem(assign_item, "advancement");
+                const cJSON *uid = cJSON_GetObjectItem(assign_item, "uuid");
+                if (!adv || !cJSON_IsString(adv) || !uid || !cJSON_IsString(uid)) continue;
+                if (adv->valuestring[0] == '\0' || uid->valuestring[0] == '\0') continue;
+                CoopAdvAssignment *a = &settings->coop_adv_assignments[settings->coop_adv_assignment_count];
+                memset(a, 0, sizeof(CoopAdvAssignment));
+                strncpy(a->advancement_root_name, adv->valuestring, sizeof(a->advancement_root_name) - 1);
+                strncpy(a->owner_uuid, uid->valuestring, sizeof(a->owner_uuid) - 1);
+                settings->coop_adv_assignment_count++;
+            }
+        }
     } else {
         defaults_were_used = true;
     }
@@ -1835,6 +1902,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
             cJSON_AddItemToArray(roster_arr, player_obj);
         }
         cJSON_AddItemToObject(coop_obj, "player_roster", roster_arr);
+
+        // Save advancement assignments (All-Players merged view)
+        cJSON_DeleteItemFromObject(coop_obj, "advancement_assignments");
+        cJSON *assign_arr = cJSON_CreateArray();
+        for (int i = 0; i < settings->coop_adv_assignment_count && i < MAX_COOP_ADV_ASSIGNMENTS; i++) {
+            const CoopAdvAssignment *a = &settings->coop_adv_assignments[i];
+            if (a->advancement_root_name[0] == '\0' || a->owner_uuid[0] == '\0') continue;
+            cJSON *assign_obj = cJSON_CreateObject();
+            cJSON_AddItemToObject(assign_obj, "advancement", cJSON_CreateString(a->advancement_root_name));
+            cJSON_AddItemToObject(assign_obj, "uuid", cJSON_CreateString(a->owner_uuid));
+            cJSON_AddItemToArray(assign_arr, assign_obj);
+        }
+        cJSON_AddItemToObject(coop_obj, "advancement_assignments", assign_arr);
     }
 
 

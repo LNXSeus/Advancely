@@ -395,6 +395,11 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
         dst->completed_criteria_count = in_cat.completed_criteria_count;
         memcpy(dst->first_contributor_uuid, in_cat.first_contributor_uuid,
                sizeof(dst->first_contributor_uuid));
+        // Carry the per-advancement coop owner so the live-Hermes merge keeps
+        // scoping an assigned complex advancement to its owner between game saves
+        // (otherwise it regresses to "most criteria wins" until the next disk merge).
+        memcpy(dst->assigned_owner_uuid, in_cat.assigned_owner_uuid,
+               sizeof(dst->assigned_owner_uuid));
 
         for (int j = 0; j < in_cat.criteria_count; j++) {
             TrackableItem in_item;
@@ -1114,7 +1119,9 @@ int main(int argc, char *argv[]) {
         log_init(true); // Each process needs its own log, advancely_overlay_log.txt
         log_message(LOG_INFO, "[OVERLAY PROCESS] Starting in overlay-only mode.\n");
 
-        AppSettings settings;
+        // static: AppSettings is large (fixed coop arrays); keep it off the stack
+        // to avoid a stack overflow in the chkstk probe at startup.
+        static AppSettings settings;
         settings_load(&settings);
         log_set_settings(&settings);
 
@@ -1348,7 +1355,9 @@ int main(int argc, char *argv[]) {
 
     // Load settings ONCE at the start and check if file was incomplete to use default values
     // Note: This calls get_settings_file_path(), which now respects the CLI override.
-    AppSettings app_settings;
+    // static: AppSettings is large (fixed coop arrays); keep it off the stack to
+    // avoid a stack overflow in the chkstk probe at startup.
+    static AppSettings app_settings;
 
     if (settings_load(&app_settings)) {
         // ----- This is the only if statement with print_debug_status outside of logger -----------

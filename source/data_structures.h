@@ -357,6 +357,12 @@ struct TrackableCategory {
     // For simple advancements (criteria_count == 0) only; complex advancements use their own logic.
     char first_contributor_uuid[48];
 
+    // Coop: UUID of the player this advancement is assigned to in the "All Players" merged view.
+    // When set (host-only), only the owner's progress drives this advancement instead of the
+    // default "player with the most criteria" rule. Empty = unassigned (Auto). Resolved from
+    // settings each merge cycle; only meaningful for complex advancements (criteria_count > 0).
+    char assigned_owner_uuid[48];
+
     // Coop (stat categories): UUID of the sole player who manually checked the
     // full-goal manual-completion checkbox. Empty when nobody manually completed
     // it OR when more than one player did (multi-manual = no face).

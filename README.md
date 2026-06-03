@@ -1399,6 +1399,13 @@ How the Host combines multiple players' progress into the **All Players** view d
   for **simple** advancements (no sub-criteria) it's the **first player to complete it**; for **complex** ones it's
   the **current leader** (most criteria earned, ties go to the lowest roster index) and appears as soon as any
   criterion is in.
+* **Advancement Assignments:** Optionally assign a complex advancement to a single player via the
+  `Advancement Assignments` list shown below the lobby roster (Host only, once players have joined). When assigned,
+  the `All Players` view tracks **only that player's** criteria for it instead of the current-leader rule - useful for dividing complex advancements among the
+  group. Note: the advancement then completes only when the assigned player finishes every criterion. Leave it on
+  `Auto (most criteria)` for the default behavior. Ghost players (disconnected or non-Advancely players found in the
+  save, when `Track disconnected / offline players (ghosts)` is on) appear in the assignment dropdown too, labeled
+  `(ghost)`, and are tracked exactly like live players since assignment is keyed by UUID.
 * **Advancement criteria:** Inside a complex advancement, each criterion can also display the parent advancement's
   leader face beside its icon. In `Hide All Completed` the face rides on every (still-visible) criterion so the
   leader stays on screen while the advancement is partial; in `Hide Template-Hidden Only` and `Show All` the face

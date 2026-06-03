@@ -605,6 +605,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     const char *advancements_label_plural_lowercase = (selected_version <= MC_VERSION_1_11_2)
                                                           ? "achievements"
                                                           : "advancements";
+    // achievement/advancement (singular, lowercase)
+    const char *advancement_label_lowercase = (selected_version <= MC_VERSION_1_11_2) ? "achievement" : "advancement";
+
     // Adv/Ach
     const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
 
@@ -4010,6 +4013,178 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::PopID();
                         }
                         ImGui::EndChild();
+
+                        // --- Advancement Assignments (host-only, All-Players merged view) ---
+                        // Shown below the lobby roster: players join first, then the host
+                        // divides the complex advancements among them. Assigning one scopes
+                        // the merged view to that single player for it (instead of the default
+                        // "player with the most criteria" rule). Edited live in app_settings
+                        // and saved immediately; the re-merge is triggered via g_settings_changed.
+                        if (temp_settings.network_mode == NETWORK_HOST) {
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+
+                            // Snapshot the ghost roster so disconnected / non-Advancely
+                            // players can be assigned too. Assignment is keyed by UUID and
+                            // the merge tracks a ghost owner identically to a live player.
+                            struct AssignGhost { char uuid[48]; char name[64]; };
+                            AssignGhost assign_ghosts[COOP_MAX_LOBBY];
+                            int assign_ghost_count = 0;
+                            if (g_coop_ctx) {
+                                SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                                for (int gi = 0; gi < g_coop_ctx->ghost_player_count &&
+                                     assign_ghost_count < COOP_MAX_LOBBY; gi++) {
+                                    const CoopGhostPlayer *gp = &g_coop_ctx->ghost_players[gi];
+                                    AssignGhost *ag = &assign_ghosts[assign_ghost_count];
+                                    strncpy(ag->uuid, gp->uuid, sizeof(ag->uuid) - 1);
+                                    ag->uuid[sizeof(ag->uuid) - 1] = '\0';
+                                    const char *gname = gp->display_name[0] ? gp->display_name : gp->username;
+                                    snprintf(ag->name, sizeof(ag->name), "%s", gname);
+                                    assign_ghost_count++;
+                                }
+                                SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+                            }
+
+                            // Count assignable (complex, non-recipe) advancements in the template.
+                            int complex_total = 0;
+                            if (t && t->template_data) {
+                                for (int i = 0; i < t->template_data->advancement_count; i++) {
+                                    TrackableCategory *adv = t->template_data->advancements[i];
+                                    if (adv->criteria_count > 0 && !adv->is_recipe) complex_total++;
+                                }
+                            }
+
+                            char assign_header[96];
+                            snprintf(assign_header, sizeof(assign_header),
+                                     "%s Assignments (%d/%d assigned)",
+                                     advancement_label_uppercase,
+                                     app_settings->coop_adv_assignment_count, complex_total);
+                            ImGui::Text("%s", assign_header);
+                            char assign_desc[160];
+                            snprintf(assign_desc, sizeof(assign_desc),
+                                     "Assign a complex %s to one player; The Merged 'All Players' view then tracks only them for it.",
+                                     advancement_label_lowercase);
+                            ImGui::TextDisabled("%s", assign_desc);
+                            if (ImGui::IsItemHovered()) {
+                                char tip[512];
+                                snprintf(tip, sizeof(tip),
+                                         "When an %s is assigned, the merged All Players view uses only the\n"
+                                         "owner's criteria for it, instead of the player with the most criteria.\n"
+                                         "Note: if the assigned player never completes every criterion, the %s\n"
+                                         "will not complete even if another player did more. This trades opportunistic\n"
+                                         "merging for predictable ownership when dividing work.",
+                                         advancement_label_lowercase, advancement_label_lowercase);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            ImGui::Spacing();
+
+                            if (app_settings->coop_player_count <= 0 && assign_ghost_count <= 0) {
+                                char wait_msg[128];
+                                snprintf(wait_msg, sizeof(wait_msg),
+                                         "Waiting for players to join before %ss can be assigned.",
+                                         advancement_label_lowercase);
+                                ImGui::TextDisabled("%s", wait_msg);
+                            } else if (complex_total == 0) {
+                                char none_msg[128];
+                                snprintf(none_msg, sizeof(none_msg),
+                                         "This template has no multi-criteria %ss to assign.",
+                                         advancement_label_lowercase);
+                                ImGui::TextDisabled("%s", none_msg);
+                            } else {
+                                ImGui::BeginChild("AdvAssignmentList", ImVec2(0, 220), true);
+                                for (int i = 0; i < t->template_data->advancement_count; i++) {
+                                    TrackableCategory *adv = t->template_data->advancements[i];
+                                    if (adv->criteria_count == 0 || adv->is_recipe) continue;
+
+                                    ImGui::PushID(4200 + i);
+
+                                    // Advancement icon
+                                    if (adv->texture) {
+                                        ImGui::Image((ImTextureID) adv->texture, ImVec2(20, 20));
+                                    } else {
+                                        ImGui::Dummy(ImVec2(20, 20));
+                                    }
+                                    ImGui::SameLine();
+
+                                    const char *adv_label = adv->display_name[0] ? adv->display_name : adv->root_name;
+                                    ImGui::TextUnformatted(adv_label);
+                                    ImGui::SameLine();
+
+                                    // Current owner (NULL = Auto).
+                                    const char *owner = coop_get_advancement_owner(app_settings, adv->root_name);
+
+                                    char preview[128];
+                                    if (!owner) {
+                                        snprintf(preview, sizeof(preview), "Auto (most criteria)");
+                                    } else {
+                                        const char *oname = nullptr;
+                                        bool owner_is_ghost = false;
+                                        for (int p = 0; p < app_settings->coop_player_count; p++) {
+                                            if (strcmp(app_settings->coop_players[p].uuid, owner) == 0) {
+                                                oname = app_settings->coop_players[p].display_name[0]
+                                                            ? app_settings->coop_players[p].display_name
+                                                            : app_settings->coop_players[p].username;
+                                                break;
+                                            }
+                                        }
+                                        if (!oname) {
+                                            for (int g = 0; g < assign_ghost_count; g++) {
+                                                if (strcmp(assign_ghosts[g].uuid, owner) == 0) {
+                                                    oname = assign_ghosts[g].name;
+                                                    owner_is_ghost = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if (oname && owner_is_ghost) {
+                                            snprintf(preview, sizeof(preview), "%s (ghost)", oname);
+                                        } else {
+                                            snprintf(preview, sizeof(preview), "%s", oname ? oname : "Unknown player");
+                                        }
+                                    }
+
+                                    ImGui::SetNextItemWidth(220.0f);
+                                    if (ImGui::BeginCombo("##assign", preview)) {
+                                        bool is_auto = (owner == nullptr);
+                                        if (ImGui::Selectable("Auto (most criteria)", is_auto)) {
+                                            coop_set_advancement_owner(app_settings, adv->root_name, nullptr);
+                                            settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                                            SDL_SetAtomicInt(&g_settings_changed, 1);
+                                        }
+                                        for (int p = 0; p < app_settings->coop_player_count; p++) {
+                                            const CoopPlayer *pl = &app_settings->coop_players[p];
+                                            const char *pname = pl->display_name[0] ? pl->display_name : pl->username;
+                                            bool is_sel = (owner && strcmp(pl->uuid, owner) == 0);
+                                            ImGui::PushID(p);
+                                            if (ImGui::Selectable(pname, is_sel)) {
+                                                coop_set_advancement_owner(app_settings, adv->root_name, pl->uuid);
+                                                settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                                                SDL_SetAtomicInt(&g_settings_changed, 1);
+                                            }
+                                            ImGui::PopID();
+                                        }
+                                        for (int g = 0; g < assign_ghost_count; g++) {
+                                            const AssignGhost *ag = &assign_ghosts[g];
+                                            char glabel[96];
+                                            snprintf(glabel, sizeof(glabel), "%s (ghost)", ag->name);
+                                            bool is_sel = (owner && strcmp(ag->uuid, owner) == 0);
+                                            ImGui::PushID(10000 + g);
+                                            if (ImGui::Selectable(glabel, is_sel)) {
+                                                coop_set_advancement_owner(app_settings, adv->root_name, ag->uuid);
+                                                settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                                                SDL_SetAtomicInt(&g_settings_changed, 1);
+                                            }
+                                            ImGui::PopID();
+                                        }
+                                        ImGui::EndCombo();
+                                    }
+
+                                    ImGui::PopID();
+                                }
+                                ImGui::EndChild();
+                            }
+                        }
                     }
                 } // end identity_complete
             } // end coop_enabled
@@ -4544,6 +4719,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 memcpy(temp_settings.coop_players, app_settings->coop_players,
                        sizeof(app_settings->coop_players));
 
+                // Advancement assignments are edited live in app_settings (like the
+                // roster), so preserve them across the temp->app copy below.
+                temp_settings.coop_adv_assignment_count = app_settings->coop_adv_assignment_count;
+                memcpy(temp_settings.coop_adv_assignments, app_settings->coop_adv_assignments,
+                       sizeof(app_settings->coop_adv_assignments));
+
                 // Copy temp settings to the real settings, save, and trigger a reload
                 memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                 memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
@@ -4757,6 +4938,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         temp_settings.coop_player_count = app_settings->coop_player_count;
         memcpy(temp_settings.coop_players, app_settings->coop_players,
                sizeof(app_settings->coop_players));
+        temp_settings.coop_adv_assignment_count = app_settings->coop_adv_assignment_count;
+        memcpy(temp_settings.coop_adv_assignments, app_settings->coop_adv_assignments,
+               sizeof(app_settings->coop_adv_assignments));
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
         saved_settings = temp_settings; // Sync so has_unsaved_changes stays false on future frames

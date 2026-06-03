@@ -3908,6 +3908,9 @@ static void coop_reset_template_progress(TemplateData *td) {
         adv->all_template_criteria_met = false;
         adv->completed_criteria_count = 0;
         adv->first_contributor_uuid[0] = '\0';
+        // Clear any stale assignment; only the All-Players merge re-stamps it after
+        // this reset, so single-player views never inherit an owner and skip merges.
+        adv->assigned_owner_uuid[0] = '\0';
         for (int j = 0; j < adv->criteria_count; j++) {
             adv->criteria[j]->done = false;
         }
@@ -3936,11 +3939,28 @@ static void coop_reset_template_progress(TemplateData *td) {
     }
 }
 
+// Decision for a complex advancement in the All-Players merge when the current
+// player's data is being applied:
+//   ASSIGN_NORMAL = unassigned, use the default "most criteria wins" rule
+//   ASSIGN_TAKE   = assigned to this player, adopt their state directly
+//   ASSIGN_SKIP   = assigned to another player, this player contributes nothing
+enum CoopAssignRole { ASSIGN_NORMAL, ASSIGN_TAKE, ASSIGN_SKIP };
+
+static CoopAssignRole coop_assignment_role(const TrackableCategory *adv, const char *player_uuid) {
+    if (!adv || adv->assigned_owner_uuid[0] == '\0') return ASSIGN_NORMAL;
+    if (player_uuid && player_uuid[0] != '\0' &&
+        strcmp(player_uuid, adv->assigned_owner_uuid) == 0) {
+        return ASSIGN_TAKE;
+    }
+    return ASSIGN_SKIP;
+}
+
 /**
  * @brief Merges one player's advancement data into TemplateData (accumulative).
  *
  * - Simple advancements (no criteria): OR across players — done if any player completed
- * - Complex advancements (has criteria): track the player with the most criteria completed
+ * - Complex advancements (has criteria): track the player with the most criteria completed,
+ *   unless the advancement is assigned to a specific player (then only that player counts)
  *
  * Works for both modern advancements (1.12+) and mid-era achievements (1.7-1.11.2).
  */
@@ -3970,7 +3990,10 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
                 adv->all_template_criteria_met = true;
             }
         } else {
-            // Complex advancement: track player with most criteria
+            // Complex advancement: track player with most criteria (or the assigned owner)
+            CoopAssignRole role = coop_assignment_role(adv, player_uuid);
+            if (role == ASSIGN_SKIP) continue; // assigned to someone else
+
             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
             std::vector<char> player_flags(adv->criteria_count, 0);
             if (player_criteria) {
@@ -3982,10 +4005,11 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
             int this_player_count = tracker_count_groups_from_flags(
                 adv, player_flags.empty() ? nullptr : player_flags.data());
 
-            // If this player has more progress units than the current best, adopt their state.
+            // Adopt this player's state when assigned to them (ASSIGN_TAKE), or when
+            // unassigned and they have more progress units than the current best.
             // Strict-greater means ties keep the current leader (= lowest roster index,
             // since callers iterate players in order).
-            if (this_player_count > adv->completed_criteria_count) {
+            if (role == ASSIGN_TAKE || this_player_count > adv->completed_criteria_count) {
                 // Overwrite criteria done flags with this player's state, then collapse to groups.
                 for (int j = 0; j < adv->criteria_count; j++) {
                     adv->criteria[j]->done = player_flags[j];
@@ -4043,7 +4067,10 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
                 ach->all_template_criteria_met = true;
             }
         } else {
-            // Complex achievement with criteria: track player with most
+            // Complex achievement with criteria: track player with most (or the assigned owner)
+            CoopAssignRole role = coop_assignment_role(ach, player_uuid);
+            if (role == ASSIGN_SKIP) continue; // assigned to someone else
+
             cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
             std::vector<char> player_flags(ach->criteria_count, 0);
             if (cJSON_IsArray(progress_array)) {
@@ -4061,7 +4088,7 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
             int this_player_count = tracker_count_groups_from_flags(
                 ach, player_flags.empty() ? nullptr : player_flags.data());
 
-            if (this_player_count > ach->completed_criteria_count) {
+            if (role == ASSIGN_TAKE || this_player_count > ach->completed_criteria_count) {
                 for (int j = 0; j < ach->criteria_count; j++) {
                     ach->criteria[j]->done = player_flags[j];
                 }
@@ -5129,6 +5156,21 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
     // 1. Reset all progress to zero before merging
     coop_reset_template_progress(t->template_data);
+
+    // Resolve per-advancement owner assignments from settings onto each complex
+    // advancement so the merge functions can scope it to a single player. Empty =
+    // unassigned (default "most criteria wins"). Only complex advancements qualify.
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        adv->assigned_owner_uuid[0] = '\0';
+        if (adv->criteria_count > 0 && !adv->is_recipe) {
+            const char *owner = coop_get_advancement_owner(settings, adv->root_name);
+            if (owner && owner[0] != '\0') {
+                strncpy(adv->assigned_owner_uuid, owner, sizeof(adv->assigned_owner_uuid) - 1);
+                adv->assigned_owner_uuid[sizeof(adv->assigned_owner_uuid) - 1] = '\0';
+            }
+        }
+    }
 
     // CRAFTMINE (25w14) ONLY: unlocks merge with AND semantics — pre-init all
     // unlocks to done=true; each player's merge flips them false if they're missing.
@@ -12355,6 +12397,13 @@ static bool hermes_apply_event_to_coop_snapshots(
                     // Let the standard handler update multi-stage goals normally
                     changed = hermes_apply_advancement_event(t, data);
 
+                    // If this advancement is assigned to a specific player, only that
+                    // player's snapshot drives it (mirrors the disk-merge ASSIGN_TAKE
+                    // rule). Captured before the scan loop because merge_coop_progress
+                    // below overwrites adv->assigned_owner_uuid with each snapshot's value.
+                    char assigned_owner[48] = {0};
+                    strncpy(assigned_owner, adv->assigned_owner_uuid, sizeof(assigned_owner) - 1);
+
                     // Overwrite the OR-merged criteria with the "player with most criteria wins" rule
                     int best_count = -1;
                     char best_uuid[48] = {0};
@@ -12378,6 +12427,22 @@ static bool hermes_apply_event_to_coop_snapshots(
                             size_t snap_sz = is_ghost ? t->coop_ghost_snapshot_sizes[local]
                                                       : t->coop_player_snapshot_sizes[local];
                             if (!snap || snap_sz < sizeof(TemplateData)) continue;
+
+                            // Resolve this snapshot's player UUID up front so an assigned
+                            // advancement can skip every player except its owner.
+                            char cur_uuid[48] = {0};
+                            if (!is_ghost) {
+                                strncpy(cur_uuid, settings->coop_players[local].uuid, sizeof(cur_uuid) - 1);
+                            } else if (g_coop_ctx) {
+                                SDL_LockMutex(g_coop_ctx->lobby_mutex);
+                                if (local < g_coop_ctx->ghost_player_count)
+                                    strncpy(cur_uuid, g_coop_ctx->ghost_players[local].uuid, sizeof(cur_uuid) - 1);
+                                SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
+                            }
+                            if (assigned_owner[0] != '\0' && strcmp(cur_uuid, assigned_owner) != 0) {
+                                continue; // assigned to someone else
+                            }
+
                             merge_coop_progress(snap, t->template_data);
                             TrackableCategory *p_adv = t->template_data->advancements[adv_idx];
                             if (p_adv->completed_criteria_count > best_count) {
@@ -12387,15 +12452,8 @@ static bool hermes_apply_event_to_coop_snapshots(
                                 for (int j = 0; j < p_adv->criteria_count; j++) {
                                     best_crit_done[j] = p_adv->criteria[j]->done;
                                 }
-                                best_uuid[0] = '\0';
-                                if (!is_ghost) {
-                                    strncpy(best_uuid, settings->coop_players[local].uuid, sizeof(best_uuid) - 1);
-                                } else if (g_coop_ctx) {
-                                    SDL_LockMutex(g_coop_ctx->lobby_mutex);
-                                    if (local < g_coop_ctx->ghost_player_count)
-                                        strncpy(best_uuid, g_coop_ctx->ghost_players[local].uuid, sizeof(best_uuid) - 1);
-                                    SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
-                                }
+                                strncpy(best_uuid, cur_uuid, sizeof(best_uuid) - 1);
+                                best_uuid[sizeof(best_uuid) - 1] = '\0';
                             } else if (p_adv->done && !best_done) {
                                 best_done = true;
                                 best_all_met = true;
@@ -12412,7 +12470,12 @@ static bool hermes_apply_event_to_coop_snapshots(
                         for (int j = 0; j < adv->criteria_count; j++) {
                             adv->criteria[j]->done = best_crit_done[j];
                         }
-                        if (best_uuid[0] != '\0' && best_count > 0) {
+                        // When assigned, the owner is the sole authority: stamp their
+                        // face even at zero criteria (the scan only considered them), so
+                        // the selected player always shows. Unassigned (Auto) keeps the
+                        // "needs real progress to claim the face" rule (best_count > 0).
+                        bool assigned = (assigned_owner[0] != '\0');
+                        if (best_uuid[0] != '\0' && (assigned || best_count > 0)) {
                             strncpy(adv->first_contributor_uuid, best_uuid,
                                     sizeof(adv->first_contributor_uuid) - 1);
                             adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
