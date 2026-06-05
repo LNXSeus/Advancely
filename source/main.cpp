@@ -72,6 +72,7 @@ extern "C" {
 // Platform specific includes
 #ifdef _WIN32
 #include <windows.h>
+#include <shellapi.h> // For ShellExecuteA (windows.h is included lean via dmon.h, so include explicitly)
 #include <direct.h>
 #define GetCurrentDir _getcwd
 #else
@@ -951,6 +952,143 @@ const char *get_notes_manifest_path() {
     return path;
 }
 
+// ============================ AUTO-UPDATE FLOW ============================
+// The update runs on a worker thread so the main thread can render a live progress
+// bar while it works. The worker only touches files and the thread-safe logger.
+
+enum UpdateStage {
+    UPDATE_STAGE_NONE = 0,
+    UPDATE_STAGE_PROMPT,
+    UPDATE_STAGE_DOWNLOADING,
+    UPDATE_STAGE_EXTRACTING,
+    UPDATE_STAGE_APPLYING,
+    UPDATE_STAGE_DONE,
+    UPDATE_STAGE_FAILED
+};
+
+struct UpdateWorker {
+    SDL_Thread *thread;
+    SDL_AtomicInt stage;    // UpdateStage, written by worker, read by main.
+    SDL_AtomicInt progress; // Progress within the current stage, 0..1000 (per-mille).
+    char download_url[256];
+    char exe_path[MAX_PATH_LENGTH];
+    char fail_reason[256];
+};
+
+static UpdateWorker g_update_worker;
+static char g_pending_release_url[256];
+static bool g_update_modal_should_open = false;
+
+static void update_progress_sink(void *user, double fraction) {
+    SDL_AtomicInt *progress = (SDL_AtomicInt *) user;
+    SDL_SetAtomicInt(progress, (int) (fraction * 1000.0));
+}
+
+// Extracts update.zip into update_temp/, reporting per-file progress. Runs on the worker thread.
+static bool extract_update_zip(UpdateWorker *w) {
+    mz_zip_archive zip_archive;
+    memset(&zip_archive, 0, sizeof(zip_archive));
+
+    if (!mz_zip_reader_init_file(&zip_archive, "update.zip", 0)) {
+        log_message(LOG_ERROR, "[UPDATE] Failed to open update.zip for extraction.\n");
+        snprintf(w->fail_reason, sizeof(w->fail_reason), "Failed to open the downloaded update file.");
+        remove("update.zip");
+        return false;
+    }
+
+    const char *temp_dir = "update_temp";
+    if (path_exists(temp_dir)) {
+        delete_directory_recursively(temp_dir);
+    }
+#ifdef _WIN32
+    _mkdir(temp_dir);
+#else
+    mkdir(temp_dir, 0755);
+#endif
+
+    mz_uint total_files = mz_zip_reader_get_num_files(&zip_archive);
+    for (mz_uint i = 0; i < total_files; i++) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+
+        char out_path[MAX_PATH_LENGTH];
+        snprintf(out_path, sizeof(out_path), "%s/%s", temp_dir, file_stat.m_filename);
+
+        if (file_stat.m_is_directory) {
+#ifdef _WIN32
+            _mkdir(out_path);
+#else
+            mkdir(out_path, 0755);
+#endif
+        } else {
+            mz_zip_reader_extract_to_file(&zip_archive, i, out_path, 0);
+        }
+
+        SDL_SetAtomicInt(&w->progress, (int) (((i + 1) * 1000) / (total_files ? total_files : 1)));
+    }
+
+    mz_zip_reader_end(&zip_archive);
+    remove("update.zip");
+    return true;
+}
+
+// Worker thread: download -> extract -> apply, publishing stage + progress via atomics.
+static int SDLCALL update_worker_fn(void *data) {
+    UpdateWorker *w = (UpdateWorker *) data;
+
+    // --- Download ---
+    SDL_SetAtomicInt(&w->progress, 0);
+    SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_DOWNLOADING);
+    if (!download_update_zip(w->download_url, update_progress_sink, &w->progress)) {
+        snprintf(w->fail_reason, sizeof(w->fail_reason),
+                 "Failed to download the update.\nPlease check advancely_log.txt for details.");
+        SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_FAILED);
+        return 0;
+    }
+
+    // --- Extract ---
+    SDL_SetAtomicInt(&w->progress, 0);
+    SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_EXTRACTING);
+    if (!extract_update_zip(w)) {
+        SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_FAILED);
+        return 0;
+    }
+
+    // --- Apply ---
+    SDL_SetAtomicInt(&w->progress, 1000);
+    SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_APPLYING);
+    if (apply_update(w->exe_path)) {
+        SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_DONE);
+    } else {
+        snprintf(w->fail_reason, sizeof(w->fail_reason),
+                 "Could not apply the update.\nPlease check advancely_log.txt for details.");
+        SDL_SetAtomicInt(&w->stage, UPDATE_STAGE_FAILED);
+    }
+    return 0;
+}
+
+// Opens a local folder or URL in the system's default handler.
+static void update_open_path(const char *target) {
+    if (!target || target[0] == '\0') return;
+
+    bool is_url = (strncmp(target, "http://", 7) == 0 || strncmp(target, "https://", 8) == 0);
+    if (is_url) {
+        SDL_OpenURL(target);
+        return;
+    }
+#ifdef _WIN32
+    ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
+#elif defined(__APPLE__)
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "open \"%s\"", target);
+    (void) system(command);
+#else
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "xdg-open \"%s\"", target);
+    (void) system(command);
+#endif
+}
+
 int main(int argc, char *argv[]) {
     // Seed random number generator once at startup
     srand(time(nullptr));
@@ -1074,8 +1212,6 @@ int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
-
-    bool should_exit_after_update_check = false; // To signal exit after updating
 
     // Post-update logic
     if (g_show_release_notes_on_startup) {
@@ -1433,13 +1569,10 @@ int main(int argc, char *argv[]) {
     g_coop_ctx = &coop_ctx;
 
     if (tracker_new(&tracker, &app_settings)) {
-        // Check for updates on startup
+        // Check for updates on startup. The check itself is a quick network call; if a newer
+        // version exists we stash its details and open the in-loop update modal, which drives
+        // the download/extract/restart with a live progress bar (see the render loop).
         if (app_settings.check_for_updates && !g_disable_updater) {
-            // checking for command line argument --disable-updater
-            bool was_always_on_top = app_settings.tracker_always_on_top;
-            if (was_always_on_top) {
-                SDL_SetWindowAlwaysOnTop(tracker->window, false);
-            }
             char latest_version_str[64];
             char download_url[256];
             char release_page_url[256];
@@ -1447,212 +1580,18 @@ int main(int argc, char *argv[]) {
                                   sizeof(download_url), release_page_url, sizeof(release_page_url))) {
                 strncpy(g_latest_known_version, latest_version_str, sizeof(g_latest_known_version) - 1);
                 g_latest_known_version[sizeof(g_latest_known_version) - 1] = '\0';
-                char message_buffer[2048];
-                snprintf(message_buffer, sizeof(message_buffer),
-                         "A new version of Advancely is available!\n\n"
-                         "  Your Version: %s\n"
-                         "  Latest Version: %s\n\n"
-                         "--- IMPORTANT: How to Protect Your Modified Templates ---\n"
-                         "The updater replaces official template files. To protect your changes, please use the Template Editor BEFORE updating:\n\n"
-                         " • If you only changed DISPLAY NAMES:\n"
-                         "   Use the 'Copy Language' feature to create a new language file. This keeps your names safe while allowing the template's structure to receive updates.\n\n"
-                         " • If you changed GOALS, ICONS, or functionality:\n"
-                         "   Use the 'Copy Template' feature to create a separate version with a unique name or optional flag (e.g., '_custom'). Your copy will not be overwritten.\n\n"
-                         "----------------------------------------------------------------\n"
-                         "The update will KEEP your settings.json and _notes.txt files.\n"
-                         "It will REPLACE the main executable, libraries (.dll, .dylib, .so), and official files in the 'resources' folder (fonts, icons, templates, reference_files, etc.).\n\n"
-                         "Options:\n"
-                         " - Update: Install the new version now.\n"
-                         " - Templates: Open your local templates folder to make backups.\n"
-                         " - Official: View official templates online.\n"
-                         " - Later: Skip updating until the next restart.\n\n"
-                         "Would you like to install it now?\n"
-                         "Expect 3 more windows after clicking \"Update\" that you need to confirm with \"OK\".\n\n"
-                         "----------------------------------------------------------------\n"
-                         "**DO NOT CLOSE ADVANCELY DURING THE UPDATE PROCESS!**",
-                         ADVANCELY_VERSION, latest_version_str);
 
-                const SDL_MessageBoxButtonData buttons[] = {
-                    {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Update"},
-                    {0, 2, "Templates"},
-                    {0, 3, "Official"},
-                    {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Later"},
+                // Stash what the in-loop update modal/worker will need.
+                strncpy(g_update_worker.download_url, download_url, sizeof(g_update_worker.download_url) - 1);
+                g_update_worker.download_url[sizeof(g_update_worker.download_url) - 1] = '\0';
+                strncpy(g_pending_release_url, release_page_url, sizeof(g_pending_release_url) - 1);
+                g_pending_release_url[sizeof(g_pending_release_url) - 1] = '\0';
 
-                };
-                const SDL_MessageBoxData messageboxdata = {
-                    SDL_MESSAGEBOX_INFORMATION,
-                    tracker->window,
-                    "Update Available",
-                    message_buffer,
-                    SDL_arraysize(buttons),
-                    buttons,
-                    nullptr
-                };
-
-                int buttonid = -1;
-                bool decision_made = false;
-
-                while (!decision_made) {
-                    SDL_ShowMessageBox(&messageboxdata, &buttonid);
-
-                    switch (buttonid) {
-                        case 1: // Install Update
-                        case 0: // Later
-                        case -1: // User closed with 'X'
-                            decision_made = true;
-                            break;
-
-                        case 2: // Open Template Folder
-                        {
-                            char templates_path[MAX_PATH_LENGTH];
-                            snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
-#ifdef _WIN32
-                            char command[MAX_PATH_LENGTH + 32];
-                            path_to_windows_native(templates_path); // Convert to backslashes for explorer
-                            snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
-                            (void) system(command);
-#else // macOS and Linux
-                            pid_t pid = fork();
-                            if (pid == 0) {  // Child process
-#if __APPLE__
-                            char *args[] = {(char *) "open", templates_path, nullptr};
-#else
-                            char *args[] = {(char *) "xdg-open", templates_path, nullptr};
-#endif
-                            execvp(args[0], args);
-                            _exit(127); // Exit if exec fails
-                            } else if (pid < 0) {
-                                log_message(LOG_ERROR, "[MAIN] Failed to fork process to open folder.\n");
-                            }
-#endif
-                            break; // Re-shows the message box
-                        }
-
-                        case 3: // View Templates Online
-                        {
-                            const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
-#ifdef _WIN32
-                            char command[1024];
-                            snprintf(command, sizeof(command), "start %s", url);
-                            (void) system(command);
-#else // macOS and Linux
-                            pid_t pid = fork();
-                            if (pid == 0) {  // Child process
-#if __APPLE__
-                            char *args[] = {(char *) "open", (char *) url, nullptr};
-#else
-                            char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
-#endif
-                            execvp(args[0], args);
-                            _exit(127); // Exit if exec fails
-                            } else if (pid < 0) {
-                                log_message(LOG_ERROR, "[MAIN] Failed to fork process to open URL.\n");
-                            }
-#endif
-                            break; // Re-shows the message box
-                        }
-                    }
-                }
-
-                if (buttonid == 1) {
-                    // -Save release page URL to a file before updating
-                    FILE *url_file = fopen("update_url.txt", "w");
-                    if (url_file) {
-                        fputs(release_page_url, url_file);
-                        fclose(url_file);
-                        log_message(LOG_INFO, "[UPDATE] Release URL saved to update_url.txt.\n");
-                    }
-
-                    // User clicked "Install Update"
-                    show_error_message("Step 1/3: Downloading Update",
-                                       "Downloading the latest version,\nplease wait after clicking \"OK\"...");
-
-                    if (download_update_zip(download_url)) {
-                        show_error_message("Step 2/3: Download Complete",
-                                           "Update downloaded.\nExtracting files after clicking \"OK\"...");
-
-                        mz_zip_archive zip_archive;
-                        memset(&zip_archive, 0, sizeof(zip_archive));
-
-                        if (mz_zip_reader_init_file(&zip_archive, "update.zip", 0)) {
-                            log_message(
-                                LOG_INFO,
-                                "[UPDATE] Successfully opened update.zip for extraction.\nClick \"OK\" to continue.\n");
-                            const char *temp_dir = "update_temp";
-
-                            // Clean up old temp dir if it exists
-                            if (path_exists(temp_dir)) {
-                                delete_directory_recursively(temp_dir);
-                            }
-
-#ifdef _WIN32
-                            _mkdir(temp_dir);
-#else
-                            mkdir(temp_dir, 0755);
-#endif
-
-                            mz_uint i;
-                            for (i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++) {
-                                mz_zip_archive_file_stat file_stat;
-                                if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-
-                                char out_path[MAX_PATH_LENGTH];
-                                const char *filename_in_zip = file_stat.m_filename;
-
-                                snprintf(out_path, sizeof(out_path), "%s/%s", temp_dir, filename_in_zip);
-
-                                if (file_stat.m_is_directory) {
-#ifdef _WIN32
-                                    _mkdir(out_path);
-#else
-                                    mkdir(out_path, 0755);
-#endif
-                                } else {
-                                    mz_zip_reader_extract_to_file(&zip_archive, i, out_path, 0);
-                                }
-                            }
-                            mz_zip_reader_end(&zip_archive);
-
-                            // Clean up the downloaded zip file
-                            remove("update.zip");
-
-                            // Now that files are extracted, apply the update
-                            char exe_path[MAX_PATH_LENGTH];
-                            if (get_executable_path(exe_path, sizeof(exe_path))) {
-                                show_error_message("Step 3/3: Update Ready",
-                                                   "Advancely will now close to apply the update and then restart automatically.\nClick \"OK\" to continue.");
-                                if (apply_update(exe_path)) {
-                                    // The updater script has been launched.
-                                    // Signal that the application should exit.
-                                    should_exit_after_update_check = true;
-                                }
-                            } else {
-                                show_error_message("Update Error", "Could not find application path to restart.");
-                            }
-                        } else {
-                            log_message(LOG_ERROR, "[UPDATE] Failed to open update.zip for extraction.\n");
-                            show_error_message("Update Error", "Failed to open the downloaded update file.");
-                            remove("update.zip");
-                        }
-                    } else {
-                        show_error_message("Update Error",
-                                           "Failed to download the update.\nPlease check advancely_log.txt for details.");
-                    }
-                }
+                // Prompt text is rendered structurally by the modal; nothing downloads until
+                // the user clicks "Update" there.
+                SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_PROMPT);
+                g_update_modal_should_open = true;
             }
-
-            if (was_always_on_top) {
-                SDL_SetWindowAlwaysOnTop(tracker->window, true);
-            }
-        }
-
-        if (should_exit_after_update_check) {
-            // Free resources and exit before the main loop starts
-            tracker_free(&tracker, &app_settings);
-            TTF_Quit();
-            SDL_Quit();
-            log_close();
-            return EXIT_SUCCESS;
         }
 
         // IPC CREATION
@@ -3642,6 +3581,205 @@ int main(int argc, char *argv[]) {
                 }
 
                 ImGui::EndPopup();
+            }
+
+            // --- Auto-Update Modal (download / extract / restart with a live progress bar) ---
+            {
+                int update_stage = SDL_GetAtomicInt(&g_update_worker.stage);
+
+                if (g_update_modal_should_open) {
+                    ImGui::OpenPopup("Advancely Update##autoupdate");
+                    g_update_modal_should_open = false;
+                }
+
+                // Keep the modal open while busy: an Escape-close would orphan the in-progress
+                // update and leave the launched updater script waiting on a process that never exits.
+                bool update_stage_is_busy = (update_stage == UPDATE_STAGE_DOWNLOADING ||
+                                             update_stage == UPDATE_STAGE_EXTRACTING ||
+                                             update_stage == UPDATE_STAGE_APPLYING ||
+                                             update_stage == UPDATE_STAGE_DONE);
+                if (update_stage_is_busy && !ImGui::IsPopupOpen("Advancely Update##autoupdate")) {
+                    ImGui::OpenPopup("Advancely Update##autoupdate");
+                }
+
+                if (update_stage != UPDATE_STAGE_NONE) {
+                    ImVec2 update_center = ImGui::GetMainViewport()->GetCenter();
+                    ImGui::SetNextWindowPos(update_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+                    ImGui::SetNextWindowSizeConstraints(ImVec2(520, 0), ImVec2(FLT_MAX, FLT_MAX));
+
+                    if (ImGui::BeginPopupModal("Advancely Update##autoupdate", nullptr,
+                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                        if (update_stage == UPDATE_STAGE_PROMPT) {
+                            // Wrap paragraphs at a fixed width so the auto-resized popup stays tidy.
+                            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 540.0f);
+
+                            ImGui::TextUnformatted("A new version of Advancely is available!");
+                            ImGui::Spacing();
+                            ImGui::Text("Your version:    %s", ADVANCELY_VERSION);
+                            ImGui::Text("Latest version:  %s", g_latest_known_version);
+                            ImGui::Spacing();
+
+                            ImGui::SeparatorText("Protect Your Modified Templates");
+                            ImGui::TextUnformatted(
+                                "The updater replaces official template files. To protect your changes, "
+                                "use the Template Editor BEFORE updating:");
+                            ImGui::Spacing();
+
+                            ImGui::Bullet();
+                            ImGui::SameLine();
+                            ImGui::TextUnformatted("If you only changed DISPLAY NAMES:");
+                            ImGui::Indent();
+                            ImGui::TextUnformatted(
+                                "Use the 'Copy Language' feature to create a new language file. This keeps your "
+                                "names safe while letting the template's structure receive updates.");
+                            ImGui::Unindent();
+                            ImGui::Spacing();
+
+                            ImGui::Bullet();
+                            ImGui::SameLine();
+                            ImGui::TextUnformatted("If you changed GOALS, ICONS, or functionality:");
+                            ImGui::Indent();
+                            ImGui::TextUnformatted(
+                                "Use the 'Copy Template' feature to create a separate version with a unique name "
+                                "or optional flag (e.g. '_custom'). Your copy will not be overwritten.");
+                            ImGui::Unindent();
+                            ImGui::Spacing();
+
+                            ImGui::SeparatorText("What the Update Changes");
+                            ImGui::TextUnformatted("KEEPS your settings.json and _notes.txt files.");
+                            ImGui::TextUnformatted(
+                                "REPLACES the main executable, libraries (.dll, .dylib, .so), and official files in "
+                                "the 'resources' folder (fonts, icons, templates, reference_files, etc.).");
+                            ImGui::Spacing();
+
+                            ImGui::SeparatorText("Options");
+                            ImGui::BulletText("%s", "Update: Install the new version now.");
+                            ImGui::BulletText("%s", "Templates: Open your local templates folder to make backups.");
+                            ImGui::BulletText("%s", "Official: View official templates online.");
+                            ImGui::BulletText("%s", "Later: Skip updating until the next restart.");
+                            ImGui::Spacing();
+
+                            ImGui::Separator();
+                            ImGui::Spacing();
+                            ImGui::TextUnformatted("Would you like to install it now?");
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                               "Do NOT close Advancely during the update process!");
+
+                            ImGui::PopTextWrapPos();
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+
+                            if (ImGui::Button("Update")) {
+                                // Saved so the post-update run can show the release notes.
+                                FILE *url_file = fopen("update_url.txt", "w");
+                                if (url_file) {
+                                    fputs(g_pending_release_url, url_file);
+                                    fclose(url_file);
+                                    log_message(LOG_INFO, "[UPDATE] Release URL saved to update_url.txt.\n");
+                                }
+
+                                if (get_executable_path(g_update_worker.exe_path, sizeof(g_update_worker.exe_path))) {
+                                    SDL_SetAtomicInt(&g_update_worker.progress, 0);
+                                    SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_DOWNLOADING);
+                                    g_update_worker.thread = SDL_CreateThread(update_worker_fn, "AdvancelyUpdate",
+                                                                              &g_update_worker);
+                                    if (!g_update_worker.thread) {
+                                        log_message(LOG_ERROR, "[UPDATE] Failed to start update worker thread.\n");
+                                        snprintf(g_update_worker.fail_reason, sizeof(g_update_worker.fail_reason),
+                                                 "Could not start the update process.");
+                                        SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_FAILED);
+                                    }
+                                } else {
+                                    snprintf(g_update_worker.fail_reason, sizeof(g_update_worker.fail_reason),
+                                             "Could not find the application path to update.");
+                                    SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_FAILED);
+                                }
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[128];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Download and install the new version now.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::Button("Templates")) {
+                                char templates_path[MAX_PATH_LENGTH];
+                                snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
+                                update_open_path(templates_path);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[160];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Open your local templates folder to back up modified files first.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::Button("Official")) {
+                                update_open_path("https://github.com/LNXSeus/Advancely#Officially-Added-Templates");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[128];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf), "View the official templates online.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::Button("Later")) {
+                                SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_NONE);
+                                ImGui::CloseCurrentPopup();
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[128];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf), "Skip updating until the next restart.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        } else if (update_stage == UPDATE_STAGE_DOWNLOADING ||
+                                   update_stage == UPDATE_STAGE_EXTRACTING ||
+                                   update_stage == UPDATE_STAGE_APPLYING) {
+                            const char *stage_label =
+                                    update_stage == UPDATE_STAGE_DOWNLOADING ? "Step 1/3: Downloading update..." :
+                                    update_stage == UPDATE_STAGE_EXTRACTING ? "Step 2/3: Extracting files..." :
+                                    "Step 3/3: Preparing restart...";
+                            ImGui::TextUnformatted(stage_label);
+                            ImGui::Spacing();
+
+                            float frac = (float) SDL_GetAtomicInt(&g_update_worker.progress) / 1000.0f;
+                            ImGui::ProgressBar(frac, ImVec2(480, 0));
+                            ImGui::Spacing();
+                            ImGui::TextUnformatted("Please do not close Advancely during the update.");
+                        } else if (update_stage == UPDATE_STAGE_DONE) {
+                            // Join the worker and exit so the launched updater script can take over.
+                            if (g_update_worker.thread) {
+                                SDL_WaitThread(g_update_worker.thread, nullptr);
+                                g_update_worker.thread = nullptr;
+                            }
+                            ImGui::TextUnformatted(
+                                "Update ready. Advancely will now close and restart automatically...");
+                            is_running = false;
+                            ImGui::CloseCurrentPopup();
+                        } else if (update_stage == UPDATE_STAGE_FAILED) {
+                            if (g_update_worker.thread) {
+                                SDL_WaitThread(g_update_worker.thread, nullptr);
+                                g_update_worker.thread = nullptr;
+                            }
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Update failed");
+                            ImGui::Spacing();
+                            ImGui::TextWrapped("%s", g_update_worker.fail_reason);
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+                            if (ImGui::Button("Close")) {
+                                SDL_SetAtomicInt(&g_update_worker.stage, UPDATE_STAGE_NONE);
+                                ImGui::CloseCurrentPopup();
+                            }
+                        }
+
+                        ImGui::EndPopup();
+                    }
+                }
             }
 
             ImGui::Render();

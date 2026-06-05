@@ -804,8 +804,11 @@ static void crit_auto_name_group(const EditorTrackableCategory &adv, char out[64
         if (n == 1) snprintf(out, 64, "group");
         else snprintf(out, 64, "group_%d", n);
         bool taken = false;
-        for (const auto &c : adv.criteria) {
-            if (strcmp(c.group, out) == 0) { taken = true; break; }
+        for (const auto &c: adv.criteria) {
+            if (strcmp(c.group, out) == 0) {
+                taken = true;
+                break;
+            }
         }
         if (!taken) return;
     }
@@ -815,10 +818,13 @@ static void crit_auto_name_group(const EditorTrackableCategory &adv, char out[64
 // Returns the distinct non-empty group IDs used by `adv`'s criteria, in first-seen order.
 static std::vector<std::string> crit_collect_group_ids(const EditorTrackableCategory &adv) {
     std::vector<std::string> ids;
-    for (const auto &c : adv.criteria) {
+    for (const auto &c: adv.criteria) {
         if (c.group[0] == '\0') continue;
         bool seen = false;
-        for (const auto &id : ids) if (id == c.group) { seen = true; break; }
+        for (const auto &id: ids) if (id == c.group) {
+            seen = true;
+            break;
+        }
         if (!seen) ids.emplace_back(c.group);
     }
     return ids;
@@ -827,11 +833,11 @@ static std::vector<std::string> crit_collect_group_ids(const EditorTrackableCate
 // Hash a group ID into a distinct ImGui color for the swatch / stripe indicator.
 static ImU32 crit_group_color(const char *id) {
     uint32_t h = 2166136261u;
-    for (const unsigned char *p = (const unsigned char *)id; *p; p++) {
+    for (const unsigned char *p = (const unsigned char *) id; *p; p++) {
         h ^= *p;
         h *= 16777619u;
     }
-    float hue = (float)(h % 360u) / 360.0f;
+    float hue = (float) (h % 360u) / 360.0f;
     ImVec4 c = ImColor::HSV(hue, 0.55f, 0.95f).Value;
     return ImGui::ColorConvertFloat4ToU32(c);
 }
@@ -873,22 +879,22 @@ static int multi_move_selected(std::vector<T> &vec, std::set<int> &sel, int targ
     std::vector<int> sel_sorted(sel.begin(), sel.end());
     std::sort(sel_sorted.begin(), sel_sorted.end());
     int adjusted = target_real;
-    for (int idx : sel_sorted) if (idx >= 0 && idx < target_real) adjusted--;
+    for (int idx: sel_sorted) if (idx >= 0 && idx < target_real) adjusted--;
     std::vector<T> moving;
     moving.reserve(sel_sorted.size());
-    for (int idx : sel_sorted) {
-        if (idx < 0 || (size_t)idx >= vec.size()) continue;
+    for (int idx: sel_sorted) {
+        if (idx < 0 || (size_t) idx >= vec.size()) continue;
         moving.push_back(vec[idx]);
     }
     for (auto it = sel_sorted.rbegin(); it != sel_sorted.rend(); ++it) {
-        if (*it < 0 || (size_t)*it >= vec.size()) continue;
+        if (*it < 0 || (size_t) *it >= vec.size()) continue;
         vec.erase(vec.begin() + *it);
     }
     if (adjusted < 0) adjusted = 0;
-    if (adjusted > (int)vec.size()) adjusted = (int)vec.size();
+    if (adjusted > (int) vec.size()) adjusted = (int) vec.size();
     vec.insert(vec.begin() + adjusted, moving.begin(), moving.end());
     sel.clear();
-    for (int i = 0; i < (int)moving.size(); i++) sel.insert(adjusted + i);
+    for (int i = 0; i < (int) moving.size(); i++) sel.insert(adjusted + i);
     return adjusted;
 }
 
@@ -1362,8 +1368,11 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         // present (true or false), respect it verbatim so users can deliberately disable
         // grouping for an advancement without losing the underlying group strings.
         if (!groups_enabled_key_present) {
-            for (const auto &c : new_cat.criteria) {
-                if (c.group[0] != '\0') { new_cat.groups_enabled = true; break; }
+            for (const auto &c: new_cat.criteria) {
+                if (c.group[0] != '\0') {
+                    new_cat.groups_enabled = true;
+                    break;
+                }
             }
         }
         category_vector.push_back(new_cat);
@@ -2994,7 +3003,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     auto open_template_import = [&](ImportFromTemplateScope scope) {
         const char *zip_filter[1] = {"*.zip"};
         const char *file = tinyfd_openFileDialog("Select Template Zip", "", 1, zip_filter,
-                                                  "Template Zip (*.zip)", 0);
+                                                 "Template Zip (*.zip)", 0);
         if (!file) return;
 
         strncpy(s_template_import_zip_path, file, sizeof(s_template_import_zip_path) - 1);
@@ -3002,7 +3011,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_lang_flags = list_lang_flags_in_zip(file);
         // Always include the default ("") even if not present, so the dropdown is non-empty.
         bool has_default = false;
-        for (const auto &f: s_template_import_lang_flags) if (f.empty()) { has_default = true; break; }
+        for (const auto &f: s_template_import_lang_flags) if (f.empty()) {
+            has_default = true;
+            break;
+        }
         if (!has_default) s_template_import_lang_flags.insert(s_template_import_lang_flags.begin(), std::string());
         s_template_import_lang_index = 0;
 
@@ -5074,7 +5086,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_adv_selection;
                     static int s_adv_last_clicked = -1;
                     for (auto it = s_adv_selection.begin(); it != s_adv_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.advancements.size()) it = s_adv_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.advancements.size())
+                            it = s_adv_selection.erase(it);
                         else ++it;
                     }
 
@@ -5096,70 +5109,71 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::BeginPopup("import_advs_source_popup")) {
                         if (ImGui::Selectable("...from player file")) {
-                        current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
-                        char start_path[MAX_PATH_LENGTH];
-                        // Determine the correct starting path based on version and settings
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            // Legacy achievements are in the stats file (global or local)
-                            if (app_settings->using_stats_per_world_legacy) {
+                            current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
+                            char start_path[MAX_PATH_LENGTH];
+                            // Determine the correct starting path based on version and settings
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                // Legacy achievements are in the stats file (global or local)
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                             t->world_name);
+                                } else {
+                                    char parent_dir[MAX_PATH_LENGTH];
+                                    if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                        snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                    } else {
+                                        strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                        start_path[sizeof(start_path) - 1] = '\0';
+                                    }
+                                }
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era achievements are in the per-world stats file
                                 snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
                             } else {
-                                char parent_dir[MAX_PATH_LENGTH];
-                                if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                    snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                // Modern advancements are in their own per-world folder
+                                snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
+                                         t->world_name);
+                            }
+
+                            // --- Version-aware file filters ---
+#ifdef __APPLE__
+                            const char *json_filter[2] = {"*.json", "public.json"};
+                            const char *dat_filter[2] = {"*.dat", "public.data"};
+                            int filter_count = 2;
+#else
+                            const char *json_filter[1] = {"*.json"};
+                            const char *dat_filter[1] = {"*.dat"};
+                            int filter_count = 1;
+#endif
+                            const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                               ? dat_filter
+                                                               : json_filter;
+                            const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                          ? "DAT files"
+                                                          : "JSON files";
+                            const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                           ? "Select Player Stats File"
+                                                           : "Select Player Advancements File";
+                            const char *selection = tinyfd_openFileDialog(dialog_title, start_path, filter_count,
+                                                                          selected_filter, filter_desc, 0);
+
+                            if (selection) {
+                                import_error_message[0] = '\0';
+                                if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                                                         importable_advancements,
+                                                                         import_error_message,
+                                                                         sizeof(import_error_message))) {
+                                    show_import_advancements_popup = true;
+                                    focus_import_search = true; // Focus search bar as soon as popup opens
+                                    import_search_criteria_only = false; // Reset search mode
+                                    import_select_criteria = false; // Reset selection mode
                                 } else {
-                                    strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
-                                    start_path[sizeof(start_path) - 1] = '\0';
+                                    // If parsing fails, show the error in the main status message
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                    status_message[sizeof(status_message) - 1] = '\0';
                                 }
                             }
-                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                            // Mid-era achievements are in the per-world stats file
-                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                        } else {
-                            // Modern advancements are in their own per-world folder
-                            snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
-                                     t->world_name);
-                        }
-
-                        // --- Version-aware file filters ---
-#ifdef __APPLE__
-                        const char *json_filter[2] = {"*.json", "public.json"};
-                        const char *dat_filter[2] = {"*.dat", "public.data"};
-                        int filter_count = 2;
-#else
-                        const char *json_filter[1] = {"*.json"};
-                        const char *dat_filter[1] = {"*.dat"};
-                        int filter_count = 1;
-#endif
-                        const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                           ? dat_filter
-                                                           : json_filter;
-                        const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                      ? "DAT files"
-                                                      : "JSON files";
-                        const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                                       ? "Select Player Stats File"
-                                                       : "Select Player Advancements File";
-                        const char *selection = tinyfd_openFileDialog(dialog_title, start_path, filter_count,
-                                                                      selected_filter, filter_desc, 0);
-
-                        if (selection) {
-                            import_error_message[0] = '\0';
-                            if (parse_player_advancements_for_import(selection, creator_selected_version,
-                                                                     importable_advancements,
-                                                                     import_error_message,
-                                                                     sizeof(import_error_message))) {
-                                show_import_advancements_popup = true;
-                                focus_import_search = true; // Focus search bar as soon as popup opens
-                                import_search_criteria_only = false; // Reset search mode
-                                import_select_criteria = false; // Reset selection mode
-                            } else {
-                                // If parsing fails, show the error in the main status message
-                                save_message_type = MSG_ERROR;
-                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                status_message[sizeof(status_message) - 1] = '\0';
-                            }
-                        }
                         }
                         if (ImGui::IsItemHovered()) {
                             char import_stats_tooltip[512];
@@ -5380,9 +5394,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                    advancements_to_render.size() == 1
                                                        ? advancements_label_upper
                                                        : advancements_label_plural_upper);
-                    if (!s_adv_selection.empty() && adv_counter_pos < (int)sizeof(counter_text)) {
+                    if (!s_adv_selection.empty() && adv_counter_pos < (int) sizeof(counter_text)) {
                         snprintf(counter_text + adv_counter_pos, sizeof(counter_text) - adv_counter_pos,
-                                 " \xC2\xB7 %d selected", (int)s_adv_selection.size());
+                                 " \xC2\xB7 %d selected", (int) s_adv_selection.size());
                     }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
                     ImGui::SetCursorPosX(
@@ -5447,7 +5461,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("adv_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected %s",
-                                     (int)s_adv_selection.size(),
+                                     (int) s_adv_selection.size(),
                                      s_adv_selection.size() == 1
                                          ? advancements_label_singular_lower
                                          : advancements_label_plural_lower);
@@ -5515,13 +5529,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 if (current_template_data.advancements[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_adv_selection.size());
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_adv_selection.size());
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 current_template_data.advancements[idx].is_hidden = target_hidden;
                             }
                             save_message_type = MSG_NONE;
@@ -5529,13 +5543,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_recipe) {
                             int recipe_count = 0;
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 if (current_template_data.advancements[idx].is_recipe) recipe_count++;
                             }
-                            bool target_recipe = (recipe_count * 2 < (int)s_adv_selection.size());
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            bool target_recipe = (recipe_count * 2 < (int) s_adv_selection.size());
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 current_template_data.advancements[idx].is_recipe = target_recipe;
                             }
                             save_message_type = MSG_NONE;
@@ -5543,13 +5557,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row3) {
                             int row3_count = 0;
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 if (current_template_data.advancements[idx].in_3rd_row) row3_count++;
                             }
-                            bool target_row3 = (row3_count * 2 < (int)s_adv_selection.size());
-                            for (int idx : s_adv_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            bool target_row3 = (row3_count * 2 < (int) s_adv_selection.size());
+                            for (int idx: s_adv_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 current_template_data.advancements[idx].in_3rd_row = target_row3;
                             }
                             save_message_type = MSG_NONE;
@@ -5564,8 +5578,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginPopup("adv_bulk_icon_popup")) {
                             ImGui::TextDisabled("Icon path for %d selected %s",
-                                                (int)s_adv_selection.size(),
-                                                s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                                                (int) s_adv_selection.size(),
+                                                s_adv_selection.size() == 1
+                                                    ? advancements_label_singular_lower
+                                                    : advancements_label_plural_lower);
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##adv_bulk_icon_path", s_adv_bulk_icon_buf,
                                                                  sizeof(s_adv_bulk_icon_buf),
@@ -5580,8 +5596,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##adv_bulk_icon");
                             if ((submit_enter || submit_apply) && s_adv_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_adv_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                for (int idx: s_adv_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                     strncpy(current_template_data.advancements[idx].icon_path, s_adv_bulk_icon_buf,
                                             sizeof(current_template_data.advancements[idx].icon_path) - 1);
                                     current_template_data.advancements[idx].icon_path[
@@ -5595,8 +5611,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginPopup("adv_bulk_layout_popup")) {
                             ImGui::TextDisabled("Layout coordinates for %d selected %s",
-                                                (int)s_adv_selection.size(),
-                                                s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                                                (int) s_adv_selection.size(),
+                                                s_adv_selection.size() == 1
+                                                    ? advancements_label_singular_lower
+                                                    : advancements_label_plural_lower);
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -5606,28 +5624,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
 
                             static bool s_adv_bl_base_set[3], s_adv_bl_base_hide[3];
-                            static float s_adv_bl_base_x[3], s_adv_bl_base_y[3], s_adv_bl_base_xs[3], s_adv_bl_base_ys[3];
+                            static float s_adv_bl_base_x[3], s_adv_bl_base_y[3], s_adv_bl_base_xs[3], s_adv_bl_base_ys[
+                                3];
                             static int s_adv_bl_base_cols[3], s_adv_bl_base_anchor[3];
                             if (ImGui::IsWindowAppearing()) {
-                                s_adv_bl_base_set[0] = s_adv_bl_icon_set; s_adv_bl_base_hide[0] = s_adv_bl_icon_hide;
-                                s_adv_bl_base_x[0] = s_adv_bl_icon_x; s_adv_bl_base_y[0] = s_adv_bl_icon_y;
-                                s_adv_bl_base_xs[0] = s_adv_bl_icon_xs; s_adv_bl_base_ys[0] = s_adv_bl_icon_ys;
-                                s_adv_bl_base_cols[0] = s_adv_bl_icon_cols; s_adv_bl_base_anchor[0] = s_adv_bl_icon_anchor;
-                                s_adv_bl_base_set[1] = s_adv_bl_text_set; s_adv_bl_base_hide[1] = s_adv_bl_text_hide;
-                                s_adv_bl_base_x[1] = s_adv_bl_text_x; s_adv_bl_base_y[1] = s_adv_bl_text_y;
-                                s_adv_bl_base_xs[1] = s_adv_bl_text_xs; s_adv_bl_base_ys[1] = s_adv_bl_text_ys;
-                                s_adv_bl_base_cols[1] = s_adv_bl_text_cols; s_adv_bl_base_anchor[1] = s_adv_bl_text_anchor;
-                                s_adv_bl_base_set[2] = s_adv_bl_prog_set; s_adv_bl_base_hide[2] = s_adv_bl_prog_hide;
-                                s_adv_bl_base_x[2] = s_adv_bl_prog_x; s_adv_bl_base_y[2] = s_adv_bl_prog_y;
-                                s_adv_bl_base_xs[2] = s_adv_bl_prog_xs; s_adv_bl_base_ys[2] = s_adv_bl_prog_ys;
-                                s_adv_bl_base_cols[2] = s_adv_bl_prog_cols; s_adv_bl_base_anchor[2] = s_adv_bl_prog_anchor;
+                                s_adv_bl_base_set[0] = s_adv_bl_icon_set;
+                                s_adv_bl_base_hide[0] = s_adv_bl_icon_hide;
+                                s_adv_bl_base_x[0] = s_adv_bl_icon_x;
+                                s_adv_bl_base_y[0] = s_adv_bl_icon_y;
+                                s_adv_bl_base_xs[0] = s_adv_bl_icon_xs;
+                                s_adv_bl_base_ys[0] = s_adv_bl_icon_ys;
+                                s_adv_bl_base_cols[0] = s_adv_bl_icon_cols;
+                                s_adv_bl_base_anchor[0] = s_adv_bl_icon_anchor;
+                                s_adv_bl_base_set[1] = s_adv_bl_text_set;
+                                s_adv_bl_base_hide[1] = s_adv_bl_text_hide;
+                                s_adv_bl_base_x[1] = s_adv_bl_text_x;
+                                s_adv_bl_base_y[1] = s_adv_bl_text_y;
+                                s_adv_bl_base_xs[1] = s_adv_bl_text_xs;
+                                s_adv_bl_base_ys[1] = s_adv_bl_text_ys;
+                                s_adv_bl_base_cols[1] = s_adv_bl_text_cols;
+                                s_adv_bl_base_anchor[1] = s_adv_bl_text_anchor;
+                                s_adv_bl_base_set[2] = s_adv_bl_prog_set;
+                                s_adv_bl_base_hide[2] = s_adv_bl_prog_hide;
+                                s_adv_bl_base_x[2] = s_adv_bl_prog_x;
+                                s_adv_bl_base_y[2] = s_adv_bl_prog_y;
+                                s_adv_bl_base_xs[2] = s_adv_bl_prog_xs;
+                                s_adv_bl_base_ys[2] = s_adv_bl_prog_ys;
+                                s_adv_bl_base_cols[2] = s_adv_bl_prog_cols;
+                                s_adv_bl_base_anchor[2] = s_adv_bl_prog_anchor;
                             }
 
                             ImGui::PushID("adv_bulk_layout_icon");
                             ImGui::Checkbox("Icon Pos.", &s_adv_bl_icon_set);
                             if (ImGui::IsItemHovered()) {
                                 char t1[160];
-                                snprintf(t1, sizeof(t1), "Enable or disable manual icon positioning on every selected %s.",
+                                snprintf(t1, sizeof(t1),
+                                         "Enable or disable manual icon positioning on every selected %s.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", t1);
                             }
@@ -5635,31 +5667,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Checkbox("Hide##adv_bl_icon", &s_adv_bl_icon_hide);
                             if (ImGui::IsItemHovered()) {
                                 char t2[160];
-                                snprintf(t2, sizeof(t2), "Set the Hide-in-layout flag for the icon on every selected %s.",
+                                snprintf(t2, sizeof(t2),
+                                         "Set the Hide-in-layout flag for the icon on every selected %s.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", t2);
                             }
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("X", &s_adv_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_icon_x = fminf(fmaxf(roundf(s_adv_bl_icon_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("X", &s_adv_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_icon_x = fminf(fmaxf(roundf(s_adv_bl_icon_x), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("+X", &s_adv_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_icon_xs = fminf(fmaxf(roundf(s_adv_bl_icon_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("+X", &s_adv_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_icon_xs = fminf(fmaxf(roundf(s_adv_bl_icon_xs), -MANUAL_POS_MAX),
+                                                         MANUAL_POS_MAX);
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("Y", &s_adv_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_icon_y = fminf(fmaxf(roundf(s_adv_bl_icon_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("Y", &s_adv_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_icon_y = fminf(fmaxf(roundf(s_adv_bl_icon_y), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("+Y", &s_adv_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_icon_ys = fminf(fmaxf(roundf(s_adv_bl_icon_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("+Y", &s_adv_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_icon_ys = fminf(fmaxf(roundf(s_adv_bl_icon_ys), -MANUAL_POS_MAX),
+                                                         MANUAL_POS_MAX);
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
@@ -5674,13 +5715,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                                  "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                  "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                             }
                             bool icon_t_en = (s_adv_bl_icon_set != s_adv_bl_base_set[0]);
                             bool icon_t_hi = (s_adv_bl_icon_hide != s_adv_bl_base_hide[0]);
-                            bool icon_t_po = (s_adv_bl_icon_x != s_adv_bl_base_x[0]) || (s_adv_bl_icon_y != s_adv_bl_base_y[0]) ||
-                                             (s_adv_bl_icon_xs != s_adv_bl_base_xs[0]) || (s_adv_bl_icon_ys != s_adv_bl_base_ys[0]) ||
+                            bool icon_t_po = (s_adv_bl_icon_x != s_adv_bl_base_x[0]) || (
+                                                 s_adv_bl_icon_y != s_adv_bl_base_y[0]) ||
+                                             (s_adv_bl_icon_xs != s_adv_bl_base_xs[0]) || (
+                                                 s_adv_bl_icon_ys != s_adv_bl_base_ys[0]) ||
                                              (s_adv_bl_icon_cols != s_adv_bl_base_cols[0]);
                             bool icon_t_an = (s_adv_bl_icon_anchor != s_adv_bl_base_anchor[0]);
                             bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
@@ -5691,8 +5734,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      icon_applabel, sizeof(icon_applabel));
                             if (ImGui::Button(icon_applabel)) {
                                 int n = 0;
-                                for (int idx : bulk_layout_sorted) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                for (int idx: bulk_layout_sorted) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
                                     int x_mult = (s_adv_bl_icon_cols >= 1) ? (n % s_adv_bl_icon_cols) : n;
                                     int y_mult = (s_adv_bl_icon_cols >= 1) ? (n / s_adv_bl_icon_cols) : n;
@@ -5704,15 +5747,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         a.icon_pos.y = fminf(fmaxf(roundf(s_adv_bl_icon_y + y_mult * s_adv_bl_icon_ys),
                                                                    -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                     }
-                                    if (icon_w_an) a.icon_pos.anchor = (AnchorPoint)s_adv_bl_icon_anchor;
+                                    if (icon_w_an) a.icon_pos.anchor = (AnchorPoint) s_adv_bl_icon_anchor;
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
                             }
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Applies only the buckets you changed since opening this popup.\n"
-                                "Change nothing (or all four) to apply everything.\n"
-                                "Untouched fields are left as-is on each selected advancement.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Applies only the buckets you changed since opening this popup.\n"
+                                                  "Change nothing (or all four) to apply everything.\n"
+                                                  "Untouched fields are left as-is on each selected advancement.");
                             ImGui::PopID();
 
                             ImGui::Separator();
@@ -5721,7 +5765,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Checkbox("Text Pos.", &s_adv_bl_text_set);
                             if (ImGui::IsItemHovered()) {
                                 char t1[160];
-                                snprintf(t1, sizeof(t1), "Enable or disable manual text positioning on every selected %s.",
+                                snprintf(t1, sizeof(t1),
+                                         "Enable or disable manual text positioning on every selected %s.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", t1);
                             }
@@ -5729,31 +5774,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Checkbox("Hide##adv_bl_text", &s_adv_bl_text_hide);
                             if (ImGui::IsItemHovered()) {
                                 char t2[160];
-                                snprintf(t2, sizeof(t2), "Set the Hide-in-layout flag for the text on every selected %s.",
+                                snprintf(t2, sizeof(t2),
+                                         "Set the Hide-in-layout flag for the text on every selected %s.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", t2);
                             }
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("X", &s_adv_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_text_x = fminf(fmaxf(roundf(s_adv_bl_text_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("X", &s_adv_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_text_x = fminf(fmaxf(roundf(s_adv_bl_text_x), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("+X", &s_adv_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_text_xs = fminf(fmaxf(roundf(s_adv_bl_text_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("+X", &s_adv_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_text_xs = fminf(fmaxf(roundf(s_adv_bl_text_xs), -MANUAL_POS_MAX),
+                                                         MANUAL_POS_MAX);
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("Y", &s_adv_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_text_y = fminf(fmaxf(roundf(s_adv_bl_text_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("Y", &s_adv_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_text_y = fminf(fmaxf(roundf(s_adv_bl_text_y), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
                             }
                             ImGui::SameLine();
                             ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragFloat("+Y", &s_adv_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                s_adv_bl_text_ys = fminf(fmaxf(roundf(s_adv_bl_text_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            if (ImGui::DragFloat("+Y", &s_adv_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                 "%.0f")) {
+                                s_adv_bl_text_ys = fminf(fmaxf(roundf(s_adv_bl_text_ys), -MANUAL_POS_MAX),
+                                                         MANUAL_POS_MAX);
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
@@ -5768,13 +5822,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                                  "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                  "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                             }
                             bool text_t_en = (s_adv_bl_text_set != s_adv_bl_base_set[1]);
                             bool text_t_hi = (s_adv_bl_text_hide != s_adv_bl_base_hide[1]);
-                            bool text_t_po = (s_adv_bl_text_x != s_adv_bl_base_x[1]) || (s_adv_bl_text_y != s_adv_bl_base_y[1]) ||
-                                             (s_adv_bl_text_xs != s_adv_bl_base_xs[1]) || (s_adv_bl_text_ys != s_adv_bl_base_ys[1]) ||
+                            bool text_t_po = (s_adv_bl_text_x != s_adv_bl_base_x[1]) || (
+                                                 s_adv_bl_text_y != s_adv_bl_base_y[1]) ||
+                                             (s_adv_bl_text_xs != s_adv_bl_base_xs[1]) || (
+                                                 s_adv_bl_text_ys != s_adv_bl_base_ys[1]) ||
                                              (s_adv_bl_text_cols != s_adv_bl_base_cols[1]);
                             bool text_t_an = (s_adv_bl_text_anchor != s_adv_bl_base_anchor[1]);
                             bool text_w_en, text_w_hi, text_w_po, text_w_an;
@@ -5785,8 +5841,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      text_applabel, sizeof(text_applabel));
                             if (ImGui::Button(text_applabel)) {
                                 int n = 0;
-                                for (int idx : bulk_layout_sorted) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                for (int idx: bulk_layout_sorted) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
                                     int x_mult = (s_adv_bl_text_cols >= 1) ? (n % s_adv_bl_text_cols) : n;
                                     int y_mult = (s_adv_bl_text_cols >= 1) ? (n / s_adv_bl_text_cols) : n;
@@ -5798,20 +5854,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         a.text_pos.y = fminf(fmaxf(roundf(s_adv_bl_text_y + y_mult * s_adv_bl_text_ys),
                                                                    -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                     }
-                                    if (text_w_an) a.text_pos.anchor = (AnchorPoint)s_adv_bl_text_anchor;
+                                    if (text_w_an) a.text_pos.anchor = (AnchorPoint) s_adv_bl_text_anchor;
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
                             }
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Applies only the buckets you changed since opening this popup.\n"
-                                "Change nothing (or all four) to apply everything.\n"
-                                "Untouched fields are left as-is on each selected advancement.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Applies only the buckets you changed since opening this popup.\n"
+                                                  "Change nothing (or all four) to apply everything.\n"
+                                                  "Untouched fields are left as-is on each selected advancement.");
                             ImGui::PopID();
 
                             bool any_selected_complex = false;
-                            for (int idx : bulk_layout_sorted) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                            for (int idx: bulk_layout_sorted) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                 if (!current_template_data.advancements[idx].criteria.empty()) {
                                     any_selected_complex = true;
                                     break;
@@ -5841,26 +5898,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s", t2);
                                 }
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("X", &s_adv_bl_prog_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_adv_bl_prog_x = fminf(fmaxf(roundf(s_adv_bl_prog_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("X", &s_adv_bl_prog_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_adv_bl_prog_x = fminf(fmaxf(roundf(s_adv_bl_prog_x), -MANUAL_POS_MAX),
+                                                            MANUAL_POS_MAX);
                                 }
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+X", &s_adv_bl_prog_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_adv_bl_prog_xs = fminf(fmaxf(roundf(s_adv_bl_prog_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("+X", &s_adv_bl_prog_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_adv_bl_prog_xs = fminf(fmaxf(roundf(s_adv_bl_prog_xs), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
                                 }
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("Y", &s_adv_bl_prog_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_adv_bl_prog_y = fminf(fmaxf(roundf(s_adv_bl_prog_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("Y", &s_adv_bl_prog_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_adv_bl_prog_y = fminf(fmaxf(roundf(s_adv_bl_prog_y), -MANUAL_POS_MAX),
+                                                            MANUAL_POS_MAX);
                                 }
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+Y", &s_adv_bl_prog_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_adv_bl_prog_ys = fminf(fmaxf(roundf(s_adv_bl_prog_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("+Y", &s_adv_bl_prog_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_adv_bl_prog_ys = fminf(fmaxf(roundf(s_adv_bl_prog_ys), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
@@ -5875,14 +5940,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                        "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                        "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 }
                                 bool prog_t_en = (s_adv_bl_prog_set != s_adv_bl_base_set[2]);
                                 bool prog_t_hi = (s_adv_bl_prog_hide != s_adv_bl_base_hide[2]);
-                                bool prog_t_po = (s_adv_bl_prog_x != s_adv_bl_base_x[2]) || (s_adv_bl_prog_y != s_adv_bl_base_y[2]) ||
-                                                 (s_adv_bl_prog_xs != s_adv_bl_base_xs[2]) || (s_adv_bl_prog_ys != s_adv_bl_base_ys[2]) ||
-                                                 (s_adv_bl_prog_cols != s_adv_bl_base_cols[2]);
+                                bool prog_t_po =
+                                        (s_adv_bl_prog_x != s_adv_bl_base_x[2]) || (
+                                            s_adv_bl_prog_y != s_adv_bl_base_y[2]) ||
+                                        (s_adv_bl_prog_xs != s_adv_bl_base_xs[2]) || (
+                                            s_adv_bl_prog_ys != s_adv_bl_base_ys[2]) ||
+                                        (s_adv_bl_prog_cols != s_adv_bl_base_cols[2]);
                                 bool prog_t_an = (s_adv_bl_prog_anchor != s_adv_bl_base_anchor[2]);
                                 bool prog_w_en, prog_w_hi, prog_w_po, prog_w_an;
                                 char prog_applabel[96];
@@ -5892,8 +5960,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          prog_applabel, sizeof(prog_applabel));
                                 if (ImGui::Button(prog_applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.advancements.size())
+                                            continue;
                                         auto &a = current_template_data.advancements[idx];
                                         if (!a.criteria.empty()) {
                                             int x_mult = (s_adv_bl_prog_cols >= 1) ? (n % s_adv_bl_prog_cols) : n;
@@ -5901,12 +5970,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             if (prog_w_en) a.progress_pos.is_set = s_adv_bl_prog_set;
                                             if (prog_w_hi) a.progress_pos.is_hidden_in_layout = s_adv_bl_prog_hide;
                                             if (prog_w_po) {
-                                                a.progress_pos.x = fminf(fmaxf(roundf(s_adv_bl_prog_x + x_mult * s_adv_bl_prog_xs),
-                                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                                a.progress_pos.y = fminf(fmaxf(roundf(s_adv_bl_prog_y + y_mult * s_adv_bl_prog_ys),
-                                                                               -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                a.progress_pos.x = fminf(
+                                                    fmaxf(roundf(s_adv_bl_prog_x + x_mult * s_adv_bl_prog_xs),
+                                                          -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                a.progress_pos.y = fminf(
+                                                    fmaxf(roundf(s_adv_bl_prog_y + y_mult * s_adv_bl_prog_ys),
+                                                          -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                             }
-                                            if (prog_w_an) a.progress_pos.anchor = (AnchorPoint)s_adv_bl_prog_anchor;
+                                            if (prog_w_an) a.progress_pos.anchor = (AnchorPoint) s_adv_bl_prog_anchor;
                                         }
                                         n++;
                                     }
@@ -5932,8 +6003,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("adv_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected %s?", (int)s_adv_selection.size(),
-                                        s_adv_selection.size() == 1 ? advancements_label_singular_lower : advancements_label_plural_lower);
+                            ImGui::Text("Delete %d selected %s?", (int) s_adv_selection.size(),
+                                        s_adv_selection.size() == 1
+                                            ? advancements_label_singular_lower
+                                            : advancements_label_plural_lower);
                             if (ImGui::Button("Delete##adv_bulk_confirm")) {
                                 bulk_delete_adv = true;
                                 ImGui::CloseCurrentPopup();
@@ -5958,7 +6031,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < advancements_to_render.size(); ++i) {
                         auto &advancement = *advancements_to_render[i];
-                        int adv_real_i = (int)(&advancement - &current_template_data.advancements[0]);
+                        int adv_real_i = (int) (&advancement - &current_template_data.advancements[0]);
                         ImGui::PushID(&advancement);
 
                         const char *display_name = advancement.display_name;
@@ -5971,9 +6044,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char placeholder[64];
                             snprintf(placeholder, sizeof(placeholder), "[New %s]", advancements_label_upper);
                             label = placeholder;
-                        }
-
-                        {
+                        } {
                             bool is_adv_selected = s_adv_selection.find(adv_real_i) != s_adv_selection.end();
                             if (ImGui::Checkbox("##adv_bulk_sel", &is_adv_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -5981,10 +6052,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_adv_last_clicked, adv_real_i);
                                     int hi = std::max(s_adv_last_clicked, adv_real_i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.advancements.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.advancements.size()) continue;
                                         bool in_filter = false;
-                                        for (const auto *p : advancements_to_render) {
-                                            if (p == &current_template_data.advancements[k]) { in_filter = true; break; }
+                                        for (const auto *p: advancements_to_render) {
+                                            if (p == &current_template_data.advancements[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
                                         }
                                         if (!in_filter) continue;
                                         if (is_adv_selected) s_adv_selection.insert(k);
@@ -6086,7 +6160,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetDragDropPayload("ADVANCEMENT_DND", &i, sizeof(int));
                             if (s_adv_selection.find(adv_real_i) != s_adv_selection.end() &&
                                 s_adv_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_adv_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_adv_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", label);
                             }
@@ -6113,8 +6187,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     sizeof(selected_root_name_before_op) - 1);
                         }
                         bool wipe_selected_ptr = false;
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.advancements.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                             EditorTrackableCategory *adv_ptr = &current_template_data.advancements[idx];
                             if (selected_advancement == adv_ptr) wipe_selected_ptr = true;
                             clear_goal_links(current_template_data, adv_ptr->root_name);
@@ -6125,7 +6199,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_advancement = nullptr;
                         } else if (selected_root_name_before_op[0] != '\0') {
                             selected_advancement = nullptr;
-                            for (auto &adv : current_template_data.advancements) {
+                            for (auto &adv: current_template_data.advancements) {
                                 if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
                                     selected_advancement = &adv;
                                     break;
@@ -6143,8 +6217,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (adv_dnd_source_index != -1 && adv_dnd_target_index != -1) {
                         EditorTrackableCategory *source_item_ptr = advancements_to_render[adv_dnd_source_index];
                         EditorTrackableCategory *target_item_ptr = advancements_to_render[adv_dnd_target_index];
-                        int adv_src_real = (int)(source_item_ptr - &current_template_data.advancements[0]);
-                        int adv_tgt_real = (int)(target_item_ptr - &current_template_data.advancements[0]);
+                        int adv_src_real = (int) (source_item_ptr - &current_template_data.advancements[0]);
+                        int adv_tgt_real = (int) (target_item_ptr - &current_template_data.advancements[0]);
 
                         if (s_adv_selection.find(adv_src_real) != s_adv_selection.end()) {
                             char selected_root_name_before_op[192] = {};
@@ -6156,7 +6230,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_adv_last_clicked = -1;
                             if (selected_root_name_before_op[0] != '\0') {
                                 selected_advancement = nullptr;
-                                for (auto &adv : current_template_data.advancements) {
+                                for (auto &adv: current_template_data.advancements) {
                                     if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
                                         selected_advancement = &adv;
                                         break;
@@ -6378,7 +6452,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_adv_root,
                                                   advancement.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -6525,7 +6600,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_crit_last_clicked = -1;
                         }
                         for (auto it = s_crit_selection.begin(); it != s_crit_selection.end();) {
-                            if (*it < 0 || (size_t)*it >= advancement.criteria.size()) it = s_crit_selection.erase(it);
+                            if (*it < 0 || (size_t) *it >= advancement.criteria.size()) it = s_crit_selection.erase(it);
                             else ++it;
                         }
 
@@ -6555,19 +6630,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                visible_criteria_count,
                                                visible_criteria_count == 1 ? "Criterion" : "Criteria");
                             if (advancement.groups_enabled) {
-                                int distinct_groups = (int)crit_collect_group_ids(advancement).size();
+                                int distinct_groups = (int) crit_collect_group_ids(advancement).size();
                                 int loose_crit = 0;
-                                for (const auto &c : advancement.criteria) if (c.group[0] == '\0') loose_crit++;
-                                if (distinct_groups > 0 && pos < (int)sizeof(crit_counter_text)) {
+                                for (const auto &c: advancement.criteria) if (c.group[0] == '\0') loose_crit++;
+                                if (distinct_groups > 0 && pos < (int) sizeof(crit_counter_text)) {
                                     pos += snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
                                                     " (%d %s + %d loose)",
                                                     distinct_groups, distinct_groups == 1 ? "group" : "groups",
                                                     loose_crit);
                                 }
                             }
-                            if (!s_crit_selection.empty() && pos < (int)sizeof(crit_counter_text)) {
+                            if (!s_crit_selection.empty() && pos < (int) sizeof(crit_counter_text)) {
                                 snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
-                                         " \xC2\xB7 %d selected", (int)s_crit_selection.size());
+                                         " \xC2\xB7 %d selected", (int) s_crit_selection.size());
                             }
                             float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
@@ -6583,45 +6658,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::BeginPopup("import_criteria_source_popup")) {
                                 if (ImGui::Selectable("...from player file")) {
-                                current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
-                                // This logic is copied from the main "Import Advancements" button
-                                char start_path[MAX_PATH_LENGTH];
-                                if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                             t->world_name);
-                                } else {
-                                    snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
-                                             t->world_name);
-                                }
-#ifdef __APPLE__
-                                const char *json_filter[2] = {"*.json", "public.json"};
-                                int filter_count = 2;
-#else
-                                const char *json_filter[1] = {"*.json"};
-                                int filter_count = 1;
-#endif
-                                const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                                               ? "Select Player Stats File"
-                                                               : "Select Player Advancements File";
-
-                                const char *selection = tinyfd_openFileDialog(
-                                    dialog_title, start_path, filter_count, json_filter, "JSON files", 0);
-
-                                if (selection) {
-                                    import_error_message[0] = '\0';
-                                    if (parse_player_advancements_for_import(selection, creator_selected_version,
-                                                                             importable_advancements,
-                                                                             import_error_message,
-                                                                             sizeof(import_error_message))) {
-                                        show_import_advancements_popup = true;
-                                        focus_import_search = true;
-                                        import_search_criteria_only = true;
-                                        import_select_criteria = true;
+                                    current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
+                                    // This logic is copied from the main "Import Advancements" button
+                                    char start_path[MAX_PATH_LENGTH];
+                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                 t->world_name);
                                     } else {
-                                        save_message_type = MSG_ERROR;
-                                        strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                        snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
+                                                 t->world_name);
                                     }
-                                }
+#ifdef __APPLE__
+                                    const char *json_filter[2] = {"*.json", "public.json"};
+                                    int filter_count = 2;
+#else
+                                    const char *json_filter[1] = {"*.json"};
+                                    int filter_count = 1;
+#endif
+                                    const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                                   ? "Select Player Stats File"
+                                                                   : "Select Player Advancements File";
+
+                                    const char *selection = tinyfd_openFileDialog(
+                                        dialog_title, start_path, filter_count, json_filter, "JSON files", 0);
+
+                                    if (selection) {
+                                        import_error_message[0] = '\0';
+                                        if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                            importable_advancements,
+                                            import_error_message,
+                                            sizeof(import_error_message))) {
+                                            show_import_advancements_popup = true;
+                                            focus_import_search = true;
+                                            import_search_criteria_only = true;
+                                            import_select_criteria = true;
+                                        } else {
+                                            save_message_type = MSG_ERROR;
+                                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                        }
+                                    }
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip[512];
@@ -6808,68 +6883,69 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::BeginPopup("crit_bulk_actions_menu")) {
                                 char hdr[160];
                                 snprintf(hdr, sizeof(hdr), "%d selected %s",
-                                         (int)s_crit_selection.size(),
+                                         (int) s_crit_selection.size(),
                                          s_crit_selection.size() == 1 ? "criterion" : "criteria");
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Set Icon...##crit_ba")) ba_open_icon = true;
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                        "Apply the same icon path to every selected criterion.");
+                                                      "Apply the same icon path to every selected criterion.");
                                 }
                                 if (ImGui::Selectable("Toggle Hidden##crit_ba")) ba_do_toggle_hidden = true;
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                        "Flip Hidden on every selected criterion.\n"
-                                        "If most are visible they all become hidden, and vice versa.");
+                                                      "Flip Hidden on every selected criterion.\n"
+                                                      "If most are visible they all become hidden, and vice versa.");
                                 }
                                 if (ImGui::Selectable("Layout Coordinates...##crit_ba")) ba_open_layout = true;
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                        "Bulk-set Icon Pos. and Text Pos. for every selected criterion.\n"
-                                        "Each X and Y supports an optional stride that distributes\n"
-                                        "values across the selection in template order.");
+                                                      "Bulk-set Icon Pos. and Text Pos. for every selected criterion.\n"
+                                                      "Each X and Y supports an optional stride that distributes\n"
+                                                      "values across the selection in template order.");
                                 }
                                 if (advancement.groups_enabled) {
                                     ImGui::Separator();
-                                    if (ImGui::Selectable("Add selection to group...##crit_ba")) ba_open_group_add = true;
+                                    if (ImGui::Selectable("Add selection to group...##crit_ba"))
+                                        ba_open_group_add = true;
                                     if (ImGui::IsItemHovered()) {
                                         ImGui::SetTooltip("%s",
-                                            "Assign every selected criterion to a group.\n"
-                                            "Either click an existing group, or type a new name.\n"
-                                            "Criteria sharing a group collapse into one progress unit.");
+                                                          "Assign every selected criterion to a group.\n"
+                                                          "Either click an existing group, or type a new name.\n"
+                                                          "Criteria sharing a group collapse into one progress unit.");
                                     }
                                     if (ImGui::Selectable("Ungroup selection##crit_ba")) ba_do_ungroup = true;
                                     if (ImGui::IsItemHovered()) {
                                         ImGui::SetTooltip("%s",
-                                            "Clear the group ID on every selected criterion.");
+                                                          "Clear the group ID on every selected criterion.");
                                     }
                                 }
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Delete Selected...##crit_ba")) ba_open_delete = true;
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                        "Remove all selected criteria. Requires confirmation.");
+                                                      "Remove all selected criteria. Requires confirmation.");
                                 }
                                 ImGui::EndPopup();
                             }
 
                             if (ba_do_toggle_hidden) {
                                 int hidden_count = 0;
-                                for (int idx : s_crit_selection) {
-                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                for (int idx: s_crit_selection) {
+                                    if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                     if (advancement.criteria[idx].is_hidden) hidden_count++;
                                 }
-                                bool target_hidden = (hidden_count * 2 < (int)s_crit_selection.size());
-                                for (int idx : s_crit_selection) {
-                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                bool target_hidden = (hidden_count * 2 < (int) s_crit_selection.size());
+                                for (int idx: s_crit_selection) {
+                                    if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                     advancement.criteria[idx].is_hidden = target_hidden;
                                 }
                                 save_message_type = MSG_NONE;
                             }
                             if (ba_do_ungroup) {
-                                for (int idx : s_crit_selection) {
-                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                for (int idx: s_crit_selection) {
+                                    if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                     advancement.criteria[idx].group[0] = '\0';
                                 }
                                 save_message_type = MSG_NONE;
@@ -6887,7 +6963,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (ImGui::BeginPopup("crit_bulk_icon_popup")) {
-                                ImGui::TextDisabled("Icon path for %d selected criteria", (int)s_crit_selection.size());
+                                ImGui::TextDisabled("Icon path for %d selected criteria",
+                                                    (int) s_crit_selection.size());
                                 ImGui::SetNextItemWidth(280.0f);
                                 bool submit_enter = ImGui::InputText("##crit_bulk_icon_path", s_crit_bulk_icon_buf,
                                                                      sizeof(s_crit_bulk_icon_buf),
@@ -6902,8 +6979,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 bool submit_apply = ImGui::Button("Apply##crit_bulk_icon");
                                 if ((submit_enter || submit_apply) && s_crit_bulk_icon_buf[0] != '\0') {
-                                    for (int idx : s_crit_selection) {
-                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    for (int idx: s_crit_selection) {
+                                        if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         strncpy(advancement.criteria[idx].icon_path, s_crit_bulk_icon_buf,
                                                 sizeof(advancement.criteria[idx].icon_path) - 1);
                                         advancement.criteria[idx].icon_path[
@@ -6917,9 +6994,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             if (ImGui::BeginPopup("crit_bulk_layout_popup")) {
                                 ImGui::TextDisabled("Layout coordinates for %d selected criteria",
-                                                    (int)s_crit_selection.size());
+                                                    (int) s_crit_selection.size());
                                 ImGui::TextDisabled("Strides distribute values in template order.");
-                                ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                                ImGui::TextDisabled(
+                                    "Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                                 ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
                                 ImGui::Separator();
 
@@ -6927,17 +7005,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 std::sort(bulk_layout_sorted.begin(), bulk_layout_sorted.end());
 
                                 static bool s_crit_bl_base_set[2], s_crit_bl_base_hide[2];
-                                static float s_crit_bl_base_x[2], s_crit_bl_base_y[2], s_crit_bl_base_xs[2], s_crit_bl_base_ys[2];
+                                static float s_crit_bl_base_x[2], s_crit_bl_base_y[2], s_crit_bl_base_xs[2],
+                                        s_crit_bl_base_ys[2];
                                 static int s_crit_bl_base_cols[2], s_crit_bl_base_anchor[2];
                                 if (ImGui::IsWindowAppearing()) {
-                                    s_crit_bl_base_set[0] = s_crit_bl_icon_set; s_crit_bl_base_hide[0] = s_crit_bl_icon_hide;
-                                    s_crit_bl_base_x[0] = s_crit_bl_icon_x; s_crit_bl_base_y[0] = s_crit_bl_icon_y;
-                                    s_crit_bl_base_xs[0] = s_crit_bl_icon_xs; s_crit_bl_base_ys[0] = s_crit_bl_icon_ys;
-                                    s_crit_bl_base_cols[0] = s_crit_bl_icon_cols; s_crit_bl_base_anchor[0] = s_crit_bl_icon_anchor;
-                                    s_crit_bl_base_set[1] = s_crit_bl_text_set; s_crit_bl_base_hide[1] = s_crit_bl_text_hide;
-                                    s_crit_bl_base_x[1] = s_crit_bl_text_x; s_crit_bl_base_y[1] = s_crit_bl_text_y;
-                                    s_crit_bl_base_xs[1] = s_crit_bl_text_xs; s_crit_bl_base_ys[1] = s_crit_bl_text_ys;
-                                    s_crit_bl_base_cols[1] = s_crit_bl_text_cols; s_crit_bl_base_anchor[1] = s_crit_bl_text_anchor;
+                                    s_crit_bl_base_set[0] = s_crit_bl_icon_set;
+                                    s_crit_bl_base_hide[0] = s_crit_bl_icon_hide;
+                                    s_crit_bl_base_x[0] = s_crit_bl_icon_x;
+                                    s_crit_bl_base_y[0] = s_crit_bl_icon_y;
+                                    s_crit_bl_base_xs[0] = s_crit_bl_icon_xs;
+                                    s_crit_bl_base_ys[0] = s_crit_bl_icon_ys;
+                                    s_crit_bl_base_cols[0] = s_crit_bl_icon_cols;
+                                    s_crit_bl_base_anchor[0] = s_crit_bl_icon_anchor;
+                                    s_crit_bl_base_set[1] = s_crit_bl_text_set;
+                                    s_crit_bl_base_hide[1] = s_crit_bl_text_hide;
+                                    s_crit_bl_base_x[1] = s_crit_bl_text_x;
+                                    s_crit_bl_base_y[1] = s_crit_bl_text_y;
+                                    s_crit_bl_base_xs[1] = s_crit_bl_text_xs;
+                                    s_crit_bl_base_ys[1] = s_crit_bl_text_ys;
+                                    s_crit_bl_base_cols[1] = s_crit_bl_text_cols;
+                                    s_crit_bl_base_anchor[1] = s_crit_bl_text_anchor;
                                 }
 
                                 ImGui::PushID("crit_bulk_layout_icon");
@@ -6945,38 +7032,56 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 ImGui::Checkbox("Hide##crit_bl_icon", &s_crit_bl_icon_hide);
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("X", &s_crit_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_icon_x = fminf(fmaxf(roundf(s_crit_bl_icon_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("X", &s_crit_bl_icon_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_icon_x = fminf(fmaxf(roundf(s_crit_bl_icon_x), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+X", &s_crit_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_icon_xs = fminf(fmaxf(roundf(s_crit_bl_icon_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", &s_crit_bl_icon_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_icon_xs = fminf(fmaxf(roundf(s_crit_bl_icon_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("Y", &s_crit_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_icon_y = fminf(fmaxf(roundf(s_crit_bl_icon_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", &s_crit_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_icon_y = fminf(fmaxf(roundf(s_crit_bl_icon_y), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+Y", &s_crit_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_icon_ys = fminf(fmaxf(roundf(s_crit_bl_icon_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", &s_crit_bl_icon_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_icon_ys = fminf(fmaxf(roundf(s_crit_bl_icon_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", &s_crit_bl_icon_cols, 0.1f, 0, 1024)) {
                                     if (s_crit_bl_icon_cols < 0) s_crit_bl_icon_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool icon_t_en = (s_crit_bl_icon_set != s_crit_bl_base_set[0]);
                                 bool icon_t_hi = (s_crit_bl_icon_hide != s_crit_bl_base_hide[0]);
-                                bool icon_t_po = (s_crit_bl_icon_x != s_crit_bl_base_x[0]) || (s_crit_bl_icon_y != s_crit_bl_base_y[0]) ||
-                                                 (s_crit_bl_icon_xs != s_crit_bl_base_xs[0]) || (s_crit_bl_icon_ys != s_crit_bl_base_ys[0]) ||
-                                                 (s_crit_bl_icon_cols != s_crit_bl_base_cols[0]);
+                                bool icon_t_po =
+                                        (s_crit_bl_icon_x != s_crit_bl_base_x[0]) || (
+                                            s_crit_bl_icon_y != s_crit_bl_base_y[0]) ||
+                                        (s_crit_bl_icon_xs != s_crit_bl_base_xs[0]) || (
+                                            s_crit_bl_icon_ys != s_crit_bl_base_ys[0]) ||
+                                        (s_crit_bl_icon_cols != s_crit_bl_base_cols[0]);
                                 bool icon_t_an = (s_crit_bl_icon_anchor != s_crit_bl_base_anchor[0]);
                                 bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
                                 char icon_applabel[96];
@@ -6986,28 +7091,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          icon_applabel, sizeof(icon_applabel));
                                 if (ImGui::Button(icon_applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
                                         int x_mult = (s_crit_bl_icon_cols >= 1) ? (n % s_crit_bl_icon_cols) : n;
                                         int y_mult = (s_crit_bl_icon_cols >= 1) ? (n / s_crit_bl_icon_cols) : n;
                                         if (icon_w_en) c.icon_pos.is_set = s_crit_bl_icon_set;
                                         if (icon_w_hi) c.icon_pos.is_hidden_in_layout = s_crit_bl_icon_hide;
                                         if (icon_w_po) {
-                                            c.icon_pos.x = fminf(fmaxf(roundf(s_crit_bl_icon_x + x_mult * s_crit_bl_icon_xs),
-                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            c.icon_pos.y = fminf(fmaxf(roundf(s_crit_bl_icon_y + y_mult * s_crit_bl_icon_ys),
-                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.icon_pos.x = fminf(
+                                                fmaxf(roundf(s_crit_bl_icon_x + x_mult * s_crit_bl_icon_xs),
+                                                      -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.icon_pos.y = fminf(
+                                                fmaxf(roundf(s_crit_bl_icon_y + y_mult * s_crit_bl_icon_ys),
+                                                      -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (icon_w_an) c.icon_pos.anchor = (AnchorPoint)s_crit_bl_icon_anchor;
+                                        if (icon_w_an) c.icon_pos.anchor = (AnchorPoint) s_crit_bl_icon_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected criterion.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected criterion.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -7017,38 +7125,56 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 ImGui::Checkbox("Hide##crit_bl_text", &s_crit_bl_text_hide);
                                 ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("X", &s_crit_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_text_x = fminf(fmaxf(roundf(s_crit_bl_text_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::DragFloat("X", &s_crit_bl_text_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_text_x = fminf(fmaxf(roundf(s_crit_bl_text_x), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+X", &s_crit_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_text_xs = fminf(fmaxf(roundf(s_crit_bl_text_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+X", &s_crit_bl_text_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_text_xs = fminf(fmaxf(roundf(s_crit_bl_text_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("Y", &s_crit_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_text_y = fminf(fmaxf(roundf(s_crit_bl_text_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("Y", &s_crit_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_text_y = fminf(fmaxf(roundf(s_crit_bl_text_y), -MANUAL_POS_MAX),
+                                                             MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragFloat("+Y", &s_crit_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    s_crit_bl_text_ys = fminf(fmaxf(roundf(s_crit_bl_text_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
+                                if (ImGui::DragFloat("+Y", &s_crit_bl_text_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                     "%.0f")) {
+                                    s_crit_bl_text_ys = fminf(fmaxf(roundf(s_crit_bl_text_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", &s_crit_bl_text_cols, 0.1f, 0, 1024)) {
                                     if (s_crit_bl_text_cols < 0) s_crit_bl_text_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool text_t_en = (s_crit_bl_text_set != s_crit_bl_base_set[1]);
                                 bool text_t_hi = (s_crit_bl_text_hide != s_crit_bl_base_hide[1]);
-                                bool text_t_po = (s_crit_bl_text_x != s_crit_bl_base_x[1]) || (s_crit_bl_text_y != s_crit_bl_base_y[1]) ||
-                                                 (s_crit_bl_text_xs != s_crit_bl_base_xs[1]) || (s_crit_bl_text_ys != s_crit_bl_base_ys[1]) ||
-                                                 (s_crit_bl_text_cols != s_crit_bl_base_cols[1]);
+                                bool text_t_po =
+                                        (s_crit_bl_text_x != s_crit_bl_base_x[1]) || (
+                                            s_crit_bl_text_y != s_crit_bl_base_y[1]) ||
+                                        (s_crit_bl_text_xs != s_crit_bl_base_xs[1]) || (
+                                            s_crit_bl_text_ys != s_crit_bl_base_ys[1]) ||
+                                        (s_crit_bl_text_cols != s_crit_bl_base_cols[1]);
                                 bool text_t_an = (s_crit_bl_text_anchor != s_crit_bl_base_anchor[1]);
                                 bool text_w_en, text_w_hi, text_w_po, text_w_an;
                                 char text_applabel[96];
@@ -7058,28 +7184,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          text_applabel, sizeof(text_applabel));
                                 if (ImGui::Button(text_applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
                                         int x_mult = (s_crit_bl_text_cols >= 1) ? (n % s_crit_bl_text_cols) : n;
                                         int y_mult = (s_crit_bl_text_cols >= 1) ? (n / s_crit_bl_text_cols) : n;
                                         if (text_w_en) c.text_pos.is_set = s_crit_bl_text_set;
                                         if (text_w_hi) c.text_pos.is_hidden_in_layout = s_crit_bl_text_hide;
                                         if (text_w_po) {
-                                            c.text_pos.x = fminf(fmaxf(roundf(s_crit_bl_text_x + x_mult * s_crit_bl_text_xs),
-                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            c.text_pos.y = fminf(fmaxf(roundf(s_crit_bl_text_y + y_mult * s_crit_bl_text_ys),
-                                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.text_pos.x = fminf(
+                                                fmaxf(roundf(s_crit_bl_text_x + x_mult * s_crit_bl_text_xs),
+                                                      -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            c.text_pos.y = fminf(
+                                                fmaxf(roundf(s_crit_bl_text_y + y_mult * s_crit_bl_text_ys),
+                                                      -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (text_w_an) c.text_pos.anchor = (AnchorPoint)s_crit_bl_text_anchor;
+                                        if (text_w_an) c.text_pos.anchor = (AnchorPoint) s_crit_bl_text_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected criterion.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected criterion.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -7088,7 +7217,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (ImGui::BeginPopup("crit_bulk_delete_confirm")) {
-                                ImGui::Text("Delete %d selected criteria?", (int)s_crit_selection.size());
+                                ImGui::Text("Delete %d selected criteria?", (int) s_crit_selection.size());
                                 if (ImGui::Button("Delete##crit_bulk_confirm")) {
                                     bulk_delete_criteria = true;
                                     ImGui::CloseCurrentPopup();
@@ -7102,15 +7231,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 std::vector<std::string> existing = crit_collect_group_ids(advancement);
                                 if (!existing.empty()) {
                                     ImGui::TextDisabled("Existing groups");
-                                    for (const auto &id : existing) {
+                                    for (const auto &id: existing) {
                                         char row[128];
                                         snprintf(row, sizeof(row), "%s##existing", id.c_str());
                                         if (ImGui::Selectable(row)) {
-                                            for (int idx : s_crit_selection) {
-                                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                            for (int idx: s_crit_selection) {
+                                                if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                                 strncpy(advancement.criteria[idx].group, id.c_str(),
                                                         sizeof(advancement.criteria[idx].group) - 1);
-                                                advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                                advancement.criteria[idx].group[
+                                                    sizeof(advancement.criteria[idx].group) - 1] = '\0';
                                             }
                                             save_message_type = MSG_NONE;
                                             ImGui::CloseCurrentPopup();
@@ -7126,11 +7256,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 bool submit_button = ImGui::Button("Apply##new_group");
                                 if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
-                                    for (int idx : s_crit_selection) {
-                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    for (int idx: s_crit_selection) {
+                                        if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         strncpy(advancement.criteria[idx].group, s_new_group_buffer,
                                                 sizeof(advancement.criteria[idx].group) - 1);
-                                        advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                        advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] =
+                                                '\0';
                                     }
                                     save_message_type = MSG_NONE;
                                     ImGui::CloseCurrentPopup();
@@ -7198,72 +7329,72 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // The bulk-selection checkbox itself lives inline with the Hidden checkbox
                             // below so it's always visible regardless of Groups.
                             if (advancement.groups_enabled) {
-                            if (criterion.group[0] != '\0') {
-                                ImVec2 sw = ImGui::GetCursorScreenPos();
-                                float h = ImGui::GetFrameHeight();
-                                ImGui::GetWindowDrawList()->AddRectFilled(
-                                    sw, ImVec2(sw.x + 8.0f, sw.y + h), crit_group_color(criterion.group));
-                                ImGui::Dummy(ImVec2(8.0f, h));
-                                ImGui::SameLine();
-                            }
-                            ImGui::SetNextItemWidth(160.0f);
-                            if (ImGui::InputText("Group", criterion.group, sizeof(criterion.group))) {
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tip[384];
-                                snprintf(tip, sizeof(tip),
-                                         "Optional group ID. Criteria in this %s sharing the same group\n"
-                                         "collapse into one progress unit: one done marks the whole group done\n"
-                                         "and renders every member as completed. Leave empty for default behaviour.",
-                                         advancements_label_singular_lower);
-                                ImGui::SetTooltip("%s", tip);
-                            }
-                            ImGui::SameLine();
-                            static char s_row_new_group_buffer[64] = "";
-                            if (ImGui::Button("Add to group##row")) {
-                                crit_auto_name_group(advancement, s_row_new_group_buffer);
-                                ImGui::OpenPopup("crit_row_add_to_group_popup");
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tip[448];
-                                snprintf(tip, sizeof(tip),
-                                         "Assign this criterion to a group. Pick an existing group or type a new name.\n"
-                                         "Only applies to this single criterion. To group several at once, tick their\n"
-                                         "checkboxes and use the \"Add selection to group\" button at the top.");
-                                ImGui::SetTooltip("%s", tip);
-                            }
-                            if (ImGui::BeginPopup("crit_row_add_to_group_popup")) {
-                                std::vector<std::string> existing = crit_collect_group_ids(advancement);
-                                if (!existing.empty()) {
-                                    ImGui::TextDisabled("Existing groups");
-                                    for (const auto &id : existing) {
-                                        char row[128];
-                                        snprintf(row, sizeof(row), "%s##row_existing", id.c_str());
-                                        if (ImGui::Selectable(row)) {
-                                            strncpy(criterion.group, id.c_str(), sizeof(criterion.group) - 1);
-                                            criterion.group[sizeof(criterion.group) - 1] = '\0';
-                                            save_message_type = MSG_NONE;
-                                            ImGui::CloseCurrentPopup();
-                                        }
-                                    }
-                                    ImGui::Separator();
+                                if (criterion.group[0] != '\0') {
+                                    ImVec2 sw = ImGui::GetCursorScreenPos();
+                                    float h = ImGui::GetFrameHeight();
+                                    ImGui::GetWindowDrawList()->AddRectFilled(
+                                        sw, ImVec2(sw.x + 8.0f, sw.y + h), crit_group_color(criterion.group));
+                                    ImGui::Dummy(ImVec2(8.0f, h));
+                                    ImGui::SameLine();
                                 }
-                                ImGui::TextDisabled("New group");
                                 ImGui::SetNextItemWidth(160.0f);
-                                bool submit_enter = ImGui::InputText("##row_new_group", s_row_new_group_buffer,
-                                                                     sizeof(s_row_new_group_buffer),
-                                                                     ImGuiInputTextFlags_EnterReturnsTrue);
-                                ImGui::SameLine();
-                                bool submit_button = ImGui::Button("Apply##row_new_group");
-                                if ((submit_enter || submit_button) && s_row_new_group_buffer[0] != '\0') {
-                                    strncpy(criterion.group, s_row_new_group_buffer, sizeof(criterion.group) - 1);
-                                    criterion.group[sizeof(criterion.group) - 1] = '\0';
+                                if (ImGui::InputText("Group", criterion.group, sizeof(criterion.group))) {
                                     save_message_type = MSG_NONE;
-                                    ImGui::CloseCurrentPopup();
                                 }
-                                ImGui::EndPopup();
-                            }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[384];
+                                    snprintf(tip, sizeof(tip),
+                                             "Optional group ID. Criteria in this %s sharing the same group\n"
+                                             "collapse into one progress unit: one done marks the whole group done\n"
+                                             "and renders every member as completed. Leave empty for default behaviour.",
+                                             advancements_label_singular_lower);
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                ImGui::SameLine();
+                                static char s_row_new_group_buffer[64] = "";
+                                if (ImGui::Button("Add to group##row")) {
+                                    crit_auto_name_group(advancement, s_row_new_group_buffer);
+                                    ImGui::OpenPopup("crit_row_add_to_group_popup");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tip[448];
+                                    snprintf(tip, sizeof(tip),
+                                             "Assign this criterion to a group. Pick an existing group or type a new name.\n"
+                                             "Only applies to this single criterion. To group several at once, tick their\n"
+                                             "checkboxes and use the \"Add selection to group\" button at the top.");
+                                    ImGui::SetTooltip("%s", tip);
+                                }
+                                if (ImGui::BeginPopup("crit_row_add_to_group_popup")) {
+                                    std::vector<std::string> existing = crit_collect_group_ids(advancement);
+                                    if (!existing.empty()) {
+                                        ImGui::TextDisabled("Existing groups");
+                                        for (const auto &id: existing) {
+                                            char row[128];
+                                            snprintf(row, sizeof(row), "%s##row_existing", id.c_str());
+                                            if (ImGui::Selectable(row)) {
+                                                strncpy(criterion.group, id.c_str(), sizeof(criterion.group) - 1);
+                                                criterion.group[sizeof(criterion.group) - 1] = '\0';
+                                                save_message_type = MSG_NONE;
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                        }
+                                        ImGui::Separator();
+                                    }
+                                    ImGui::TextDisabled("New group");
+                                    ImGui::SetNextItemWidth(160.0f);
+                                    bool submit_enter = ImGui::InputText("##row_new_group", s_row_new_group_buffer,
+                                                                         sizeof(s_row_new_group_buffer),
+                                                                         ImGuiInputTextFlags_EnterReturnsTrue);
+                                    ImGui::SameLine();
+                                    bool submit_button = ImGui::Button("Apply##row_new_group");
+                                    if ((submit_enter || submit_button) && s_row_new_group_buffer[0] != '\0') {
+                                        strncpy(criterion.group, s_row_new_group_buffer, sizeof(criterion.group) - 1);
+                                        criterion.group[sizeof(criterion.group) - 1] = '\0';
+                                        save_message_type = MSG_NONE;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
                             } // end if (advancement.groups_enabled)
 
                             static char focused_crit_root[192] = {};
@@ -7280,7 +7411,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals, focused_crit_root,
                                                       criterion.root_name, advancement.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char root_name_tooltip_buffer[128];
@@ -7460,9 +7592,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Use the flag to make the non-interactive group a drag source
                             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                                 ImGui::SetDragDropPayload("CRITERION_DND", &j, sizeof(int));
-                                if (s_crit_selection.find((int)j) != s_crit_selection.end() &&
+                                if (s_crit_selection.find((int) j) != s_crit_selection.end() &&
                                     s_crit_selection.size() > 1) {
-                                    ImGui::Text("Reordering %d selected items", (int)s_crit_selection.size());
+                                    ImGui::Text("Reordering %d selected items", (int) s_crit_selection.size());
                                 } else {
                                     ImGui::Text("Reorder %s", criterion.root_name);
                                 }
@@ -7492,7 +7624,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
                                 advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
-                                if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
+                                if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index
+                                        --;
                                 advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
                                                             item_to_move);
                                 s_crit_selection.clear();
@@ -7505,8 +7638,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (bulk_delete_criteria && !s_crit_selection.empty()) {
                             std::vector<int> sorted_desc(s_crit_selection.begin(), s_crit_selection.end());
                             std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                            for (int idx : sorted_desc) {
-                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                            for (int idx: sorted_desc) {
+                                if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                 clear_goal_links(current_template_data, advancement.criteria[idx].root_name);
                                 advancement.criteria.erase(advancement.criteria.begin() + idx);
                             }
@@ -7517,11 +7650,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (criterion_to_remove != -1) {
-                            clear_goal_links(current_template_data, advancement.criteria[criterion_to_remove].root_name);
+                            clear_goal_links(current_template_data,
+                                             advancement.criteria[criterion_to_remove].root_name);
                             advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                             // Shift selection indices: drop the removed one, decrement those above it.
                             std::set<int> shifted;
-                            for (int idx : s_crit_selection) {
+                            for (int idx: s_crit_selection) {
                                 if (idx == criterion_to_remove) continue;
                                 shifted.insert(idx > criterion_to_remove ? idx - 1 : idx);
                             }
@@ -7581,7 +7715,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         new_criterion);
                             // Shift selection indices above the insertion point.
                             std::set<int> shifted;
-                            for (int idx : s_crit_selection) shifted.insert(idx > criterion_to_copy ? idx + 1 : idx);
+                            for (int idx: s_crit_selection) shifted.insert(idx > criterion_to_copy ? idx + 1 : idx);
                             s_crit_selection = shifted;
                             if (s_crit_last_clicked > criterion_to_copy) s_crit_last_clicked++;
                             save_message_type = MSG_NONE;
@@ -7607,7 +7741,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_stat_selection;
                     static int s_stat_last_clicked = -1;
                     for (auto it = s_stat_selection.begin(); it != s_stat_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.stats.size()) it = s_stat_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.stats.size())
+                            it = s_stat_selection.erase(it);
                         else ++it;
                     }
 
@@ -7623,61 +7758,62 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::BeginPopup("import_stats_source_popup")) {
                         if (ImGui::Selectable("...from player file")) {
-                        current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
-                        char start_path[MAX_PATH_LENGTH];
-                        // Determine the correct starting path based on version and settings
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            if (app_settings->using_stats_per_world_legacy) {
-                                // Legacy, Per-World: .../saves/WORLD_NAME/stats/
-                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                            } else {
-                                // Legacy, Global: .../stats/
-                                char parent_dir[MAX_PATH_LENGTH];
-                                if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                    snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                            current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
+                            char start_path[MAX_PATH_LENGTH];
+                            // Determine the correct starting path based on version and settings
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    // Legacy, Per-World: .../saves/WORLD_NAME/stats/
+                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                             t->world_name);
                                 } else {
-                                    strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
-                                    start_path[sizeof(start_path) - 1] = '\0';
+                                    // Legacy, Global: .../stats/
+                                    char parent_dir[MAX_PATH_LENGTH];
+                                    if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                        snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                    } else {
+                                        strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                        start_path[sizeof(start_path) - 1] = '\0';
+                                    }
+                                }
+                            } else {
+                                // Mid-era and Modern stats are always in a per-world stats folder
+                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                            }
+
+                            // --- Version-aware file filters ---
+#ifdef __APPLE__
+                            const char *json_filter[2] = {"*.json", "public.json"};
+                            const char *dat_filter[2] = {"*.dat", "public.data"};
+                            int filter_count = 2;
+#else
+                            const char *json_filter[1] = {"*.json"};
+                            const char *dat_filter[1] = {"*.dat"};
+                            int filter_count = 1;
+#endif
+                            const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                               ? dat_filter
+                                                               : json_filter;
+                            const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                          ? "DAT files"
+                                                          : "JSON files";
+
+                            const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path,
+                                                                          filter_count,
+                                                                          selected_filter, filter_desc, 0);
+
+                            if (selection) {
+                                import_error_message[0] = '\0';
+                                if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
+                                                                  import_error_message, sizeof(import_error_message))) {
+                                    show_import_stats_popup = true;
+                                    last_clicked_stat_index = -1; // Reset range selection
+                                } else {
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                    status_message[sizeof(status_message) - 1] = '\0';
                                 }
                             }
-                        } else {
-                            // Mid-era and Modern stats are always in a per-world stats folder
-                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                        }
-
-                        // --- Version-aware file filters ---
-#ifdef __APPLE__
-                        const char *json_filter[2] = {"*.json", "public.json"};
-                        const char *dat_filter[2] = {"*.dat", "public.data"};
-                        int filter_count = 2;
-#else
-                        const char *json_filter[1] = {"*.json"};
-                        const char *dat_filter[1] = {"*.dat"};
-                        int filter_count = 1;
-#endif
-                        const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                           ? dat_filter
-                                                           : json_filter;
-                        const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                      ? "DAT files"
-                                                      : "JSON files";
-
-                        const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path,
-                                                                      filter_count,
-                                                                      selected_filter, filter_desc, 0);
-
-                        if (selection) {
-                            import_error_message[0] = '\0';
-                            if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
-                                                              import_error_message, sizeof(import_error_message))) {
-                                show_import_stats_popup = true;
-                                last_clicked_stat_index = -1; // Reset range selection
-                            } else {
-                                save_message_type = MSG_ERROR;
-                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                status_message[sizeof(status_message) - 1] = '\0';
-                            }
-                        }
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip[512];
@@ -7917,9 +8053,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int stat_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
                                                     stats_to_render.size(),
                                                     stats_to_render.size() == 1 ? "Stat" : "Stats");
-                    if (!s_stat_selection.empty() && stat_counter_pos < (int)sizeof(counter_text)) {
+                    if (!s_stat_selection.empty() && stat_counter_pos < (int) sizeof(counter_text)) {
                         snprintf(counter_text + stat_counter_pos, sizeof(counter_text) - stat_counter_pos,
-                                 " \xC2\xB7 %d selected", (int)s_stat_selection.size());
+                                 " \xC2\xB7 %d selected", (int) s_stat_selection.size());
                     }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
                     ImGui::SetCursorPosX(
@@ -7980,47 +8116,53 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("stat_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected %s",
-                                     (int)s_stat_selection.size(),
+                                     (int) s_stat_selection.size(),
                                      s_stat_selection.size() == 1 ? "stat" : "stats");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##stat_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Apply the same icon path to every selected stat.");
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                "%s", "Apply the same icon path to every selected stat.");
                             if (ImGui::Selectable("Toggle Hidden##stat_ba")) ba_do_toggle_hidden = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Hidden on every selected stat.\n"
-                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hidden on every selected stat.\n"
+                                                  "If most are visible they all become hidden, and vice versa.");
                             if (ImGui::Selectable("Toggle Row 2##stat_ba")) ba_do_toggle_row2 = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Row 2 on every selected stat.\n"
-                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Row 2 on every selected stat.\n"
+                                                  "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Toggle Multi-Stat Category##stat_ba")) ba_do_toggle_multistat = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Multi-Stat Category on every selected stat.\n"
-                                "If most are simple they all become multi-stat, and vice versa.\n"
-                                "Converting a multi-stat category back to simple keeps only its\n"
-                                "first sub-stat.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Multi-Stat Category on every selected stat.\n"
+                                                  "If most are simple they all become multi-stat, and vice versa.\n"
+                                                  "Converting a multi-stat category back to simple keeps only its\n"
+                                                  "first sub-stat.");
                             if (ImGui::Selectable("Layout Coordinates...##stat_ba")) ba_open_layout = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected stat.\n"
-                                "Each X and Y supports an optional stride that distributes\n"
-                                "values across the selection in template order.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected stat.\n"
+                                                  "Each X and Y supports an optional stride that distributes\n"
+                                                  "values across the selection in template order.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##stat_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected stats. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected stats. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 if (current_template_data.stats[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_stat_selection.size());
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_stat_selection.size());
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 current_template_data.stats[idx].is_hidden = target_hidden;
                             }
                             save_message_type = MSG_NONE;
@@ -8028,13 +8170,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row2) {
                             int row2_count = 0;
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 if (current_template_data.stats[idx].in_2nd_row) row2_count++;
                             }
-                            bool target_row2 = (row2_count * 2 < (int)s_stat_selection.size());
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            bool target_row2 = (row2_count * 2 < (int) s_stat_selection.size());
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 current_template_data.stats[idx].in_2nd_row = target_row2;
                             }
                             save_message_type = MSG_NONE;
@@ -8042,13 +8184,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_multistat) {
                             int multi_count = 0;
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 if (!current_template_data.stats[idx].is_simple_stat) multi_count++;
                             }
-                            bool target_multi = (multi_count * 2 < (int)s_stat_selection.size());
-                            for (int idx : s_stat_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                            bool target_multi = (multi_count * 2 < (int) s_stat_selection.size());
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                 auto &sc = current_template_data.stats[idx];
                                 bool was_simple_stat = sc.is_simple_stat;
                                 if (was_simple_stat == !target_multi) continue; // already in target state
@@ -8097,7 +8239,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ba_open_delete) ImGui::OpenPopup("stat_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("stat_bulk_icon_popup")) {
-                            ImGui::TextDisabled("Icon path for %d selected stats", (int)s_stat_selection.size());
+                            ImGui::TextDisabled("Icon path for %d selected stats", (int) s_stat_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##stat_bulk_icon_path", s_stat_bulk_icon_buf,
                                                                  sizeof(s_stat_bulk_icon_buf),
@@ -8112,8 +8254,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##stat_bulk_icon");
                             if ((submit_enter || submit_apply) && s_stat_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_stat_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                for (int idx: s_stat_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                     strncpy(current_template_data.stats[idx].icon_path, s_stat_bulk_icon_buf,
                                             sizeof(current_template_data.stats[idx].icon_path) - 1);
                                     current_template_data.stats[idx].icon_path[
@@ -8126,7 +8268,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("stat_bulk_layout_popup")) {
-                            ImGui::TextDisabled("Layout coordinates for %d selected stats", (int)s_stat_selection.size());
+                            ImGui::TextDisabled("Layout coordinates for %d selected stats",
+                                                (int) s_stat_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -8145,19 +8288,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 float *p_x, *p_y, *p_xs, *p_ys;
                                 int *p_cols, *p_anchor;
                             } sections[3] = {
-                                {"stat_bulk_layout_icon", "Icon Pos.", "Anchor##stat_bl_icon", "Apply Icon Pos. to selected",
-                                 &s_stat_bl_icon_set, &s_stat_bl_icon_hide,
-                                 &s_stat_bl_icon_x, &s_stat_bl_icon_y, &s_stat_bl_icon_xs, &s_stat_bl_icon_ys,
-                                 &s_stat_bl_icon_cols, &s_stat_bl_icon_anchor},
-                                {"stat_bulk_layout_text", "Text Pos.", "Anchor##stat_bl_text", "Apply Text Pos. to selected",
-                                 &s_stat_bl_text_set, &s_stat_bl_text_hide,
-                                 &s_stat_bl_text_x, &s_stat_bl_text_y, &s_stat_bl_text_xs, &s_stat_bl_text_ys,
-                                 &s_stat_bl_text_cols, &s_stat_bl_text_anchor},
-                                {"stat_bulk_layout_prog", "Progress Pos.", "Anchor##stat_bl_prog", "Apply Progress Pos. to selected",
-                                 &s_stat_bl_prog_set, &s_stat_bl_prog_hide,
-                                 &s_stat_bl_prog_x, &s_stat_bl_prog_y, &s_stat_bl_prog_xs, &s_stat_bl_prog_ys,
-                                 &s_stat_bl_prog_cols, &s_stat_bl_prog_anchor},
-                            };
+                                        {
+                                            "stat_bulk_layout_icon", "Icon Pos.", "Anchor##stat_bl_icon",
+                                            "Apply Icon Pos. to selected",
+                                            &s_stat_bl_icon_set, &s_stat_bl_icon_hide,
+                                            &s_stat_bl_icon_x, &s_stat_bl_icon_y, &s_stat_bl_icon_xs,
+                                            &s_stat_bl_icon_ys,
+                                            &s_stat_bl_icon_cols, &s_stat_bl_icon_anchor
+                                        },
+                                        {
+                                            "stat_bulk_layout_text", "Text Pos.", "Anchor##stat_bl_text",
+                                            "Apply Text Pos. to selected",
+                                            &s_stat_bl_text_set, &s_stat_bl_text_hide,
+                                            &s_stat_bl_text_x, &s_stat_bl_text_y, &s_stat_bl_text_xs,
+                                            &s_stat_bl_text_ys,
+                                            &s_stat_bl_text_cols, &s_stat_bl_text_anchor
+                                        },
+                                        {
+                                            "stat_bulk_layout_prog", "Progress Pos.", "Anchor##stat_bl_prog",
+                                            "Apply Progress Pos. to selected",
+                                            &s_stat_bl_prog_set, &s_stat_bl_prog_hide,
+                                            &s_stat_bl_prog_x, &s_stat_bl_prog_y, &s_stat_bl_prog_xs,
+                                            &s_stat_bl_prog_ys,
+                                            &s_stat_bl_prog_cols, &s_stat_bl_prog_anchor
+                                        },
+                                    };
                             static bool s_bl_base_set[3], s_bl_base_hide[3];
                             static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
                             static int s_bl_base_cols[3], s_bl_base_anchor[3];
@@ -8184,29 +8339,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                     if (*s.p_cols < 0) *s.p_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -8219,27 +8382,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                 if (ImGui::Button(applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                                         auto &st = current_template_data.stats[idx];
-                                        ManualPos *target = (si == 0) ? &st.icon_pos : (si == 1) ? &st.text_pos : &st.progress_pos;
+                                        ManualPos *target = (si == 0)
+                                                                ? &st.icon_pos
+                                                                : (si == 1)
+                                                                      ? &st.text_pos
+                                                                      : &st.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
-                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                         }
-                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected item.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -8249,7 +8419,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("stat_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected stats?", (int)s_stat_selection.size());
+                            ImGui::Text("Delete %d selected stats?", (int) s_stat_selection.size());
                             if (ImGui::Button("Delete##stat_bulk_confirm")) {
                                 bulk_delete_stats = true;
                                 ImGui::CloseCurrentPopup();
@@ -8273,7 +8443,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < stats_to_render.size(); i++) {
                         auto &stat = *stats_to_render[i];
-                        int stat_real_i = (int)(&stat - &current_template_data.stats[0]);
+                        int stat_real_i = (int) (&stat - &current_template_data.stats[0]);
                         ImGui::PushID(&stat);
 
                         const char *display_name = stat.display_name;
@@ -8283,9 +8453,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 : root_name;
                         if (label[0] == '\0') {
                             label = "[New Stat]";
-                        }
-
-                        {
+                        } {
                             bool is_stat_selected = s_stat_selection.find(stat_real_i) != s_stat_selection.end();
                             if (ImGui::Checkbox("##stat_bulk_sel", &is_stat_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -8293,10 +8461,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_stat_last_clicked, stat_real_i);
                                     int hi = std::max(s_stat_last_clicked, stat_real_i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.stats.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.stats.size()) continue;
                                         bool in_filter = false;
-                                        for (const auto *p : stats_to_render) {
-                                            if (p == &current_template_data.stats[k]) { in_filter = true; break; }
+                                        for (const auto *p: stats_to_render) {
+                                            if (p == &current_template_data.stats[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
                                         }
                                         if (!in_filter) continue;
                                         if (is_stat_selected) s_stat_selection.insert(k);
@@ -8381,7 +8552,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetDragDropPayload("STAT_DND", &i, sizeof(int));
                             if (s_stat_selection.find(stat_real_i) != s_stat_selection.end() &&
                                 s_stat_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_stat_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_stat_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", label);
                             }
@@ -8406,12 +8577,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     sizeof(selected_root_name_before_op) - 1);
                         }
                         bool wipe_selected_ptr = false;
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.stats.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
                             EditorTrackableCategory *sp = &current_template_data.stats[idx];
                             if (selected_stat == sp) wipe_selected_ptr = true;
                             clear_goal_links(current_template_data, sp->root_name);
-                            for (const auto &sub : sp->criteria) {
+                            for (const auto &sub: sp->criteria) {
                                 clear_goal_links(current_template_data, sub.root_name);
                             }
                             current_template_data.stats.erase(current_template_data.stats.begin() + idx);
@@ -8420,7 +8591,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_stat = nullptr;
                         } else if (selected_root_name_before_op[0] != '\0') {
                             selected_stat = nullptr;
-                            for (auto &stat : current_template_data.stats) {
+                            for (auto &stat: current_template_data.stats) {
                                 if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
                                     selected_stat = &stat;
                                     break;
@@ -8438,8 +8609,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (stat_dnd_source_index != -1 && stat_dnd_target_index != -1) {
                         EditorTrackableCategory *source_item_ptr = stats_to_render[stat_dnd_source_index];
                         EditorTrackableCategory *target_item_ptr = stats_to_render[stat_dnd_target_index];
-                        int stat_src_real = (int)(source_item_ptr - &current_template_data.stats[0]);
-                        int stat_tgt_real = (int)(target_item_ptr - &current_template_data.stats[0]);
+                        int stat_src_real = (int) (source_item_ptr - &current_template_data.stats[0]);
+                        int stat_tgt_real = (int) (target_item_ptr - &current_template_data.stats[0]);
 
                         if (s_stat_selection.find(stat_src_real) != s_stat_selection.end()) {
                             char selected_root_name_before_op[192] = {};
@@ -8451,7 +8622,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_stat_last_clicked = -1;
                             if (selected_root_name_before_op[0] != '\0') {
                                 selected_stat = nullptr;
-                                for (auto &st : current_template_data.stats) {
+                                for (auto &st: current_template_data.stats) {
                                     if (strcmp(st.root_name, selected_root_name_before_op) == 0) {
                                         selected_stat = &st;
                                         break;
@@ -8657,7 +8828,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_stat_root,
                                                   stat_cat.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -8919,7 +9091,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals, focused_simple_stat_root,
                                                       simple_crit.root_name, stat_cat.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char stat_root_name_tooltip_buffer[256];
@@ -8967,7 +9140,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 s_sub_last_clicked = -1;
                             }
                             for (auto it = s_sub_selection.begin(); it != s_sub_selection.end();) {
-                                if (*it < 0 || (size_t)*it >= stat_cat.criteria.size()) it = s_sub_selection.erase(it);
+                                if (*it < 0 || (size_t) *it >= stat_cat.criteria.size()) it = s_sub_selection.erase(it);
                                 else ++it;
                             }
 
@@ -8992,9 +9165,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             int sub_pos = snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s",
                                                    visible_criteria_count,
                                                    visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
-                            if (!s_sub_selection.empty() && sub_pos < (int)sizeof(crit_counter_text)) {
+                            if (!s_sub_selection.empty() && sub_pos < (int) sizeof(crit_counter_text)) {
                                 snprintf(crit_counter_text + sub_pos, sizeof(crit_counter_text) - sub_pos,
-                                         " \xC2\xB7 %d selected", (int)s_sub_selection.size());
+                                         " \xC2\xB7 %d selected", (int) s_sub_selection.size());
                             }
                             float text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
@@ -9010,55 +9183,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::BeginPopup("import_sub_stats_source_popup")) {
                                 if (ImGui::Selectable("...from player file")) {
-                                current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
-                                char start_path[MAX_PATH_LENGTH];
-                                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                    if (app_settings->using_stats_per_world_legacy) {
+                                    current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
+                                    char start_path[MAX_PATH_LENGTH];
+                                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                        if (app_settings->using_stats_per_world_legacy) {
+                                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                     t->world_name);
+                                        } else {
+                                            char parent_dir[MAX_PATH_LENGTH];
+                                            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir),
+                                                                     1)) {
+                                                snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                            } else {
+                                                strncpy(start_path, t->saves_path, sizeof(start_path));
+                                            }
+                                        }
+                                    } else {
                                         snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                  t->world_name);
-                                    } else {
-                                        char parent_dir[MAX_PATH_LENGTH];
-                                        if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                            snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                    }
+#ifdef __APPLE__
+                                    const char *json_filter[2] = {"*.json", "public.json"};
+                                    const char *dat_filter[2] = {"*.dat", "public.data"};
+                                    int filter_count = 2;
+#else
+                                    const char *json_filter[1] = {"*.json"};
+                                    const char *dat_filter[1] = {"*.dat"};
+                                    int filter_count = 1;
+#endif
+                                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                                       ? dat_filter
+                                                                       : json_filter;
+                                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                                  ? "DAT files"
+                                                                  : "JSON files";
+                                    const char *selection = tinyfd_openFileDialog(
+                                        "Select Player Stats File", start_path, filter_count, selected_filter,
+                                        filter_desc,
+                                        0);
+                                    if (selection) {
+                                        import_error_message[0] = '\0';
+                                        if (parse_player_stats_for_import(selection, creator_selected_version,
+                                                                          importable_stats,
+                                                                          import_error_message,
+                                                                          sizeof(import_error_message))) {
+                                            show_import_stats_popup = true;
+                                            last_clicked_stat_index = -1;
                                         } else {
-                                            strncpy(start_path, t->saves_path, sizeof(start_path));
+                                            save_message_type = MSG_ERROR;
+                                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
                                         }
                                     }
-                                } else {
-                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                             t->world_name);
-                                }
-#ifdef __APPLE__
-                                const char *json_filter[2] = {"*.json", "public.json"};
-                                const char *dat_filter[2] = {"*.dat", "public.data"};
-                                int filter_count = 2;
-#else
-                                const char *json_filter[1] = {"*.json"};
-                                const char *dat_filter[1] = {"*.dat"};
-                                int filter_count = 1;
-#endif
-                                const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                                   ? dat_filter
-                                                                   : json_filter;
-                                const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                              ? "DAT files"
-                                                              : "JSON files";
-                                const char *selection = tinyfd_openFileDialog(
-                                    "Select Player Stats File", start_path, filter_count, selected_filter, filter_desc,
-                                    0);
-                                if (selection) {
-                                    import_error_message[0] = '\0';
-                                    if (parse_player_stats_for_import(selection, creator_selected_version,
-                                                                      importable_stats,
-                                                                      import_error_message,
-                                                                      sizeof(import_error_message))) {
-                                        show_import_stats_popup = true;
-                                        last_clicked_stat_index = -1;
-                                    } else {
-                                        save_message_type = MSG_ERROR;
-                                        strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                    }
-                                }
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip[512];
@@ -9235,38 +9410,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::BeginPopup("sub_bulk_actions_menu")) {
                                     char hdr[160];
                                     snprintf(hdr, sizeof(hdr), "%d selected sub-stat%s",
-                                             (int)s_sub_selection.size(),
+                                             (int) s_sub_selection.size(),
                                              s_sub_selection.size() == 1 ? "" : "s");
                                     ImGui::TextDisabled("%s", hdr);
                                     ImGui::Separator();
                                     if (ImGui::Selectable("Set Icon...##sub_ba")) ba_open_icon = true;
-                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                        "Apply the same icon path to every selected sub-stat.");
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Apply the same icon path to every selected sub-stat.");
                                     if (ImGui::Selectable("Toggle Hidden##sub_ba")) ba_do_toggle_hidden = true;
-                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                        "Flip Hidden on every selected sub-stat.\n"
-                                        "If most are visible they all become hidden, and vice versa.");
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Flip Hidden on every selected sub-stat.\n"
+                                                          "If most are visible they all become hidden, and vice versa.");
                                     if (ImGui::Selectable("Layout Coordinates...##sub_ba")) ba_open_layout = true;
-                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                        "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected sub-stat.\n"
-                                        "Each X and Y supports an optional stride that distributes\n"
-                                        "values across the selection in template order.");
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected sub-stat.\n"
+                                                          "Each X and Y supports an optional stride that distributes\n"
+                                                          "values across the selection in template order.");
                                     ImGui::Separator();
                                     if (ImGui::Selectable("Delete Selected...##sub_ba")) ba_open_delete = true;
-                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                        "Remove all selected sub-stats. Requires confirmation.");
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Remove all selected sub-stats. Requires confirmation.");
                                     ImGui::EndPopup();
                                 }
 
                                 if (ba_do_toggle_hidden) {
                                     int hidden_count = 0;
-                                    for (int idx : s_sub_selection) {
-                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                    for (int idx: s_sub_selection) {
+                                        if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
                                         if (stat_cat.criteria[idx].is_hidden) hidden_count++;
                                     }
-                                    bool target_hidden = (hidden_count * 2 < (int)s_sub_selection.size());
-                                    for (int idx : s_sub_selection) {
-                                        if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                    bool target_hidden = (hidden_count * 2 < (int) s_sub_selection.size());
+                                    for (int idx: s_sub_selection) {
+                                        if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
                                         stat_cat.criteria[idx].is_hidden = target_hidden;
                                     }
                                     save_message_type = MSG_NONE;
@@ -9280,7 +9459,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ba_open_delete) ImGui::OpenPopup("sub_bulk_delete_confirm");
 
                                 if (ImGui::BeginPopup("sub_bulk_icon_popup")) {
-                                    ImGui::TextDisabled("Icon path for %d selected sub-stats", (int)s_sub_selection.size());
+                                    ImGui::TextDisabled("Icon path for %d selected sub-stats",
+                                                        (int) s_sub_selection.size());
                                     ImGui::SetNextItemWidth(280.0f);
                                     bool submit_enter = ImGui::InputText("##sub_bulk_icon_path", s_sub_bulk_icon_buf,
                                                                          sizeof(s_sub_bulk_icon_buf),
@@ -9295,8 +9475,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                     bool submit_apply = ImGui::Button("Apply##sub_bulk_icon");
                                     if ((submit_enter || submit_apply) && s_sub_bulk_icon_buf[0] != '\0') {
-                                        for (int idx : s_sub_selection) {
-                                            if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                        for (int idx: s_sub_selection) {
+                                            if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
                                             strncpy(stat_cat.criteria[idx].icon_path, s_sub_bulk_icon_buf,
                                                     sizeof(stat_cat.criteria[idx].icon_path) - 1);
                                             stat_cat.criteria[idx].icon_path[
@@ -9309,10 +9489,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
 
                                 if (ImGui::BeginPopup("sub_bulk_layout_popup")) {
-                                    ImGui::TextDisabled("Layout coordinates for %d selected sub-stats", (int)s_sub_selection.size());
+                                    ImGui::TextDisabled("Layout coordinates for %d selected sub-stats",
+                                                        (int) s_sub_selection.size());
                                     ImGui::TextDisabled("Strides distribute values in template order.");
-                                    ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                                    ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                                    ImGui::TextDisabled(
+                                        "Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+                                    ImGui::TextDisabled(
+                                        "Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
                                     ImGui::Separator();
 
                                     std::vector<int> bulk_layout_sorted(s_sub_selection.begin(), s_sub_selection.end());
@@ -9328,19 +9511,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         float *p_x, *p_y, *p_xs, *p_ys;
                                         int *p_cols, *p_anchor;
                                     } sections[3] = {
-                                        {"sub_bulk_layout_icon", "Icon Pos.", "Anchor##sub_bl_icon", "Apply Icon Pos. to selected",
-                                         &s_sub_bl_icon_set, &s_sub_bl_icon_hide,
-                                         &s_sub_bl_icon_x, &s_sub_bl_icon_y, &s_sub_bl_icon_xs, &s_sub_bl_icon_ys,
-                                         &s_sub_bl_icon_cols, &s_sub_bl_icon_anchor},
-                                        {"sub_bulk_layout_text", "Text Pos.", "Anchor##sub_bl_text", "Apply Text Pos. to selected",
-                                         &s_sub_bl_text_set, &s_sub_bl_text_hide,
-                                         &s_sub_bl_text_x, &s_sub_bl_text_y, &s_sub_bl_text_xs, &s_sub_bl_text_ys,
-                                         &s_sub_bl_text_cols, &s_sub_bl_text_anchor},
-                                        {"sub_bulk_layout_prog", "Progress Pos.", "Anchor##sub_bl_prog", "Apply Progress Pos. to selected",
-                                         &s_sub_bl_prog_set, &s_sub_bl_prog_hide,
-                                         &s_sub_bl_prog_x, &s_sub_bl_prog_y, &s_sub_bl_prog_xs, &s_sub_bl_prog_ys,
-                                         &s_sub_bl_prog_cols, &s_sub_bl_prog_anchor},
-                                    };
+                                                {
+                                                    "sub_bulk_layout_icon", "Icon Pos.", "Anchor##sub_bl_icon",
+                                                    "Apply Icon Pos. to selected",
+                                                    &s_sub_bl_icon_set, &s_sub_bl_icon_hide,
+                                                    &s_sub_bl_icon_x, &s_sub_bl_icon_y, &s_sub_bl_icon_xs,
+                                                    &s_sub_bl_icon_ys,
+                                                    &s_sub_bl_icon_cols, &s_sub_bl_icon_anchor
+                                                },
+                                                {
+                                                    "sub_bulk_layout_text", "Text Pos.", "Anchor##sub_bl_text",
+                                                    "Apply Text Pos. to selected",
+                                                    &s_sub_bl_text_set, &s_sub_bl_text_hide,
+                                                    &s_sub_bl_text_x, &s_sub_bl_text_y, &s_sub_bl_text_xs,
+                                                    &s_sub_bl_text_ys,
+                                                    &s_sub_bl_text_cols, &s_sub_bl_text_anchor
+                                                },
+                                                {
+                                                    "sub_bulk_layout_prog", "Progress Pos.", "Anchor##sub_bl_prog",
+                                                    "Apply Progress Pos. to selected",
+                                                    &s_sub_bl_prog_set, &s_sub_bl_prog_hide,
+                                                    &s_sub_bl_prog_x, &s_sub_bl_prog_y, &s_sub_bl_prog_xs,
+                                                    &s_sub_bl_prog_ys,
+                                                    &s_sub_bl_prog_cols, &s_sub_bl_prog_anchor
+                                                },
+                                            };
                                     static bool s_bl_base_set[3], s_bl_base_hide[3];
                                     static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
                                     static int s_bl_base_cols[3], s_bl_base_anchor[3];
@@ -9364,32 +9559,44 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SameLine();
                                         ImGui::Checkbox("Hide", s.p_hide);
                                         ImGui::SetNextItemWidth(70);
-                                        if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                        if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                             "%.0f")) {
                                             *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                        if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                        ImGui::SameLine();
+                                        ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                             "%.0f")) {
                                             *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                        if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                            "%s", "Increment added to X for each item after the first.");
+                                        ImGui::SameLine();
+                                        ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                             "%.0f")) {
                                             *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
-                                        if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                        ImGui::SameLine();
+                                        ImGui::SetNextItemWidth(70);
+                                        if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
+                                                             "%.0f")) {
                                             *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                            "%s", "Increment added to Y for each item after the first.");
                                         ImGui::SetNextItemWidth(140);
-                                        ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                        ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                        ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                                     IM_ARRAYSIZE(anchor_point_labels));
+                                        ImGui::SameLine();
+                                        ImGui::SetNextItemWidth(70);
                                         if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                             if (*s.p_cols < 0) *s.p_cols = 0;
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                            "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                            "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                        if (ImGui::IsItemHovered())
+                                            ImGui::SetTooltip("%s",
+                                                              "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                              "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                         bool t_en = (*s.p_set != s_bl_base_set[si]);
                                         bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                         bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -9402,27 +9609,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                  w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                         if (ImGui::Button(applabel)) {
                                             int n = 0;
-                                            for (int idx : bulk_layout_sorted) {
-                                                if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                            for (int idx: bulk_layout_sorted) {
+                                                if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
                                                 auto &c = stat_cat.criteria[idx];
-                                                ManualPos *target = (si == 0) ? &c.icon_pos : (si == 1) ? &c.text_pos : &c.progress_pos;
+                                                ManualPos *target = (si == 0)
+                                                                        ? &c.icon_pos
+                                                                        : (si == 1)
+                                                                              ? &c.text_pos
+                                                                              : &c.progress_pos;
                                                 int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                                 int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
                                                 if (w_en) target->is_set = *s.p_set;
                                                 if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                                 if (w_po) {
-                                                    target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                                    target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                                    target->x = fminf(
+                                                        fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
+                                                    target->y = fminf(
+                                                        fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                        MANUAL_POS_MAX);
                                                 }
-                                                if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                                if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                                 n++;
                                             }
                                             save_message_type = MSG_NONE;
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                            "Applies only the buckets you changed since opening this popup.\n"
-                                            "Change nothing (or all four) to apply everything.\n"
-                                            "Untouched fields are left as-is on each selected item.");
+                                        if (ImGui::IsItemHovered())
+                                            ImGui::SetTooltip("%s",
+                                                              "Applies only the buckets you changed since opening this popup.\n"
+                                                              "Change nothing (or all four) to apply everything.\n"
+                                                              "Untouched fields are left as-is on each selected item.");
                                         ImGui::PopID();
                                     }
 
@@ -9432,7 +9648,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
 
                                 if (ImGui::BeginPopup("sub_bulk_delete_confirm")) {
-                                    ImGui::Text("Delete %d selected sub-stats?", (int)s_sub_selection.size());
+                                    ImGui::Text("Delete %d selected sub-stats?", (int) s_sub_selection.size());
                                     if (ImGui::Button("Delete##sub_bulk_confirm")) {
                                         bulk_delete_sub = true;
                                         ImGui::CloseCurrentPopup();
@@ -9506,7 +9722,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           current_template_data.counter_goals, focused_sub_stat_root,
                                                           crit.root_name, stat_cat.root_name,
                                                           &current_template_data.stats,
-                                                          &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                          &current_template_data.custom_goals,
+                                                          &current_template_data.multi_stage_goals);
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char stat_root_name_tooltip_buffer[256];
@@ -9574,15 +9791,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              ">0 = Progress-based counter (completes when value reached).\n"
                                              "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                     ImGui::SetTooltip("%s", target_tooltip_buffer);
-                                }
-                                {
-                                    bool is_sub_selected = s_sub_selection.find((int)j) != s_sub_selection.end();
+                                } {
+                                    bool is_sub_selected = s_sub_selection.find((int) j) != s_sub_selection.end();
                                     if (ImGui::Checkbox("##sub_bulk_sel", &is_sub_selected)) {
                                         bool shift = ImGui::GetIO().KeyShift;
-                                        if (shift && s_sub_last_clicked >= 0 && s_sub_last_clicked != (int)j) {
-                                            int lo = std::min(s_sub_last_clicked, (int)j);
-                                            int hi = std::max(s_sub_last_clicked, (int)j);
-                                            for (int k = lo; k <= hi && k < (int)stat_cat.criteria.size(); k++) {
+                                        if (shift && s_sub_last_clicked >= 0 && s_sub_last_clicked != (int) j) {
+                                            int lo = std::min(s_sub_last_clicked, (int) j);
+                                            int hi = std::max(s_sub_last_clicked, (int) j);
+                                            for (int k = lo; k <= hi && k < (int) stat_cat.criteria.size(); k++) {
                                                 if (is_details_search_active) {
                                                     const auto &cc = stat_cat.criteria[k];
                                                     char gs[32];
@@ -9598,10 +9814,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 else s_sub_selection.erase(k);
                                             }
                                         } else {
-                                            if (is_sub_selected) s_sub_selection.insert((int)j);
-                                            else s_sub_selection.erase((int)j);
+                                            if (is_sub_selected) s_sub_selection.insert((int) j);
+                                            else s_sub_selection.erase((int) j);
                                         }
-                                        s_sub_last_clicked = (int)j;
+                                        s_sub_last_clicked = (int) j;
                                     }
                                     if (ImGui::IsItemHovered()) {
                                         char sel_tip[320];
@@ -9812,9 +10028,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                 if (ImGui::BeginDragDropSource()) {
                                     ImGui::SetDragDropPayload("STAT_CRITERION_DND", &j, sizeof(int));
-                                    if (s_sub_selection.find((int)j) != s_sub_selection.end() &&
+                                    if (s_sub_selection.find((int) j) != s_sub_selection.end() &&
                                         s_sub_selection.size() > 1) {
-                                        ImGui::Text("Reordering %d selected items", (int)s_sub_selection.size());
+                                        ImGui::Text("Reordering %d selected items", (int) s_sub_selection.size());
                                     } else {
                                         ImGui::Text("Reorder %s", crit.root_name);
                                     }
@@ -9847,7 +10063,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
                                                              item_to_move);
                                     std::set<int> shifted_dnd;
-                                    for (int idx : s_sub_selection) {
+                                    for (int idx: s_sub_selection) {
                                         int new_idx = idx;
                                         if (idx == stat_crit_dnd_source_index) new_idx = stat_crit_dnd_target_index;
                                         else {
@@ -9865,8 +10081,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (bulk_delete_sub && !s_sub_selection.empty()) {
                                 std::vector<int> sorted_desc(s_sub_selection.begin(), s_sub_selection.end());
                                 std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                                for (int idx : sorted_desc) {
-                                    if (idx < 0 || (size_t)idx >= stat_cat.criteria.size()) continue;
+                                for (int idx: sorted_desc) {
+                                    if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
                                     clear_goal_links(current_template_data, stat_cat.criteria[idx].root_name);
                                     stat_cat.criteria.erase(stat_cat.criteria.begin() + idx);
                                 }
@@ -9880,7 +10096,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 clear_goal_links(current_template_data, stat_cat.criteria[crit_to_remove].root_name);
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
                                 std::set<int> shifted_rm;
-                                for (int idx : s_sub_selection) {
+                                for (int idx: s_sub_selection) {
                                     if (idx == crit_to_remove) continue;
                                     shifted_rm.insert(idx > crit_to_remove ? idx - 1 : idx);
                                 }
@@ -9933,7 +10149,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                                 stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
                                 std::set<int> shifted_cp;
-                                for (int idx : s_sub_selection) shifted_cp.insert(idx > crit_to_copy ? idx + 1 : idx);
+                                for (int idx: s_sub_selection) shifted_cp.insert(idx > crit_to_copy ? idx + 1 : idx);
                                 s_sub_selection = shifted_cp;
                                 if (s_sub_last_clicked > crit_to_copy) s_sub_last_clicked++;
                                 save_message_type = MSG_NONE;
@@ -9959,7 +10175,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_unlocks_selection;
                     static int s_unlocks_last_clicked = -1;
                     for (auto it = s_unlocks_selection.begin(); it != s_unlocks_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.unlocks.size()) it = s_unlocks_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.unlocks.size())
+                            it = s_unlocks_selection.erase(it);
                         else ++it;
                     }
 
@@ -10018,8 +10235,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Counter for the list (right-aligned on the Import line) ---
                     bool is_unlock_search_active = (
-                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
-                    {
+                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0'); {
                         char counter_text_top[128];
                         size_t count_top = 0;
                         if (!is_unlock_search_active) {
@@ -10035,9 +10251,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
                                                count_top, count_top == 1 ? "Unlock" : "Unlocks");
-                        if (!s_unlocks_selection.empty() && pos_top < (int)sizeof(counter_text_top)) {
+                        if (!s_unlocks_selection.empty() && pos_top < (int) sizeof(counter_text_top)) {
                             snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
-                                     " \xC2\xB7 %d selected", (int)s_unlocks_selection.size());
+                                     " \xC2\xB7 %d selected", (int) s_unlocks_selection.size());
                         }
                         float tw_top = ImGui::CalcTextSize(counter_text_top).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
@@ -10082,9 +10298,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // --- Sorting Controls (right-aligned on the Add line) ---
                     bool can_sort_unlocks = false;
                     for (const auto &goal: current_template_data.unlocks) {
-                        if (goal.sort_order > 0) { can_sort_unlocks = true; break; }
-                    }
-                    {
+                        if (goal.sort_order > 0) {
+                            can_sort_unlocks = true;
+                            break;
+                        }
+                    } {
                         float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
@@ -10097,8 +10315,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tip[128];
-                        if (!can_sort_unlocks) snprintf(tip, sizeof(tip),
-                                                       "Click the order badges next to unlocks to assign a sort order first.");
+                        if (!can_sort_unlocks)
+                            snprintf(tip, sizeof(tip),
+                                     "Click the order badges next to unlocks to assign a sort order first.");
                         else snprintf(tip, sizeof(tip), "Rearrange the numbered unlocks among themselves.");
                         ImGui::SetTooltip("%s", tip);
                     }
@@ -10160,42 +10379,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("unlocks_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected unlock%s",
-                                     (int)s_unlocks_selection.size(),
+                                     (int) s_unlocks_selection.size(),
                                      s_unlocks_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##unlocks_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Apply the same icon path to every selected unlock.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Apply the same icon path to every selected unlock.");
                             if (ImGui::Selectable("Toggle Hidden##unlocks_ba")) ba_do_toggle_hidden = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Hidden on every selected unlock.\n"
-                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hidden on every selected unlock.\n"
+                                                  "If most are visible they all become hidden, and vice versa.");
                             if (ImGui::Selectable("Toggle Row 3##unlocks_ba")) ba_do_toggle_row3 = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Row 3 on every selected unlock.\n"
-                                "If most are off they all move to the 3rd row, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Row 3 on every selected unlock.\n"
+                                                  "If most are off they all move to the 3rd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##unlocks_ba")) ba_open_layout = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Bulk-set Icon Pos. and Text Pos. for every selected unlock.\n"
-                                "Each X and Y supports an optional stride that distributes\n"
-                                "values across the selection in template order.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Bulk-set Icon Pos. and Text Pos. for every selected unlock.\n"
+                                                  "Each X and Y supports an optional stride that distributes\n"
+                                                  "values across the selection in template order.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##unlocks_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected unlocks. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected unlocks. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                            for (int idx: s_unlocks_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                 if (current_template_data.unlocks[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_unlocks_selection.size());
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_unlocks_selection.size());
+                            for (int idx: s_unlocks_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                 current_template_data.unlocks[idx].is_hidden = target_hidden;
                             }
                             save_message_type = MSG_NONE;
@@ -10203,13 +10427,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row3) {
                             int row3_count = 0;
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                            for (int idx: s_unlocks_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                 if (current_template_data.unlocks[idx].in_3rd_row) row3_count++;
                             }
-                            bool target_row3 = (row3_count * 2 < (int)s_unlocks_selection.size());
-                            for (int idx : s_unlocks_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                            bool target_row3 = (row3_count * 2 < (int) s_unlocks_selection.size());
+                            for (int idx: s_unlocks_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                 current_template_data.unlocks[idx].in_3rd_row = target_row3;
                             }
                             save_message_type = MSG_NONE;
@@ -10223,7 +10447,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ba_open_delete) ImGui::OpenPopup("unlocks_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("unlocks_bulk_icon_popup")) {
-                            ImGui::TextDisabled("Icon path for %d selected unlocks", (int)s_unlocks_selection.size());
+                            ImGui::TextDisabled("Icon path for %d selected unlocks", (int) s_unlocks_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##bulk_icon_path", s_unlocks_bulk_icon_buf,
                                                                  sizeof(s_unlocks_bulk_icon_buf),
@@ -10238,8 +10462,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##unlocks_bulk_icon");
                             if ((submit_enter || submit_apply) && s_unlocks_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_unlocks_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                for (int idx: s_unlocks_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                     strncpy(current_template_data.unlocks[idx].icon_path, s_unlocks_bulk_icon_buf,
                                             sizeof(current_template_data.unlocks[idx].icon_path) - 1);
                                     current_template_data.unlocks[idx].icon_path[
@@ -10252,7 +10476,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("unlocks_bulk_layout_popup")) {
-                            ImGui::TextDisabled("Layout coordinates for %d selected unlocks", (int)s_unlocks_selection.size());
+                            ImGui::TextDisabled("Layout coordinates for %d selected unlocks",
+                                                (int) s_unlocks_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -10271,15 +10496,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 float *p_x, *p_y, *p_xs, *p_ys;
                                 int *p_cols, *p_anchor;
                             } sections[2] = {
-                                {"unl_bulk_layout_icon", "Icon Pos.", "Anchor##unl_bl_icon", "Apply Icon Pos. to selected",
-                                 &s_unl_bl_icon_set, &s_unl_bl_icon_hide,
-                                 &s_unl_bl_icon_x, &s_unl_bl_icon_y, &s_unl_bl_icon_xs, &s_unl_bl_icon_ys,
-                                 &s_unl_bl_icon_cols, &s_unl_bl_icon_anchor},
-                                {"unl_bulk_layout_text", "Text Pos.", "Anchor##unl_bl_text", "Apply Text Pos. to selected",
-                                 &s_unl_bl_text_set, &s_unl_bl_text_hide,
-                                 &s_unl_bl_text_x, &s_unl_bl_text_y, &s_unl_bl_text_xs, &s_unl_bl_text_ys,
-                                 &s_unl_bl_text_cols, &s_unl_bl_text_anchor},
-                            };
+                                        {
+                                            "unl_bulk_layout_icon", "Icon Pos.", "Anchor##unl_bl_icon",
+                                            "Apply Icon Pos. to selected",
+                                            &s_unl_bl_icon_set, &s_unl_bl_icon_hide,
+                                            &s_unl_bl_icon_x, &s_unl_bl_icon_y, &s_unl_bl_icon_xs, &s_unl_bl_icon_ys,
+                                            &s_unl_bl_icon_cols, &s_unl_bl_icon_anchor
+                                        },
+                                        {
+                                            "unl_bulk_layout_text", "Text Pos.", "Anchor##unl_bl_text",
+                                            "Apply Text Pos. to selected",
+                                            &s_unl_bl_text_set, &s_unl_bl_text_hide,
+                                            &s_unl_bl_text_x, &s_unl_bl_text_y, &s_unl_bl_text_xs, &s_unl_bl_text_ys,
+                                            &s_unl_bl_text_cols, &s_unl_bl_text_anchor
+                                        },
+                                    };
                             static bool s_bl_base_set[2], s_bl_base_hide[2];
                             static float s_bl_base_x[2], s_bl_base_y[2], s_bl_base_xs[2], s_bl_base_ys[2];
                             static int s_bl_base_cols[2], s_bl_base_anchor[2];
@@ -10306,29 +10537,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                     if (*s.p_cols < 0) *s.p_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -10341,8 +10580,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                 if (ImGui::Button(applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                         auto &u = current_template_data.unlocks[idx];
                                         ManualPos *target = (si == 0) ? &u.icon_pos : &u.text_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
@@ -10350,18 +10589,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
-                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                         }
-                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected item.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -10371,7 +10613,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("unlocks_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected unlocks?", (int)s_unlocks_selection.size());
+                            ImGui::Text("Delete %d selected unlocks?", (int) s_unlocks_selection.size());
                             if (ImGui::Button("Delete##unlocks_bulk_confirm")) {
                                 bulk_delete_unlocks = true;
                                 ImGui::CloseCurrentPopup();
@@ -10452,7 +10694,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_unlock_root,
                                                   unlock.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -10492,24 +10735,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
                                      "The icon must be inside the 'resources/icons' folder!");
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                        }
-                        {
-                            bool is_unlock_selected = s_unlocks_selection.find((int)i) != s_unlocks_selection.end();
+                        } {
+                            bool is_unlock_selected = s_unlocks_selection.find((int) i) != s_unlocks_selection.end();
                             if (ImGui::Checkbox("##unlock_bulk_sel", &is_unlock_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_unlocks_last_clicked >= 0 && s_unlocks_last_clicked != (int)i) {
-                                    int lo = std::min(s_unlocks_last_clicked, (int)i);
-                                    int hi = std::max(s_unlocks_last_clicked, (int)i);
+                                if (shift && s_unlocks_last_clicked >= 0 && s_unlocks_last_clicked != (int) i) {
+                                    int lo = std::min(s_unlocks_last_clicked, (int) i);
+                                    int hi = std::max(s_unlocks_last_clicked, (int) i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.unlocks.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.unlocks.size()) continue;
                                         if (is_unlock_selected) s_unlocks_selection.insert(k);
                                         else s_unlocks_selection.erase(k);
                                     }
                                 } else {
-                                    if (is_unlock_selected) s_unlocks_selection.insert((int)i);
-                                    else s_unlocks_selection.erase((int)i);
+                                    if (is_unlock_selected) s_unlocks_selection.insert((int) i);
+                                    else s_unlocks_selection.erase((int) i);
                                 }
-                                s_unlocks_last_clicked = (int)i;
+                                s_unlocks_last_clicked = (int) i;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char sel_tip[320];
@@ -10616,9 +10858,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource()) {
                             ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
-                            if (s_unlocks_selection.find((int)i) != s_unlocks_selection.end() &&
+                            if (s_unlocks_selection.find((int) i) != s_unlocks_selection.end() &&
                                 s_unlocks_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_unlocks_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_unlocks_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", unlock.root_name);
                             }
@@ -10652,7 +10894,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.unlocks.insert(
                                 current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
                             std::set<int> shifted_dnd;
-                            for (int idx : s_unlocks_selection) {
+                            for (int idx: s_unlocks_selection) {
                                 int new_idx = idx;
                                 if (idx == unlocks_dnd_source_index) new_idx = unlocks_dnd_target_index;
                                 else {
@@ -10670,8 +10912,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (bulk_delete_unlocks && !s_unlocks_selection.empty()) {
                         std::vector<int> sorted_desc(s_unlocks_selection.begin(), s_unlocks_selection.end());
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.unlocks.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                             clear_goal_links(current_template_data, current_template_data.unlocks[idx].root_name);
                             current_template_data.unlocks.erase(current_template_data.unlocks.begin() + idx);
                         }
@@ -10682,10 +10924,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data, current_template_data.unlocks[item_to_remove].root_name);
+                        clear_goal_links(current_template_data,
+                                         current_template_data.unlocks[item_to_remove].root_name);
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
                         std::set<int> shifted_rm;
-                        for (int idx : s_unlocks_selection) {
+                        for (int idx: s_unlocks_selection) {
                             if (idx == item_to_remove) continue;
                             shifted_rm.insert(idx > item_to_remove ? idx - 1 : idx);
                         }
@@ -10739,7 +10982,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
                                                              new_item);
                         std::set<int> shifted_cp;
-                        for (int idx : s_unlocks_selection) shifted_cp.insert(idx > item_to_copy ? idx + 1 : idx);
+                        for (int idx: s_unlocks_selection) shifted_cp.insert(idx > item_to_copy ? idx + 1 : idx);
                         s_unlocks_selection = shifted_cp;
                         if (s_unlocks_last_clicked > item_to_copy) s_unlocks_last_clicked++;
                         save_message_type = MSG_NONE;
@@ -10756,7 +10999,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_custom_selection;
                     static int s_custom_last_clicked = -1;
                     for (auto it = s_custom_selection.begin(); it != s_custom_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.custom_goals.size()) it = s_custom_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.custom_goals.size())
+                            it = s_custom_selection.erase(it);
                         else ++it;
                     }
 
@@ -10781,8 +11025,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Counter for the list (right-aligned on the Import line) ---
                     bool is_custom_search_active_top = (
-                        current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
-                    {
+                        current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0'); {
                         char counter_text_top[128];
                         size_t count_top = 0;
                         if (!is_custom_search_active_top) {
@@ -10801,9 +11044,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
                                                count_top, count_top == 1 ? "Custom Goal" : "Custom Goals");
-                        if (!s_custom_selection.empty() && pos_top < (int)sizeof(counter_text_top)) {
+                        if (!s_custom_selection.empty() && pos_top < (int) sizeof(counter_text_top)) {
                             snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
-                                     " \xC2\xB7 %d selected", (int)s_custom_selection.size());
+                                     " \xC2\xB7 %d selected", (int) s_custom_selection.size());
                         }
                         float tw_top = ImGui::CalcTextSize(counter_text_top).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
@@ -10852,9 +11095,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // --- Sorting Controls (right-aligned on the Add line) ---
                     bool can_sort_custom = false;
                     for (const auto &goal: current_template_data.custom_goals) {
-                        if (goal.sort_order > 0) { can_sort_custom = true; break; }
-                    }
-                    {
+                        if (goal.sort_order > 0) {
+                            can_sort_custom = true;
+                            break;
+                        }
+                    } {
                         float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
@@ -10867,8 +11112,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tip[128];
-                        if (!can_sort_custom) snprintf(tip, sizeof(tip),
-                                                      "Click the order badges next to goals to assign a sort order first.");
+                        if (!can_sort_custom)
+                            snprintf(tip, sizeof(tip),
+                                     "Click the order badges next to goals to assign a sort order first.");
                         else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
                         ImGui::SetTooltip("%s", tip);
                     }
@@ -10954,42 +11200,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("custom_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected custom goal%s",
-                                     (int)s_custom_selection.size(),
+                                     (int) s_custom_selection.size(),
                                      s_custom_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##custom_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Apply the same icon path to every selected custom goal.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Apply the same icon path to every selected custom goal.");
                             if (ImGui::Selectable("Toggle Hidden##custom_ba")) ba_do_toggle_hidden = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Hidden on every selected custom goal.\n"
-                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hidden on every selected custom goal.\n"
+                                                  "If most are visible they all become hidden, and vice versa.");
                             if (ImGui::Selectable("Toggle Row 2##custom_ba")) ba_do_toggle_row2 = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Row 2 on every selected custom goal.\n"
-                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Row 2 on every selected custom goal.\n"
+                                                  "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##custom_ba")) ba_open_layout = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Bulk-set Icon Pos. and Text Pos. for every selected custom goal.\n"
-                                "Each X and Y supports an optional stride that distributes\n"
-                                "values across the selection in template order.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Bulk-set Icon Pos. and Text Pos. for every selected custom goal.\n"
+                                                  "Each X and Y supports an optional stride that distributes\n"
+                                                  "values across the selection in template order.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##custom_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected custom goals. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected custom goals. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                            for (int idx: s_custom_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                                 if (current_template_data.custom_goals[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_custom_selection.size());
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_custom_selection.size());
+                            for (int idx: s_custom_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                                 current_template_data.custom_goals[idx].is_hidden = target_hidden;
                             }
                             save_message_type = MSG_NONE;
@@ -10997,13 +11248,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row2) {
                             int row2_count = 0;
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                            for (int idx: s_custom_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                                 if (current_template_data.custom_goals[idx].in_2nd_row) row2_count++;
                             }
-                            bool target_row2 = (row2_count * 2 < (int)s_custom_selection.size());
-                            for (int idx : s_custom_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                            bool target_row2 = (row2_count * 2 < (int) s_custom_selection.size());
+                            for (int idx: s_custom_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                                 current_template_data.custom_goals[idx].in_2nd_row = target_row2;
                             }
                             save_message_type = MSG_NONE;
@@ -11017,7 +11268,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ba_open_delete) ImGui::OpenPopup("custom_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("custom_bulk_icon_popup")) {
-                            ImGui::TextDisabled("Icon path for %d selected custom goals", (int)s_custom_selection.size());
+                            ImGui::TextDisabled("Icon path for %d selected custom goals",
+                                                (int) s_custom_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##custom_bulk_icon_path", s_custom_bulk_icon_buf,
                                                                  sizeof(s_custom_bulk_icon_buf),
@@ -11032,8 +11284,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##custom_bulk_icon");
                             if ((submit_enter || submit_apply) && s_custom_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_custom_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                for (int idx: s_custom_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                                     strncpy(current_template_data.custom_goals[idx].icon_path, s_custom_bulk_icon_buf,
                                             sizeof(current_template_data.custom_goals[idx].icon_path) - 1);
                                     current_template_data.custom_goals[idx].icon_path[
@@ -11046,7 +11298,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("custom_bulk_layout_popup")) {
-                            ImGui::TextDisabled("Layout coordinates for %d selected custom goals", (int)s_custom_selection.size());
+                            ImGui::TextDisabled("Layout coordinates for %d selected custom goals",
+                                                (int) s_custom_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -11065,15 +11318,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 float *p_x, *p_y, *p_xs, *p_ys;
                                 int *p_cols, *p_anchor;
                             } sections[2] = {
-                                {"cg_bulk_layout_icon", "Icon Pos.", "Anchor##cg_bl_icon", "Apply Icon Pos. to selected",
-                                 &s_cg_bl_icon_set, &s_cg_bl_icon_hide,
-                                 &s_cg_bl_icon_x, &s_cg_bl_icon_y, &s_cg_bl_icon_xs, &s_cg_bl_icon_ys,
-                                 &s_cg_bl_icon_cols, &s_cg_bl_icon_anchor},
-                                {"cg_bulk_layout_text", "Text Pos.", "Anchor##cg_bl_text", "Apply Text Pos. to selected",
-                                 &s_cg_bl_text_set, &s_cg_bl_text_hide,
-                                 &s_cg_bl_text_x, &s_cg_bl_text_y, &s_cg_bl_text_xs, &s_cg_bl_text_ys,
-                                 &s_cg_bl_text_cols, &s_cg_bl_text_anchor},
-                            };
+                                        {
+                                            "cg_bulk_layout_icon", "Icon Pos.", "Anchor##cg_bl_icon",
+                                            "Apply Icon Pos. to selected",
+                                            &s_cg_bl_icon_set, &s_cg_bl_icon_hide,
+                                            &s_cg_bl_icon_x, &s_cg_bl_icon_y, &s_cg_bl_icon_xs, &s_cg_bl_icon_ys,
+                                            &s_cg_bl_icon_cols, &s_cg_bl_icon_anchor
+                                        },
+                                        {
+                                            "cg_bulk_layout_text", "Text Pos.", "Anchor##cg_bl_text",
+                                            "Apply Text Pos. to selected",
+                                            &s_cg_bl_text_set, &s_cg_bl_text_hide,
+                                            &s_cg_bl_text_x, &s_cg_bl_text_y, &s_cg_bl_text_xs, &s_cg_bl_text_ys,
+                                            &s_cg_bl_text_cols, &s_cg_bl_text_anchor
+                                        },
+                                    };
                             static bool s_bl_base_set[2], s_bl_base_hide[2];
                             static float s_bl_base_x[2], s_bl_base_y[2], s_bl_base_xs[2], s_bl_base_ys[2];
                             static int s_bl_base_cols[2], s_bl_base_anchor[2];
@@ -11100,29 +11359,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                     if (*s.p_cols < 0) *s.p_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -11135,8 +11402,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                 if (ImGui::Button(applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size())
+                                            continue;
                                         auto &g = current_template_data.custom_goals[idx];
                                         ManualPos *target = (si == 0) ? &g.icon_pos : &g.text_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
@@ -11144,18 +11412,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
-                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                         }
-                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected item.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -11165,7 +11436,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("custom_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected custom goals?", (int)s_custom_selection.size());
+                            ImGui::Text("Delete %d selected custom goals?", (int) s_custom_selection.size());
                             if (ImGui::Button("Delete##custom_bulk_confirm")) {
                                 bulk_delete_custom = true;
                                 ImGui::CloseCurrentPopup();
@@ -11189,7 +11460,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
                         auto &goal = *goals_to_render[i];
-                        int real_i = (int)(&goal - &current_template_data.custom_goals[0]);
+                        int real_i = (int) (&goal - &current_template_data.custom_goals[0]);
 
                         ImGui::PushID(i);
 
@@ -11234,7 +11505,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_cg_root, goal.root_name,
                                                   nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -11385,9 +11657,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::EndChild();
                             }
-                        }
-
-                        {
+                        } {
                             bool is_cg_selected = s_custom_selection.find(real_i) != s_custom_selection.end();
                             if (ImGui::Checkbox("##custom_bulk_sel", &is_cg_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -11395,7 +11665,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_custom_last_clicked, real_i);
                                     int hi = std::max(s_custom_last_clicked, real_i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.custom_goals.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.custom_goals.size()) continue;
                                         if (is_custom_search_active) {
                                             const auto &gg = current_template_data.custom_goals[k];
                                             char gs[32];
@@ -11541,7 +11811,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
                             if (s_custom_selection.find(real_i) != s_custom_selection.end() &&
                                 s_custom_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_custom_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_custom_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", goal.root_name);
                             }
@@ -11564,21 +11834,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index !=
                         custom_dnd_target_index) {
                         int cg_src_real = -1, cg_tgt_real = -1;
-                        if (custom_dnd_source_index >= 0 && custom_dnd_source_index < (int)goals_to_render.size()) {
-                            cg_src_real = (int)(goals_to_render[custom_dnd_source_index] -
-                                                &current_template_data.custom_goals[0]);
+                        if (custom_dnd_source_index >= 0 && custom_dnd_source_index < (int) goals_to_render.size()) {
+                            cg_src_real = (int) (goals_to_render[custom_dnd_source_index] -
+                                                 &current_template_data.custom_goals[0]);
                         }
-                        if (custom_dnd_target_index >= 0 && custom_dnd_target_index < (int)goals_to_render.size()) {
-                            cg_tgt_real = (int)(goals_to_render[custom_dnd_target_index] -
-                                                &current_template_data.custom_goals[0]);
+                        if (custom_dnd_target_index >= 0 && custom_dnd_target_index < (int) goals_to_render.size()) {
+                            cg_tgt_real = (int) (goals_to_render[custom_dnd_target_index] -
+                                                 &current_template_data.custom_goals[0]);
                         } else {
-                            cg_tgt_real = (int)current_template_data.custom_goals.size();
+                            cg_tgt_real = (int) current_template_data.custom_goals.size();
                         }
                         if (cg_src_real >= 0 && s_custom_selection.find(cg_src_real) != s_custom_selection.end()) {
                             multi_move_selected(current_template_data.custom_goals, s_custom_selection, cg_tgt_real);
                             s_custom_last_clicked = -1;
                         } else {
-                            EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
+                            EditorTrackableItem item_to_move = current_template_data.custom_goals[
+                                custom_dnd_source_index];
                             current_template_data.custom_goals.erase(
                                 current_template_data.custom_goals.begin() + custom_dnd_source_index);
                             if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
@@ -11593,8 +11864,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (bulk_delete_custom && !s_custom_selection.empty()) {
                         std::vector<int> sorted_desc(s_custom_selection.begin(), s_custom_selection.end());
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.custom_goals.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
                             clear_goal_links(current_template_data, current_template_data.custom_goals[idx].root_name);
                             current_template_data.custom_goals.erase(
                                 current_template_data.custom_goals.begin() + idx);
@@ -11606,7 +11877,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data, current_template_data.custom_goals[item_to_remove].root_name);
+                        clear_goal_links(current_template_data,
+                                         current_template_data.custom_goals[item_to_remove].root_name);
                         current_template_data.custom_goals.erase(
                             current_template_data.custom_goals.begin() + item_to_remove);
                         s_custom_selection.clear();
@@ -11678,7 +11950,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_msg_selection;
                     static int s_msg_last_clicked = -1;
                     for (auto it = s_msg_selection.begin(); it != s_msg_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.multi_stage_goals.size()) it = s_msg_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.multi_stage_goals.size())
+                            it = s_msg_selection.erase(it);
                         else ++it;
                     }
 
@@ -11961,10 +12234,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char counter_text[160];
                     int msg_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
                                                    goals_to_render.size(),
-                                                   goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
-                    if (!s_msg_selection.empty() && msg_counter_pos < (int)sizeof(counter_text)) {
+                                                   goals_to_render.size() == 1
+                                                       ? "Multi-Stage Goal"
+                                                       : "Multi-Stage Goals");
+                    if (!s_msg_selection.empty() && msg_counter_pos < (int) sizeof(counter_text)) {
                         snprintf(counter_text + msg_counter_pos, sizeof(counter_text) - msg_counter_pos,
-                                 " \xC2\xB7 %d selected", (int)s_msg_selection.size());
+                                 " \xC2\xB7 %d selected", (int) s_msg_selection.size());
                     }
                     float text_width = ImGui::CalcTextSize(counter_text).x;
                     ImGui::SetCursorPosX(
@@ -12025,46 +12300,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("msg_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected multi-stage goal%s",
-                                     (int)s_msg_selection.size(),
+                                     (int) s_msg_selection.size(),
                                      s_msg_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##msg_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Apply the same icon path to every selected multi-stage goal.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Apply the same icon path to every selected multi-stage goal.");
                             if (ImGui::Selectable("Toggle Hidden##msg_ba")) ba_do_toggle_hidden = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Hidden on every selected multi-stage goal.\n"
-                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hidden on every selected multi-stage goal.\n"
+                                                  "If most are visible they all become hidden, and vice versa.");
                             if (ImGui::Selectable("Toggle Row 2##msg_ba")) ba_do_toggle_row2 = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Row 2 on every selected multi-stage goal.\n"
-                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Row 2 on every selected multi-stage goal.\n"
+                                                  "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Toggle Per-Stage Icons##msg_ba")) ba_do_toggle_stage_icons = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Per-Stage Icons on every selected multi-stage goal.\n"
-                                "If most are off they all enable per-stage icons, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Per-Stage Icons on every selected multi-stage goal.\n"
+                                                  "If most are off they all enable per-stage icons, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##msg_ba")) ba_open_layout = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected multi-stage goal.\n"
-                                "Each X and Y supports an optional stride that distributes\n"
-                                "values across the selection in template order.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected multi-stage goal.\n"
+                                                  "Each X and Y supports an optional stride that distributes\n"
+                                                  "values across the selection in template order.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##msg_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected multi-stage goals. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected multi-stage goals. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 if (current_template_data.multi_stage_goals[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_msg_selection.size());
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_msg_selection.size());
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 current_template_data.multi_stage_goals[idx].is_hidden = target_hidden;
                             }
                             ms_goal_data_changed = true;
@@ -12073,13 +12354,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row2) {
                             int row2_count = 0;
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 if (current_template_data.multi_stage_goals[idx].in_2nd_row) row2_count++;
                             }
-                            bool target_row2 = (row2_count * 2 < (int)s_msg_selection.size());
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            bool target_row2 = (row2_count * 2 < (int) s_msg_selection.size());
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 current_template_data.multi_stage_goals[idx].in_2nd_row = target_row2;
                             }
                             ms_goal_data_changed = true;
@@ -12088,13 +12369,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_stage_icons) {
                             int stage_icons_count = 0;
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 if (current_template_data.multi_stage_goals[idx].use_stage_icons) stage_icons_count++;
                             }
-                            bool target_stage_icons = (stage_icons_count * 2 < (int)s_msg_selection.size());
-                            for (int idx : s_msg_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                            bool target_stage_icons = (stage_icons_count * 2 < (int) s_msg_selection.size());
+                            for (int idx: s_msg_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                                 current_template_data.multi_stage_goals[idx].use_stage_icons = target_stage_icons;
                             }
                             ms_goal_data_changed = true;
@@ -12109,7 +12390,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ba_open_delete) ImGui::OpenPopup("msg_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("msg_bulk_icon_popup")) {
-                            ImGui::TextDisabled("Icon path for %d selected goals", (int)s_msg_selection.size());
+                            ImGui::TextDisabled("Icon path for %d selected goals", (int) s_msg_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##msg_bulk_icon_path", s_msg_bulk_icon_buf,
                                                                  sizeof(s_msg_bulk_icon_buf),
@@ -12124,8 +12405,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##msg_bulk_icon");
                             if ((submit_enter || submit_apply) && s_msg_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_msg_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                for (int idx: s_msg_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size())
+                                        continue;
                                     strncpy(current_template_data.multi_stage_goals[idx].icon_path, s_msg_bulk_icon_buf,
                                             sizeof(current_template_data.multi_stage_goals[idx].icon_path) - 1);
                                     current_template_data.multi_stage_goals[idx].icon_path[
@@ -12139,7 +12421,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("msg_bulk_layout_popup")) {
-                            ImGui::TextDisabled("Layout coordinates for %d selected multi-stage goals", (int)s_msg_selection.size());
+                            ImGui::TextDisabled("Layout coordinates for %d selected multi-stage goals",
+                                                (int) s_msg_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -12158,19 +12441,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 float *p_x, *p_y, *p_xs, *p_ys;
                                 int *p_cols, *p_anchor;
                             } sections[3] = {
-                                {"msg_bulk_layout_icon", "Icon Pos.", "Anchor##msg_bl_icon", "Apply Icon Pos. to selected",
-                                 &s_msg_bl_icon_set, &s_msg_bl_icon_hide,
-                                 &s_msg_bl_icon_x, &s_msg_bl_icon_y, &s_msg_bl_icon_xs, &s_msg_bl_icon_ys,
-                                 &s_msg_bl_icon_cols, &s_msg_bl_icon_anchor},
-                                {"msg_bulk_layout_text", "Text Pos.", "Anchor##msg_bl_text", "Apply Text Pos. to selected",
-                                 &s_msg_bl_text_set, &s_msg_bl_text_hide,
-                                 &s_msg_bl_text_x, &s_msg_bl_text_y, &s_msg_bl_text_xs, &s_msg_bl_text_ys,
-                                 &s_msg_bl_text_cols, &s_msg_bl_text_anchor},
-                                {"msg_bulk_layout_prog", "Progress Pos.", "Anchor##msg_bl_prog", "Apply Progress Pos. to selected",
-                                 &s_msg_bl_prog_set, &s_msg_bl_prog_hide,
-                                 &s_msg_bl_prog_x, &s_msg_bl_prog_y, &s_msg_bl_prog_xs, &s_msg_bl_prog_ys,
-                                 &s_msg_bl_prog_cols, &s_msg_bl_prog_anchor},
-                            };
+                                        {
+                                            "msg_bulk_layout_icon", "Icon Pos.", "Anchor##msg_bl_icon",
+                                            "Apply Icon Pos. to selected",
+                                            &s_msg_bl_icon_set, &s_msg_bl_icon_hide,
+                                            &s_msg_bl_icon_x, &s_msg_bl_icon_y, &s_msg_bl_icon_xs, &s_msg_bl_icon_ys,
+                                            &s_msg_bl_icon_cols, &s_msg_bl_icon_anchor
+                                        },
+                                        {
+                                            "msg_bulk_layout_text", "Text Pos.", "Anchor##msg_bl_text",
+                                            "Apply Text Pos. to selected",
+                                            &s_msg_bl_text_set, &s_msg_bl_text_hide,
+                                            &s_msg_bl_text_x, &s_msg_bl_text_y, &s_msg_bl_text_xs, &s_msg_bl_text_ys,
+                                            &s_msg_bl_text_cols, &s_msg_bl_text_anchor
+                                        },
+                                        {
+                                            "msg_bulk_layout_prog", "Progress Pos.", "Anchor##msg_bl_prog",
+                                            "Apply Progress Pos. to selected",
+                                            &s_msg_bl_prog_set, &s_msg_bl_prog_hide,
+                                            &s_msg_bl_prog_x, &s_msg_bl_prog_y, &s_msg_bl_prog_xs, &s_msg_bl_prog_ys,
+                                            &s_msg_bl_prog_cols, &s_msg_bl_prog_anchor
+                                        },
+                                    };
                             static bool s_bl_base_set[3], s_bl_base_hide[3];
                             static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
                             static int s_bl_base_cols[3], s_bl_base_anchor[3];
@@ -12197,29 +12489,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                     if (*s.p_cols < 0) *s.p_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -12232,28 +12532,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                 if (ImGui::Button(applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size())
+                                            continue;
                                         auto &g = current_template_data.multi_stage_goals[idx];
-                                        ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
+                                        ManualPos *target = (si == 0)
+                                                                ? &g.icon_pos
+                                                                : (si == 1)
+                                                                      ? &g.text_pos
+                                                                      : &g.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
-                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                         }
-                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                         n++;
                                     }
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected item.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -12263,7 +12571,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("msg_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected multi-stage goals?", (int)s_msg_selection.size());
+                            ImGui::Text("Delete %d selected multi-stage goals?", (int) s_msg_selection.size());
                             if (ImGui::Button("Delete##msg_bulk_confirm")) {
                                 bulk_delete_msg = true;
                                 ImGui::CloseCurrentPopup();
@@ -12287,7 +12595,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
                         auto &goal = *goals_to_render[i];
-                        int msg_real_i = (int)(&goal - &current_template_data.multi_stage_goals[0]);
+                        int msg_real_i = (int) (&goal - &current_template_data.multi_stage_goals[0]);
                         ImGui::PushID(&goal);
 
                         const char *display_name = goal.display_name;
@@ -12297,9 +12605,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 : root_name;
                         if (label[0] == '\0') {
                             label = "[New Goal]";
-                        }
-
-                        {
+                        } {
                             bool is_msg_selected = s_msg_selection.find(msg_real_i) != s_msg_selection.end();
                             if (ImGui::Checkbox("##msg_bulk_sel", &is_msg_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -12307,10 +12613,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_msg_last_clicked, msg_real_i);
                                     int hi = std::max(s_msg_last_clicked, msg_real_i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.multi_stage_goals.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.multi_stage_goals.size())
+                                            continue;
                                         bool in_filter = false;
-                                        for (const auto *p : goals_to_render) {
-                                            if (p == &current_template_data.multi_stage_goals[k]) { in_filter = true; break; }
+                                        for (const auto *p: goals_to_render) {
+                                            if (p == &current_template_data.multi_stage_goals[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
                                         }
                                         if (!in_filter) continue;
                                         if (is_msg_selected) s_msg_selection.insert(k);
@@ -12396,7 +12706,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetDragDropPayload("MS_GOAL_DND", &i, sizeof(int));
                             if (s_msg_selection.find(msg_real_i) != s_msg_selection.end() &&
                                 s_msg_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_msg_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_msg_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", label);
                             }
@@ -12421,8 +12731,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     sizeof(selected_root_name_before_op) - 1);
                         }
                         bool wipe_selected_ptr = false;
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.multi_stage_goals.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size()) continue;
                             EditorMultiStageGoal *gp = &current_template_data.multi_stage_goals[idx];
                             if (selected_ms_goal == gp) wipe_selected_ptr = true;
                             clear_goal_links(current_template_data, gp->root_name);
@@ -12433,7 +12743,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_ms_goal = nullptr;
                         } else if (selected_root_name_before_op[0] != '\0') {
                             selected_ms_goal = nullptr;
-                            for (auto &g : current_template_data.multi_stage_goals) {
+                            for (auto &g: current_template_data.multi_stage_goals) {
                                 if (strcmp(g.root_name, selected_root_name_before_op) == 0) {
                                     selected_ms_goal = &g;
                                     break;
@@ -12452,8 +12762,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ms_goal_dnd_source_index != -1 && ms_goal_dnd_target_index != -1) {
                         EditorMultiStageGoal *source_item_ptr = goals_to_render[ms_goal_dnd_source_index];
                         EditorMultiStageGoal *target_item_ptr = goals_to_render[ms_goal_dnd_target_index];
-                        int msg_src_real = (int)(source_item_ptr - &current_template_data.multi_stage_goals[0]);
-                        int msg_tgt_real = (int)(target_item_ptr - &current_template_data.multi_stage_goals[0]);
+                        int msg_src_real = (int) (source_item_ptr - &current_template_data.multi_stage_goals[0]);
+                        int msg_tgt_real = (int) (target_item_ptr - &current_template_data.multi_stage_goals[0]);
 
                         if (s_msg_selection.find(msg_src_real) != s_msg_selection.end()) {
                             char selected_root_name_before_op[192] = {};
@@ -12465,7 +12775,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_msg_last_clicked = -1;
                             if (selected_root_name_before_op[0] != '\0') {
                                 selected_ms_goal = nullptr;
-                                for (auto &g : current_template_data.multi_stage_goals) {
+                                for (auto &g: current_template_data.multi_stage_goals) {
                                     if (strcmp(g.root_name, selected_root_name_before_op) == 0) {
                                         selected_ms_goal = &g;
                                         break;
@@ -12659,7 +12969,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             propagate_goal_rename(current_template_data.decorations,
                                                   current_template_data.counter_goals, focused_msg_root, goal.root_name,
                                                   nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -12790,7 +13101,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_stage_last_clicked = -1;
                         }
                         for (auto it = s_stage_selection.begin(); it != s_stage_selection.end();) {
-                            if (*it < 0 || (size_t)*it >= goal.stages.size()) it = s_stage_selection.erase(it);
+                            if (*it < 0 || (size_t) *it >= goal.stages.size()) it = s_stage_selection.erase(it);
                             else ++it;
                         }
 
@@ -12837,9 +13148,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int stage_pos = snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s",
                                                  visible_stages_count,
                                                  visible_stages_count == 1 ? "Stage" : "Stages");
-                        if (!s_stage_selection.empty() && stage_pos < (int)sizeof(stage_counter_text)) {
+                        if (!s_stage_selection.empty() && stage_pos < (int) sizeof(stage_counter_text)) {
                             snprintf(stage_counter_text + stage_pos, sizeof(stage_counter_text) - stage_pos,
-                                     " \xC2\xB7 %d selected", (int)s_stage_selection.size());
+                                     " \xC2\xB7 %d selected", (int) s_stage_selection.size());
                         }
                         float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
@@ -13060,14 +13371,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::BeginPopup("stage_bulk_actions_menu")) {
                                 char hdr[160];
                                 snprintf(hdr, sizeof(hdr), "%d selected stage%s",
-                                         (int)s_stage_selection.size(),
+                                         (int) s_stage_selection.size(),
                                          s_stage_selection.size() == 1 ? "" : "s");
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
                                 if (goal.use_stage_icons) {
                                     if (ImGui::Selectable("Set Icon...##stage_ba")) ba_open_icon = true;
-                                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                        "Apply the same icon path to every selected stage.");
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Apply the same icon path to every selected stage.");
                                 } else {
                                     ImGui::BeginDisabled();
                                     ImGui::Selectable("Set Icon... (enable Per-Stage Icons first)##stage_ba_dis");
@@ -13075,8 +13387,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Delete Selected...##stage_ba")) ba_open_delete = true;
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Remove all selected stages. Requires confirmation.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Remove all selected stages. Requires confirmation.");
                                 ImGui::EndPopup();
                             }
 
@@ -13087,7 +13400,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ba_open_delete) ImGui::OpenPopup("stage_bulk_delete_confirm");
 
                             if (ImGui::BeginPopup("stage_bulk_icon_popup")) {
-                                ImGui::TextDisabled("Icon path for %d selected stages", (int)s_stage_selection.size());
+                                ImGui::TextDisabled("Icon path for %d selected stages", (int) s_stage_selection.size());
                                 ImGui::SetNextItemWidth(280.0f);
                                 bool submit_enter = ImGui::InputText("##stage_bulk_icon_path", s_stage_bulk_icon_buf,
                                                                      sizeof(s_stage_bulk_icon_buf),
@@ -13102,8 +13415,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 bool submit_apply = ImGui::Button("Apply##stage_bulk_icon");
                                 if ((submit_enter || submit_apply) && s_stage_bulk_icon_buf[0] != '\0') {
-                                    for (int idx : s_stage_selection) {
-                                        if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
+                                    for (int idx: s_stage_selection) {
+                                        if (idx < 0 || (size_t) idx >= goal.stages.size()) continue;
                                         strncpy(goal.stages[idx].icon_path, s_stage_bulk_icon_buf,
                                                 sizeof(goal.stages[idx].icon_path) - 1);
                                         goal.stages[idx].icon_path[
@@ -13117,7 +13430,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (ImGui::BeginPopup("stage_bulk_delete_confirm")) {
-                                ImGui::Text("Delete %d selected stages?", (int)s_stage_selection.size());
+                                ImGui::Text("Delete %d selected stages?", (int) s_stage_selection.size());
                                 if (ImGui::Button("Delete##stage_bulk_confirm")) {
                                     bulk_delete_stages = true;
                                     ImGui::CloseCurrentPopup();
@@ -13223,7 +13536,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        goal.root_name, focused_stage_id,
                                                        stage.stage_id,
                                                        &current_template_data.stats,
-                                                       &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                       &current_template_data.custom_goals,
+                                                       &current_template_data.multi_stage_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[256];
@@ -13753,24 +14067,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::EndChild();
                                     }
                                 }
-                            }
-
-                            {
-                                bool is_stage_selected = s_stage_selection.find((int)j) != s_stage_selection.end();
+                            } {
+                                bool is_stage_selected = s_stage_selection.find((int) j) != s_stage_selection.end();
                                 if (ImGui::Checkbox("##stage_bulk_sel", &is_stage_selected)) {
                                     bool shift = ImGui::GetIO().KeyShift;
-                                    if (shift && s_stage_last_clicked >= 0 && s_stage_last_clicked != (int)j) {
-                                        int lo = std::min(s_stage_last_clicked, (int)j);
-                                        int hi = std::max(s_stage_last_clicked, (int)j);
-                                        for (int k = lo; k <= hi && k < (int)goal.stages.size(); k++) {
+                                    if (shift && s_stage_last_clicked >= 0 && s_stage_last_clicked != (int) j) {
+                                        int lo = std::min(s_stage_last_clicked, (int) j);
+                                        int hi = std::max(s_stage_last_clicked, (int) j);
+                                        for (int k = lo; k <= hi && k < (int) goal.stages.size(); k++) {
                                             if (is_stage_selected) s_stage_selection.insert(k);
                                             else s_stage_selection.erase(k);
                                         }
                                     } else {
-                                        if (is_stage_selected) s_stage_selection.insert((int)j);
-                                        else s_stage_selection.erase((int)j);
+                                        if (is_stage_selected) s_stage_selection.insert((int) j);
+                                        else s_stage_selection.erase((int) j);
                                     }
-                                    s_stage_last_clicked = (int)j;
+                                    s_stage_last_clicked = (int) j;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char sel_tip[384];
@@ -13856,9 +14168,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // To make a non-interactive item a drag source we use the flag
                             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                                 ImGui::SetDragDropPayload("MS_STAGE_DND", &j, sizeof(int));
-                                if (s_stage_selection.find((int)j) != s_stage_selection.end() &&
+                                if (s_stage_selection.find((int) j) != s_stage_selection.end() &&
                                     s_stage_selection.size() > 1) {
-                                    ImGui::Text("Reordering %d selected stages", (int)s_stage_selection.size());
+                                    ImGui::Text("Reordering %d selected stages", (int) s_stage_selection.size());
                                 } else {
                                     ImGui::Text("Reorder Stage: %s", stage.stage_id);
                                 }
@@ -13889,7 +14201,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
                                 goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
                                 std::set<int> shifted_dnd;
-                                for (int idx : s_stage_selection) {
+                                for (int idx: s_stage_selection) {
                                     int new_idx = idx;
                                     if (idx == stage_dnd_source_index) new_idx = stage_dnd_target_index;
                                     else {
@@ -13908,8 +14220,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (bulk_delete_stages && !s_stage_selection.empty()) {
                             std::vector<int> sorted_desc(s_stage_selection.begin(), s_stage_selection.end());
                             std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                            for (int idx : sorted_desc) {
-                                if (idx < 0 || (size_t)idx >= goal.stages.size()) continue;
+                            for (int idx: sorted_desc) {
+                                if (idx < 0 || (size_t) idx >= goal.stages.size()) continue;
                                 clear_goal_links(current_template_data, goal.root_name, goal.stages[idx].stage_id);
                                 goal.stages.erase(goal.stages.begin() + idx);
                             }
@@ -13925,7 +14237,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              goal.stages[stage_to_remove].stage_id);
                             goal.stages.erase(goal.stages.begin() + stage_to_remove);
                             std::set<int> shifted_rm;
-                            for (int idx : s_stage_selection) {
+                            for (int idx: s_stage_selection) {
                                 if (idx == stage_to_remove) continue;
                                 shifted_rm.insert(idx > stage_to_remove ? idx - 1 : idx);
                             }
@@ -13989,7 +14301,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                             goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
                             std::set<int> shifted_cp;
-                            for (int idx : s_stage_selection) shifted_cp.insert(idx > stage_to_copy ? idx + 1 : idx);
+                            for (int idx: s_stage_selection) shifted_cp.insert(idx > stage_to_copy ? idx + 1 : idx);
                             s_stage_selection = shifted_cp;
                             if (s_stage_last_clicked > stage_to_copy) s_stage_last_clicked++;
                             ms_goal_data_changed = true;
@@ -14020,7 +14332,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_ctr_selection;
                     static int s_ctr_last_clicked = -1;
                     for (auto it = s_ctr_selection.begin(); it != s_ctr_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.counter_goals.size()) it = s_ctr_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.counter_goals.size())
+                            it = s_ctr_selection.erase(it);
                         else ++it;
                     }
 
@@ -14049,11 +14362,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     bool can_sort_ctr = false;
                     for (const auto &c: current_template_data.counter_goals) {
-                        if (c.sort_order > 0) { can_sort_ctr = true; break; }
-                    }
-                    {
+                        if (c.sort_order > 0) {
+                            can_sort_ctr = true;
+                            break;
+                        }
+                    } {
                         float sort_btn_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                        float reset_btn_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                        float reset_btn_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
                         float total_btns_w = sort_btn_w + reset_btn_w + ImGui::GetStyle().ItemSpacing.x;
                         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_btns_w);
                     }
@@ -14064,8 +14380,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tip[128];
-                        if (!can_sort_ctr) snprintf(tip, sizeof(tip),
-                                                   "Click the order badges next to counters to assign a sort order first.");
+                        if (!can_sort_ctr)
+                            snprintf(tip, sizeof(tip),
+                                     "Click the order badges next to counters to assign a sort order first.");
                         else snprintf(tip, sizeof(tip), "Rearrange the numbered items among themselves.");
                         ImGui::SetTooltip("%s", tip);
                     }
@@ -14118,8 +14435,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     ImGui::Separator();
 
-                    bool ctr_search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_COUNTERS);
-                    {
+                    bool ctr_search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_COUNTERS); {
                         size_t count_top = 0;
                         if (!ctr_search_active) {
                             count_top = current_template_data.counter_goals.size();
@@ -14135,9 +14451,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char ctr_count_text[160];
                         int ctr_pos = snprintf(ctr_count_text, sizeof(ctr_count_text), "%zu %s",
                                                count_top, count_top == 1 ? "Counter" : "Counters");
-                        if (!s_ctr_selection.empty() && ctr_pos < (int)sizeof(ctr_count_text)) {
+                        if (!s_ctr_selection.empty() && ctr_pos < (int) sizeof(ctr_count_text)) {
                             snprintf(ctr_count_text + ctr_pos, sizeof(ctr_count_text) - ctr_pos,
-                                     " \xC2\xB7 %d selected", (int)s_ctr_selection.size());
+                                     " \xC2\xB7 %d selected", (int) s_ctr_selection.size());
                         }
                         float tw = ImGui::CalcTextSize(ctr_count_text).x;
                         ImGui::SetCursorPosX(
@@ -14213,42 +14529,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("ctr_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected counter%s",
-                                     (int)s_ctr_selection.size(),
+                                     (int) s_ctr_selection.size(),
                                      s_ctr_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##ctr_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Apply the same icon path to every selected counter.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Apply the same icon path to every selected counter.");
                             if (ImGui::Selectable("Toggle Hidden##ctr_ba")) ba_do_toggle_hidden = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Hidden on every selected counter.\n"
-                                "If most are visible they all become hidden, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hidden on every selected counter.\n"
+                                                  "If most are visible they all become hidden, and vice versa.");
                             if (ImGui::Selectable("Toggle Row 2##ctr_ba")) ba_do_toggle_row2 = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Flip Row 2 on every selected counter.\n"
-                                "If most are off they all move to the 2nd row, and vice versa.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Row 2 on every selected counter.\n"
+                                                  "If most are off they all move to the 2nd row, and vice versa.");
                             if (ImGui::Selectable("Layout Coordinates...##ctr_ba")) ba_open_layout = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected counter.\n"
-                                "Each X and Y supports an optional stride that distributes\n"
-                                "values across the selection in template order.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Bulk-set Icon Pos., Text Pos., and Progress Pos. for every selected counter.\n"
+                                                  "Each X and Y supports an optional stride that distributes\n"
+                                                  "values across the selection in template order.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##ctr_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected counters. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected counters. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_do_toggle_hidden) {
                             int hidden_count = 0;
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                            for (int idx: s_ctr_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                                 if (current_template_data.counter_goals[idx].is_hidden) hidden_count++;
                             }
-                            bool target_hidden = (hidden_count * 2 < (int)s_ctr_selection.size());
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                            bool target_hidden = (hidden_count * 2 < (int) s_ctr_selection.size());
+                            for (int idx: s_ctr_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                                 current_template_data.counter_goals[idx].is_hidden = target_hidden;
                             }
                             save_message_type = MSG_NONE;
@@ -14256,13 +14577,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ba_do_toggle_row2) {
                             int row2_count = 0;
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                            for (int idx: s_ctr_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                                 if (current_template_data.counter_goals[idx].in_2nd_row) row2_count++;
                             }
-                            bool target_row2 = (row2_count * 2 < (int)s_ctr_selection.size());
-                            for (int idx : s_ctr_selection) {
-                                if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                            bool target_row2 = (row2_count * 2 < (int) s_ctr_selection.size());
+                            for (int idx: s_ctr_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                                 current_template_data.counter_goals[idx].in_2nd_row = target_row2;
                             }
                             save_message_type = MSG_NONE;
@@ -14276,7 +14597,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ba_open_delete) ImGui::OpenPopup("ctr_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("ctr_bulk_icon_popup")) {
-                            ImGui::TextDisabled("Icon path for %d selected counters", (int)s_ctr_selection.size());
+                            ImGui::TextDisabled("Icon path for %d selected counters", (int) s_ctr_selection.size());
                             ImGui::SetNextItemWidth(280.0f);
                             bool submit_enter = ImGui::InputText("##ctr_bulk_icon_path", s_ctr_bulk_icon_buf,
                                                                  sizeof(s_ctr_bulk_icon_buf),
@@ -14291,8 +14612,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             bool submit_apply = ImGui::Button("Apply##ctr_bulk_icon");
                             if ((submit_enter || submit_apply) && s_ctr_bulk_icon_buf[0] != '\0') {
-                                for (int idx : s_ctr_selection) {
-                                    if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                for (int idx: s_ctr_selection) {
+                                    if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                                     strncpy(current_template_data.counter_goals[idx].icon_path, s_ctr_bulk_icon_buf,
                                             sizeof(current_template_data.counter_goals[idx].icon_path) - 1);
                                     current_template_data.counter_goals[idx].icon_path[
@@ -14305,7 +14626,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("ctr_bulk_layout_popup")) {
-                            ImGui::TextDisabled("Layout coordinates for %d selected counters", (int)s_ctr_selection.size());
+                            ImGui::TextDisabled("Layout coordinates for %d selected counters",
+                                                (int) s_ctr_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
                             ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
                             ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
@@ -14324,19 +14646,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 float *p_x, *p_y, *p_xs, *p_ys;
                                 int *p_cols, *p_anchor;
                             } sections[3] = {
-                                {"ctr_bulk_layout_icon", "Icon Pos.", "Anchor##ctr_bl_icon", "Apply Icon Pos. to selected",
-                                 &s_ctr_bl_icon_set, &s_ctr_bl_icon_hide,
-                                 &s_ctr_bl_icon_x, &s_ctr_bl_icon_y, &s_ctr_bl_icon_xs, &s_ctr_bl_icon_ys,
-                                 &s_ctr_bl_icon_cols, &s_ctr_bl_icon_anchor},
-                                {"ctr_bulk_layout_text", "Text Pos.", "Anchor##ctr_bl_text", "Apply Text Pos. to selected",
-                                 &s_ctr_bl_text_set, &s_ctr_bl_text_hide,
-                                 &s_ctr_bl_text_x, &s_ctr_bl_text_y, &s_ctr_bl_text_xs, &s_ctr_bl_text_ys,
-                                 &s_ctr_bl_text_cols, &s_ctr_bl_text_anchor},
-                                {"ctr_bulk_layout_prog", "Progress Pos.", "Anchor##ctr_bl_prog", "Apply Progress Pos. to selected",
-                                 &s_ctr_bl_prog_set, &s_ctr_bl_prog_hide,
-                                 &s_ctr_bl_prog_x, &s_ctr_bl_prog_y, &s_ctr_bl_prog_xs, &s_ctr_bl_prog_ys,
-                                 &s_ctr_bl_prog_cols, &s_ctr_bl_prog_anchor},
-                            };
+                                        {
+                                            "ctr_bulk_layout_icon", "Icon Pos.", "Anchor##ctr_bl_icon",
+                                            "Apply Icon Pos. to selected",
+                                            &s_ctr_bl_icon_set, &s_ctr_bl_icon_hide,
+                                            &s_ctr_bl_icon_x, &s_ctr_bl_icon_y, &s_ctr_bl_icon_xs, &s_ctr_bl_icon_ys,
+                                            &s_ctr_bl_icon_cols, &s_ctr_bl_icon_anchor
+                                        },
+                                        {
+                                            "ctr_bulk_layout_text", "Text Pos.", "Anchor##ctr_bl_text",
+                                            "Apply Text Pos. to selected",
+                                            &s_ctr_bl_text_set, &s_ctr_bl_text_hide,
+                                            &s_ctr_bl_text_x, &s_ctr_bl_text_y, &s_ctr_bl_text_xs, &s_ctr_bl_text_ys,
+                                            &s_ctr_bl_text_cols, &s_ctr_bl_text_anchor
+                                        },
+                                        {
+                                            "ctr_bulk_layout_prog", "Progress Pos.", "Anchor##ctr_bl_prog",
+                                            "Apply Progress Pos. to selected",
+                                            &s_ctr_bl_prog_set, &s_ctr_bl_prog_hide,
+                                            &s_ctr_bl_prog_x, &s_ctr_bl_prog_y, &s_ctr_bl_prog_xs, &s_ctr_bl_prog_ys,
+                                            &s_ctr_bl_prog_cols, &s_ctr_bl_prog_anchor
+                                        },
+                                    };
                             static bool s_bl_base_set[3], s_bl_base_hide[3];
                             static float s_bl_base_x[3], s_bl_base_y[3], s_bl_base_xs[3], s_bl_base_ys[3];
                             static int s_bl_base_cols[3], s_bl_base_anchor[3];
@@ -14363,29 +14694,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("X", s.p_x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_x = fminf(fmaxf(roundf(*s.p_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to X for each item after the first.");
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to X for each item after the first.");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_y = fminf(fmaxf(roundf(*s.p_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                                    "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels));
-                                ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                             IM_ARRAYSIZE(anchor_point_labels));
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
                                     if (*s.p_cols < 0) *s.p_cols = 0;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                    "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
@@ -14398,27 +14737,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          w_en, w_hi, w_po, w_an, applabel, sizeof(applabel));
                                 if (ImGui::Button(applabel)) {
                                     int n = 0;
-                                    for (int idx : bulk_layout_sorted) {
-                                        if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                                    for (int idx: bulk_layout_sorted) {
+                                        if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size())
+                                            continue;
                                         auto &g = current_template_data.counter_goals[idx];
-                                        ManualPos *target = (si == 0) ? &g.icon_pos : (si == 1) ? &g.text_pos : &g.progress_pos;
+                                        ManualPos *target = (si == 0)
+                                                                ? &g.icon_pos
+                                                                : (si == 1)
+                                                                      ? &g.text_pos
+                                                                      : &g.progress_pos;
                                         int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
                                         int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
-                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                            target->x = fminf(fmaxf(roundf(*s.p_x + x_mult * *s.p_xs), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
+                                            target->y = fminf(fmaxf(roundf(*s.p_y + y_mult * *s.p_ys), -MANUAL_POS_MAX),
+                                                              MANUAL_POS_MAX);
                                         }
-                                        if (w_an) target->anchor = (AnchorPoint)*s.p_anchor;
+                                        if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                    "Applies only the buckets you changed since opening this popup.\n"
-                                    "Change nothing (or all four) to apply everything.\n"
-                                    "Untouched fields are left as-is on each selected item.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s",
+                                                      "Applies only the buckets you changed since opening this popup.\n"
+                                                      "Change nothing (or all four) to apply everything.\n"
+                                                      "Untouched fields are left as-is on each selected item.");
                                 ImGui::PopID();
                             }
 
@@ -14428,7 +14775,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginPopup("ctr_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected counters?", (int)s_ctr_selection.size());
+                            ImGui::Text("Delete %d selected counters?", (int) s_ctr_selection.size());
                             if (ImGui::Button("Delete##ctr_bulk_confirm")) {
                                 bulk_delete_ctr = true;
                                 ImGui::CloseCurrentPopup();
@@ -14452,7 +14799,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < counters_to_render.size(); ++i) {
                         auto &counter = *counters_to_render[i];
-                        int ctr_real_i = (int)(&counter - &current_template_data.counter_goals[0]);
+                        int ctr_real_i = (int) (&counter - &current_template_data.counter_goals[0]);
                         ImGui::PushID(&counter);
 
                         const char *display_name = counter.display_name;
@@ -14460,9 +14807,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const char *label = show_counter_display_names
                                                 ? (display_name[0] ? display_name : root_name)
                                                 : root_name;
-                        if (label[0] == '\0') label = "[New Counter]";
-
-                        {
+                        if (label[0] == '\0') label = "[New Counter]"; {
                             bool is_ctr_selected = s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end();
                             if (ImGui::Checkbox("##ctr_bulk_sel", &is_ctr_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -14470,10 +14815,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_ctr_last_clicked, ctr_real_i);
                                     int hi = std::max(s_ctr_last_clicked, ctr_real_i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.counter_goals.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.counter_goals.size()) continue;
                                         bool in_filter = false;
-                                        for (const auto *p : counters_to_render) {
-                                            if (p == &current_template_data.counter_goals[k]) { in_filter = true; break; }
+                                        for (const auto *p: counters_to_render) {
+                                            if (p == &current_template_data.counter_goals[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
                                         }
                                         if (!in_filter) continue;
                                         if (is_ctr_selected) s_ctr_selection.insert(k);
@@ -14559,7 +14907,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetDragDropPayload("COUNTER_DND", &i, sizeof(int));
                             if (s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end() &&
                                 s_ctr_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_ctr_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_ctr_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", label);
                             }
@@ -14580,20 +14928,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         std::vector<int> sorted_desc(s_ctr_selection.begin(), s_ctr_selection.end());
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
                         char selected_root_name_before_op[192] = {};
-                        if (selected_counter_index >= 0 && selected_counter_index < (int)current_template_data.counter_goals.size()) {
+                        if (selected_counter_index >= 0 && selected_counter_index < (int) current_template_data.
+                            counter_goals.size()) {
                             strncpy(selected_root_name_before_op,
                                     current_template_data.counter_goals[selected_counter_index].root_name,
                                     sizeof(selected_root_name_before_op) - 1);
                         }
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.counter_goals.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
                             clear_goal_links(current_template_data, current_template_data.counter_goals[idx].root_name);
                             current_template_data.counter_goals.erase(
                                 current_template_data.counter_goals.begin() + idx);
                         }
                         selected_counter_index = -1;
                         if (selected_root_name_before_op[0] != '\0') {
-                            for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                            for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
                                 if (strcmp(current_template_data.counter_goals[ci].root_name,
                                            selected_root_name_before_op) == 0) {
                                     selected_counter_index = ci;
@@ -14612,12 +14961,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ctr_dnd_source_index != -1 && ctr_dnd_target_index != -1) {
                         EditorCounterGoal *source_item_ptr = counters_to_render[ctr_dnd_source_index];
                         EditorCounterGoal *target_item_ptr = counters_to_render[ctr_dnd_target_index];
-                        int ctr_src_real = (int)(source_item_ptr - &current_template_data.counter_goals[0]);
-                        int ctr_tgt_real = (int)(target_item_ptr - &current_template_data.counter_goals[0]);
+                        int ctr_src_real = (int) (source_item_ptr - &current_template_data.counter_goals[0]);
+                        int ctr_tgt_real = (int) (target_item_ptr - &current_template_data.counter_goals[0]);
 
                         if (s_ctr_selection.find(ctr_src_real) != s_ctr_selection.end()) {
                             char selected_root_name_before_op[192] = {};
-                            if (selected_counter_index >= 0 && selected_counter_index < (int)current_template_data.counter_goals.size()) {
+                            if (selected_counter_index >= 0 && selected_counter_index < (int) current_template_data.
+                                counter_goals.size()) {
                                 strncpy(selected_root_name_before_op,
                                         current_template_data.counter_goals[selected_counter_index].root_name,
                                         sizeof(selected_root_name_before_op) - 1);
@@ -14626,7 +14976,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             s_ctr_last_clicked = -1;
                             selected_counter_index = -1;
                             if (selected_root_name_before_op[0] != '\0') {
-                                for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                                for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
                                     if (strcmp(current_template_data.counter_goals[ci].root_name,
                                                selected_root_name_before_op) == 0) {
                                         selected_counter_index = ci;
@@ -14670,7 +15020,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (selected_counter_index == actual_idx) selected_counter_index = -1;
                         else if (selected_counter_index > actual_idx) selected_counter_index--;
                         std::set<int> shifted_rm;
-                        for (int idx : s_ctr_selection) {
+                        for (int idx: s_ctr_selection) {
                             if (idx == actual_idx) continue;
                             shifted_rm.insert(idx > actual_idx ? idx - 1 : idx);
                         }
@@ -14774,7 +15124,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals,
                                                       focused_counter_root, counter.root_name,
                                                       nullptr, &current_template_data.stats,
-                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
                             }
                         }
                         if (ImGui::IsItemHovered()) {
@@ -14958,7 +15309,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     static std::set<int> s_deco_selection;
                     static int s_deco_last_clicked = -1;
                     for (auto it = s_deco_selection.begin(); it != s_deco_selection.end();) {
-                        if (*it < 0 || (size_t)*it >= current_template_data.decorations.size()) it = s_deco_selection.erase(it);
+                        if (*it < 0 || (size_t) *it >= current_template_data.decorations.size())
+                            it = s_deco_selection.erase(it);
                         else ++it;
                     }
 
@@ -15005,9 +15357,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char deco_counter_top[128];
                         int deco_pos_top = snprintf(deco_counter_top, sizeof(deco_counter_top), "%zu %s",
                                                     deco_count_top, deco_count_top == 1 ? "Decoration" : "Decorations");
-                        if (!s_deco_selection.empty() && deco_pos_top < (int)sizeof(deco_counter_top)) {
+                        if (!s_deco_selection.empty() && deco_pos_top < (int) sizeof(deco_counter_top)) {
                             snprintf(deco_counter_top + deco_pos_top, sizeof(deco_counter_top) - deco_pos_top,
-                                     " \xC2\xB7 %d selected", (int)s_deco_selection.size());
+                                     " \xC2\xB7 %d selected", (int) s_deco_selection.size());
                         }
                         float deco_tw_top = ImGui::CalcTextSize(deco_counter_top).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - deco_tw_top);
@@ -15110,9 +15462,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // --- Sorting Controls (right-aligned on the Add line) ---
                     bool can_sort_decos2 = false;
                     for (const auto &deco: current_template_data.decorations) {
-                        if (deco.sort_order > 0) { can_sort_decos2 = true; break; }
-                    }
-                    {
+                        if (deco.sort_order > 0) {
+                            can_sort_decos2 = true;
+                            break;
+                        }
+                    } {
                         float sb_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float rb_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
                         float total_w = sb_w + rb_w + ImGui::GetStyle().ItemSpacing.x;
@@ -15125,8 +15479,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tip[128];
-                        if (!can_sort_decos2) snprintf(tip, sizeof(tip),
-                                                       "Click the order badges next to decorations to assign a sort order first.");
+                        if (!can_sort_decos2)
+                            snprintf(tip, sizeof(tip),
+                                     "Click the order badges next to decorations to assign a sort order first.");
                         else snprintf(tip, sizeof(tip), "Rearrange the numbered decorations among themselves.");
                         ImGui::SetTooltip("%s", tip);
                     }
@@ -15172,20 +15527,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginPopup("deco_bulk_actions_menu")) {
                             char hdr[160];
                             snprintf(hdr, sizeof(hdr), "%d selected decoration%s",
-                                     (int)s_deco_selection.size(),
+                                     (int) s_deco_selection.size(),
                                      s_deco_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##deco_ba")) ba_open_delete = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s",
-                                "Remove all selected decorations. Requires confirmation.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Remove all selected decorations. Requires confirmation.");
                             ImGui::EndPopup();
                         }
 
                         if (ba_open_delete) ImGui::OpenPopup("deco_bulk_delete_confirm");
 
                         if (ImGui::BeginPopup("deco_bulk_delete_confirm")) {
-                            ImGui::Text("Delete %d selected decorations?", (int)s_deco_selection.size());
+                            ImGui::Text("Delete %d selected decorations?", (int) s_deco_selection.size());
                             if (ImGui::Button("Delete##deco_bulk_confirm")) {
                                 bulk_delete_decos = true;
                                 ImGui::CloseCurrentPopup();
@@ -15530,17 +15886,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Arrow opacity after the Start Goal is completed.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
-                        }
-
-                        {
-                            bool is_deco_selected = s_deco_selection.find((int)i) != s_deco_selection.end();
+                        } {
+                            bool is_deco_selected = s_deco_selection.find((int) i) != s_deco_selection.end();
                             if (ImGui::Checkbox("##deco_bulk_sel", &is_deco_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_deco_last_clicked >= 0 && s_deco_last_clicked != (int)i) {
-                                    int lo = std::min(s_deco_last_clicked, (int)i);
-                                    int hi = std::max(s_deco_last_clicked, (int)i);
+                                if (shift && s_deco_last_clicked >= 0 && s_deco_last_clicked != (int) i) {
+                                    int lo = std::min(s_deco_last_clicked, (int) i);
+                                    int hi = std::max(s_deco_last_clicked, (int) i);
                                     for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t)k >= current_template_data.decorations.size()) continue;
+                                        if (k < 0 || (size_t) k >= current_template_data.decorations.size()) continue;
                                         if (is_deco_search_active) {
                                             const auto &dd = current_template_data.decorations[k];
                                             const char *type_str = "Unknown";
@@ -15557,10 +15911,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         else s_deco_selection.erase(k);
                                     }
                                 } else {
-                                    if (is_deco_selected) s_deco_selection.insert((int)i);
-                                    else s_deco_selection.erase((int)i);
+                                    if (is_deco_selected) s_deco_selection.insert((int) i);
+                                    else s_deco_selection.erase((int) i);
                                 }
-                                s_deco_last_clicked = (int)i;
+                                s_deco_last_clicked = (int) i;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char sel_tip[320];
@@ -15719,9 +16073,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::BeginDragDropSource()) {
                             ImGui::SetDragDropPayload("DECO_DND", &i, sizeof(int));
-                            if (s_deco_selection.find((int)i) != s_deco_selection.end() &&
+                            if (s_deco_selection.find((int) i) != s_deco_selection.end() &&
                                 s_deco_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int)s_deco_selection.size());
+                                ImGui::Text("Reordering %d selected items", (int) s_deco_selection.size());
                             } else {
                                 ImGui::Text("Reorder %s", deco.id);
                             }
@@ -15748,14 +16102,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 deco_dnd_target_index);
                             s_deco_last_clicked = -1;
                         } else {
-                            EditorDecorationElement item_to_move = current_template_data.decorations[deco_dnd_source_index];
+                            EditorDecorationElement item_to_move = current_template_data.decorations[
+                                deco_dnd_source_index];
                             current_template_data.decorations.erase(
                                 current_template_data.decorations.begin() + deco_dnd_source_index);
                             if (deco_dnd_target_index > deco_dnd_source_index) deco_dnd_target_index--;
                             current_template_data.decorations.insert(
                                 current_template_data.decorations.begin() + deco_dnd_target_index, item_to_move);
                             std::set<int> shifted_dnd;
-                            for (int idx : s_deco_selection) {
+                            for (int idx: s_deco_selection) {
                                 int new_idx = idx;
                                 if (idx == deco_dnd_source_index) new_idx = deco_dnd_target_index;
                                 else {
@@ -15773,8 +16128,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (bulk_delete_decos && !s_deco_selection.empty()) {
                         std::vector<int> sorted_desc(s_deco_selection.begin(), s_deco_selection.end());
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                        for (int idx : sorted_desc) {
-                            if (idx < 0 || (size_t)idx >= current_template_data.decorations.size()) continue;
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.decorations.size()) continue;
                             current_template_data.decorations.erase(
                                 current_template_data.decorations.begin() + idx);
                         }
@@ -15788,7 +16143,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.decorations.erase(
                             current_template_data.decorations.begin() + deco_to_remove);
                         std::set<int> shifted_rm;
-                        for (int idx : s_deco_selection) {
+                        for (int idx: s_deco_selection) {
                             if (idx == deco_to_remove) continue;
                             shifted_rm.insert(idx > deco_to_remove ? idx - 1 : idx);
                         }
@@ -15857,7 +16212,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.decorations.insert(
                             current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
                         std::set<int> shifted_cp;
-                        for (int idx : s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
+                        for (int idx: s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
                         s_deco_selection = shifted_cp;
                         if (s_deco_last_clicked > deco_to_copy) s_deco_last_clicked++;
                         save_message_type = MSG_NONE;
@@ -16347,7 +16702,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 ? "Import Achievements from File"
                                                 : "Import Advancements from File");
 
-    static std::vector<std::pair<std::string, std::string>> s_pending_renames;
+    static std::vector<std::pair<std::string, std::string> > s_pending_renames;
     static std::unordered_map<std::string, std::string> s_rename_user_picks;
     struct PendingCriteriaChange {
         std::string template_root;
@@ -16355,7 +16710,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         std::vector<std::string> removes;
     };
     static std::vector<PendingCriteriaChange> s_pending_criteria_changes;
-    static std::unordered_map<std::string, std::unordered_map<std::string, bool>> s_criteria_user_picks;
+    static std::unordered_map<std::string, std::unordered_map<std::string, bool> > s_criteria_user_picks;
     static std::vector<std::string> s_pending_advancement_removes;
     static std::unordered_map<std::string, bool> s_stale_user_picks;
     static bool s_pending_renames_session_initialized = false;
@@ -16383,10 +16738,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Hotkey logic for search bar. Skip when a nested helper popup is open so the
         // hotkey lands in the inner popup's search bar instead of the outer one's.
         bool any_inner_open =
-            ImGui::IsPopupOpen("###import_new_advancements_popup") ||
-            ImGui::IsPopupOpen("###import_match_renames_popup") ||
-            ImGui::IsPopupOpen("###import_stale_advs_popup") ||
-            ImGui::IsPopupOpen("###import_add_criteria_popup");
+                ImGui::IsPopupOpen("###import_new_advancements_popup") ||
+                ImGui::IsPopupOpen("###import_match_renames_popup") ||
+                ImGui::IsPopupOpen("###import_stale_advs_popup") ||
+                ImGui::IsPopupOpen("###import_add_criteria_popup");
         if (!any_inner_open &&
             (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -16444,11 +16799,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             if (ImGui::IsItemHovered()) {
                 const char *visible_target = (creator_selected_version > MC_VERSION_1_11_2)
-                                                 ? "advancement/recipe" : advancements_label_singular_lower;
+                                                 ? "advancement/recipe"
+                                                 : advancements_label_singular_lower;
                 const char *crit_clause = (creator_selected_version > MC_VERSION_1_6_4)
-                                              ? " (and their criteria if 'Include Crit.' is checked)" : "";
+                                              ? " (and their criteria if 'Include Crit.' is checked)"
+                                              : "";
                 const char *recipes_note = (creator_selected_version > MC_VERSION_1_11_2)
-                                               ? " (recipes hidden by default)" : "";
+                                               ? " (recipes hidden by default)"
+                                               : "";
                 char rename_line[384] = "";
                 char stale_line[320] = "";
                 char criteria_line[384] = "";
@@ -16600,7 +16958,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         const char *match_rules = (creator_selected_version > MC_VERSION_1_11_2)
                                                       ? "whose basename (after the final '/') matches, plus pairs\n"
-                                                        "whose criteria overlap is 80%% or more on the smaller side"
+                                                      "whose criteria overlap is 80%% or more on the smaller side"
                                                       : "whose criteria overlap is 80%% or more on the smaller side";
                         char rename_tooltip_buffer[640];
                         snprintf(rename_tooltip_buffer, sizeof(rename_tooltip_buffer),
@@ -16697,7 +17055,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     size_t old_p = 0;
                     for (size_t new_p = 0; new_p < new_indices_v.size(); new_p++) {
                         while (old_p < s_new_adv_indices.size() &&
-                               s_new_adv_indices[old_p] < new_indices_v[new_p]) old_p++;
+                               s_new_adv_indices[old_p] < new_indices_v[new_p])
+                            old_p++;
                         if (old_p < s_new_adv_indices.size() &&
                             s_new_adv_indices[old_p] == new_indices_v[new_p] &&
                             old_p < s_new_adv_local_selected.size()) {
@@ -16772,9 +17131,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Clear every checkbox in the preview.\n"
                              "You can also Shift+Click checkboxes to toggle a range at once.");
                     ImGui::SetTooltip("%s", tip);
-                }
-
-                {
+                } {
                     const float sw = 200.0f;
                     const float cw = ImGui::GetFrameHeight();
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
@@ -16895,7 +17252,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &p: s_pending_renames) pending_map[p.first] = p.second;
 
                     std::vector<std::string> template_roots;
-                    std::vector<std::vector<std::string>> template_crits;
+                    std::vector<std::vector<std::string> > template_crits;
                     template_roots.reserve(current_template_data.advancements.size());
                     template_crits.reserve(current_template_data.advancements.size());
                     for (const auto &a: current_template_data.advancements) {
@@ -16933,21 +17290,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (i >= s_rename_rows.size()) return false;
                     const RenameRow &row = s_rename_rows[i];
                     if (row.template_index < 0 ||
-                        row.template_index >= (int) current_template_data.advancements.size()) return false;
+                        row.template_index >= (int) current_template_data.advancements.size())
+                        return false;
                     if (s_rename_search[0] == '\0') return true;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     if (str_contains_insensitive(tmpl_adv.root_name, s_rename_search)) return true;
                     for (const auto &cand: row.candidates) {
                         if (cand.import_index < 0 ||
-                            cand.import_index >= (int) importable_advancements.size()) continue;
+                            cand.import_index >= (int) importable_advancements.size())
+                            continue;
                         if (str_contains_insensitive(importable_advancements[cand.import_index].root_name.c_str(),
-                                                     s_rename_search)) return true;
+                                                     s_rename_search))
+                            return true;
                     }
                     return false;
                 };
 
                 const char *adv_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                   ? "achievements" : "advancements";
+                                                   ? "achievements"
+                                                   : "advancements";
                 ImGui::Text("%d %s with rename candidates", (int) s_rename_rows.size(), adv_label_plural);
                 if (ImGui::IsItemHovered()) {
                     char tip[320];
@@ -17010,9 +17371,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char tip[192];
                     snprintf(tip, sizeof(tip), "Clear every per-row selection.");
                     ImGui::SetTooltip("%s", tip);
-                }
-
-                {
+                } {
                     const float sw = 200.0f;
                     const float cw = ImGui::GetFrameHeight();
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
@@ -17050,7 +17409,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (sel >= 0 && sel < (int) row.candidates.size()) {
                         int imp_idx = row.candidates[sel].import_index;
                         const char *new_name = (imp_idx >= 0 && imp_idx < (int) importable_advancements.size())
-                                                   ? importable_advancements[imp_idx].root_name.c_str() : "?";
+                                                   ? importable_advancements[imp_idx].root_name.c_str()
+                                                   : "?";
                         snprintf(header, sizeof(header), "%s  ->  %s (%d candidates)",
                                  tmpl_adv.root_name, new_name, (int) row.candidates.size());
                     } else {
@@ -17068,7 +17428,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (size_t c = 0; c < row.candidates.size(); c++) {
                             const RenameCandidate &cand = row.candidates[c];
                             if (cand.import_index < 0 ||
-                                cand.import_index >= (int) importable_advancements.size()) continue;
+                                cand.import_index >= (int) importable_advancements.size())
+                                continue;
                             const auto &iadv = importable_advancements[cand.import_index];
 
                             char badge[96];
@@ -17129,7 +17490,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         bool already_pending = false;
                         for (auto &p: s_pending_renames) {
-                            if (p.first == old_name) { p.second = new_name; already_pending = true; break; }
+                            if (p.first == old_name) {
+                                p.second = new_name;
+                                already_pending = true;
+                                break;
+                            }
                         }
                         if (!already_pending) s_pending_renames.emplace_back(old_name, new_name);
                         s_rename_user_picks.erase(old_name);
@@ -17194,7 +17559,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     std::unordered_set<std::string> import_set;
                     for (const auto &a: importable_advancements) import_set.insert(a.root_name);
                     std::unordered_set<std::string> staged_removes(s_pending_advancement_removes.begin(),
-                                                                    s_pending_advancement_removes.end());
+                                                                   s_pending_advancement_removes.end());
                     std::unordered_map<std::string, std::string> rename_map;
                     for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
 
@@ -17256,7 +17621,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const auto &a = current_template_data.advancements[idx];
                     std::string post_rename = a.root_name;
                     for (const auto &p: s_pending_renames) {
-                        if (p.first == a.root_name) { post_rename = p.second; break; }
+                        if (p.first == a.root_name) {
+                            post_rename = p.second;
+                            break;
+                        }
                     }
                     return str_contains_insensitive(a.root_name, s_stale_search) ||
                            str_contains_insensitive(post_rename.c_str(), s_stale_search);
@@ -17269,7 +17637,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     std::string name = current_template_data.advancements[idx].root_name;
                     std::string post_rename = name;
                     for (const auto &p: s_pending_renames) {
-                        if (p.first == name) { post_rename = p.second; break; }
+                        if (p.first == name) {
+                            post_rename = p.second;
+                            break;
+                        }
                     }
                     s_stale_user_picks[post_rename] = val;
                 };
@@ -17301,9 +17672,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char tip[192];
                     snprintf(tip, sizeof(tip), "Clear every checkbox in the preview.");
                     ImGui::SetTooltip("%s", tip);
-                }
-
-                {
+                } {
                     const float sw = 200.0f;
                     const float cw = ImGui::GetFrameHeight();
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
@@ -17337,7 +17706,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const auto &a = current_template_data.advancements[idx];
                     std::string post_rename = a.root_name;
                     for (const auto &p: s_pending_renames) {
-                        if (p.first == a.root_name) { post_rename = p.second; break; }
+                        if (p.first == a.root_name) {
+                            post_rename = p.second;
+                            break;
+                        }
                     }
                     char label[384];
                     if (post_rename != a.root_name) {
@@ -17386,11 +17758,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         std::string name = current_template_data.advancements[idx].root_name;
                         std::string post_rename = name;
                         for (const auto &p: s_pending_renames) {
-                            if (p.first == name) { post_rename = p.second; break; }
+                            if (p.first == name) {
+                                post_rename = p.second;
+                                break;
+                            }
                         }
                         bool already = false;
                         for (const auto &e: s_pending_advancement_removes) {
-                            if (e == post_rename) { already = true; break; }
+                            if (e == post_rename) {
+                                already = true;
+                                break;
+                            }
                         }
                         if (!already) s_pending_advancement_removes.push_back(post_rename);
                         s_stale_user_picks.erase(post_rename);
@@ -17451,7 +17829,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
 
                     std::vector<std::string> template_roots;
-                    std::vector<std::vector<std::string>> template_crits;
+                    std::vector<std::vector<std::string> > template_crits;
                     if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
                         template_roots.emplace_back(selected_advancement->root_name);
                         std::vector<std::string> cs;
@@ -17471,14 +17849,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     bool include_recipes_for_deltas =
-                        (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) ? true : s_criteria_show_recipes;
+                            (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) ? true : s_criteria_show_recipes;
                     s_criteria_rows = compute_criteria_deltas(
                         template_roots, template_crits, importable_advancements,
                         include_recipes_for_deltas);
                     if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
                         int sel_idx = -1;
                         for (int i = 0; i < (int) current_template_data.advancements.size(); i++) {
-                            if (&current_template_data.advancements[i] == selected_advancement) { sel_idx = i; break; }
+                            if (&current_template_data.advancements[i] == selected_advancement) {
+                                sel_idx = i;
+                                break;
+                            }
                         }
                         for (auto &row: s_criteria_rows) row.template_index = sel_idx;
                     }
@@ -17486,16 +17867,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     std::unordered_set<std::string> staged_template_roots;
                     for (const auto &chg: s_pending_criteria_changes) staged_template_roots.insert(chg.template_root);
                     std::unordered_set<std::string> staged_remove_roots(s_pending_advancement_removes.begin(),
-                                                                         s_pending_advancement_removes.end());
+                                                                        s_pending_advancement_removes.end());
                     s_criteria_rows.erase(
                         std::remove_if(s_criteria_rows.begin(), s_criteria_rows.end(),
                                        [&](const CriteriaDeltaRow &r) {
                                            if (r.template_index < 0 ||
                                                r.template_index >= (int) current_template_data.advancements.size())
                                                return true;
-                                           const char *tn = current_template_data.advancements[r.template_index].root_name;
+                                           const char *tn = current_template_data.advancements[r.template_index].
+                                                   root_name;
                                            auto rit = rename_map.find(tn);
-                                           const std::string &shadow = (rit != rename_map.end()) ? rit->second : std::string(tn);
+                                           const std::string &shadow = (rit != rename_map.end())
+                                                                           ? rit->second
+                                                                           : std::string(tn);
                                            return staged_template_roots.find(shadow) != staged_template_roots.end() ||
                                                   staged_remove_roots.find(shadow) != staged_remove_roots.end();
                                        }),
@@ -17503,7 +17887,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (auto &row: s_criteria_rows) {
                         if (row.template_index < 0 ||
-                            row.template_index >= (int) current_template_data.advancements.size()) continue;
+                            row.template_index >= (int) current_template_data.advancements.size())
+                            continue;
                         const char *tn = current_template_data.advancements[row.template_index].root_name;
                         auto rit = rename_map.find(tn);
                         std::string key = (rit != rename_map.end()) ? rit->second : std::string(tn);
@@ -17525,12 +17910,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 };
                 auto criteria_row_visible = [&](const CriteriaDeltaRow &row) -> bool {
                     if (row.template_index < 0 ||
-                        row.template_index >= (int) current_template_data.advancements.size()) return false;
+                        row.template_index >= (int) current_template_data.advancements.size())
+                        return false;
                     if (s_criteria_search[0] == '\0') return true;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     std::string shadow_root = tmpl_adv.root_name;
                     for (const auto &p: s_pending_renames) {
-                        if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
+                        if (p.first == tmpl_adv.root_name) {
+                            shadow_root = p.second;
+                            break;
+                        }
                     }
                     if (s_criteria_search_crits_only) {
                         for (const auto &d: row.deltas) {
@@ -17577,7 +17966,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const char *tn = current_template_data.advancements[row.template_index].root_name;
                             shadow_root = tn;
                             for (const auto &p: s_pending_renames) {
-                                if (p.first == tn) { shadow_root = p.second; break; }
+                                if (p.first == tn) {
+                                    shadow_root = p.second;
+                                    break;
+                                }
                             }
                         }
                         for (auto &d: row.deltas) {
@@ -17605,7 +17997,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const char *tn = current_template_data.advancements[row.template_index].root_name;
                             shadow_root = tn;
                             for (const auto &p: s_pending_renames) {
-                                if (p.first == tn) { shadow_root = p.second; break; }
+                                if (p.first == tn) {
+                                    shadow_root = p.second;
+                                    break;
+                                }
                             }
                         }
                         for (auto &d: row.deltas) {
@@ -17619,9 +18014,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char tip[192];
                     snprintf(tip, sizeof(tip), "Uncheck every difference on every row.");
                     ImGui::SetTooltip("%s", tip);
-                }
-
-                {
+                } {
                     const float sw = 200.0f;
                     const float cw = ImGui::GetFrameHeight();
                     const char *scope_label = "Crit. Search";
@@ -17666,7 +18059,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     std::string shadow_root = tmpl_adv.root_name;
                     for (const auto &p: s_pending_renames) {
-                        if (p.first == tmpl_adv.root_name) { shadow_root = p.second; break; }
+                        if (p.first == tmpl_adv.root_name) {
+                            shadow_root = p.second;
+                            break;
+                        }
                     }
 
                     int n_new = 0, n_stale = 0;
@@ -17734,11 +18130,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int staged_rows = 0;
                     for (const auto &row: s_criteria_rows) {
                         if (row.template_index < 0 ||
-                            row.template_index >= (int) current_template_data.advancements.size()) continue;
+                            row.template_index >= (int) current_template_data.advancements.size())
+                            continue;
                         const char *tn = current_template_data.advancements[row.template_index].root_name;
                         std::string shadow_root = tn;
                         for (const auto &p: s_pending_renames) {
-                            if (p.first == tn) { shadow_root = p.second; break; }
+                            if (p.first == tn) {
+                                shadow_root = p.second;
+                                break;
+                            }
                         }
                         PendingCriteriaChange change;
                         change.template_root = shadow_root;
@@ -17770,7 +18170,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     if (staged_rows > 0) {
-                        log_message(LOG_INFO, "[TEMP CREATOR] Staged criteria differences for %d row(s).\n", staged_rows);
+                        log_message(LOG_INFO, "[TEMP CREATOR] Staged criteria differences for %d row(s).\n",
+                                    staged_rows);
                     }
                     s_criteria_needs_recompute = true;
                     ImGui::CloseCurrentPopup();
@@ -17966,11 +18367,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int diff_new = 0, diff_stale = 0;
                     EditorTrackableCategory *tmpl_cat = nullptr;
                     for (auto &cat: current_template_data.advancements) {
-                        if (strcmp(cat.root_name, p.first.c_str()) == 0) { tmpl_cat = &cat; break; }
+                        if (strcmp(cat.root_name, p.first.c_str()) == 0) {
+                            tmpl_cat = &cat;
+                            break;
+                        }
                     }
                     ImportableAdvancement *imp_adv = nullptr;
                     for (auto &a: importable_advancements) {
-                        if (a.root_name == p.second) { imp_adv = &a; break; }
+                        if (a.root_name == p.second) {
+                            imp_adv = &a;
+                            break;
+                        }
                     }
                     if (tmpl_cat && imp_adv) {
                         std::unordered_set<std::string> tcrit_set;
@@ -17982,7 +18389,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     bool already_staged_criteria = false;
                     for (auto &chg: s_pending_criteria_changes) {
-                        if (chg.template_root == p.second) { already_staged_criteria = true; break; }
+                        if (chg.template_root == p.second) {
+                            already_staged_criteria = true;
+                            break;
+                        }
                     }
                     if (diff_new > 0 || diff_stale > 0) {
                         ImGui::SameLine();
@@ -18123,11 +18533,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const char *staged_reason = nullptr;
                 if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
                     for (const auto &p: s_pending_renames) {
-                        if (p.second == adv.root_name) { staged_reason = "rename"; break; }
+                        if (p.second == adv.root_name) {
+                            staged_reason = "rename";
+                            break;
+                        }
                     }
                     if (!staged_reason) {
                         for (const auto &chg: s_pending_criteria_changes) {
-                            if (chg.template_root == adv.root_name) { staged_reason = "criteria changes"; break; }
+                            if (chg.template_root == adv.root_name) {
+                                staged_reason = "criteria changes";
+                                break;
+                            }
                         }
                     }
                 }
@@ -18209,7 +18625,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &chg: s_pending_criteria_changes) {
                                 if (chg.template_root != selected_advancement->root_name) continue;
                                 for (const auto &add_name: chg.adds) {
-                                    if (add_name == crit.root_name) { crit_staged_for_add = true; break; }
+                                    if (add_name == crit.root_name) {
+                                        crit_staged_for_add = true;
+                                        break;
+                                    }
                                 }
                                 if (crit_staged_for_add) break;
                             }
@@ -18326,12 +18745,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                               current_template_data.counter_goals,
                                               old_name, cat.root_name, nullptr,
                                               &current_template_data.stats,
-                                              &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                              &current_template_data.custom_goals,
+                                              &current_template_data.multi_stage_goals);
                         committed++;
                         break;
                     }
                 }
-                if (committed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n", committed);
+                if (committed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n",
+                                               committed);
                 s_pending_renames.clear();
 
                 int crit_rows = 0;
@@ -18359,13 +18780,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   rm_name.c_str(), "", cat.root_name,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                         crit_rows++;
                         break;
                     }
                 }
-                if (crit_rows > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
+                if (crit_rows > 0) log_message(
+                    LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
                 s_pending_criteria_changes.clear();
 
                 if (!s_pending_advancement_removes.empty()) {
@@ -18382,11 +18805,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   name.c_str(), "", nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                             removed++;
                         }
                     }
-                    if (removed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
+                    if (removed > 0) log_message(
+                        LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
                     s_pending_advancement_removes.clear();
                 }
 
@@ -18451,7 +18876,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   rm_name.c_str(), "", selected_advancement->root_name,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                         }
                     }
                     s_pending_criteria_changes.clear();
@@ -18516,12 +18942,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 std::unordered_map<std::string, std::string> rename_map;
                 for (const auto &p: s_pending_renames) rename_map[p.first] = p.second;
                 std::unordered_set<std::string> staged_remove_set(s_pending_advancement_removes.begin(),
-                                                                   s_pending_advancement_removes.end());
+                                                                  s_pending_advancement_removes.end());
                 std::unordered_set<std::string> existing_names;
                 for (const auto &existing_adv: current_template_data.advancements) {
                     auto it = rename_map.find(existing_adv.root_name);
                     std::string post_rename = (it != rename_map.end())
-                                                  ? it->second : std::string(existing_adv.root_name);
+                                                  ? it->second
+                                                  : std::string(existing_adv.root_name);
                     if (staged_remove_set.count(post_rename)) continue;
                     existing_names.insert(post_rename);
                 }
@@ -18548,7 +18975,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   old_name, cat.root_name, nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                             committed++;
                             break;
                         }
@@ -18583,7 +19011,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       current_template_data.counter_goals,
                                                       rm_name.c_str(), "", cat.root_name,
                                                       &current_template_data.stats,
-                                                      &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
                             }
                             crit_rows++;
                             break;
@@ -18607,7 +19036,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   current_template_data.counter_goals,
                                                   name.c_str(), "", nullptr,
                                                   &current_template_data.stats,
-                                                  &current_template_data.custom_goals, &current_template_data.multi_stage_goals);
+                                                  &current_template_data.custom_goals,
+                                                  &current_template_data.multi_stage_goals);
                             removed++;
                         }
                     }
@@ -19432,19 +19862,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 case IFTS_TEMPLATE_CRITERIA: {
                     int p = s_template_import_parent_index;
-                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) { out[0] = '\0'; break; }
+                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) {
+                        out[0] = '\0';
+                        break;
+                    }
                     snprintf(out, out_size, "%s", s_template_import_data.advancements[p].criteria[i].root_name);
                     break;
                 }
                 case IFTS_TEMPLATE_SUB_STATS: {
                     int p = s_template_import_parent_index;
-                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) { out[0] = '\0'; break; }
+                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) {
+                        out[0] = '\0';
+                        break;
+                    }
                     snprintf(out, out_size, "%s", s_template_import_data.stats[p].criteria[i].root_name);
                     break;
                 }
                 case IFTS_TEMPLATE_STAGES: {
                     int p = s_template_import_parent_index;
-                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) { out[0] = '\0'; break; }
+                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) {
+                        out[0] = '\0';
+                        break;
+                    }
                     snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[p].stages[i].stage_id);
                     break;
                 }
@@ -19453,11 +19892,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         auto parent_label_at = [&](int i, char *out, size_t out_size) {
             switch (s_template_import_scope) {
                 case IFTS_TEMPLATE_CRITERIA:
-                    snprintf(out, out_size, "%s", s_template_import_data.advancements[i].root_name); break;
+                    snprintf(out, out_size, "%s", s_template_import_data.advancements[i].root_name);
+                    break;
                 case IFTS_TEMPLATE_SUB_STATS:
-                    snprintf(out, out_size, "%s", s_template_import_data.stats[i].root_name); break;
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[i].root_name);
+                    break;
                 case IFTS_TEMPLATE_STAGES:
-                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[i].root_name); break;
+                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[i].root_name);
+                    break;
                 default: out[0] = '\0';
             }
         };
@@ -19489,8 +19931,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         auto root_name_valid_for_version = [&](const char *rn, bool is_stat) -> bool {
             if (!rn || !*rn) return false;
             bool mid_era_stat_window = is_stat &&
-                creator_selected_version >= MC_VERSION_1_12 &&
-                creator_selected_version <= MC_VERSION_1_12_2;
+                                       creator_selected_version >= MC_VERSION_1_12 &&
+                                       creator_selected_version <= MC_VERSION_1_12_2;
             if (mid_era_stat_window) {
                 if (strncmp(rn, "stat.", 5) != 0) return false;
                 return strchr(rn, ':') == nullptr;
@@ -19527,8 +19969,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_TEMPLATE_CRITERIA: {
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return "Invalid parent.";
-                    if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name, false))
+                    if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return
+                            "Out of range.";
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name,
+                                                     false))
                         return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
@@ -19543,7 +19987,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_TEMPLATE_STAGES: {
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return "Invalid parent.";
-                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return "Out of range.";
+                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return
+                            "Out of range.";
                     const auto &st = s_template_import_data.multi_stage_goals[p].stages[i];
                     if (!stage_type_valid_for_version(st.type))
                         return "Stage type is not supported in this Minecraft version.";
@@ -19558,7 +20003,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (st.type == SUBGOAL_MANUAL) continue;
                         if (!stage_type_valid_for_version(st.type))
                             return "Contains a stage whose type is not supported in this Minecraft version.";
-                        if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name, st.type == SUBGOAL_STAT))
+                        if (st.root_name[0] != '\0' && !root_name_valid_for_version(
+                                st.root_name, st.type == SUBGOAL_STAT))
                             return "Contains a stage whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
@@ -19596,8 +20042,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (!s_template_import_lang_flags.empty()) {
                 auto lang_label = [&](int i) -> const char * {
                     if (i < 0 || i >= (int) s_template_import_lang_flags.size()) return "?";
-                    return s_template_import_lang_flags[i].empty() ? "(default)"
-                                                                    : s_template_import_lang_flags[i].c_str();
+                    return s_template_import_lang_flags[i].empty()
+                               ? "(default)"
+                               : s_template_import_lang_flags[i].c_str();
                 };
                 ImGui::SetNextItemWidth(220.0f);
                 if (ImGui::BeginCombo("Language", lang_label(s_template_import_lang_index))) {
@@ -19629,9 +20076,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 int pcount = parent_count_in_scope();
                 if (pcount == 0) {
                     const char *parent_word =
-                        (s_template_import_scope == IFTS_TEMPLATE_CRITERIA) ? "advancements" :
-                        (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS) ? "stats" :
-                        "multi-stage goals";
+                            (s_template_import_scope == IFTS_TEMPLATE_CRITERIA)
+                                ? "advancements"
+                                : (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS)
+                                      ? "stats"
+                                      : "multi-stage goals";
                     ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
                                        "The selected template has no %s to import from.", parent_word);
                     ImGui::Separator();
@@ -19652,9 +20101,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_template_import_last_clicked = -1;
                 }
                 const char *combo_label =
-                    (s_template_import_scope == IFTS_TEMPLATE_CRITERIA) ? "Source advancement" :
-                    (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS) ? "Source stat" :
-                    "Source multi-stage goal";
+                        (s_template_import_scope == IFTS_TEMPLATE_CRITERIA)
+                            ? "Source advancement"
+                            : (s_template_import_scope == IFTS_TEMPLATE_SUB_STATS)
+                                  ? "Source stat"
+                                  : "Source multi-stage goal";
                 char parent_preview[256];
                 parent_label_at(s_template_import_parent_index, parent_preview, sizeof(parent_preview));
                 ImGui::SetNextItemWidth(420.0f);
@@ -19844,12 +20295,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 };
                 switch (s_template_import_scope) {
-                    case IFTS_ADVANCEMENTS: add_top_imports(s_template_import_data.advancements); break;
-                    case IFTS_STATS: add_top_imports(s_template_import_data.stats); break;
-                    case IFTS_UNLOCKS: add_top_imports(s_template_import_data.unlocks); break;
-                    case IFTS_CUSTOM_GOALS: add_top_imports(s_template_import_data.custom_goals); break;
-                    case IFTS_COUNTERS: add_top_imports(s_template_import_data.counter_goals); break;
-                    case IFTS_MS_GOALS: add_top_imports(s_template_import_data.multi_stage_goals); break;
+                    case IFTS_ADVANCEMENTS: add_top_imports(s_template_import_data.advancements);
+                        break;
+                    case IFTS_STATS: add_top_imports(s_template_import_data.stats);
+                        break;
+                    case IFTS_UNLOCKS: add_top_imports(s_template_import_data.unlocks);
+                        break;
+                    case IFTS_CUSTOM_GOALS: add_top_imports(s_template_import_data.custom_goals);
+                        break;
+                    case IFTS_COUNTERS: add_top_imports(s_template_import_data.counter_goals);
+                        break;
+                    case IFTS_MS_GOALS: add_top_imports(s_template_import_data.multi_stage_goals);
+                        break;
                     default: break;
                 }
 
@@ -19866,7 +20323,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (st.type == SUBGOAL_CRITERION && st.parent_advancement[0] &&
                         !will_exist.count(st.parent_advancement)) {
                         char buf[512];
-                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s parent -> %s", goal_root, st.stage_id, st.parent_advancement);
+                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s parent -> %s", goal_root, st.stage_id,
+                                                st.parent_advancement);
                         else snprintf(buf, sizeof(buf), "%s parent -> %s", st.stage_id, st.parent_advancement);
                         out.emplace_back(buf);
                     }
@@ -19880,7 +20338,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             return;
                         }
                         char buf[512];
-                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s root -> %s", goal_root, st.stage_id, st.root_name);
+                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s root -> %s", goal_root, st.stage_id,
+                                                st.root_name);
                         else snprintf(buf, sizeof(buf), "%s root -> %s", st.stage_id, st.root_name);
                         out.emplace_back(buf);
                     }
@@ -20041,7 +20500,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(
+                                        c.icon_path);
                                     current_template_data.advancements.push_back(std::move(item));
                                 }
                             }
@@ -20076,7 +20536,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(c.icon_path);
+                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(
+                                        c.icon_path);
                                     current_template_data.stats.push_back(std::move(item));
                                 }
                             }
@@ -20186,7 +20647,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         item.progress_pos = ManualPos{};
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &st: item.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(st.icon_path);
+                                    for (const auto &st: item.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(
+                                        st.icon_path);
                                     current_template_data.multi_stage_goals.push_back(std::move(item));
                                 }
                             }
@@ -20363,7 +20825,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             ImGui::EndPopup();
         }
-        template_import_popup_done: ;
+    template_import_popup_done: ;
     }
 
     // ========== Goal Selector Popup ==========

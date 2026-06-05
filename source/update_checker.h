@@ -42,15 +42,26 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                        size_t url_max_len, char *out_html_url, size_t html_url_max_len);
 
 /**
+* @brief Progress callback invoked during a download.
+*
+* @param user An opaque pointer supplied by the caller (passed straight through).
+* @param fraction Download progress in the range [0.0, 1.0]. May stay at 0.0 until
+*                 the server reports a content length.
+*/
+typedef void (*update_progress_cb)(void *user, double fraction);
+
+/**
 * @brief Downloads the update zip file from a given URL.
 *
-* Uses curl to download the file and save it as "update.zip" in the application's
-* root directory.
+* Uses libcurl on all platforms to download the file and save it as "update.zip"
+* in the application's root directory.
 *
 * @param url The direct URL to the .zip release asset.
+* @param progress_cb Optional progress callback (may be nullptr) invoked as the download proceeds.
+* @param progress_user Opaque pointer forwarded to progress_cb.
 * @return true on successful download, false otherwise.
 */
-bool download_update_zip(const char *url);
+bool download_update_zip(const char *url, update_progress_cb progress_cb, void *progress_user);
 
 /**
 * @brief Applies the downloaded and extracted update.

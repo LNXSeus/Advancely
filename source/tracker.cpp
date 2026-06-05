@@ -828,7 +828,10 @@ static int tracker_collapse_advancement_groups(TrackableCategory *adv) {
         if (!crit->done) continue;
         bool already = false;
         for (int s = 0; s < satisfied_count; s++) {
-            if (strcmp(satisfied[s], crit->group) == 0) { already = true; break; }
+            if (strcmp(satisfied[s], crit->group) == 0) {
+                already = true;
+                break;
+            }
         }
         if (!already && satisfied_count < MAX_GROUPS) {
             strncpy(satisfied[satisfied_count], crit->group, sizeof(satisfied[0]) - 1);
@@ -840,7 +843,10 @@ static int tracker_collapse_advancement_groups(TrackableCategory *adv) {
         TrackableItem *crit = adv->criteria[j];
         if (!crit || crit->group[0] == '\0' || crit->done) continue;
         for (int s = 0; s < satisfied_count; s++) {
-            if (strcmp(satisfied[s], crit->group) == 0) { crit->done = true; break; }
+            if (strcmp(satisfied[s], crit->group) == 0) {
+                crit->done = true;
+                break;
+            }
         }
     }
     return satisfied_count + ungrouped_done;
@@ -872,7 +878,10 @@ static int tracker_count_groups_from_flags(const TrackableCategory *adv, const c
         if (!flags[j]) continue;
         bool already = false;
         for (int s = 0; s < satisfied_count; s++) {
-            if (strcmp(satisfied[s], crit->group) == 0) { already = true; break; }
+            if (strcmp(satisfied[s], crit->group) == 0) {
+                already = true;
+                break;
+            }
         }
         if (!already && satisfied_count < MAX_GROUPS) {
             strncpy(satisfied[satisfied_count], crit->group, sizeof(satisfied[0]) - 1);
@@ -895,10 +904,16 @@ static int tracker_compute_progress_total(const TrackableCategory *adv) {
     for (int j = 0; j < adv->criteria_count; j++) {
         const TrackableItem *crit = adv->criteria[j];
         if (!crit) continue;
-        if (crit->group[0] == '\0') { ungrouped++; continue; }
+        if (crit->group[0] == '\0') {
+            ungrouped++;
+            continue;
+        }
         bool already = false;
         for (int s = 0; s < seen_count; s++) {
-            if (strcmp(seen[s], crit->group) == 0) { already = true; break; }
+            if (strcmp(seen[s], crit->group) == 0) {
+                already = true;
+                break;
+            }
         }
         if (!already && seen_count < MAX_GROUPS) {
             strncpy(seen[seen_count], crit->group, sizeof(seen[0]) - 1);
@@ -1702,8 +1717,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                 }
                 // Group-collapse the progress denominator for advancements; stats keep raw count.
                 new_cat->criteria_progress_total = is_stat_category
-                    ? new_cat->criteria_count
-                    : tracker_compute_progress_total(new_cat);
+                                                       ? new_cat->criteria_count
+                                                       : tracker_compute_progress_total(new_cat);
                 *total_criteria_count += new_cat->criteria_progress_total;
             }
         } else if (is_stat_category && !criteria_obj) {
@@ -2805,72 +2820,72 @@ static bool is_goal_completed_by_root(const TemplateData *td, const char *root_n
 
     // Check advancements
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_ADVANCEMENT)
-    for (int j = 0; j < td->advancement_count; j++) {
-        if (!td->advancements[j]) continue;
-        if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
-            (!parent_root || parent_root[0] == '\0'))
-            return td->advancements[j]->done;
-        // Check criteria
-        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
-            if (td->advancements[j]->criteria[k] &&
-                strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0) {
-                // If parent_root is specified, match the parent advancement
-                if (parent_root && parent_root[0] != '\0') {
-                    if (strcmp(td->advancements[j]->root_name, parent_root) != 0) continue;
+        for (int j = 0; j < td->advancement_count; j++) {
+            if (!td->advancements[j]) continue;
+            if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
+                (!parent_root || parent_root[0] == '\0'))
+                return td->advancements[j]->done;
+            // Check criteria
+            for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
+                if (td->advancements[j]->criteria[k] &&
+                    strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0) {
+                    // If parent_root is specified, match the parent advancement
+                    if (parent_root && parent_root[0] != '\0') {
+                        if (strcmp(td->advancements[j]->root_name, parent_root) != 0) continue;
+                    }
+                    return td->advancements[j]->criteria[k]->done;
                 }
-                return td->advancements[j]->criteria[k]->done;
             }
         }
-    }
     // Check stats
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_STAT)
-    for (int j = 0; j < td->stat_count; j++) {
-        if (!td->stats[j]) continue;
-        if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
-            (!parent_root || parent_root[0] == '\0'))
-            return td->stats[j]->done;
-        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
-            if (td->stats[j]->criteria[k] &&
-                strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0) {
-                if (parent_root && parent_root[0] != '\0') {
-                    if (strcmp(td->stats[j]->root_name, parent_root) != 0) continue;
+        for (int j = 0; j < td->stat_count; j++) {
+            if (!td->stats[j]) continue;
+            if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
+                (!parent_root || parent_root[0] == '\0'))
+                return td->stats[j]->done;
+            for (int k = 0; k < td->stats[j]->criteria_count; k++) {
+                if (td->stats[j]->criteria[k] &&
+                    strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0) {
+                    if (parent_root && parent_root[0] != '\0') {
+                        if (strcmp(td->stats[j]->root_name, parent_root) != 0) continue;
+                    }
+                    return td->stats[j]->criteria[k]->done;
                 }
-                return td->stats[j]->criteria[k]->done;
             }
         }
-    }
     // Check unlocks
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_UNLOCK)
-    for (int j = 0; j < td->unlock_count; j++) {
-        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
-            return td->unlocks[j]->done;
-    }
+        for (int j = 0; j < td->unlock_count; j++) {
+            if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
+                return td->unlocks[j]->done;
+        }
     // Check custom goals
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_CUSTOM)
-    for (int j = 0; j < td->custom_goal_count; j++) {
-        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
-            return td->custom_goals[j]->done;
-    }
+        for (int j = 0; j < td->custom_goal_count; j++) {
+            if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
+                return td->custom_goals[j]->done;
+        }
     // Check multi-stage goals
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_MULTI_STAGE)
-    for (int j = 0; j < td->multi_stage_goal_count; j++) {
-        MultiStageGoal *msg = td->multi_stage_goals[j];
-        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
-        if (!stage_id || stage_id[0] == '\0') {
-            return msg->current_stage >= msg->stage_count - 1;
-        }
-        for (int k = 0; k < msg->stage_count; k++) {
-            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
-                return msg->current_stage > k;
+        for (int j = 0; j < td->multi_stage_goal_count; j++) {
+            MultiStageGoal *msg = td->multi_stage_goals[j];
+            if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
+            if (!stage_id || stage_id[0] == '\0') {
+                return msg->current_stage >= msg->stage_count - 1;
+            }
+            for (int k = 0; k < msg->stage_count; k++) {
+                if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
+                    return msg->current_stage > k;
+                }
             }
         }
-    }
     // Check counter goals
     if (type == LINK_TYPE_ANY || type == LINK_TYPE_COUNTER)
-    for (int j = 0; j < td->counter_goal_count; j++) {
-        if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
-            return td->counter_goals[j]->done;
-    }
+        for (int j = 0; j < td->counter_goal_count; j++) {
+            if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
+                return td->counter_goals[j]->done;
+        }
     return false;
 }
 
@@ -3965,7 +3980,7 @@ static CoopAssignRole coop_assignment_role(const TrackableCategory *adv, const c
  * Works for both modern advancements (1.12+) and mid-era achievements (1.7-1.11.2).
  */
 static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player_adv_json,
-                                            const char *player_uuid) {
+                                           const char *player_uuid) {
     if (!player_adv_json) return;
 
     for (int i = 0; i < td->advancement_count; i++) {
@@ -4036,7 +4051,7 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
  * Mid-era (1.7-1.11.2): achievements are in a flat JSON with value/progress fields.
  */
 static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_stats_json,
-                                         const char *player_uuid) {
+                                        const char *player_uuid) {
     if (!player_stats_json) return;
 
     for (int i = 0; i < td->advancement_count; i++) {
@@ -5015,7 +5030,10 @@ static void tracker_kick_ghost_name_resolver(void) {
     bool has_unresolved = false;
     SDL_LockMutex(g_coop_ctx->lobby_mutex);
     for (int i = 0; i < g_coop_ctx->ghost_player_count; i++) {
-        if (!g_coop_ctx->ghost_players[i].name_resolved) { has_unresolved = true; break; }
+        if (!g_coop_ctx->ghost_players[i].name_resolved) {
+            has_unresolved = true;
+            break;
+        }
     }
     SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
     if (!has_unresolved) return;
@@ -5072,7 +5090,10 @@ void tracker_refresh_ghost_players(Tracker *t, const AppSettings *settings, MC_V
     for (int i = 0; i < disc_count; i++) {
         bool in_roster = false;
         for (int p = 0; p < settings->coop_player_count; p++) {
-            if (strcmp(settings->coop_players[p].uuid, disc_uuids[i]) == 0) { in_roster = true; break; }
+            if (strcmp(settings->coop_players[p].uuid, disc_uuids[i]) == 0) {
+                in_roster = true;
+                break;
+            }
         }
         if (!in_roster) keep.push_back(i);
     }
@@ -5205,7 +5226,10 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     // Skip any ghost UUID that also appears in the live roster to avoid double
     // counting (the roster loop above already merged it).
     if (settings->coop_read_all_save_files && g_coop_ctx) {
-        struct GhostMergeEntry { char uuid[48]; char username[64]; };
+        struct GhostMergeEntry {
+            char uuid[48];
+            char username[64];
+        };
         GhostMergeEntry ghost_snapshot[COOP_MAX_LOBBY];
         int ghost_n = 0;
         SDL_LockMutex(g_coop_ctx->lobby_mutex);
@@ -5221,7 +5245,10 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         for (int gi = 0; gi < ghost_n; gi++) {
             bool in_roster = false;
             for (int p = 0; p < settings->coop_player_count; p++) {
-                if (strcmp(settings->coop_players[p].uuid, ghost_snapshot[gi].uuid) == 0) { in_roster = true; break; }
+                if (strcmp(settings->coop_players[p].uuid, ghost_snapshot[gi].uuid) == 0) {
+                    in_roster = true;
+                    break;
+                }
             }
             if (in_roster) continue;
             coop_merge_one_player_from_disk(t, settings, version,
@@ -5398,8 +5425,7 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
     coop_finalize_multi_stage(t->template_data);
     if (version == MC_VERSION_25W14CRAFTMINE) coop_finalize_unlocks(t->template_data);
 
-    tracker_update_custom_progress(t, settings_json, settings, uuid);
-    {
+    tracker_update_custom_progress(t, settings_json, settings, uuid); {
         bool changed;
         int guard = 0;
         do {
@@ -6383,7 +6409,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Determine if parent should be hidden based *only* on hiding mode + template hidden status
         bool should_hide_parent_based_on_mode = false;
-        should_hide_parent_based_on_mode = tracker_should_hide_by_mode(settings, cat->is_hidden, is_category_considered_complete);
+        should_hide_parent_based_on_mode = tracker_should_hide_by_mode(settings, cat->is_hidden,
+                                                                       is_category_considered_complete);
 
         // Skip entire category if hidden by mode
         if (should_hide_parent_based_on_mode) continue;
@@ -6467,7 +6494,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                         cat->criteria_count == 0 && cat->done));
 
         bool should_hide_parent_render = false;
-        should_hide_parent_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
+        should_hide_parent_render =
+                tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
 
         if (should_hide_parent_render) continue; // Skip if parent hidden based on mode
 
@@ -6572,7 +6600,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                             cat->criteria_count == 0 && cat->done));
 
             bool parent_should_hide_render = false;
-            parent_should_hide_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
+            parent_should_hide_render = tracker_should_hide_by_mode(settings, cat->is_hidden,
+                                                                    is_considered_complete_render);
             if (parent_should_hide_render) continue;
 
             // Search Filter (for rendering visibility)
@@ -6753,7 +6782,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             bool should_hide_parent_render = false;
-            should_hide_parent_render = tracker_should_hide_by_mode(settings, cat->is_hidden, is_considered_complete_render);
+            should_hide_parent_render = tracker_should_hide_by_mode(settings, cat->is_hidden,
+                                                                    is_considered_complete_render);
             if (should_hide_parent_render) continue;
 
             // --- Search Filtering (for rendering) ---
@@ -7152,7 +7182,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 float main_font_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
 
-                ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_considered_complete_render) ? text_color_faded : text_color;
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_considered_complete_render)
+                                               ? text_color_faded
+                                               : text_color;
 
                 if (settings->use_manual_layout && cat->text_pos.is_set) {
                     ImVec2 text_anchor_off = get_anchor_offset(cat->text_pos.anchor, text_size.x, text_size.y);
@@ -7350,7 +7382,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 // Final top-left for drawing
                                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                                 // Final bottom-right for drawing
-                                ImU32 icon_tint = tracker_is_faded_by_mode(settings, crit->done) ? icon_tint_faded : IM_COL32_WHITE; // Apply fade if done
+                                ImU32 icon_tint = tracker_is_faded_by_mode(settings, crit->done)
+                                                      ? icon_tint_faded
+                                                      : IM_COL32_WHITE; // Apply fade if done
                                 draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0),
                                                     ImVec2(1, 1),
                                                     icon_tint);
@@ -7396,7 +7430,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // alongside stat_face_follows_text below).
                         bool adv_crit_face_eligible = !is_stat_section &&
                                                       settings->coop_show_contributor_faces &&
-                                                      t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
+                                                      t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx ==
+                                                      -1 &&
                                                       g_coop_ctx &&
                                                       coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                       cat->first_contributor_uuid[0] != '\0' &&
@@ -7584,7 +7619,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         bool stat_face_eligible = is_stat_section && cat->criteria_count > 1 &&
                                                   settings->coop_show_contributor_faces &&
                                                   settings->coop_stat_merge == COOP_STAT_HIGHEST &&
-                                                  t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1 &&
+                                                  t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1
+                                                  &&
                                                   g_coop_ctx &&
                                                   coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                   crit->highest_contributor_uuid[0] != '\0' &&
@@ -7618,7 +7654,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // LOD: Check if zoom level is sufficient for sub-text
                         // Render Child Text and Progress
                         if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD && !hide_crit_text_in_layout) {
-                            ImU32 current_child_text_color = tracker_is_faded_by_mode(settings, crit->done) ? text_color_faded : text_color;
+                            ImU32 current_child_text_color = tracker_is_faded_by_mode(settings, crit->done)
+                                                                 ? text_color_faded
+                                                                 : text_color;
 
                             float scale_factor = (settings->tracker_font_size > 0.0f)
                                                      ? (settings->tracker_sub_font_size / settings->tracker_font_size)
@@ -7677,13 +7715,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 ImVec2 crit_text_anchor_off = get_anchor_offset(
                                     crit->text_pos.anchor, crit_combined_w, child_text_size.y);
                                 float combined_min_x_screen =
-                                    ((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x;
+                                        ((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset
+                                        .x;
                                 float combined_min_y_screen =
-                                    ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                                        ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset
+                                        .y;
                                 if (crit_face_on_right) {
                                     child_text_pos = ImVec2(combined_min_x_screen, combined_min_y_screen);
                                     crit_face_x_screen =
-                                        combined_min_x_screen + (child_text_size.x + crit_face_pad) * t->zoom_level;
+                                            combined_min_x_screen + (child_text_size.x + crit_face_pad) * t->zoom_level;
                                 } else {
                                     child_text_pos = ImVec2(
                                         combined_min_x_screen + crit_face_slot_w * t->zoom_level,
@@ -7739,8 +7779,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                         ImVec2 prog_anchor_off = get_anchor_offset(
                                             crit->progress_pos.anchor, crit_progress_size.x, crit_progress_size.y);
                                         crit_progress_pos = ImVec2(
-                                            ((crit->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
-                                            ((crit->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
+                                            ((crit->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->
+                                            camera_offset.x,
+                                            ((crit->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->
+                                            camera_offset.y);
                                     }
 
                                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
@@ -8374,7 +8416,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done) ? text_color_faded : text_color; // Fade if done
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done)
+                                               ? text_color_faded
+                                               : text_color; // Fade if done
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -8846,7 +8890,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done) ? text_color_faded : text_color; // Fade if done
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done)
+                                               ? text_color_faded
+                                               : text_color; // Fade if done
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -9329,7 +9375,9 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_goal_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = tracker_is_faded_by_mode(settings, goal->done) ? text_color_faded : text_color;
+                ImU32 current_text_color = tracker_is_faded_by_mode(settings, goal->done)
+                                               ? text_color_faded
+                                               : text_color;
 
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
@@ -9812,7 +9860,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Render Text (Main Name and Current Stage Text)
             float main_font_size = settings->tracker_font_size;
             float sub_font_size = settings->tracker_sub_font_size;
-            ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_done_render) ? text_color_faded : text_color; // Fade if done
+            ImU32 current_text_color = tracker_is_faded_by_mode(settings, is_done_render)
+                                           ? text_color_faded
+                                           : text_color; // Fade if done
 
             // --- TEXT CENTERING AND POSITIONING ---
             float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -11309,22 +11359,21 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Six entries cover every combination of the 3 modes and the invert flag.
     // Locked while the Visual Layout Editor is active: that mode forces "Show All" so every
     // goal stays visible while repositioning, so switching the mode here would be misleading.
-    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing);
-    {
+    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); {
         struct VisibilityOption {
             const char *label;
             GoalHidingMode mode;
             bool inverted;
         };
         static const VisibilityOption visibility_options[] = {
-            {"Hide All Completed",                HIDE_ALL_COMPLETED,        false},
-            {"Hide All Incomplete (Inverted)",    HIDE_ALL_COMPLETED,        true},
-            {"Hide Template-Hidden Only",         HIDE_ONLY_TEMPLATE_HIDDEN, false},
-            {"Hide Template-Hidden (Inverted)",   HIDE_ONLY_TEMPLATE_HIDDEN, true},
-            {"Show All",                          SHOW_ALL,                  false},
-            {"Show All (Inverted)",               SHOW_ALL,                  true},
+            {"Hide All Completed", HIDE_ALL_COMPLETED, false},
+            {"Hide All Incomplete (Inverted)", HIDE_ALL_COMPLETED, true},
+            {"Hide Template-Hidden Only", HIDE_ONLY_TEMPLATE_HIDDEN, false},
+            {"Hide Template-Hidden (Inverted)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
+            {"Show All", SHOW_ALL, false},
+            {"Show All (Inverted)", SHOW_ALL, true},
         };
-        const int visibility_option_count = (int)(sizeof(visibility_options) / sizeof(visibility_options[0]));
+        const int visibility_option_count = (int) (sizeof(visibility_options) / sizeof(visibility_options[0]));
 
         int current_idx = 0;
         for (int i = 0; i < visibility_option_count; i++) {
@@ -12422,10 +12471,12 @@ static bool hermes_apply_event_to_coop_snapshots(
                         for (int s = 0; s < roster_n + ghost_n; s++) {
                             bool is_ghost = (s >= roster_n);
                             int local = is_ghost ? (s - roster_n) : s;
-                            char *snap = is_ghost ? t->coop_ghost_snapshots[local]
-                                                  : t->coop_player_snapshots[local];
-                            size_t snap_sz = is_ghost ? t->coop_ghost_snapshot_sizes[local]
-                                                      : t->coop_player_snapshot_sizes[local];
+                            char *snap = is_ghost
+                                             ? t->coop_ghost_snapshots[local]
+                                             : t->coop_player_snapshots[local];
+                            size_t snap_sz = is_ghost
+                                                 ? t->coop_ghost_snapshot_sizes[local]
+                                                 : t->coop_player_snapshot_sizes[local];
                             if (!snap || snap_sz < sizeof(TemplateData)) continue;
 
                             // Resolve this snapshot's player UUID up front so an assigned
@@ -13380,7 +13431,8 @@ bool tracker_build_coop_sync_label(const Tracker *t, const AppSettings *settings
     out[0] = '\0';
     if (!t || !settings || !g_coop_ctx) return false;
     if (settings->network_mode != NETWORK_RECEIVER &&
-        settings->network_mode != NETWORK_HOST) return false;
+        settings->network_mode != NETWORK_HOST)
+        return false;
     CoopNetState net_state = coop_net_get_state(g_coop_ctx);
     if (net_state != COOP_NET_CONNECTED && net_state != COOP_NET_LISTENING) return false;
 

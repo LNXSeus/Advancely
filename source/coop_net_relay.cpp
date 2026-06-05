@@ -40,9 +40,12 @@ static bool parse_pinned_fingerprint(unsigned char out[32]) {
     const char *s = RELAY_CERT_FINGERPRINT_SHA256;
     int byte_idx = 0;
     while (*s && byte_idx < 32) {
-        if (*s == ':') { s++; continue; }
+        if (*s == ':') {
+            s++;
+            continue;
+        }
         if (!s[0] || !s[1]) return false;
-        char hex[3] = { s[0], s[1], 0 };
+        char hex[3] = {s[0], s[1], 0};
         char *endp = nullptr;
         unsigned long v = strtoul(hex, &endp, 16);
         if (endp != hex + 2) return false;
@@ -109,12 +112,20 @@ RelayConn *relay_connect(char *out_err, size_t err_size) {
     char port_str[12];
     snprintf(port_str, sizeof(port_str), "%d", RELAY_PORT);
     rc = mbedtls_net_connect(&c->net, RELAY_HOST, port_str, MBEDTLS_NET_PROTO_TCP);
-    if (rc) { write_err(out_err, err_size, "tcp connect", rc); relay_close(c); return nullptr; }
+    if (rc) {
+        write_err(out_err, err_size, "tcp connect", rc);
+        relay_close(c);
+        return nullptr;
+    }
 
     rc = mbedtls_ssl_config_defaults(&c->conf, MBEDTLS_SSL_IS_CLIENT,
                                      MBEDTLS_SSL_TRANSPORT_STREAM,
                                      MBEDTLS_SSL_PRESET_DEFAULT);
-    if (rc) { write_err(out_err, err_size, "config_defaults", rc); relay_close(c); return nullptr; }
+    if (rc) {
+        write_err(out_err, err_size, "config_defaults", rc);
+        relay_close(c);
+        return nullptr;
+    }
 
     // We pin the server cert ourselves below, so don't bother validating a CA
     // chain we never installed. Pinning is strictly stronger than CA-trust
@@ -124,10 +135,18 @@ RelayConn *relay_connect(char *out_err, size_t err_size) {
     mbedtls_ssl_conf_authmode(&c->conf, MBEDTLS_SSL_VERIFY_NONE);
 
     rc = mbedtls_ssl_setup(&c->ssl, &c->conf);
-    if (rc) { write_err(out_err, err_size, "ssl_setup", rc); relay_close(c); return nullptr; }
+    if (rc) {
+        write_err(out_err, err_size, "ssl_setup", rc);
+        relay_close(c);
+        return nullptr;
+    }
 
     rc = mbedtls_ssl_set_hostname(&c->ssl, RELAY_HOST);
-    if (rc) { write_err(out_err, err_size, "set_hostname", rc); relay_close(c); return nullptr; }
+    if (rc) {
+        write_err(out_err, err_size, "set_hostname", rc);
+        relay_close(c);
+        return nullptr;
+    }
 
     // Provide f_recv_timeout so relay_set_read_timeout can drive timed reads
     // post-handshake. mbedtls_net_recv_timeout uses select() under the hood.
@@ -249,8 +268,8 @@ static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len
         snprintf(tls_last_error, sizeof(tls_last_error),
                  "%s [wrote=%zu/%zu elapsed=%ums idle=%ums]",
                  base, total - len, total,
-                 (unsigned)(SDL_GetTicks() - t_start),
-                 (unsigned)(SDL_GetTicks() - t_last_progress));
+                 (unsigned) (SDL_GetTicks() - t_start),
+                 (unsigned) (SDL_GetTicks() - t_last_progress));
         log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
         return false;
     }
@@ -338,14 +357,14 @@ static bool relay_compress_payload(const void *src, uint32_t src_len,
         free(buf);
         return false;
     }
-    if ((uint32_t)(4 + dest_len) >= src_len) {
+    if ((uint32_t) (4 + dest_len) >= src_len) {
         // No size win — caller will send uncompressed.
         free(buf);
         return false;
     }
     put_be32(buf, src_len);
     *out = buf;
-    *out_len = (uint32_t)(4 + dest_len);
+    *out_len = (uint32_t) (4 + dest_len);
     return true;
 }
 
@@ -364,7 +383,7 @@ static bool relay_decompress_payload(const void *src, uint32_t src_len,
     unsigned char *buf = (unsigned char *) malloc(uncompressed_len);
     if (!buf) return false;
     mz_ulong dest_len = uncompressed_len;
-    int rc = mz_uncompress(buf, &dest_len, p + 4, (mz_ulong)(src_len - 4));
+    int rc = mz_uncompress(buf, &dest_len, p + 4, (mz_ulong) (src_len - 4));
     if (rc != MZ_OK || dest_len != uncompressed_len) {
         free(buf);
         return false;
@@ -493,7 +512,7 @@ int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
             // which separates "peer stopped feeding bytes then closed after
             // T ms" (large idle) from "closed instantly after a chunk"
             // (idle ~0). pct shows how far we got through the frame.
-            unsigned pct = length > 0 ? (unsigned)((payload_got * 100ULL) / length) : 0;
+            unsigned pct = length > 0 ? (unsigned) ((payload_got * 100ULL) / length) : 0;
             char base[192];
             strncpy(base, tls_last_error, sizeof(base) - 1);
             base[sizeof(base) - 1] = '\0';

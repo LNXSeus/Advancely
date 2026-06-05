@@ -279,19 +279,20 @@ std::vector<int> compute_new_advancement_indices(
  * for a template advancement missing from the imported file.
  */
 struct RenameCandidate {
-    int import_index;           // Index into the importable_advancements vector.
-    int criteria_overlap;       // Number of criterion root_names shared between template and import sides.
-    int smaller_criteria_size;  // Min of template/import criteria counts on this pair (0 if either side has no criteria).
-    bool basename_match;        // True when the substring after the final '/' is identical on both sides.
-    bool overlap_match;         // True when accepted via the >=80% criteria-overlap rule.
+    int import_index; // Index into the importable_advancements vector.
+    int criteria_overlap; // Number of criterion root_names shared between template and import sides.
+    int smaller_criteria_size;
+    // Min of template/import criteria counts on this pair (0 if either side has no criteria).
+    bool basename_match; // True when the substring after the final '/' is identical on both sides.
+    bool overlap_match; // True when accepted via the >=80% criteria-overlap rule.
 };
 
 /**
  * @brief A template advancement row in the rename modal, paired with its ranked candidate list.
  */
 struct RenameRow {
-    int template_index;                       // Index into the template advancement vector supplied by the caller.
-    std::vector<RenameCandidate> candidates;  // Sorted by descending criteria similarity, then basename-priority.
+    int template_index; // Index into the template advancement vector supplied by the caller.
+    std::vector<RenameCandidate> candidates; // Sorted by descending criteria similarity, then basename-priority.
 };
 
 /**
@@ -317,7 +318,7 @@ struct RenameRow {
  */
 std::vector<RenameRow> compute_rename_candidates(
     const std::vector<std::string> &template_root_names,
-    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<std::vector<std::string> > &template_criteria,
     const std::vector<ImportableAdvancement> &import_advs,
     bool include_recipes,
     bool match_basename,
@@ -329,16 +330,16 @@ std::vector<RenameRow> compute_rename_candidates(
  */
 struct CriterionDelta {
     std::string root_name;
-    bool is_new;       // true: present in import, missing in template (add candidate).
-                       // false: present in template, missing in import (stale candidate).
-    bool is_selected;  // Default: false. The user picks what to stage.
+    bool is_new; // true: present in import, missing in template (add candidate).
+    // false: present in template, missing in import (stale candidate).
+    bool is_selected; // Default: false. The user picks what to stage.
 };
 
 /**
  * @brief A template advancement row whose criteria differ from the matching import advancement.
  */
 struct CriteriaDeltaRow {
-    int template_index;                 // Index into the template advancement vector supplied by the caller.
+    int template_index; // Index into the template advancement vector supplied by the caller.
     std::vector<CriterionDelta> deltas; // Mixed list, new entries first then stale.
 };
 
@@ -357,7 +358,7 @@ struct CriteriaDeltaRow {
  */
 std::vector<CriteriaDeltaRow> compute_criteria_deltas(
     const std::vector<std::string> &template_root_names,
-    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<std::vector<std::string> > &template_criteria,
     const std::vector<ImportableAdvancement> &import_advs,
     bool include_recipes);
 

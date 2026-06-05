@@ -11,6 +11,7 @@
 #include "settings_utils.h" // Include the full header for the AppSettings definition
 #include <cstdio>
 #include <ctime>
+#include <SDL3/SDL_mutex.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -18,6 +19,9 @@
 
 // Global file pointer for the log file, only accessible within this file
 static FILE *log_file = nullptr;
+
+// Guards log_message() against concurrent calls from the update worker thread.
+static SDL_Mutex *log_mutex = nullptr;
 
 // A static pointer to the application settings
 static const AppSettings *g_app_settings = nullptr;
@@ -27,6 +31,10 @@ void log_set_settings(const AppSettings *settings) {
 }
 
 void log_init(bool is_overlay_process) {
+    if (log_mutex == nullptr) {
+        log_mutex = SDL_CreateMutex();
+    }
+
     const char *log_filename = is_overlay_process ? "advancely_overlay_log.txt" : "advancely_log.txt";
 
     // Open the log file in write mode to clear it on each startup
@@ -64,6 +72,8 @@ void log_message(LogLevel level, const char *format, ...) {
     vsnprintf(message, sizeof(message), format, args);
     va_end(args);
 
+    if (log_mutex) SDL_LockMutex(log_mutex);
+
     // Print to the appropriate console stream
     if (level == LOG_ERROR) {
 #ifdef _WIN32
@@ -96,6 +106,8 @@ void log_message(LogLevel level, const char *format, ...) {
         fprintf(log_file, "[%s] %s", time_buf, message);
         fflush(log_file); // Ensure log is written immediately in case of a crash
     }
+
+    if (log_mutex) SDL_UnlockMutex(log_mutex);
 }
 
 void log_close(void) {
@@ -104,5 +116,10 @@ void log_close(void) {
         fprintf(log_file, "Log finished.\n");
         fclose(log_file);
         log_file = nullptr;
+    }
+
+    if (log_mutex) {
+        SDL_DestroyMutex(log_mutex);
+        log_mutex = nullptr;
     }
 }

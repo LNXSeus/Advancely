@@ -2235,8 +2235,9 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 log_message(LOG_INFO, "[COOP NET] Relay slot %d (%s) timed out (no traffic for %ums).\n",
                             i, ctx->clients[i].username, silent_ms);
                 set_status(ctx, "%s timed out",
-                           ctx->clients[i].display_name[0] ? ctx->clients[i].display_name
-                                                           : ctx->clients[i].username);
+                           ctx->clients[i].display_name[0]
+                               ? ctx->clients[i].display_name
+                               : ctx->clients[i].username);
                 // Broadcast a targeted KICK so the dropped receiver gets a
                 // specific reason instead of having to infer eviction from
                 // the next PLAYER_LIST. Receivers self-filter on target_uuid.
@@ -2343,9 +2344,11 @@ static int SDLCALL host_relay_thread_func(void *data) {
 
                     if (dup_uuid || dup_user || slot < 0) {
                         const char *reason =
-                            slot < 0 ? "Server full"
-                                     : (dup_uuid ? "A player with this UUID is already in the lobby"
-                                                 : "Username already in lobby");
+                                slot < 0
+                                    ? "Server full"
+                                    : (dup_uuid
+                                           ? "A player with this UUID is already in the lobby"
+                                           : "Username already in lobby");
                         cJSON *rej = cJSON_CreateObject();
                         cJSON_AddStringToObject(rej, "target_uuid", req_uuid);
                         cJSON_AddStringToObject(rej, "reason", reason);

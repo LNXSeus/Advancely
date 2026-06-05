@@ -36,16 +36,16 @@
 
 struct CacheEntry {
     char uuid[48];
-    SDL_Texture *texture;          // owned by cache; created on main thread
-    SDL_Surface *pending_surface;  // worker fills; main thread converts and frees
+    SDL_Texture *texture; // owned by cache; created on main thread
+    SDL_Surface *pending_surface; // worker fills; main thread converts and frees
     bool fetch_in_flight;
-    bool fetch_failed;             // permanent fallback to Notch
-    bool is_notch_alias;           // entry has been remapped to use Notch's texture
+    bool fetch_failed; // permanent fallback to Notch
+    bool is_notch_alias; // entry has been remapped to use Notch's texture
 };
 
 struct FetchJob {
     char uuid[48];
-    bool offline_known;            // skip Mojang call, use Notch directly
+    bool offline_known; // skip Mojang call, use Notch directly
 };
 
 static SDL_Renderer *g_renderer = nullptr;
@@ -353,9 +353,18 @@ void skin_cache_shutdown(void) {
     }
     g_entry_count = 0;
 
-    if (g_cache_mutex) { SDL_DestroyMutex(g_cache_mutex); g_cache_mutex = nullptr; }
-    if (g_queue_mutex) { SDL_DestroyMutex(g_queue_mutex); g_queue_mutex = nullptr; }
-    if (g_queue_cond)  { SDL_DestroyCondition(g_queue_cond); g_queue_cond = nullptr; }
+    if (g_cache_mutex) {
+        SDL_DestroyMutex(g_cache_mutex);
+        g_cache_mutex = nullptr;
+    }
+    if (g_queue_mutex) {
+        SDL_DestroyMutex(g_queue_mutex);
+        g_queue_mutex = nullptr;
+    }
+    if (g_queue_cond) {
+        SDL_DestroyCondition(g_queue_cond);
+        g_queue_cond = nullptr;
+    }
     g_renderer = nullptr;
 }
 

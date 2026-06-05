@@ -35,9 +35,11 @@ extern SDL_AtomicInt g_templates_changed; // To signal that the template list ne
 extern SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
 extern SDL_AtomicInt g_suppress_settings_watch; // Suppress dmon settings watcher for app-initiated saves
 extern SDL_AtomicInt g_hotkey_capture_armed; // Settings hotkey capture: 1 while waiting for a key press
-extern SDL_AtomicInt g_hotkey_captured_scancode; // Settings hotkey capture: SDL_Scancode written by event handler (0 = cleared/escape)
+extern SDL_AtomicInt g_hotkey_captured_scancode;
+// Settings hotkey capture: SDL_Scancode written by event handler (0 = cleared/escape)
 extern ForceOpenReason g_force_open_reason; // Flag to force settings open on invalid path
-extern char g_latest_known_version[64]; // Latest Advancely version observed via the startup update check ("" if unknown). Used to gate relay connections to "must be on latest".
+extern char g_latest_known_version[64];
+// Latest Advancely version observed via the startup update check ("" if unknown). Used to gate relay connections to "must be on latest".
 
 /**
  * @brief Processes the global SDL event queue.

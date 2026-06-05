@@ -1315,7 +1315,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SameLine();
                 ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Prevent the Display Name from changing automatically when switching templates or languages.");
+                    ImGui::SetTooltip(
+                        "Prevent the Display Name from changing automatically when switching templates or languages.");
                 }
             }
 
@@ -1373,87 +1374,87 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
 
                 if (run_completion_open) {
-                // Target advancement/achievement count
-                char adv_threshold_label[64];
-                snprintf(adv_threshold_label, sizeof(adv_threshold_label), "Complete at %s count", goal_word);
-                ImGui::Checkbox(adv_threshold_label, &temp_settings.completion_use_adv_threshold);
-                if (ImGui::IsItemHovered()) {
-                    char adv_threshold_tooltip_buffer[512];
-                    snprintf(adv_threshold_tooltip_buffer, sizeof(adv_threshold_tooltip_buffer),
-                             "When enabled, the run completes once this many %s are done.\n"
-                             "The maximum (%d) is the number of %s in the selected template.",
-                             goal_word, max_adv, goal_word);
-                    ImGui::SetTooltip("%s", adv_threshold_tooltip_buffer);
-                }
-
-                // Inline count input, shown only while the checkbox is ticked.
-                if (temp_settings.completion_use_adv_threshold) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(120.0f);
-                    if (ImGui::InputInt("##completion_target_count", &temp_settings.completion_adv_threshold)) {
-                        if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
-                        if (temp_settings.completion_adv_threshold > max_adv)
-                            temp_settings.completion_adv_threshold = max_adv;
-                    }
+                    // Target advancement/achievement count
+                    char adv_threshold_label[64];
+                    snprintf(adv_threshold_label, sizeof(adv_threshold_label), "Complete at %s count", goal_word);
+                    ImGui::Checkbox(adv_threshold_label, &temp_settings.completion_use_adv_threshold);
                     if (ImGui::IsItemHovered()) {
-                        char target_count_tooltip_buffer[256];
-                        snprintf(target_count_tooltip_buffer, sizeof(target_count_tooltip_buffer),
-                                 "Number of completed %s required (1 to %d).", goal_word, max_adv);
-                        ImGui::SetTooltip("%s", target_count_tooltip_buffer);
+                        char adv_threshold_tooltip_buffer[512];
+                        snprintf(adv_threshold_tooltip_buffer, sizeof(adv_threshold_tooltip_buffer),
+                                 "When enabled, the run completes once this many %s are done.\n"
+                                 "The maximum (%d) is the number of %s in the selected template.",
+                                 goal_word, max_adv, goal_word);
+                        ImGui::SetTooltip("%s", adv_threshold_tooltip_buffer);
                     }
-                }
 
-                // Target overall progress percentage
-                ImGui::Checkbox("Complete at progress percentage", &temp_settings.completion_use_percent_threshold);
-                if (ImGui::IsItemHovered()) {
-                    char pct_threshold_tooltip_buffer[512];
-                    snprintf(pct_threshold_tooltip_buffer, sizeof(pct_threshold_tooltip_buffer),
-                             "When enabled, the run completes once overall progress reaches this percentage.\n"
-                             "This is the same overall progress shown in the tracker and overlay\n"
-                             "(every goal type except advancements contributes to it).");
-                    ImGui::SetTooltip("%s", pct_threshold_tooltip_buffer);
-                }
-
-                // Inline percentage input, shown only while the checkbox is ticked.
-                if (temp_settings.completion_use_percent_threshold) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(120.0f);
-                    if (ImGui::InputFloat("##completion_target_percentage",
-                                          &temp_settings.completion_percent_threshold, 0.0f, 0.0f, "%.2f")) {
-                        if (temp_settings.completion_percent_threshold < 0.0f)
-                            temp_settings.completion_percent_threshold = 0.0f;
-                        if (temp_settings.completion_percent_threshold > 100.0f)
-                            temp_settings.completion_percent_threshold = 100.0f;
+                    // Inline count input, shown only while the checkbox is ticked.
+                    if (temp_settings.completion_use_adv_threshold) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(120.0f);
+                        if (ImGui::InputInt("##completion_target_count", &temp_settings.completion_adv_threshold)) {
+                            if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
+                            if (temp_settings.completion_adv_threshold > max_adv)
+                                temp_settings.completion_adv_threshold = max_adv;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char target_count_tooltip_buffer[256];
+                            snprintf(target_count_tooltip_buffer, sizeof(target_count_tooltip_buffer),
+                                     "Number of completed %s required (1 to %d).", goal_word, max_adv);
+                            ImGui::SetTooltip("%s", target_count_tooltip_buffer);
+                        }
                     }
+
+                    // Target overall progress percentage
+                    ImGui::Checkbox("Complete at progress percentage", &temp_settings.completion_use_percent_threshold);
                     if (ImGui::IsItemHovered()) {
-                        char target_pct_tooltip_buffer[256];
-                        snprintf(target_pct_tooltip_buffer, sizeof(target_pct_tooltip_buffer),
-                                 "Overall progress percentage required (0.00 to 100.00).");
-                        ImGui::SetTooltip("%s", target_pct_tooltip_buffer);
+                        char pct_threshold_tooltip_buffer[512];
+                        snprintf(pct_threshold_tooltip_buffer, sizeof(pct_threshold_tooltip_buffer),
+                                 "When enabled, the run completes once overall progress reaches this percentage.\n"
+                                 "This is the same overall progress shown in the tracker and overlay\n"
+                                 "(every goal type except advancements contributes to it).");
+                        ImGui::SetTooltip("%s", pct_threshold_tooltip_buffer);
                     }
-                }
 
-                // AND/OR logic, only meaningful when both targets are enabled
-                bool both_targets_enabled = temp_settings.completion_use_adv_threshold &&
-                                            temp_settings.completion_use_percent_threshold;
-                if (!both_targets_enabled) ImGui::BeginDisabled();
-                ImGui::Checkbox("Require both targets (AND)", &temp_settings.completion_threshold_require_both);
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char require_both_tooltip_buffer[512];
-                    if (!both_targets_enabled) {
-                        snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
-                                 "Disabled because only one (or no) target is enabled.\n"
-                                 "Enable BOTH the %s count and the progress percentage targets above\n"
-                                 "to choose whether both must be met (AND) or just either one (OR).",
-                                 goal_word);
-                    } else {
-                        snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
-                                 "Checked: the run completes only when BOTH targets are met (AND).\n"
-                                 "Unchecked: the run completes as soon as EITHER target is met (OR).");
+                    // Inline percentage input, shown only while the checkbox is ticked.
+                    if (temp_settings.completion_use_percent_threshold) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(120.0f);
+                        if (ImGui::InputFloat("##completion_target_percentage",
+                                              &temp_settings.completion_percent_threshold, 0.0f, 0.0f, "%.2f")) {
+                            if (temp_settings.completion_percent_threshold < 0.0f)
+                                temp_settings.completion_percent_threshold = 0.0f;
+                            if (temp_settings.completion_percent_threshold > 100.0f)
+                                temp_settings.completion_percent_threshold = 100.0f;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char target_pct_tooltip_buffer[256];
+                            snprintf(target_pct_tooltip_buffer, sizeof(target_pct_tooltip_buffer),
+                                     "Overall progress percentage required (0.00 to 100.00).");
+                            ImGui::SetTooltip("%s", target_pct_tooltip_buffer);
+                        }
                     }
-                    ImGui::SetTooltip("%s", require_both_tooltip_buffer);
-                }
-                if (!both_targets_enabled) ImGui::EndDisabled();
+
+                    // AND/OR logic, only meaningful when both targets are enabled
+                    bool both_targets_enabled = temp_settings.completion_use_adv_threshold &&
+                                                temp_settings.completion_use_percent_threshold;
+                    if (!both_targets_enabled) ImGui::BeginDisabled();
+                    ImGui::Checkbox("Require both targets (AND)", &temp_settings.completion_threshold_require_both);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char require_both_tooltip_buffer[512];
+                        if (!both_targets_enabled) {
+                            snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
+                                     "Disabled because only one (or no) target is enabled.\n"
+                                     "Enable BOTH the %s count and the progress percentage targets above\n"
+                                     "to choose whether both must be met (AND) or just either one (OR).",
+                                     goal_word);
+                        } else {
+                            snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
+                                     "Checked: the run completes only when BOTH targets are met (AND).\n"
+                                     "Unchecked: the run completes as soon as EITHER target is met (OR).");
+                        }
+                        ImGui::SetTooltip("%s", require_both_tooltip_buffer);
+                    }
+                    if (!both_targets_enabled) ImGui::EndDisabled();
                 } // end run_completion_open
             }
 
@@ -3009,8 +3010,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::BeginDisabled(net_is_active);
                         if (ImGui::Checkbox("Host locally (LAN / VPN)", &host_locally)) {
                             temp_settings.coop_transport = host_locally
-                                ? COOP_TRANSPORT_DIRECT
-                                : COOP_TRANSPORT_RELAY;
+                                                               ? COOP_TRANSPORT_DIRECT
+                                                               : COOP_TRANSPORT_RELAY;
                         }
                         ImGui::EndDisabled();
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
@@ -3143,129 +3144,131 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                 && strcmp(temp_settings.host_public_ip, temp_settings.host_ip) == 0;
 
                         if (transport_direct) {
-                        if (net_is_active) ImGui::BeginDisabled();
-                        ImGui::SetNextItemWidth(200.0f);
-                        ImGuiInputTextFlags ip_flags = coop_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
-                        ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip),
-                                         ip_flags);
-                        if (net_is_active) {
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Cannot change IP while a lobby is active.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                            if (net_is_active) ImGui::BeginDisabled();
+                            ImGui::SetNextItemWidth(200.0f);
+                            ImGuiInputTextFlags ip_flags = coop_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
+                            ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip),
+                                             ip_flags);
+                            if (net_is_active) {
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Cannot change IP while a lobby is active.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            } else {
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[512];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "The IP address Advancely binds to on this machine.\n"
+                                             "Use your VPN/LAN IP (e.g. ZeroTier) or local network IP.\n"
+                                             "This field is hidden to prevent accidental leaks on stream.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
                             }
-                        } else {
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[512];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "The IP address Advancely binds to on this machine.\n"
-                                         "Use your VPN/LAN IP (e.g. ZeroTier) or local network IP.\n"
-                                         "This field is hidden to prevent accidental leaks on stream.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        }
-                        if (net_is_active) ImGui::EndDisabled();
-                        // Reveal/Hide button stays enabled even while hosting
-                        ImGui::SameLine();
-                        if (coop_ip_revealed) {
-                            if (ImGui::SmallButton("Hide IP")) {
-                                coop_ip_revealed = false;
-                            }
-                        } else {
-                            if (ImGui::SmallButton("Reveal IP")) {
-                                ImGui::OpenPopup("Reveal IP?##coop");
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Show the IP address in plain text.\n"
-                                         "WARNING: Do not reveal this while streaming or screen sharing.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        }
-                        if (ip_filled && !ip_valid) {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
-                        }
-
-                        // Optional public IP or domain for the room code
-                        if (net_is_active) ImGui::BeginDisabled();
-                        ImGui::SetNextItemWidth(200.0f);
-                        ImGuiInputTextFlags pub_ip_flags = coop_public_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
-                        ImGui::InputTextWithHint("Public IP##host", "Optional",
-                                                 temp_settings.host_public_ip,
-                                                 sizeof(temp_settings.host_public_ip),
-                                                 pub_ip_flags);
-                        if (net_is_active) {
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Cannot change Public IP while a lobby is active.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        } else {
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[512];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Optional. Your public IP or domain for players connecting over the internet.\n"
-                                         "Requires port forwarding on your router.\n"
-                                         "If set, the room code will use this instead of the bind IP.\n"
-                                         "Leave empty to use the bind IP for the room code (VPN/LAN).\n"
-                                         "Accepts IPv4 addresses (e.g. 203.0.113.5) or domains (e.g. play.example.com).\n"
-                                         "This field is hidden to prevent accidental leaks on stream.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        }
-                        if (net_is_active) ImGui::EndDisabled();
-                        // Reveal/Hide button for public IP
-                        ImGui::SameLine();
-                        if (coop_public_ip_revealed) {
-                            if (ImGui::SmallButton("Hide Public IP")) {
-                                coop_public_ip_revealed = false;
-                            }
-                        } else {
-                            if (ImGui::SmallButton("Reveal Public IP")) {
-                                ImGui::OpenPopup("Reveal Public IP?##coop");
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Show the public IP address in plain text.\n"
-                                         "WARNING: Do not reveal this while streaming or screen sharing.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        }
-                        if (pub_ip_filled && !pub_ip_valid) {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP or domain");
-                        }
-                        if (pub_ip_duplicate) {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
-                                               "Public IP must be different from the bind IP.");
-                        }
-
-                        if (net_is_active) ImGui::BeginDisabled();
-                        ImGui::SetNextItemWidth(120.0f);
-                        ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
-                                         ImGuiInputTextFlags_CharsDecimal);
-                        if (net_is_active) {
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Cannot change port while a lobby is active.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        } else {
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 12345.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                        }
-                        if (port_filled && !port_valid) {
+                            if (net_is_active) ImGui::EndDisabled();
+                            // Reveal/Hide button stays enabled even while hosting
                             ImGui::SameLine();
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (1-65535)");
-                        }
-                        if (net_is_active) ImGui::EndDisabled();
+                            if (coop_ip_revealed) {
+                                if (ImGui::SmallButton("Hide IP")) {
+                                    coop_ip_revealed = false;
+                                }
+                            } else {
+                                if (ImGui::SmallButton("Reveal IP")) {
+                                    ImGui::OpenPopup("Reveal IP?##coop");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Show the IP address in plain text.\n"
+                                             "WARNING: Do not reveal this while streaming or screen sharing.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            }
+                            if (ip_filled && !ip_valid) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
+                            }
+
+                            // Optional public IP or domain for the room code
+                            if (net_is_active) ImGui::BeginDisabled();
+                            ImGui::SetNextItemWidth(200.0f);
+                            ImGuiInputTextFlags pub_ip_flags = coop_public_ip_revealed
+                                                                   ? 0
+                                                                   : ImGuiInputTextFlags_Password;
+                            ImGui::InputTextWithHint("Public IP##host", "Optional",
+                                                     temp_settings.host_public_ip,
+                                                     sizeof(temp_settings.host_public_ip),
+                                                     pub_ip_flags);
+                            if (net_is_active) {
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Cannot change Public IP while a lobby is active.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            } else {
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[512];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Optional. Your public IP or domain for players connecting over the internet.\n"
+                                             "Requires port forwarding on your router.\n"
+                                             "If set, the room code will use this instead of the bind IP.\n"
+                                             "Leave empty to use the bind IP for the room code (VPN/LAN).\n"
+                                             "Accepts IPv4 addresses (e.g. 203.0.113.5) or domains (e.g. play.example.com).\n"
+                                             "This field is hidden to prevent accidental leaks on stream.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            }
+                            if (net_is_active) ImGui::EndDisabled();
+                            // Reveal/Hide button for public IP
+                            ImGui::SameLine();
+                            if (coop_public_ip_revealed) {
+                                if (ImGui::SmallButton("Hide Public IP")) {
+                                    coop_public_ip_revealed = false;
+                                }
+                            } else {
+                                if (ImGui::SmallButton("Reveal Public IP")) {
+                                    ImGui::OpenPopup("Reveal Public IP?##coop");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Show the public IP address in plain text.\n"
+                                             "WARNING: Do not reveal this while streaming or screen sharing.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            }
+                            if (pub_ip_filled && !pub_ip_valid) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP or domain");
+                            }
+                            if (pub_ip_duplicate) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                                   "Public IP must be different from the bind IP.");
+                            }
+
+                            if (net_is_active) ImGui::BeginDisabled();
+                            ImGui::SetNextItemWidth(120.0f);
+                            ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
+                                             ImGuiInputTextFlags_CharsDecimal);
+                            if (net_is_active) {
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Cannot change port while a lobby is active.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            } else {
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 12345.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            }
+                            if (port_filled && !port_valid) {
+                                ImGui::SameLine();
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (1-65535)");
+                            }
+                            if (net_is_active) ImGui::EndDisabled();
                         } else {
                             // Relay host: just a password (optional). Room code is
                             // assigned by the relay on Start Lobby and displayed below.
@@ -3319,8 +3322,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
 
                         coop_host_input_error = transport_direct
-                            && ((ip_filled && !ip_valid) || (port_filled && !port_valid)
-                                || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate);
+                                                && ((ip_filled && !ip_valid) || (port_filled && !port_valid)
+                                                    || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate);
 
                         // --- Goal Merging Rules (above Start Lobby so host configures before starting) ---
                         ImGui::Spacing();
@@ -3476,75 +3479,74 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.coop_show_contributor_faces = show_faces;
 
                             if (show_faces) {
-                            // Corner placement (main-goal faces)
-                            ImGui::Text("Face Corner:");
-                            ImGui::SameLine();
-                            int corner = temp_settings.coop_face_corner;
-                            ImGui::PushID("coop_face_corner");
-                            ImGui::RadioButton("Top-Right", &corner, COOP_FACE_CORNER_TOP_RIGHT);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Render the contributor face in the top-right corner of advancements,\n"
-                                         "simple stats, and counter custom goals.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                            ImGui::SameLine();
-                            ImGui::RadioButton("Bottom-Left", &corner, COOP_FACE_CORNER_BOTTOM_LEFT);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Render the contributor face in the bottom-left corner of advancements,\n"
-                                         "simple stats, and counter custom goals.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                            ImGui::SameLine();
-                            ImGui::RadioButton("Bottom-Right", &corner, COOP_FACE_CORNER_BOTTOM_RIGHT);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Render the contributor face in the bottom-right corner of advancements,\n"
-                                         "simple stats, and counter custom goals. (Default)");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                            temp_settings.coop_face_corner = (CoopFaceCorner) corner;
-                            ImGui::PopID();
+                                // Corner placement (main-goal faces)
+                                ImGui::Text("Face Corner:");
+                                ImGui::SameLine();
+                                int corner = temp_settings.coop_face_corner;
+                                ImGui::PushID("coop_face_corner");
+                                ImGui::RadioButton("Top-Right", &corner, COOP_FACE_CORNER_TOP_RIGHT);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Render the contributor face in the top-right corner of advancements,\n"
+                                             "simple stats, and counter custom goals.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Bottom-Left", &corner, COOP_FACE_CORNER_BOTTOM_LEFT);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Render the contributor face in the bottom-left corner of advancements,\n"
+                                             "simple stats, and counter custom goals.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Bottom-Right", &corner, COOP_FACE_CORNER_BOTTOM_RIGHT);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Render the contributor face in the bottom-right corner of advancements,\n"
+                                             "simple stats, and counter custom goals. (Default)");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                temp_settings.coop_face_corner = (CoopFaceCorner) corner;
+                                ImGui::PopID();
 
-                            // Face size (DragFloat to match the other numeric sliders)
-                            if (ImGui::DragFloat("Main-Goal Face Size",
-                                                 &temp_settings.coop_face_size, 1.0f, 16.0f, 48.0f, "%.0f px")) {
-                                if (temp_settings.coop_face_size < 16.0f) temp_settings.coop_face_size = 16.0f;
-                                if (temp_settings.coop_face_size > 48.0f) temp_settings.coop_face_size = 48.0f;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char face_size_tooltip[1024];
-                                snprintf(face_size_tooltip, sizeof(face_size_tooltip),
-                                         "Logical pixel size of the contributor face on main goals (advancements,\n"
-                                         "simple stats, counter custom goals). Range 16-48 px.\n"
-                                         "Sub-stat and checkbox faces use a fixed size that matches the checkbox.\n"
-                                         "Default: %.0f px", DEFAULT_COOP_FACE_SIZE);
-                                ImGui::SetTooltip("%s", face_size_tooltip);
-                            }
+                                // Face size (DragFloat to match the other numeric sliders)
+                                if (ImGui::DragFloat("Main-Goal Face Size",
+                                                     &temp_settings.coop_face_size, 1.0f, 16.0f, 48.0f, "%.0f px")) {
+                                    if (temp_settings.coop_face_size < 16.0f) temp_settings.coop_face_size = 16.0f;
+                                    if (temp_settings.coop_face_size > 48.0f) temp_settings.coop_face_size = 48.0f;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char face_size_tooltip[1024];
+                                    snprintf(face_size_tooltip, sizeof(face_size_tooltip),
+                                             "Logical pixel size of the contributor face on main goals (advancements,\n"
+                                             "simple stats, counter custom goals). Range 16-48 px.\n"
+                                             "Sub-stat and checkbox faces use a fixed size that matches the checkbox.\n"
+                                             "Default: %.0f px", DEFAULT_COOP_FACE_SIZE);
+                                    ImGui::SetTooltip("%s", face_size_tooltip);
+                                }
 
-                            // Face LOD threshold (matches the other LOD sliders in Visuals)
-                            if (ImGui::DragFloat("Hide Contributor Faces At",
-                                                 &temp_settings.coop_face_lod_threshold, 0.001f, 0.05f, 10.0f,
-                                                 "%.3f")) {
-                                if (temp_settings.coop_face_lod_threshold < 0.05f)
-                                    temp_settings.coop_face_lod_threshold = 0.05f;
-                                if (temp_settings.coop_face_lod_threshold > 10.0f)
-                                    temp_settings.coop_face_lod_threshold = 10.0f;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char lod_face_tooltip[1024];
-                                snprintf(lod_face_tooltip, sizeof(lod_face_tooltip),
-                                         "The zoom threshold below which non-checkbox contributor faces are hidden.\n"
-                                         "Higher values are more zoomed in.\n"
-                                         "Affects:\n"
-                                         " - Main-goal corner faces (advancements, simple stats, counter custom goals).\n"
-                                         " - Sub-stat highest-value faces.\n"
-                                         "Faces drawn behind manual-completion checkboxes follow the checkbox LOD instead.\n"
-                                         "Default: %.3f", DEFAULT_COOP_FACE_LOD_THRESHOLD);
-                                ImGui::SetTooltip("%s", lod_face_tooltip);
-                            }
-
+                                // Face LOD threshold (matches the other LOD sliders in Visuals)
+                                if (ImGui::DragFloat("Hide Contributor Faces At",
+                                                     &temp_settings.coop_face_lod_threshold, 0.001f, 0.05f, 10.0f,
+                                                     "%.3f")) {
+                                    if (temp_settings.coop_face_lod_threshold < 0.05f)
+                                        temp_settings.coop_face_lod_threshold = 0.05f;
+                                    if (temp_settings.coop_face_lod_threshold > 10.0f)
+                                        temp_settings.coop_face_lod_threshold = 10.0f;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char lod_face_tooltip[1024];
+                                    snprintf(lod_face_tooltip, sizeof(lod_face_tooltip),
+                                             "The zoom threshold below which non-checkbox contributor faces are hidden.\n"
+                                             "Higher values are more zoomed in.\n"
+                                             "Affects:\n"
+                                             " - Main-goal corner faces (advancements, simple stats, counter custom goals).\n"
+                                             " - Sub-stat highest-value faces.\n"
+                                             "Faces drawn behind manual-completion checkboxes follow the checkbox LOD instead.\n"
+                                             "Default: %.3f", DEFAULT_COOP_FACE_LOD_THRESHOLD);
+                                    ImGui::SetTooltip("%s", lod_face_tooltip);
+                                }
                             } // end if (show_faces)
                         }
 
@@ -3556,11 +3558,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         {
                             bool editor_open = p_temp_creator_open && *p_temp_creator_open;
                             bool inputs_ok = transport_direct
-                                             ? (ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate)
-                                             : true; // Relay: no ip/port; password is optional.
+                                                 ? (ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate)
+                                                 : true; // Relay: no ip/port; password is optional.
                             bool relay_outdated = !transport_direct && g_latest_known_version[0] != '\0'
                                                   && compare_version_strings(ADVANCELY_VERSION,
-                                                                              g_latest_known_version) < 0;
+                                                                             g_latest_known_version) < 0;
                             bool can_start = inputs_ok && !relay_outdated
                                              && g_coop_ctx && !net_is_active && !has_unsaved_changes && !editor_open;
                             if (!can_start) ImGui::BeginDisabled();
@@ -3706,10 +3708,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;
                                 bool relay_outdated_recv = g_latest_known_version[0] != '\0'
                                                            && compare_version_strings(ADVANCELY_VERSION,
-                                                                                       g_latest_known_version) < 0;
+                                                               g_latest_known_version) < 0;
                                 bool can_join_relay = !has_unsaved_changes && !join_editor_open
-                                                       && !relay_outdated_recv
-                                                       && coop_relay_room_code_recv[0] != '\0';
+                                                      && !relay_outdated_recv
+                                                      && coop_relay_room_code_recv[0] != '\0';
 
                                 ImGui::SetNextItemWidth(120.0f);
                                 ImGui::InputTextWithHint("Room Code##relay_recv", "ABC123",
@@ -4028,13 +4030,16 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             // Snapshot the ghost roster so disconnected / non-Advancely
                             // players can be assigned too. Assignment is keyed by UUID and
                             // the merge tracks a ghost owner identically to a live player.
-                            struct AssignGhost { char uuid[48]; char name[64]; };
+                            struct AssignGhost {
+                                char uuid[48];
+                                char name[64];
+                            };
                             AssignGhost assign_ghosts[COOP_MAX_LOBBY];
                             int assign_ghost_count = 0;
                             if (g_coop_ctx) {
                                 SDL_LockMutex(g_coop_ctx->lobby_mutex);
                                 for (int gi = 0; gi < g_coop_ctx->ghost_player_count &&
-                                     assign_ghost_count < COOP_MAX_LOBBY; gi++) {
+                                                 assign_ghost_count < COOP_MAX_LOBBY; gi++) {
                                     const CoopGhostPlayer *gp = &g_coop_ctx->ghost_players[gi];
                                     AssignGhost *ag = &assign_ghosts[assign_ghost_count];
                                     strncpy(ag->uuid, gp->uuid, sizeof(ag->uuid) - 1);
@@ -4237,12 +4242,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             // --- Reveal Relay Password Confirmation Popups ---
             for (int relay_pw_idx = 0; relay_pw_idx < 2; ++relay_pw_idx) {
-                const char *popup_id   = relay_pw_idx == 0
-                                             ? "Reveal Password?##coop_relay_host"
-                                             : "Reveal Password?##coop_relay_recv";
-                bool *revealed_ptr     = relay_pw_idx == 0
-                                             ? &coop_relay_password_host_revealed
-                                             : &coop_relay_password_recv_revealed;
+                const char *popup_id = relay_pw_idx == 0
+                                           ? "Reveal Password?##coop_relay_host"
+                                           : "Reveal Password?##coop_relay_recv";
+                bool *revealed_ptr = relay_pw_idx == 0
+                                         ? &coop_relay_password_host_revealed
+                                         : &coop_relay_password_recv_revealed;
 
                 ImVec2 center = ImGui::GetMainViewport()->GetCenter();
                 ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));

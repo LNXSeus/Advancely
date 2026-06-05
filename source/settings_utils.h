@@ -218,6 +218,7 @@ typedef struct {
     char advancement_root_name[192]; // e.g. "minecraft:adventure/adventuring_time"
     char owner_uuid[48]; // Roster player UUID that owns this advancement
 } CoopAdvAssignment;
+
 #define MAX_COOP_ADV_ASSIGNMENTS 1024
 
 typedef struct {
@@ -395,7 +396,8 @@ struct AppSettings {
     bool igt_unit_spacing; // If true, a space is inserted before every time unit suffix (e.g. "02 m 04 s").
     bool igt_always_show_ms; // If true, milliseconds are always shown regardless of the time magnitude.
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
-    char overlay_progress_separator[9]; // Separator string drawn between top-bar segments. Default "|". Up to 8 visible characters.
+    char overlay_progress_separator[9];
+    // Separator string drawn between top-bar segments. Default "|". Up to 8 visible characters.
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
 
@@ -406,7 +408,8 @@ struct AppSettings {
     // --- Co-op Settings ---
     bool coop_enabled; // Master toggle for co-op mode
     bool coop_auto_accept; // Host: auto-approve incoming join requests without showing an approval prompt
-    bool coop_read_all_save_files; // Host: keep reading on-disk player files for UUIDs not in the live lobby (ghost players)
+    bool coop_read_all_save_files;
+    // Host: keep reading on-disk player files for UUIDs not in the live lobby (ghost players)
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopTransport coop_transport; // RELAY (default, via relay server) or DIRECT (LAN/VPN)
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative

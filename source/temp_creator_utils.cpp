@@ -1510,7 +1510,7 @@ static std::string basename_after_last_slash(const std::string &s) {
 
 std::vector<RenameRow> compute_rename_candidates(
     const std::vector<std::string> &template_root_names,
-    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<std::vector<std::string> > &template_criteria,
     const std::vector<ImportableAdvancement> &import_advs,
     bool include_recipes,
     bool match_basename,
@@ -1533,7 +1533,7 @@ std::vector<RenameRow> compute_rename_candidates(
     import_set.reserve(import_advs.size() * 2);
     for (const auto &adv: import_advs) import_set.insert(adv.root_name);
 
-    std::vector<std::unordered_set<std::string>> import_crit_sets(import_advs.size());
+    std::vector<std::unordered_set<std::string> > import_crit_sets(import_advs.size());
     for (int idx: candidate_imports) {
         const auto &adv = import_advs[idx];
         for (const auto &c: adv.criteria) import_crit_sets[idx].insert(c.root_name);
@@ -1545,7 +1545,7 @@ std::vector<RenameRow> compute_rename_candidates(
         std::string tbase = basename_after_last_slash(tname);
 
         const std::vector<std::string> &tcrits =
-            (t < (int) template_criteria.size()) ? template_criteria[t] : std::vector<std::string>{};
+                (t < (int) template_criteria.size()) ? template_criteria[t] : std::vector<std::string>{};
         std::unordered_set<std::string> tcrit_set(tcrits.begin(), tcrits.end());
 
         std::vector<RenameCandidate> cands;
@@ -1558,9 +1558,11 @@ std::vector<RenameRow> compute_rename_candidates(
             int smaller = std::min((int) tcrit_set.size(), (int) import_crit_sets[idx].size());
             if (smaller > 0) {
                 const auto &small_set = (tcrit_set.size() <= import_crit_sets[idx].size())
-                                            ? tcrit_set : import_crit_sets[idx];
+                                            ? tcrit_set
+                                            : import_crit_sets[idx];
                 const auto &big_set = (tcrit_set.size() <= import_crit_sets[idx].size())
-                                          ? import_crit_sets[idx] : tcrit_set;
+                                          ? import_crit_sets[idx]
+                                          : tcrit_set;
                 for (const auto &name: small_set) if (big_set.find(name) != big_set.end()) overlap++;
             }
 
@@ -1585,9 +1587,11 @@ std::vector<RenameRow> compute_rename_candidates(
         std::sort(cands.begin(), cands.end(), [](const RenameCandidate &a, const RenameCandidate &b) {
             if (a.basename_match != b.basename_match) return a.basename_match;
             double sa = (a.smaller_criteria_size > 0)
-                            ? (double) a.criteria_overlap / (double) a.smaller_criteria_size : 0.0;
+                            ? (double) a.criteria_overlap / (double) a.smaller_criteria_size
+                            : 0.0;
             double sb = (b.smaller_criteria_size > 0)
-                            ? (double) b.criteria_overlap / (double) b.smaller_criteria_size : 0.0;
+                            ? (double) b.criteria_overlap / (double) b.smaller_criteria_size
+                            : 0.0;
             if (sa != sb) return sa > sb;
             return a.import_index < b.import_index;
         });
@@ -1603,7 +1607,7 @@ std::vector<RenameRow> compute_rename_candidates(
 
 std::vector<CriteriaDeltaRow> compute_criteria_deltas(
     const std::vector<std::string> &template_root_names,
-    const std::vector<std::vector<std::string>> &template_criteria,
+    const std::vector<std::vector<std::string> > &template_criteria,
     const std::vector<ImportableAdvancement> &import_advs,
     bool include_recipes) {
     std::vector<CriteriaDeltaRow> result;
@@ -1623,7 +1627,7 @@ std::vector<CriteriaDeltaRow> compute_criteria_deltas(
 
         const std::vector<std::string> empty_v;
         const std::vector<std::string> &tcrits =
-            (t < (int) template_criteria.size()) ? template_criteria[t] : empty_v;
+                (t < (int) template_criteria.size()) ? template_criteria[t] : empty_v;
         std::unordered_set<std::string> tcrit_set(tcrits.begin(), tcrits.end());
         std::unordered_set<std::string> icrit_set;
         icrit_set.reserve(iadv.criteria.size() * 2);
@@ -1714,8 +1718,14 @@ static std::string lang_flag_from_filename(const char *name) {
     for (const char *p = base; p < dot - 4; p++) {
         if (strncmp(p, "_lang", 5) == 0) {
             const char *after = p + 5;
-            if (after == dot) { lang_marker = p; break; } // _lang.json
-            if (*after == '_' && after < dot) { lang_marker = p; break; } // _lang_<flag>.json
+            if (after == dot) {
+                lang_marker = p;
+                break;
+            } // _lang.json
+            if (*after == '_' && after < dot) {
+                lang_marker = p;
+                break;
+            } // _lang_<flag>.json
         }
     }
     if (!lang_marker) return "<NOMATCH>";
@@ -1760,7 +1770,10 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
         std::string got = lang_flag_from_filename(fs.m_filename);
         if (got == "<NOMATCH>") continue;
         bool dup = false;
-        for (const auto &f: out) if (f == got) { dup = true; break; }
+        for (const auto &f: out) if (f == got) {
+            dup = true;
+            break;
+        }
         if (!dup) out.push_back(std::move(got));
     }
     mz_zip_reader_end(&zip);

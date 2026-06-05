@@ -138,7 +138,9 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
         normalize_path(start_path);
     }
 #ifdef __APPLE__
-    const char *filter_patterns[6] = {"*.ttf", "*.otf", "*.ttc", "public.truetype-ttf-font", "public.opentype-font", "public.truetype-collection-font"};
+    const char *filter_patterns[6] = {
+        "*.ttf", "*.otf", "*.ttc", "public.truetype-ttf-font", "public.opentype-font", "public.truetype-collection-font"
+    };
     int filter_count = 6;
 #else
     const char *filter_patterns[3] = {"*.ttf", "*.otf", "*.ttc"};

@@ -1041,7 +1041,10 @@ static void discover_scan_one_dir(const char *dir_path,
                 break;
             }
         }
-        if (!found) { uuids.emplace_back(uuid); mtimes_ms.push_back(mtime_ms); }
+        if (!found) {
+            uuids.emplace_back(uuid);
+            mtimes_ms.push_back(mtime_ms);
+        }
     } while (FindNextFileA(h, &fd));
     FindClose(h);
 #else
@@ -1066,7 +1069,10 @@ static void discover_scan_one_dir(const char *dir_path,
                 break;
             }
         }
-        if (!found) { uuids.emplace_back(uuid); mtimes_ms.push_back(mtime_ms); }
+        if (!found) {
+            uuids.emplace_back(uuid);
+            mtimes_ms.push_back(mtime_ms);
+        }
     }
     closedir(dir);
 #endif

@@ -462,10 +462,16 @@ some other custom launcher.
 
 Advancely is designed to be easy to maintain. By default, **the tracker will automatically check for new versions on
 startup**. When an update is available, you will be notified with a prompt offering to download and install it for you.
-This process is designed to be as safe as possible for your custom files.
+After you click `Update`, the rest happens automatically: a single progress window walks through the download,
+extraction, and restart with no further clicks. This process is designed to be as safe as possible for your custom
+files.
 
 <p align="center">
-  <img src="readme_assets/Automatic_Updating_v0.9.414.png" alt="Automatic Update Preview">
+  <img src="readme_assets/Automatic_Updating_v1.5.3.png" alt="Automatic Update Prompt">
+</p>
+
+<p align="center">
+  <img src="readme_assets/Automatic_Updating_v1.5.3_2.png" alt="Automatic Update Progress">
 </p>
 
 <details>

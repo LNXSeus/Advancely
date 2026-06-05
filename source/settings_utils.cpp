@@ -1521,8 +1521,9 @@ bool settings_load(AppSettings *settings) {
                                              ? string_to_coop_face_corner(corner->valuestring)
                                              : DEFAULT_COOP_FACE_CORNER;
             const cJSON *fsz = cJSON_GetObjectItem(faces_obj, "size");
-            settings->coop_face_size = (fsz && cJSON_IsNumber(fsz)) ? (float) fsz->valuedouble
-                                                                    : DEFAULT_COOP_FACE_SIZE;
+            settings->coop_face_size = (fsz && cJSON_IsNumber(fsz))
+                                           ? (float) fsz->valuedouble
+                                           : DEFAULT_COOP_FACE_SIZE;
             if (settings->coop_face_size < 16.0f) settings->coop_face_size = 16.0f;
             if (settings->coop_face_size > 48.0f) settings->coop_face_size = 48.0f;
             const cJSON *lod = cJSON_GetObjectItem(faces_obj, "lod_threshold");

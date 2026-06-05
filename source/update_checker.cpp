@@ -19,7 +19,6 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h> // For ShellExecuteA
-#include <urlmon.h>   // For URLDownloadToFileA
 #else
 #include <dirent.h>
 #include <unistd.h> // For execv
@@ -95,15 +94,6 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, std::str
     }
     return new_length;
 }
-
-#ifndef _WIN32 // Only for Linux and macOS
-// This is a callback for curl to write downloaded data into a file
-static size_t write_file_callback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    size_t written = fwrite(ptr, size, nmemb, stream);
-    return written;
-}
-#endif
-
 
 bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
                        size_t url_max_len, char *out_html_url, size_t html_url_max_len) {
@@ -199,24 +189,35 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
     return is_new_version_available;
 }
 
-bool download_update_zip(const char *url) {
-#ifdef _WIN32
-    // --- Windows-specific implementation using native API ---
-    log_message(LOG_INFO, "[UPDATE] Downloading update using native Windows API from %s\n", url);
-    HRESULT hr = URLDownloadToFileA(nullptr, url, "update.zip", 0, nullptr);
-    if (SUCCEEDED(hr)) {
-        log_message(LOG_INFO, "[UPDATE] Successfully downloaded update.zip\n");
-        return true;
-    } else {
-        log_message(LOG_ERROR, "[UPDATE] URLDownloadToFileA failed. HRESULT: 0x%lX\n", hr);
-        return false;
+struct DownloadProgress {
+    update_progress_cb cb;
+    void *user;
+};
+
+static int xferinfo_callback(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
+                             curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) {
+    DownloadProgress *p = (DownloadProgress *) clientp;
+    if (p && p->cb && dltotal > 0) {
+        double fraction = (double) dlnow / (double) dltotal;
+        if (fraction < 0.0) fraction = 0.0;
+        if (fraction > 1.0) fraction = 1.0;
+        p->cb(p->user, fraction);
     }
-#else
-    // --- macOS and Linux implementation using libcurl ---
+    return 0;
+}
+
+static size_t download_write_callback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    return fwrite(ptr, size, nmemb, stream);
+}
+
+bool download_update_zip(const char *url, update_progress_cb progress_cb, void *progress_user) {
+    // libcurl on all platforms for a single code path and real download progress.
     CURL *curl;
     FILE *fp;
     CURLcode res;
     bool success = false;
+
+    DownloadProgress progress = {progress_cb, progress_user};
 
     curl = curl_easy_init();
     if (curl) {
@@ -224,14 +225,20 @@ bool download_update_zip(const char *url) {
         if (fp) {
             curl_easy_setopt(curl, CURLOPT_URL, url);
             curl_easy_setopt(curl, CURLOPT_USERAGENT, "AdvancelyUpdateChecker/1.0");
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_callback);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, download_write_callback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
             curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
             curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+            curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+            curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo_callback);
+            curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress);
 
             res = curl_easy_perform(curl);
             if (res == CURLE_OK) {
                 success = true;
+                if (progress_cb) progress_cb(progress_user, 1.0);
                 log_message(LOG_INFO, "[UPDATE] Successfully downloaded update from %s\n", url);
             } else {
                 log_message(LOG_ERROR, "[UPDATE] curl_easy_perform() failed during download: %s\n",
@@ -244,7 +251,6 @@ bool download_update_zip(const char *url) {
         curl_easy_cleanup(curl);
     }
     return success;
-#endif
 }
 
 bool apply_update(const char *main_executable_path) {

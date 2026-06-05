@@ -27,14 +27,14 @@ extern "C" {
 // Types 100+ are control frames; types 1-13 (the existing COOP_MSG_*)
 // are forwarded transparently by the relay between host and receivers.
 enum {
-    COOP_MSG_RELAY_LIST_ROOMS       = 100, // client -> relay; empty payload
-    COOP_MSG_RELAY_ROOM_LIST_RESP   = 101, // relay -> client; JSON {rooms:[...]}
-    COOP_MSG_RELAY_CREATE_ROOM      = 102, // client -> relay; JSON {password_hash, mc_version}
-    COOP_MSG_RELAY_ROOM_CREATED     = 103, // relay -> client; JSON {code}
-    COOP_MSG_RELAY_JOIN_ROOM        = 104, // client -> relay; JSON {code, password_hash}
-    COOP_MSG_RELAY_JOIN_ROOM_OK     = 105, // relay -> client; empty
+    COOP_MSG_RELAY_LIST_ROOMS = 100, // client -> relay; empty payload
+    COOP_MSG_RELAY_ROOM_LIST_RESP = 101, // relay -> client; JSON {rooms:[...]}
+    COOP_MSG_RELAY_CREATE_ROOM = 102, // client -> relay; JSON {password_hash, mc_version}
+    COOP_MSG_RELAY_ROOM_CREATED = 103, // relay -> client; JSON {code}
+    COOP_MSG_RELAY_JOIN_ROOM = 104, // client -> relay; JSON {code, password_hash}
+    COOP_MSG_RELAY_JOIN_ROOM_OK = 105, // relay -> client; empty
     COOP_MSG_RELAY_JOIN_ROOM_DENIED = 106, // relay -> client; UTF-8 reason string
-    COOP_MSG_RELAY_ROOM_CLOSED      = 107  // relay -> client; empty
+    COOP_MSG_RELAY_ROOM_CLOSED = 107 // relay -> client; empty
 };
 
 #define RELAY_ROOM_CODE_LEN     6
@@ -43,7 +43,7 @@ enum {
 
 typedef struct {
     char code[RELAY_ROOM_CODE_LEN + 1];
-    int  player_count;
+    int player_count;
     char mc_version[32];
 } RelayRoomEntry;
 
@@ -61,11 +61,13 @@ bool relay_hash_password(const char *plaintext, char out[RELAY_PASSWORD_HASH_LEN
 // Encoders return a heap-allocated buffer (caller free()s) and write the byte
 // length into *out_len. Return NULL on allocation failure.
 char *relay_encode_create_room(const char *password_hash, const char *mc_version, size_t *out_len);
-char *relay_encode_join_room  (const char *code,          const char *password_hash, size_t *out_len);
+
+char *relay_encode_join_room(const char *code, const char *password_hash, size_t *out_len);
 
 // Decoders parse a payload (NOT null-terminated; len bytes). Return false on
 // malformed input. Output buffers/structs are written only on success.
-bool relay_decode_room_created  (const char *payload, size_t len, char out_code[RELAY_ROOM_CODE_LEN + 1]);
+bool relay_decode_room_created(const char *payload, size_t len, char out_code[RELAY_ROOM_CODE_LEN + 1]);
+
 bool relay_decode_room_list_resp(const char *payload, size_t len, RelayRoomList *out);
 
 typedef struct RelayConn RelayConn;

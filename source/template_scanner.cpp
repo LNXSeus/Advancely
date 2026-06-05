@@ -430,7 +430,8 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     cJSON_ArrayForEach(c, crit_obj) {
                         cJSON *g = cJSON_GetObjectItem(c, "group");
                         if (g && cJSON_IsString(g) && g->valuestring && g->valuestring[0] != '\0') {
-                            groups_active = true; break;
+                            groups_active = true;
+                            break;
                         }
                     }
                 }

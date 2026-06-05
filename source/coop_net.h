@@ -52,8 +52,8 @@ enum CoopMsgType {
     COOP_MSG_JOIN_REJECT = 8, // Host -> Receiver: reason string, then close
     COOP_MSG_PLAYER_LIST = 9, // Host -> All receivers: JSON player list on any change
     COOP_MSG_KICK = 10, // Host -> All Receivers: JSON {target_uuid, reason}.
-                        //   Receivers self-filter on target_uuid (relay broadcasts;
-                        //   direct also uses this format for consistency).
+    //   Receivers self-filter on target_uuid (relay broadcasts;
+    //   direct also uses this format for consistency).
     COOP_MSG_CUSTOM_GOAL_MOD = 11, // Receiver -> Host: custom goal/stat checkbox modification
     COOP_MSG_PLAYER_STATES = 12, // Host -> All receivers: per-player progress snapshots
     // Receiver -> Host: raw stats file upload for legacy (<=1.6.4) merging ONLY.
@@ -102,9 +102,9 @@ typedef struct {
     char username[64];
     char uuid[48];
     char display_name[64];
-    bool is_offline;            // Parity with lobby player; skin still resolves by UUID
-    bool name_resolved;         // Mojang/Hermes lookup done (false = UUID-prefix fallback name)
-    Uint64 last_file_mtime_ms;  // mtime of the discovered <uuid>.json (cap drop-order + staleness)
+    bool is_offline; // Parity with lobby player; skin still resolves by UUID
+    bool name_resolved; // Mojang/Hermes lookup done (false = UUID-prefix fallback name)
+    Uint64 last_file_mtime_ms; // mtime of the discovered <uuid>.json (cap drop-order + staleness)
 } CoopGhostPlayer;
 
 // Custom goal/stat checkbox modification actions (Receiver -> Host)
@@ -143,7 +143,7 @@ typedef struct {
     char display_name[64]; // From handshake
     bool is_offline; // From handshake (offline accounts skip Mojang skin fetch)
     Uint32 connect_time; // When the socket was accepted (for handshake timeout)
-    Uint32 last_seen_ms;          // SDL_GetTicks of the most recent inbound frame (relay path)
+    Uint32 last_seen_ms; // SDL_GetTicks of the most recent inbound frame (relay path)
     SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
     char pending_action_reason[128]; // Reason string for kick/reject
 } CoopClient;
@@ -269,7 +269,7 @@ typedef struct {
     int transport;
     RelayConn *relay_conn;
     SDL_Mutex *relay_send_mutex; // Serializes writes; multiple threads broadcast on the same TLS conn.
-    char relay_room_code[8];     // Set after CREATE_ROOM/JOIN_ROOM; 6 chars + NUL + slack.
+    char relay_room_code[8]; // Set after CREATE_ROOM/JOIN_ROOM; 6 chars + NUL + slack.
     char relay_password_hash[65]; // SHA-256 hex; sent in CREATE_ROOM (host) or JOIN_ROOM (receiver).
 } CoopNetContext;
 
