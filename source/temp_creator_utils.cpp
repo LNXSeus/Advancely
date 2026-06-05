@@ -875,6 +875,11 @@ bool delete_lang_file(const char *version, const char *category, const char *fla
 
 // --- TEMPLATE IMPORT/EXPORT LOGIC ---
 
+// Name of the metadata file embedded in exported template zips. It records the exact
+// version/category/optional_flag so importing can pre-fill the fields without relying on
+// filename heuristics. Older zips without this file fall back to filename parsing.
+static const char *TEMPLATE_META_FILENAME = "advancely_template.json";
+
 
 // Recursively collect all "icon" string values from a cJSON object/array
 static void collect_icons_recursive(const cJSON *node, std::vector<std::string> &out) {
@@ -1029,6 +1034,21 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
         snprintf(status_message, msg_size, "Error: No files found to export for this template.");
         mz_zip_writer_end(&zip_archive);
         return false;
+    }
+
+    // --- Embed metadata so importing can pre-fill version/category/flag exactly ---
+    {
+        cJSON *meta = cJSON_CreateObject();
+        cJSON_AddStringToObject(meta, "version", version);
+        cJSON_AddStringToObject(meta, "category", template_info.category);
+        cJSON_AddStringToObject(meta, "optional_flag", template_info.optional_flag);
+        char *meta_str = cJSON_PrintUnformatted(meta);
+        cJSON_Delete(meta);
+        if (meta_str) {
+            mz_zip_writer_add_mem(&zip_archive, TEMPLATE_META_FILENAME, meta_str, strlen(meta_str),
+                                  MZ_DEFAULT_COMPRESSION);
+            free(meta_str);
+        }
     }
 
     // --- Add icon files to the zip under icons/<relative_path> ---
@@ -1187,11 +1207,43 @@ static bool parse_template_filename(const char *filename, char *out_version, cha
 }
 
 bool get_info_from_zip(const char *zip_path, char *out_version, char *out_category, char *out_flag, char *error_message,
-                       size_t msg_size) {
+                       size_t msg_size, bool *out_from_metadata) {
+    if (out_from_metadata) *out_from_metadata = false;
     mz_zip_archive zip_archive = {};
     if (!mz_zip_reader_init_file(&zip_archive, zip_path, 0)) {
         snprintf(error_message, msg_size, "Error: Could not read zip file.");
         return false;
+    }
+
+    // --- Prefer the embedded metadata file for an exact, heuristic-free result ---
+    int meta_idx = mz_zip_reader_locate_file(&zip_archive, TEMPLATE_META_FILENAME, nullptr, 0);
+    if (meta_idx >= 0) {
+        size_t meta_size = 0;
+        void *meta_buf = mz_zip_reader_extract_to_heap(&zip_archive, (mz_uint) meta_idx, &meta_size, 0);
+        if (meta_buf) {
+            cJSON *meta = cJSON_ParseWithLength((const char *) meta_buf, meta_size);
+            free(meta_buf);
+            if (meta) {
+                cJSON *v = cJSON_GetObjectItemCaseSensitive(meta, "version");
+                cJSON *c = cJSON_GetObjectItemCaseSensitive(meta, "category");
+                cJSON *f = cJSON_GetObjectItemCaseSensitive(meta, "optional_flag");
+                if (cJSON_IsString(v) && cJSON_IsString(c)) {
+                    strncpy(out_version, v->valuestring, 64 - 1);
+                    out_version[64 - 1] = '\0';
+                    strncpy(out_category, c->valuestring, MAX_PATH_LENGTH - 1);
+                    out_category[MAX_PATH_LENGTH - 1] = '\0';
+                    const char *flag_val = cJSON_IsString(f) ? f->valuestring : "";
+                    strncpy(out_flag, flag_val, MAX_PATH_LENGTH - 1);
+                    out_flag[MAX_PATH_LENGTH - 1] = '\0';
+                    if (out_from_metadata) *out_from_metadata = true;
+                    cJSON_Delete(meta);
+                    mz_zip_reader_end(&zip_archive);
+                    return true;
+                }
+                cJSON_Delete(meta);
+            }
+        }
+        // Metadata present but unreadable: fall through to filename parsing.
     }
 
     char main_template_filename[MAX_PATH_LENGTH] = "";
@@ -1199,6 +1251,7 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
     for (mz_uint i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+        if (strcmp(file_stat.m_filename, TEMPLATE_META_FILENAME) == 0) continue; // skip metadata file
         if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") && !
             strstr(file_stat.m_filename, "_lang")) {
             if (main_template_filename[0] != '\0') {
@@ -1296,6 +1349,9 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
         char new_filename[MAX_PATH_LENGTH];
         const char *original_filename = file_stat.m_filename;
         size_t old_base_len = strlen(old_base_filename);
+
+        // Skip the embedded metadata file; it is only used to pre-fill the import fields.
+        if (strcmp(original_filename, TEMPLATE_META_FILENAME) == 0) continue;
 
         // Check if the file matches the old template structure for renaming
         if (strncmp(original_filename, old_base_filename, old_base_len) == 0) {

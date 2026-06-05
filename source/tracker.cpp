@@ -12951,7 +12951,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
         settings->category[sizeof(settings->category) - 1] = '\0';
 
-        settings->optional_flag[0] = '\0';
+        strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
+        settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
         settings->lang_flag[0] = '\0';
 
         // 5. Save these new default settings back to the settings.json file

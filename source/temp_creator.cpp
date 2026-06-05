@@ -2880,6 +2880,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_category[MAX_PATH_LENGTH] = "";
     static char import_flag[MAX_PATH_LENGTH] = "";
 
+    // The original identity declared by the zip (from its embedded metadata or filename),
+    // shown so the user can tell if they changed the pre-filled fields.
+    static char import_orig_version[64] = "";
+    static char import_orig_category[MAX_PATH_LENGTH] = "";
+    static char import_orig_flag[MAX_PATH_LENGTH] = "";
+    // True only when the identity came from the zip's embedded metadata file. When false the values
+    // were guessed from the filename, so we must not claim to know the exact category/flag split.
+    static bool import_orig_from_metadata = false;
+
     static bool import_zip_has_icons = false; // set when zip is opened
     static bool import_icons_checkbox = false; // user's choice
     static bool show_export_options_popup = false; // Popup for export options (includes icons checkbox)
@@ -3711,7 +3720,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         if (strcmp(creator_version_str, "1.16.1") == 0 &&
             strcmp(selected.category, "all_advancements") == 0 &&
-            selected.optional_flag[0] == '\0') {
+            strcmp(selected.optional_flag, "_aatool_optimized") == 0) {
             is_default_template = true;
         }
     }
@@ -3804,7 +3813,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       "Template ZIP Archive", 0);
         if (open_path) {
             char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
-            if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
+            bool from_metadata = false;
+            if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message),
+                                  &from_metadata)) {
                 // Success: Pre-fill the confirmation view
                 strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
                 import_zip_path[sizeof(import_zip_path) - 1] = '\0';
@@ -3815,8 +3826,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 strncpy(import_flag, flag, sizeof(import_flag) - 1);
                 import_flag[sizeof(import_flag) - 1] = '\0';
 
-                // Pre-select the version dropdown to match the creator's current version.
+                // Remember the zip's declared identity to show alongside the (editable) fields.
+                strncpy(import_orig_version, version, sizeof(import_orig_version) - 1);
+                import_orig_version[sizeof(import_orig_version) - 1] = '\0';
+                strncpy(import_orig_category, category, sizeof(import_orig_category) - 1);
+                import_orig_category[sizeof(import_orig_category) - 1] = '\0';
+                strncpy(import_orig_flag, flag, sizeof(import_orig_flag) - 1);
+                import_orig_flag[sizeof(import_orig_flag) - 1] = '\0';
+                import_orig_from_metadata = from_metadata;
+
+                // Pre-select the version dropdown to match the version recorded in the zip.
+                // Fall back to the creator's current version if no match is found.
                 import_version_idx = creator_version_idx;
+                for (int v = 0; v < VERSION_STRINGS_COUNT; ++v) {
+                    if (strcmp(VERSION_STRINGS[v], version) == 0) {
+                        import_version_idx = v;
+                        break;
+                    }
+                }
 
                 show_import_confirmation_view = true;
                 import_zip_has_icons = zip_contains_icons(open_path);
@@ -15980,6 +16007,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Text("Confirm Import");
         ImGui::Separator();
         ImGui::TextWrapped("Importing from: %s", import_zip_path);
+
+        // Show the identity the zip declared so the user can spot accidental edits to the pre-fill.
+        // Category and flag are labeled separately because their boundary is exactly what's ambiguous.
+        // Only trust these values when they came from the embedded metadata; otherwise they were
+        // guessed from the filename and the category/flag split is unreliable, so we say "unknown".
+        char exported_as_buffer[MAX_PATH_LENGTH * 2];
+        if (import_orig_from_metadata) {
+            snprintf(exported_as_buffer, sizeof(exported_as_buffer),
+                     "Exported as:   Version: %s   |   Category: %s   |   Flag: %s",
+                     import_orig_version, import_orig_category,
+                     import_orig_flag[0] != '\0' ? import_orig_flag : "(none)");
+        } else {
+            snprintf(exported_as_buffer, sizeof(exported_as_buffer),
+                     "Exported as:   unknown (zip has no metadata; fields guessed from filename)");
+        }
+        ImGui::TextDisabled("%s", exported_as_buffer);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            if (import_orig_from_metadata) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "The version, category and optional flag this template was exported with.\n"
+                         "The fields below are pre-filled to match (important for COOP).\n"
+                         "Edit them only if you want to import under a different name.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "This zip has no embedded metadata, so its exact identity is unknown.\n"
+                         "The fields below were guessed from the filename and the split between\n"
+                         "category and flag may be wrong. Please verify them before importing.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::Spacing();
 
         ImGui::Text("Please confirm or edit the details for the new template:");

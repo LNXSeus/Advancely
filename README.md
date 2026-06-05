@@ -789,8 +789,12 @@ From the main editor view, you can manage entire template packages:
 * **Copy Template**: Duplicates an existing template, including all its language files. This is the perfect starting
   point for creating a variation of a complex template.
 * **Delete Template**: Permanently removes a template and all of its associated language **and notes files**.
-* **Import Template**: Imports a full template package from a `.zip` file. You can confirm or change the version,
-  category, and flag before the files are added. If the zip contains bundled icon files, an **Import bundled icon
+* **Import Template**: Imports a full template package from a `.zip` file. Exported zips embed their exact version,
+  category, and flag, so the import fields are pre-filled correctly (important for COOP) without guessing from the filename (older zips fall
+  back to filename parsing). An `Exported as` line shows the zip's original identity so you can spot any accidental
+  edits to the pre-fill before importing; for older zips without embedded metadata it shows `unknown`, since the
+  category/flag split was only guessed from the filename and may be wrong. You can still confirm or change the version, category, and flag before the
+  files are added. If the zip contains bundled icon files, an **Import bundled icon
   files** checkbox will appear and enabling it extracts those icons directly into your `resources/icons/` folder so
   they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
 * **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for
@@ -1649,7 +1653,7 @@ maintainers or advanced users who want to override default behaviors.
 | `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
 | `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
 | `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
-| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host. |
+| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host.      |
 | `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
 
 </details>

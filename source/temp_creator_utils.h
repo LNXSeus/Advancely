@@ -196,10 +196,12 @@ bool delete_lang_file(const char *version, const char *category, const char *fla
  * @param out_flag Buffer to store the parsed flag string.
  * @param error_message Buffer to store an error message on failure.
  * @param msg_size Size of the error_message buffer.
+ * @param out_from_metadata Optional; set to true if the info came from the embedded metadata file,
+ *        false if it was guessed from the filename. Pass nullptr if not needed.
  * @return true on success, false on failure.
  */
 bool get_info_from_zip(const char *zip_path, char *out_version, char *out_category, char *out_flag, char *error_message,
-                       size_t msg_size);
+                       size_t msg_size, bool *out_from_metadata = nullptr);
 
 /**
  * @brief Imports a template from a zip, optionally extracting bundled icon files.

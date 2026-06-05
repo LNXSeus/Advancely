@@ -15,6 +15,19 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.5.2" date="2026-06-05">
+      <description>
+        <ul>
+          <li>Exported template zips now embed their exact version, category, and flag, so the import fields pre-fill correctly instead of being guessed from the filename.</li>
+          <li>The default template is now all_advancements _aatool_optimized; corrupted/missing-template recovery falls back to it.</li>
+          <li>Coop: complex advancements/achievements can be assigned to specific players; "auto" still tracks the player with the most criteria.</li>
+          <li>Goal hiding mode moved to a dropdown in the tracker controls and applies instantly without restarting the overlay.</li>
+          <li>More bulk actions for Recipe, Row 3, Row 2, and Per-Stage Icons checkboxes.</li>
+          <li>New templates: 1.6.4 all_achievements _ssg_kaimaseed, plus 26.1 and 26.2 categorical templates.</li>
+          <li>Fixes: main game files now take priority over the 5-minute Hermes re-read so advancements revoke properly; "Row 3" checkbox persists across template switches; note window no longer reverts on ESC.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.1" date="2026-05-28">
       <description>
         <ul>
