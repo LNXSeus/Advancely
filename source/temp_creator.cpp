@@ -14807,7 +14807,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const char *label = show_counter_display_names
                                                 ? (display_name[0] ? display_name : root_name)
                                                 : root_name;
-                        if (label[0] == '\0') label = "[New Counter]"; {
+                        if (label[0] == '\0') label = "[New Counter]";
+                        {
                             bool is_ctr_selected = s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end();
                             if (ImGui::Checkbox("##ctr_bulk_sel", &is_ctr_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
