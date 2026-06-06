@@ -116,9 +116,9 @@ Thank you for supporting the project!
 </p>
 
 <p align="center">
-  <img src="readme_assets/Advancely_v1.3.0_Preview2.png" alt="Advancely Manual Layout Preview">
+  <img src="readme_assets/Advancely_v1.5.3_Preview2.png" alt="Advancely Manual Layout Preview">
   <br>
-  <em>This screenshot shows a fully custom manual layout (<code>1.16</code> <code>all_advancements</code> <code>_categorical</code>) built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns. Then you must turn on <code>Manual Layout</code> on the tracker.</em>
+  <em>This screenshot shows a fully custom manual layout (<code>26.2</code> <code>all_advancements</code> <code>_categorical</code>) built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns. Then you must turn on <code>Manual Layout</code> on the tracker.</em>
 </p>
 
 Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
@@ -780,7 +780,7 @@ share the rulesets or `templates` that the tracker uses. You can access it by op
 the `Open Template Editor` button.
 
 <p align="center">
-  <img src="readme_assets/v1.2.0_Template_Editor.png" alt="Template_Editor">
+  <img src="readme_assets/v1.5.3_Template_Editor.png" alt="Template_Editor">
 </p>
 
 <details>
