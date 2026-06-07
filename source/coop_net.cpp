@@ -1996,11 +1996,14 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                 set_status(ctx, "Connection lost");
             break;
         }
-        if (rc == 0) {
-            // Timeout tick: emit periodic heartbeat so the relay sees us as alive
-            // AND the host can track per-UUID liveness (the UUID rides along in
-            // the payload; otherwise the relay strips identity on the wire).
-            Uint32 now = SDL_GetTicks();
+        // Periodic upkeep, run on every iteration regardless of whether this read
+        // returned a frame or timed out: send our heartbeat (the UUID rides along
+        // so the host can track per-UUID liveness), log diag, and watch host
+        // liveness. Gating these on the read-timeout branch let a steady stream of
+        // inbound frames starve our outbound heartbeat and trip the host's 25s
+        // stale-slot kick even though we were perfectly alive.
+        Uint32 now = SDL_GetTicks();
+        {
             if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
                 cJSON *hb = cJSON_CreateObject();
                 cJSON_AddStringToObject(hb, "uuid", ctx->connect_uuid);
@@ -2060,9 +2063,11 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                            (now - last_inbound_ms) / 1000);
                 break;
             }
-            continue;
         }
-        last_inbound_ms = SDL_GetTicks();
+
+        if (rc == 0) continue;
+
+        last_inbound_ms = now;
         frames_in++;
         int drc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
                                             &last_heartbeat_recv);
@@ -2182,11 +2187,12 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 set_status(ctx, "Server connection lost");
             break;
         }
-        if (rc == 0) {
-            // Timeout tick: emit periodic heartbeat so the relay sees us as alive.
-            // Receivers also broadcast HEARTBEAT_ACK on receipt (handled below)
-            // which doubles as room-wide liveness traffic.
-            Uint32 now = SDL_GetTicks();
+        // Periodic upkeep, run on every iteration regardless of whether this read
+        // returned a frame or timed out: send our host heartbeat so the relay and
+        // receivers see us alive, log diag, and expire stale slots. Gating these on
+        // the read-timeout branch let a busy room's inbound stream starve them.
+        Uint32 now = SDL_GetTicks();
+        {
             if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
                 SDL_LockMutex(ctx->relay_send_mutex);
                 bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT, nullptr, 0);
@@ -2263,10 +2269,11 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 rebuild_lobby_list(ctx);
                 broadcast_player_list(ctx);
             }
-            continue;
         }
 
-        last_inbound_ms = SDL_GetTicks();
+        if (rc == 0) continue;
+
+        last_inbound_ms = now;
         frames_in++;
 
         if (msg_type == COOP_MSG_JOIN_REQUEST) {

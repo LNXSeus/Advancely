@@ -3554,6 +3554,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::Separator();
                         ImGui::Spacing();
 
+                        // Pre-host reminder: template/mod options bake into the lobby at Start Lobby. Hidden once hosting.
+                        if (!net_is_active) {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
+                            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+                            if (selected_version <= MC_VERSION_1_6_4) {
+                                ImGui::TextWrapped(
+                                    "Before starting the lobby, set your template (version, category, optional flag), "
+                                    "the Hermes Mod toggle, and the StatsPerWorld Mod toggle. These cannot be changed "
+                                    "once the lobby is being hosted.");
+                            } else {
+                                ImGui::TextWrapped(
+                                    "Before starting the lobby, set your template (version, category, optional flag) "
+                                    "and the Hermes Mod toggle. These cannot be changed once the lobby is being hosted.");
+                            }
+                            ImGui::PopTextWrapPos();
+                            ImGui::PopStyleColor();
+                            ImGui::Spacing();
+                        }
+
                         // Start Lobby button (disabled when already hosting, invalid input, unsaved changes, or template editor open)
                         {
                             bool editor_open = p_temp_creator_open && *p_temp_creator_open;
