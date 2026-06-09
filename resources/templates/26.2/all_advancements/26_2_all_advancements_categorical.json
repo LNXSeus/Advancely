@@ -4342,8 +4342,6 @@
 			"linked_goals":	[{
 					"root_name":	"minecraft:nautilus",
 					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
 				}],
 			"icon_pos":	{
 				"x":	-3000,
@@ -4367,8 +4365,6 @@
 			"root_name":	"minecraft:crafted/minecraft:golden_carrot",
 			"target":	8,
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/all_effects"
-				}, {
 					"root_name":	"minecraft:horse",
 					"parent_root":	"minecraft:husbandry/bred_all_animals"
 				}, {
@@ -4497,8 +4493,8 @@
 				}, {
 					"stage_id":	"5",
 					"icon":	"blocks/Sniffer_Egg_JE1_BE1.png",
-					"type":	"stat",
-					"root_name":	"minecraft:used/minecraft:sniffer_egg",
+					"type":	"advancement",
+					"root_name":	"minecraft:husbandry/feed_snifflet",
 					"target":	3
 				}, {
 					"stage_id":	"final",
@@ -4578,7 +4574,7 @@
 					"target":	0
 				}, {
 					"stage_id":	"4",
-					"icon":	"items/nether_wart_25w14craftmine.png",
+					"icon":	"monsters/wither.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/create_full_beacon",
 					"target":	1
