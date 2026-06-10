@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <string>
 #include <cstring> // For memcmp on simple sub-structs
+#include <cctype> // For tolower() in preset-name comparison
+#include <cstdio> // For remove() when deleting preset files
 
 #include "logger.h"
 
@@ -337,6 +339,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static std::vector<const char *> version_display_c_strs;
     static bool version_counts_generated = false;
 
+    // --- Settings presets (the bar above the tabs) ---
+    static const int MAX_SETTING_PRESETS_UI = 256;
+    static char preset_names[MAX_SETTING_PRESETS_UI][SETTING_PRESET_NAME_LEN];
+    static int preset_count = 0;
+    static int preset_selected = -1;
+    static bool presets_need_rescan = true;
+    static char new_preset_name[SETTING_PRESET_NAME_LEN] = "";
+    static char preset_status_msg[256] = "";
+    static bool preset_status_is_error = false;
+
     // Helper lambda to auto-select a language for the currently selected template
     auto auto_select_language = [&]() {
         DiscoveredTemplate *selected_template = nullptr;
@@ -489,6 +501,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (just_opened) {
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
         memcpy(&saved_settings, app_settings, sizeof(AppSettings));
+        presets_need_rescan = true; // Refresh the preset list every time the window opens
+        new_preset_name[0] = '\0';
+        preset_status_msg[0] = '\0';
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
         show_hotkey_warning_message = false;
@@ -610,6 +625,288 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Adv/Ach
     const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
+
+    // --- Settings Presets (always visible above the tabs) ---
+    // Presets are full snapshots of settings.json stored next to it in resources/config/.
+    // preset_loaded_this_frame is set when a preset is loaded so the completion-threshold
+    // state below adopts the loaded values instead of resetting them on the template change.
+    bool preset_loaded_this_frame = false;
+    {
+        // Some settings clash with the synchronised lobby state, so lock the section while active.
+        bool preset_lobby_locked = g_coop_ctx &&
+                                   (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
+                                    coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
+                                    coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
+
+        if (presets_need_rescan) {
+            preset_count = list_setting_presets(preset_names, MAX_SETTING_PRESETS_UI);
+            if (preset_selected >= preset_count) preset_selected = preset_count - 1;
+            presets_need_rescan = false;
+        }
+
+        auto name_to_lower = [](const char *s, char *out, size_t n) {
+            size_t i = 0;
+            for (; s[i] != '\0' && i + 1 < n; ++i) out[i] = (char) tolower((unsigned char) s[i]);
+            out[i] = '\0';
+        };
+
+        ImGui::Text("Settings Presets");
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            char preset_help_buffer[768];
+            snprintf(preset_help_buffer, sizeof(preset_help_buffer),
+                     "Save and switch between full snapshots of your settings.\n"
+                     "Presets are stored as .json files in resources/config/, right next to\n"
+                     "settings.json. Advancely always reads only settings.json itself, so\n"
+                     "loading a preset just fills this window with its values - click\n"
+                     "'Apply Settings' afterwards to actually use them.");
+            ImGui::SetTooltip("%s", preset_help_buffer);
+        }
+
+        if (preset_lobby_locked) ImGui::BeginDisabled();
+
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::InputTextWithHint("##new_preset_name", "New preset name", new_preset_name, sizeof(new_preset_name));
+        ImGui::SameLine();
+
+        bool create_disabled = has_unsaved_changes;
+        if (create_disabled) ImGui::BeginDisabled();
+        if (ImGui::Button("Create Preset")) {
+            char name[SETTING_PRESET_NAME_LEN];
+            strncpy(name, new_preset_name, sizeof(name) - 1);
+            name[sizeof(name) - 1] = '\0';
+            char *start = name;
+            while (*start == ' ' || *start == '\t') start++;
+            size_t end = strlen(start);
+            while (end > 0 && (start[end - 1] == ' ' || start[end - 1] == '\t')) start[--end] = '\0';
+
+            bool ok = true;
+            if (start[0] == '\0') {
+                snprintf(preset_status_msg, sizeof(preset_status_msg), "Enter a name for the preset.");
+                preset_status_is_error = true;
+                ok = false;
+            }
+            if (ok && strpbrk(start, "/\\:*?\"<>|") != nullptr) {
+                snprintf(preset_status_msg, sizeof(preset_status_msg),
+                         "Preset name cannot contain any of: / \\ : * ? \" < > |");
+                preset_status_is_error = true;
+                ok = false;
+            }
+            if (ok) {
+                char lower[SETTING_PRESET_NAME_LEN];
+                name_to_lower(start, lower, sizeof(lower));
+                if (strcmp(lower, "settings") == 0) {
+                    snprintf(preset_status_msg, sizeof(preset_status_msg),
+                             "'settings' is reserved for the main settings file. Choose another name.");
+                    preset_status_is_error = true;
+                    ok = false;
+                }
+                for (int i = 0; ok && i < preset_count; ++i) {
+                    char existing_lower[SETTING_PRESET_NAME_LEN];
+                    name_to_lower(preset_names[i], existing_lower, sizeof(existing_lower));
+                    if (strcmp(lower, existing_lower) == 0) {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg),
+                                 "A preset named '%s' already exists.", preset_names[i]);
+                        preset_status_is_error = true;
+                        ok = false;
+                    }
+                }
+            }
+            if (ok) {
+                // Copy the entire current settings.json verbatim into the new preset file.
+                cJSON *root = cJSON_from_file(get_settings_file_path());
+                if (!root) {
+                    snprintf(preset_status_msg, sizeof(preset_status_msg),
+                             "Could not read settings.json to create the preset.");
+                    preset_status_is_error = true;
+                } else {
+                    char preset_path[MAX_PATH_LENGTH];
+                    snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(), start);
+                    if (cJSON_write_to_file_atomic(preset_path, root)) {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Created preset '%s'.", start);
+                        preset_status_is_error = false;
+                        new_preset_name[0] = '\0';
+                        presets_need_rescan = true;
+                    } else {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to write the preset file.");
+                        preset_status_is_error = true;
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+        }
+        if (create_disabled) ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char create_tooltip_buffer[768];
+            if (has_unsaved_changes) {
+                snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
+                         "Disabled because there are unsaved changes.\n"
+                         "Apply or revert your changes first so the preset matches the\n"
+                         "settings.json file, then create the preset.");
+            } else {
+                snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
+                         "Save the current settings as a new preset file in resources/config/.\n"
+                         "The name cannot be 'settings' or match an existing preset.");
+            }
+            ImGui::SetTooltip("%s", create_tooltip_buffer);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Open Settings Folder")) {
+            char config_path[MAX_PATH_LENGTH];
+            snprintf(config_path, sizeof(config_path), "%s/config", get_resources_path());
+#ifdef _WIN32
+            path_to_windows_native(config_path);
+#endif
+            open_content(config_path);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char open_config_tooltip_buffer[256];
+            snprintf(open_config_tooltip_buffer, sizeof(open_config_tooltip_buffer),
+                     "Opens the 'resources/config' folder in your file explorer,\n"
+                     "where settings.json and your preset files are stored.");
+            ImGui::SetTooltip("%s", open_config_tooltip_buffer);
+        }
+
+        if (preset_count > 0) {
+            ImGui::SetNextItemWidth(200.0f);
+            const char *preview = (preset_selected >= 0 && preset_selected < preset_count)
+                                      ? preset_names[preset_selected]
+                                      : "Select a preset";
+            if (ImGui::BeginCombo("##preset_select", preview)) {
+                for (int i = 0; i < preset_count; ++i) {
+                    bool is_sel = (i == preset_selected);
+                    if (ImGui::Selectable(preset_names[i], is_sel)) preset_selected = i;
+                    if (is_sel) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            bool have_selection = (preset_selected >= 0 && preset_selected < preset_count);
+
+            ImGui::SameLine();
+            if (!have_selection) ImGui::BeginDisabled();
+            if (ImGui::Button("Load Preset")) {
+                char preset_path[MAX_PATH_LENGTH];
+                snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
+                         preset_names[preset_selected]);
+                if (settings_load_from_file(&temp_settings, preset_path)) {
+                    // Force the template list to rescan and the completion thresholds to
+                    // adopt (not reset) the loaded values, so the tabs refresh in place.
+                    last_scanned_version[0] = '\0';
+                    preset_loaded_this_frame = true;
+                    snprintf(preset_status_msg, sizeof(preset_status_msg),
+                             "Loaded preset '%s'. Click 'Apply Settings' to use it.", preset_names[preset_selected]);
+                    preset_status_is_error = false;
+                } else {
+                    snprintf(preset_status_msg, sizeof(preset_status_msg),
+                             "Failed to read preset '%s'.", preset_names[preset_selected]);
+                    preset_status_is_error = true;
+                }
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char load_tooltip_buffer[768];
+                snprintf(load_tooltip_buffer, sizeof(load_tooltip_buffer),
+                         "Fill this window with the selected preset's values.\n"
+                         "Nothing is applied yet - review the tabs, then click 'Apply Settings'\n"
+                         "to switch to the preset (or 'Revert Changes' to discard it).");
+                ImGui::SetTooltip("%s", load_tooltip_buffer);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Remove Preset")) {
+                ImGui::OpenPopup("Delete Preset?");
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char remove_tooltip_buffer[512];
+                snprintf(remove_tooltip_buffer, sizeof(remove_tooltip_buffer),
+                         "Permanently delete the selected preset file from resources/config/.\n"
+                         "This does not affect your current settings.");
+                ImGui::SetTooltip("%s", remove_tooltip_buffer);
+            }
+            if (!have_selection) ImGui::EndDisabled();
+        } else {
+            ImGui::TextDisabled("No presets saved yet.");
+        }
+
+        if (preset_lobby_locked) ImGui::EndDisabled();
+
+        // Removal confirmation popup (only opens via the enabled "Remove Preset" button).
+        ImVec2 delete_popup_center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(delete_popup_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("Delete Preset?", nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+            const char *del_name = (preset_selected >= 0 && preset_selected < preset_count)
+                                       ? preset_names[preset_selected]
+                                       : "";
+            char delete_prompt_buffer[256];
+            snprintf(delete_prompt_buffer, sizeof(delete_prompt_buffer),
+                     "Permanently delete the preset '%s'?", del_name);
+            ImGui::Text("%s", delete_prompt_buffer);
+            ImGui::Spacing();
+            ImGui::TextDisabled("This cannot be undone.");
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+            if (ImGui::Button("Delete") || enter_pressed) {
+                if (preset_selected >= 0 && preset_selected < preset_count) {
+                    char preset_path[MAX_PATH_LENGTH];
+                    snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
+                             preset_names[preset_selected]);
+                    if (remove(preset_path) == 0) {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Removed preset '%s'.",
+                                 preset_names[preset_selected]);
+                        preset_status_is_error = false;
+                    } else {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to remove preset '%s'.",
+                                 preset_names[preset_selected]);
+                        preset_status_is_error = true;
+                    }
+                    presets_need_rescan = true;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Permanently delete this preset file.\n"
+                         "You can also press 'ENTER'.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+
+            ImGui::SameLine();
+
+            bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+            if (ImGui::Button("Cancel") || esc_pressed) {
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Keep the preset.\n"
+                         "You can also press 'ESCAPE'.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+
+            ImGui::EndPopup();
+        }
+
+        if (preset_status_msg[0] != '\0') {
+            ImVec4 status_color = preset_status_is_error
+                                      ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                      : ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+            ImGui::TextColored(status_color, "%s", preset_status_msg);
+        }
+
+        if (preset_lobby_locked) {
+            ImGui::TextDisabled("Presets are locked while a co-op lobby is active.");
+        }
+    }
+    ImGui::Separator();
+    ImGui::Spacing();
 
     // SETTINGS TABS START
     if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None)) {
@@ -1332,8 +1629,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(completion_sig, sizeof(completion_sig), "%s|%s|%s",
                          temp_settings.version_str, temp_settings.category, temp_settings.optional_flag);
 
-                if (just_opened) {
-                    // Adopt the current selection on open without wiping the saved thresholds.
+                if (just_opened || preset_loaded_this_frame) {
+                    // Adopt the current selection on open (or right after a preset load)
+                    // without wiping the thresholds the preset/settings file carried.
                     strncpy(completion_last_template_sig, completion_sig,
                             sizeof(completion_last_template_sig) - 1);
                     completion_last_template_sig[sizeof(completion_last_template_sig) - 1] = '\0';

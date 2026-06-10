@@ -492,6 +492,20 @@ void settings_set_defaults(AppSettings *settings);
 bool settings_load(AppSettings *settings);
 
 /**
+ * @brief Loads settings from an arbitrary file (e.g. a settings preset) into `settings`.
+ *
+ * Behaves like settings_load() but reads from `path` instead of settings.json, and
+ * skips the .bak recovery and the "corrupted" popup that are specific to the primary
+ * settings file. It never writes anything to disk. After parsing it calls
+ * `construct_template_paths` to build the final file paths.
+ *
+ * @param settings A pointer to the AppSettings struct to be populated.
+ * @param path The full path to the settings file to read.
+ * @return true if the file was read and parsed, false if it could not be read.
+ */
+bool settings_load_from_file(AppSettings *settings, const char *path);
+
+/**
  * @brief Saves settings to settings.json based on a specific context.
  * It reads the existing file, updates values according to the context, and writes it back.
  * @param settings A pointer to the AppSettings struct containing the data to save.

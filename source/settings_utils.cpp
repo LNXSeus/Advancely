@@ -668,47 +668,11 @@ void coop_set_advancement_owner(AppSettings *settings, const char *adv_root_name
     settings->coop_adv_assignments[idx].owner_uuid[sizeof(settings->coop_adv_assignments[idx].owner_uuid) - 1] = '\0';
 }
 
-bool settings_load(AppSettings *settings) {
-    // Flag to signal re-save when default values need to be written back to settings.json
+// Parses an already-loaded settings JSON object into `settings`, which must already
+// hold defaults. `json` may be NULL, in which case every field keeps its default.
+// Returns true if any field fell back to a default (signaling a re-save is needed).
+static bool settings_apply_json(AppSettings *settings, cJSON *json) {
     bool defaults_were_used = false;
-
-    // Set safe defaults first by calling settings_set_defaults
-    settings_set_defaults(settings);
-
-    // Try to load and parse the settings file, read with escaping
-    cJSON *json = cJSON_from_file(get_settings_file_path());
-
-    // A transient read failure (a write landing at the same instant, antivirus or
-    // cloud sync briefly locking the file) must not wipe the user's settings.
-    // Retry a few times before giving up.
-    for (int attempt = 0; json == nullptr && attempt < 3; attempt++) {
-        SDL_Delay(40);
-        json = cJSON_from_file(get_settings_file_path());
-    }
-
-    if (json == nullptr) {
-        // Fall back to the last-known-good backup written by settings_save().
-        char backup_path[1088];
-        snprintf(backup_path, sizeof(backup_path), "%s.bak", get_settings_file_path());
-        json = cJSON_from_file(backup_path);
-        if (json != nullptr) {
-            log_message(LOG_INFO,
-                        "[SETTINGS UTILS] settings.json was unreadable; recovered from backup: %s\n",
-                        backup_path);
-            // Recovered values get rewritten to settings.json on the next save.
-            defaults_were_used = true;
-        }
-    }
-
-    if (json == nullptr) {
-        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to load or parse settings file: %s. Using default settings.\n",
-                    get_settings_file_path());
-
-        // Show pop-up error message
-        show_error_message("Settings Corrupted",
-                           "Could not read settings.json. The file may be corrupted or missing.\n Restart Advancely then your settings have been reset to their defaults.");
-        defaults_were_used = true; // The whole file is missing, so it needs to be created.
-    }
 
     // Load settings, explicitly applying defaults if a key is missing or invalid
     const cJSON *path_mode_json = cJSON_GetObjectItem(json, "path_mode");
@@ -1676,11 +1640,70 @@ bool settings_load(AppSettings *settings) {
         if (cJSON_IsBool(use_manual_layout)) settings->use_manual_layout = cJSON_IsTrue(use_manual_layout);
     }
 
+    return defaults_were_used;
+}
+
+bool settings_load(AppSettings *settings) {
+    // Flag to signal re-save when default values need to be written back to settings.json
+    bool defaults_were_used = false;
+
+    // Set safe defaults first by calling settings_set_defaults
+    settings_set_defaults(settings);
+
+    // Try to load and parse the settings file, read with escaping
+    cJSON *json = cJSON_from_file(get_settings_file_path());
+
+    // A transient read failure (a write landing at the same instant, antivirus or
+    // cloud sync briefly locking the file) must not wipe the user's settings.
+    // Retry a few times before giving up.
+    for (int attempt = 0; json == nullptr && attempt < 3; attempt++) {
+        SDL_Delay(40);
+        json = cJSON_from_file(get_settings_file_path());
+    }
+
+    if (json == nullptr) {
+        // Fall back to the last-known-good backup written by settings_save().
+        char backup_path[1088];
+        snprintf(backup_path, sizeof(backup_path), "%s.bak", get_settings_file_path());
+        json = cJSON_from_file(backup_path);
+        if (json != nullptr) {
+            log_message(LOG_INFO,
+                        "[SETTINGS UTILS] settings.json was unreadable; recovered from backup: %s\n",
+                        backup_path);
+            // Recovered values get rewritten to settings.json on the next save.
+            defaults_were_used = true;
+        }
+    }
+
+    if (json == nullptr) {
+        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to load or parse settings file: %s. Using default settings.\n",
+                    get_settings_file_path());
+
+        // Show pop-up error message
+        show_error_message("Settings Corrupted",
+                           "Could not read settings.json. The file may be corrupted or missing.\n Restart Advancely then your settings have been reset to their defaults.");
+        defaults_were_used = true; // The whole file is missing, so it needs to be created.
+    }
+
+    defaults_were_used |= settings_apply_json(settings, json);
     cJSON_Delete(json);
     construct_template_paths(settings);
     log_message(LOG_INFO, "[SETTINGS UTILS] Settings loaded successfully!\n");
 
     return defaults_were_used;
+}
+
+bool settings_load_from_file(AppSettings *settings, const char *path) {
+    // Loads an alternate settings file (a preset) into `settings`. Unlike
+    // settings_load(), it skips the .bak recovery and the "corrupted" popup that
+    // are specific to the primary settings.json, and never writes anything.
+    settings_set_defaults(settings);
+    cJSON *json = cJSON_from_file(path);
+    if (json == nullptr) return false;
+    settings_apply_json(settings, json);
+    cJSON_Delete(json);
+    construct_template_paths(settings);
+    return true;
 }
 
 void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context) {

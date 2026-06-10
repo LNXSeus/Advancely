@@ -17,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cctype>
 
 
 // Platform-specific includes
@@ -1247,4 +1248,66 @@ bool get_executable_path(char *out_path, size_t max_len) {
     }
     return false;
 #endif
+}
+
+int list_setting_presets(char out_names[][SETTING_PRESET_NAME_LEN], int max_names) {
+    if (!out_names || max_names <= 0) return 0;
+
+    char config_dir[MAX_PATH_LENGTH];
+    snprintf(config_dir, sizeof(config_dir), "%s/config", get_resources_path());
+
+    std::vector<std::string> presets;
+
+#ifdef _WIN32
+    char search_path[MAX_PATH_LENGTH];
+    snprintf(search_path, sizeof(search_path), "%s/*.json", config_dir);
+    WIN32_FIND_DATAA find_data;
+    HANDLE h_find = FindFirstFileA(search_path, &find_data);
+    if (h_find != INVALID_HANDLE_VALUE) {
+        do {
+            if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            presets.emplace_back(find_data.cFileName);
+        } while (FindNextFileA(h_find, &find_data) != 0);
+        FindClose(h_find);
+    }
+#else
+    DIR *dir = opendir(config_dir);
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (entry->d_type == DT_DIR) continue;
+            presets.emplace_back(entry->d_name);
+        }
+        closedir(dir);
+    }
+#endif
+
+    // Keep only "<name>.json" entries, drop the extension, and exclude settings.json.
+    std::vector<std::string> names;
+    for (auto &fname : presets) {
+        if (fname.size() <= 5) continue; // shorter than "x.json"
+        if (fname.compare(fname.size() - 5, 5, ".json") != 0) continue;
+        std::string base = fname.substr(0, fname.size() - 5);
+        std::string lower = base;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return (char) std::tolower(c); });
+        if (lower == "settings") continue; // the primary settings file is never a preset
+        names.push_back(base);
+    }
+
+    std::sort(names.begin(), names.end(), [](const std::string &a, const std::string &b) {
+        std::string la = a, lb = b;
+        std::transform(la.begin(), la.end(), la.begin(), [](unsigned char c) { return (char) std::tolower(c); });
+        std::transform(lb.begin(), lb.end(), lb.begin(), [](unsigned char c) { return (char) std::tolower(c); });
+        return la < lb;
+    });
+
+    int count = 0;
+    for (auto &n : names) {
+        if (count >= max_names) break;
+        strncpy(out_names[count], n.c_str(), SETTING_PRESET_NAME_LEN - 1);
+        out_names[count][SETTING_PRESET_NAME_LEN - 1] = '\0';
+        count++;
+    }
+    return count;
 }

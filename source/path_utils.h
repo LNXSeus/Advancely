@@ -21,11 +21,27 @@ extern "C" {
 
 struct AppSettings;
 
+// Maximum length (including the null terminator) of a settings-preset name.
+#define SETTING_PRESET_NAME_LEN 128
+
 /**
 * @brief Converts backslashes in a path to forward slashes for consistency.
 * @param path The path string to modify in-place.
 */
 void normalize_path(char *path);
+
+/**
+* @brief Lists the names of all settings presets stored in resources/config/.
+*
+* A preset is any "<name>.json" file directly inside the config folder other than the
+* primary settings.json. The base names (without the ".json" extension) are written to
+* out_names, sorted case-insensitively.
+*
+* @param out_names 2D char buffer receiving the preset names.
+* @param max_names The number of rows available in out_names.
+* @return The number of preset names written (capped at max_names).
+*/
+int list_setting_presets(char out_names[][SETTING_PRESET_NAME_LEN], int max_names);
 
 /**
  * @brief Gets the final, normalized path to the .minecraft saves folder based on the selected mode.
