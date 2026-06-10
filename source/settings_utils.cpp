@@ -261,15 +261,7 @@ void settings_prune_stale_coop_progress(const AppSettings *settings) {
 
     if (changed) {
         SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-        FILE *file = fopen(get_settings_file_path(), "w");
-        if (file) {
-            char *json_str = cJSON_Print(root);
-            if (json_str) {
-                fputs(json_str, file);
-                free(json_str);
-            }
-            fclose(file);
-        }
+        cJSON_write_to_file_atomic(get_settings_file_path(), root);
     }
     cJSON_Delete(root);
 }
@@ -685,6 +677,29 @@ bool settings_load(AppSettings *settings) {
 
     // Try to load and parse the settings file, read with escaping
     cJSON *json = cJSON_from_file(get_settings_file_path());
+
+    // A transient read failure (a write landing at the same instant, antivirus or
+    // cloud sync briefly locking the file) must not wipe the user's settings.
+    // Retry a few times before giving up.
+    for (int attempt = 0; json == nullptr && attempt < 3; attempt++) {
+        SDL_Delay(40);
+        json = cJSON_from_file(get_settings_file_path());
+    }
+
+    if (json == nullptr) {
+        // Fall back to the last-known-good backup written by settings_save().
+        char backup_path[1088];
+        snprintf(backup_path, sizeof(backup_path), "%s.bak", get_settings_file_path());
+        json = cJSON_from_file(backup_path);
+        if (json != nullptr) {
+            log_message(LOG_INFO,
+                        "[SETTINGS UTILS] settings.json was unreadable; recovered from backup: %s\n",
+                        backup_path);
+            // Recovered values get rewritten to settings.json on the next save.
+            defaults_were_used = true;
+        }
+    }
+
     if (json == nullptr) {
         log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to load or parse settings file: %s. Using default settings.\n",
                     get_settings_file_path());
@@ -2114,18 +2129,17 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "view_state", view_state_obj);
     }
 
-    // Write the modified JSON object to the file
-    FILE *file = fopen(get_settings_file_path(), "w");
-    if (file) {
-        char *json_str = cJSON_Print(root);
-        if (json_str) {
-            fputs(json_str, file);
-            free(json_str);
-            json_str = nullptr;
-        }
-        fclose(file);
+    // Atomically write the modified JSON object to the file. A temp-file + rename
+    // keeps any concurrent reader (file watcher thread, a second process) from
+    // ever seeing a truncated settings.json, which is what corrupts it.
+    if (cJSON_write_to_file_atomic(get_settings_file_path(), root)) {
+        // Keep a last-known-good backup so an externally corrupted settings.json
+        // (antivirus, cloud sync, disk error) can be recovered without resetting.
+        char backup_path[1088];
+        snprintf(backup_path, sizeof(backup_path), "%s.bak", get_settings_file_path());
+        cJSON_write_to_file_atomic(backup_path, root);
     } else {
-        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n",
+        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to write settings file: %s\n",
                     get_settings_file_path());
     }
     cJSON_Delete(root);
@@ -2140,17 +2154,9 @@ void settings_save_overlay_width_only(int width) {
     cJSON_DeleteItemFromObject(overlay_obj, "w");
     cJSON_AddItemToObject(overlay_obj, "w", cJSON_CreateNumber(width));
 
-    FILE *file = fopen(get_settings_file_path(), "w");
-    if (file) {
-        char *json_str = cJSON_Print(root);
-        if (json_str) {
-            fputs(json_str, file);
-            free(json_str);
-        }
-        fclose(file);
-    } else {
+    if (!cJSON_write_to_file_atomic(get_settings_file_path(), root)) {
         log_message(LOG_ERROR,
-                    "[SETTINGS UTILS] Failed to open settings file for writing overlay width: %s\n",
+                    "[SETTINGS UTILS] Failed to write settings file for overlay width: %s\n",
                     get_settings_file_path());
     }
     cJSON_Delete(root);

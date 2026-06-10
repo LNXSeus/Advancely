@@ -5600,16 +5600,8 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
     }
 
     SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-    FILE *file = fopen(get_settings_file_path(), "w");
-    if (file) {
-        char *json_str = cJSON_Print(root);
-        if (json_str) {
-            fputs(json_str, file);
-            free(json_str);
-        }
-        fclose(file);
-    } else {
-        log_message(LOG_ERROR, "[TRACKER] Failed to open settings file for coop mod write.\n");
+    if (!cJSON_write_to_file_atomic(get_settings_file_path(), root)) {
+        log_message(LOG_ERROR, "[TRACKER] Failed to write settings file for coop mod write.\n");
     }
     cJSON_Delete(root);
 }
@@ -13287,14 +13279,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
     if (save_needed) {
         log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
-        // Write the synchronized settings back to the file
-        FILE *file = fopen(get_settings_file_path(), "w");
-        if (file) {
-            char *json_str = cJSON_Print(settings_root);
-            fputs(json_str, file);
-            fclose(file);
-            free(json_str);
-            json_str = nullptr;
+        // Atomically write the synchronized settings back to the file.
+        if (!cJSON_write_to_file_atomic(get_settings_file_path(), settings_root)) {
+            log_message(LOG_ERROR, "[TRACKER] Failed to write synchronized settings.json.\n");
         }
     } else {
         // TODO: Debug

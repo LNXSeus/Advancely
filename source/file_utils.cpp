@@ -13,6 +13,13 @@
 #include <cstdlib>
 #include <cstring>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h> // _commit, _fileno
+#else
+#include <unistd.h> // fsync, getpid
+#endif
+
 // function to read a JSON file
 // In file_utils.cpp
 
@@ -86,4 +93,78 @@ cJSON *cJSON_from_file(const char *filename) {
     free(buffer);
 
     return json;
+}
+
+bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root) {
+    if (!filename || !root) return false;
+
+    char *json_str = cJSON_Print(root);
+    if (!json_str) {
+        log_message(LOG_ERROR, "[FILE_UTILS] cJSON_Print failed while saving: %s\n", filename);
+        return false;
+    }
+    size_t json_len = strlen(json_str);
+
+    // Temp file lives in the same directory as the target so the rename stays on
+    // one volume (a cross-volume rename is a copy+delete and is not atomic). The
+    // PID suffix keeps two processes from clobbering each other's temp file.
+    char tmp_path[1088];
+#ifdef _WIN32
+    unsigned long pid = (unsigned long) GetCurrentProcessId();
+#else
+    unsigned long pid = (unsigned long) getpid();
+#endif
+    int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.%lu", filename, pid);
+    if (n < 0 || (size_t) n >= sizeof(tmp_path)) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Temp path too long while saving: %s\n", filename);
+        free(json_str);
+        return false;
+    }
+
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to open temp file for writing: %s\n", tmp_path);
+        free(json_str);
+        return false;
+    }
+
+    bool ok = (fwrite(json_str, 1, json_len, f) == json_len);
+    free(json_str);
+    json_str = nullptr;
+
+    // Flush stdio buffers, then force the bytes to physical storage before the
+    // rename so a crash or power loss can't leave a renamed-but-empty file.
+    if (ok && fflush(f) != 0) ok = false;
+    if (ok) {
+#ifdef _WIN32
+        if (_commit(_fileno(f)) != 0) ok = false;
+#else
+        if (fsync(fileno(f)) != 0) ok = false;
+#endif
+    }
+    if (fclose(f) != 0) ok = false;
+
+    if (!ok) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to write temp file: %s\n", tmp_path);
+        remove(tmp_path);
+        return false;
+    }
+
+    // Atomically replace the target. On NTFS and POSIX same-volume renames this
+    // is atomic, so a concurrent reader always sees either the old or new file whole.
+#ifdef _WIN32
+    if (!MoveFileExA(tmp_path, filename, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to replace '%s' (err %lu).\n", filename,
+                    (unsigned long) GetLastError());
+        remove(tmp_path);
+        return false;
+    }
+#else
+    if (rename(tmp_path, filename) != 0) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to rename temp over '%s'.\n", filename);
+        remove(tmp_path);
+        return false;
+    }
+#endif
+    return true;
 }

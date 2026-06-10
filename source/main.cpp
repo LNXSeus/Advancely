@@ -83,6 +83,7 @@ extern "C" {
 #include <signal.h> // For SIGKILL
 #include <fcntl.h>     // For O_* constants
 #include <sys/mman.h>  // For shared memory
+#include <sys/file.h>  // For flock (single-instance lock)
 #include <semaphore.h> // For named semaphores (acting as mutexes)
 #endif
 
@@ -743,11 +744,14 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
 
     // AppSettings *settings = (AppSettings *) user;
 
-    if (action == DMON_ACTION_MODIFY) {
-        // --- TODO: Debug Print ---
-        log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Settings Watcher triggered by file: %s\n", filepath);
-        // ----------------
+    // Atomic settings saves (temp file + rename) land as DMON_ACTION_MOVE with the
+    // new name, while in-place external edits land as DMON_ACTION_MODIFY. Treat both
+    // the same so app-initiated saves stay suppressed and external edits still reload.
+    if (action == DMON_ACTION_MODIFY || action == DMON_ACTION_MOVE) {
+        // Only react to settings.json itself. Atomic saves also touch sibling
+        // ".tmp.<pid>" and ".bak" files in this directory; ignore those quietly.
         if (strcmp(filepath, "settings.json") == 0) {
+            log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Settings Watcher triggered by file: %s\n", filepath);
             // If the app itself wrote settings.json (e.g. checkbox toggle, counter hotkey),
             // suppress the watcher to avoid a destructive full template reinit.
             if (SDL_SetAtomicInt(&g_suppress_settings_watch, 0) == 1) {
@@ -1484,6 +1488,47 @@ int main(int argc, char *argv[]) {
     }
     fclose(write_test);
     remove(".advancely-write-test");
+
+    // --- Single-instance guard --------------------------------------------------
+    // Two full Advancely instances both write settings.json with no cross-process
+    // coordination, which races and corrupts the file. The overlay child process
+    // (--overlay) returned above, so this only runs for the main tracker. If an
+    // instance is already running, focus it and exit. Skipped under --test-mode so
+    // CI smoke tests are never blocked by a stray window.
+    if (!is_test_mode) {
+#ifdef _WIN32
+        HANDLE h_single_instance = CreateMutexA(nullptr, TRUE, "AdvancelyAppInstanceMutex");
+        if (h_single_instance == nullptr || GetLastError() == ERROR_ALREADY_EXISTS) {
+            log_message(LOG_INFO, "[MAIN] Another Advancely instance is already running. Focusing it and exiting.\n");
+            HWND existing = FindWindowA(nullptr, TRACKER_TITLE);
+            if (existing) {
+                if (IsIconic(existing)) ShowWindow(existing, SW_RESTORE);
+                SetForegroundWindow(existing);
+            }
+            if (h_single_instance) CloseHandle(h_single_instance);
+            log_close();
+            return EXIT_SUCCESS;
+        }
+        // Handle is intentionally left open for the process lifetime to hold the
+        // named mutex; the OS releases it on exit.
+#else
+        // Anchor the lock to the settings file's location (not the CWD) so the
+        // guard works regardless of where the app was launched from, and so two
+        // instances using genuinely separate --settings-file configs can coexist.
+        char lock_path[1088];
+        snprintf(lock_path, sizeof(lock_path), "%s.lock", get_settings_file_path());
+        int single_instance_fd = open(lock_path, O_CREAT | O_RDWR, 0644);
+        if (single_instance_fd >= 0 && flock(single_instance_fd, LOCK_EX | LOCK_NB) != 0) {
+            log_message(LOG_INFO, "[MAIN] Another Advancely instance is already running. Exiting.\n");
+            close(single_instance_fd);
+            log_close();
+            return EXIT_SUCCESS;
+        }
+        // fd intentionally left open to hold the flock for the process lifetime;
+        // the kernel releases it on exit.
+#endif
+    }
+    // ----------------------------------------------------------------------------
 
     // Expect the worst
     bool exit_status = EXIT_FAILURE;

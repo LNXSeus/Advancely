@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 #include <cJSON.h>
+#include <stdbool.h>
 
 
 /**
@@ -27,6 +28,20 @@ extern "C" {
  * The caller is responsible for freeing the returned object with cJSON_Delete().
  */
 cJSON *cJSON_from_file(const char *filename);
+
+/**
+ * @brief Atomically writes a cJSON object to a file.
+ * The data is first written to a unique temporary file in the same directory,
+ * flushed to physical storage, and then atomically renamed over the target.
+ * This guarantees a concurrent reader (another thread, the file watcher, or a
+ * second process) never observes a truncated or partially-written file, which
+ * is the root cause of settings.json corruption.
+ *
+ * @param filename The destination path.
+ * @param root The cJSON object to serialize (formatted/pretty-printed).
+ * @return true on success, false if any step failed (the destination is left untouched on failure).
+ */
+bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root);
 
 #ifdef __cplusplus
 }
