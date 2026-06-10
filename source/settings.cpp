@@ -1964,8 +1964,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
 
             if (font_settings_changed) {
+#ifdef _WIN32
                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                                    "Click 'Restart Advancely' to properly apply these font/size changes.");
+#else
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                                   "Manually restart Advancely to properly apply these font/size changes.");
+#endif
             }
 
             ImGui::Separator();
@@ -2070,8 +2075,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
 
             if (font_settings_changed) {
+#ifdef _WIN32
                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                                    "Click 'Restart Advancely' to properly apply these font/size changes.");
+#else
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                                   "Manually restart Advancely to properly apply these font/size changes.");
+#endif
             }
 
             ImGui::Separator();
@@ -2147,8 +2157,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // Conditionally show the warning
             if (ui_theme_colors_changed) {
                 ImGui::Spacing(); // Add a little space before the warning
+#ifdef _WIN32
                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                                    "Click 'Restart Advancely' to properly apply these theme color changes.");
+#else
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                                   "Manually restart Advancely to properly apply these theme color changes.");
+#endif
             }
 
             ImGui::EndTabItem();
@@ -4566,11 +4581,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
             if (ImGui::IsItemHovered()) {
                 char auto_update_tooltip_buffer[1024];
-                snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
+                int auto_update_len = snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
                          "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
                          "You can see your current version (vX.X.X) in the title of the main Advancely window.\n"
                          "Through that notification you'll then be able to automatically install the update\n"
                          "for your operating system. You can find more instructions on that popup.");
+#ifdef __linux__
+                if (auto_update_len > 0 && (size_t) auto_update_len < sizeof(auto_update_tooltip_buffer)) {
+                    snprintf(auto_update_tooltip_buffer + auto_update_len,
+                             sizeof(auto_update_tooltip_buffer) - (size_t) auto_update_len,
+                             "\n\nLinux: the built-in updater only works for the portable build.\n"
+                             "If you installed Advancely from a package (.deb/.rpm/AUR/NixOS),\n"
+                             "update it through that installer or your package manager instead.");
+                }
+#else
+                (void) auto_update_len;
+#endif
                 ImGui::SetTooltip("%s", auto_update_tooltip_buffer);
             }
 
@@ -4953,6 +4979,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
     ImGui::SameLine();
 
+    // Windows-only: the in-app relaunch is unreliable on Linux/macOS, so the button is
+    // omitted there and users restart manually (the warnings above adjust their wording).
+#ifdef _WIN32
     if (apply_disabled) ImGui::BeginDisabled();
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
@@ -5009,6 +5038,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         ImGui::SetTooltip("%s", restart_button_tooltip_buffer);
     }
     if (apply_disabled) ImGui::EndDisabled();
+#endif // _WIN32: Restart Advancely button (Linux/macOS restart manually)
 
     ImGui::SameLine();
 
