@@ -1202,281 +1202,281 @@
 				"bread":	{
 					"icon":	"items/bread_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	134
+						"x":	1586,
+						"y":	138
 					}
 				},
 				"cooked_porkchop":	{
 					"icon":	"items/cooked_porkchop_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	134
+						"x":	1746,
+						"y":	138
 					}
 				},
 				"porkchop":	{
 					"icon":	"items/porkchop_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	170
+						"x":	1586,
+						"y":	174
 					}
 				},
 				"cooked_beef":	{
 					"icon":	"items/cooked_beef_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	170
+						"x":	1746,
+						"y":	174
 					}
 				},
 				"beef":	{
 					"icon":	"items/beef_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	206
+						"x":	1586,
+						"y":	210
 					}
 				},
 				"cooked_chicken":	{
 					"icon":	"items/cooked_chicken_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	206
+						"x":	1746,
+						"y":	210
 					}
 				},
 				"chicken":	{
 					"icon":	"items/chicken_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	242
+						"x":	1586,
+						"y":	246
 					}
 				},
 				"cooked_mutton":	{
 					"icon":	"items/cooked_mutton_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	242
+						"x":	1746,
+						"y":	246
 					}
 				},
 				"mutton":	{
 					"icon":	"items/mutton_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	278
+						"x":	1586,
+						"y":	282
 					}
 				},
 				"cooked_rabbit":	{
 					"icon":	"items/cooked_rabbit_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	278
+						"x":	1746,
+						"y":	282
 					}
 				},
 				"rabbit":	{
 					"icon":	"items/rabbit_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	314
+						"x":	1586,
+						"y":	318
 					}
 				},
 				"cooked_cod":	{
 					"icon":	"items/cooked_cod_1.13.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	314
+						"x":	1746,
+						"y":	318
 					}
 				},
 				"cod":	{
 					"icon":	"items/cod_1.13.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	350
+						"x":	1586,
+						"y":	354
 					}
 				},
 				"tropical_fish":	{
 					"icon":	"items/tropical_fish_1.13.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	350
+						"x":	1746,
+						"y":	354
 					}
 				},
 				"cooked_salmon":	{
 					"icon":	"items/cooked_salmon_1.13.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	386
+						"x":	1586,
+						"y":	390
 					}
 				},
 				"salmon":	{
 					"icon":	"items/salmon_1.13.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	386
+						"x":	1746,
+						"y":	390
 					}
 				},
 				"pufferfish":	{
 					"icon":	"items/pufferfish_1.13.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	422
+						"x":	1586,
+						"y":	426
 					}
 				},
 				"cookie":	{
 					"icon":	"items/cookie_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	422
+						"x":	1746,
+						"y":	426
 					}
 				},
 				"pumpkin_pie":	{
 					"icon":	"items/pumpkin_pie_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	458
+						"x":	1586,
+						"y":	462
 					}
 				},
 				"apple":	{
 					"icon":	"items/apple_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	458
+						"x":	1746,
+						"y":	462
 					}
 				},
 				"golden_apple":	{
 					"icon":	"items/golden_apple_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	494
+						"x":	1586,
+						"y":	498
 					}
 				},
 				"enchanted_golden_apple":	{
 					"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	494
+						"x":	1746,
+						"y":	498
 					}
 				},
 				"golden_carrot":	{
 					"icon":	"items/golden_carrot_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	530
+						"x":	1586,
+						"y":	534
 					}
 				},
 				"carrot":	{
 					"icon":	"items/carrot_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	530
+						"x":	1746,
+						"y":	534
 					}
 				},
 				"melon_slice":	{
 					"icon":	"items/melon_slice_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	566
+						"x":	1586,
+						"y":	570
 					}
 				},
 				"baked_potato":	{
 					"icon":	"items/baked_potato_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	566
+						"x":	1746,
+						"y":	570
 					}
 				},
 				"potato":	{
 					"icon":	"items/potato_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1540,
-						"y":	602
+						"x":	1586,
+						"y":	606
 					}
 				},
 				"poisonous_potato":	{
 					"icon":	"items/poisonous_potato_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1700,
-						"y":	602
+						"x":	1746,
+						"y":	606
 					}
 				},
 				"beetroot":	{
 					"icon":	"items/beetroot_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	134
+						"x":	1906,
+						"y":	138
 					}
 				},
 				"sweet_berries":	{
 					"icon":	"items/sweet_berries_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	170
+						"x":	1906,
+						"y":	174
 					}
 				},
 				"glow_berries":	{
 					"icon":	"items/glow_berries_25w14craftmine.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	206
+						"x":	1906,
+						"y":	210
 					}
 				},
 				"chorus_fruit":	{
 					"icon":	"items/chorus_fruit_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	242
+						"x":	1906,
+						"y":	246
 					}
 				},
 				"mushroom_stew":	{
 					"icon":	"items/mushroom_stew_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	278
+						"x":	1906,
+						"y":	282
 					}
 				},
 				"suspicious_stew":	{
 					"icon":	"items/suspicious_stew_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	314
+						"x":	1906,
+						"y":	318
 					}
 				},
 				"rabbit_stew":	{
 					"icon":	"items/rabbit_stew_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	350
+						"x":	1906,
+						"y":	354
 					}
 				},
 				"beetroot_soup":	{
 					"icon":	"items/beetroot_soup_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	386
+						"x":	1906,
+						"y":	390
 					}
 				},
 				"dried_kelp":	{
 					"icon":	"items/dried_kelp_1.13.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	422
+						"x":	1906,
+						"y":	426
 					}
 				},
 				"honey_bottle":	{
 					"icon":	"items/honey_bottle_1.15.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	458
+						"x":	1906,
+						"y":	462
 					}
 				},
 				"rotten_flesh":	{
 					"icon":	"items/rotten_flesh_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	494
+						"x":	1906,
+						"y":	498
 					}
 				},
 				"spider_eye":	{
 					"icon":	"items/spider_eye_3d_shareware_v1.34.png",
 					"icon_pos":	{
-						"x":	1860,
-						"y":	530
+						"x":	1906,
+						"y":	534
 					}
 				}
 			},
@@ -3889,7 +3889,7 @@
 			"thickness":	2,
 			"opacity":	1,
 			"pos2":	{
-				"x":	1562,
+				"x":	1561,
 				"y":	1340
 			},
 			"pos":	{
@@ -3920,6 +3920,19 @@
 			},
 			"pos":	{
 				"x":	1900,
+				"y":	780
+			}
+		}, {
+			"id":	"line_6_copy_copy",
+			"type":	"line",
+			"thickness":	2,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1539,
+				"y":	-12
+			},
+			"pos":	{
+				"x":	1539,
 				"y":	780
 			}
 		}, {
