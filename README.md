@@ -1564,6 +1564,7 @@ This way templates don't need to be copied for each subversion.
 | `all_advancements` | 1.16.1, 1.17, 26.1, 26.2                        | `_aatool_optimized` | Default, ger, zh_cn |
 | `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2 | `_optimized`        | Default, ger, zh_cn |
 | `all_advancements` | 1.16.1                                          | `_ssg_blackcat`     | Default, ger, zh_cn |
+| `all_blocks`       | 1.16.1                                          |                     | Default             |
 | `miku%`            | 1.21                                            |                     | Default             |
 | `all_trims`        | 1.21                                            |                     | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine      | `1`                 | Default             |
@@ -1724,6 +1725,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[DCMii](https://www.twitch.tv/dcmii)**: Windows coop tester.
 * **[Lune](https://www.twitch.tv/lunemcsr)**: Fantastic Linux coop tester.
 * **[Duncan](https://linktr.ee/DuncanRuns)**: Creator of the `Hermes` mod and important coop tester.
+* **[Magnissima](https://www.twitch.tv/magnissima)**: Created amazing `1.16.1` `all_blocks` template.
 
 </details>
 
