@@ -16473,6 +16473,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else if (!is_valid_filename_part_for_ui(import_flag)) {
                     snprintf(status_message, sizeof(status_message), "Error: Flag contains invalid characters.");
                     save_message_type = MSG_ERROR;
+                } else if (strcasecmp(combined_name, "advancely_template") == 0) {
+                    snprintf(status_message, sizeof(status_message),
+                             "Error: 'advancely_template' is a reserved name and cannot be used.");
+                    save_message_type = MSG_ERROR;
                 } else if (version_enum <= MC_VERSION_1_6_4 && ends_with(combined_name, "_snapshot")) {
                     // BLOCKING _snapshot for legacy versions
                     snprintf(status_message, sizeof(status_message),

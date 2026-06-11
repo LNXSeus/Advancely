@@ -398,6 +398,17 @@ bool validate_and_create_template(const char *version, const char *category, con
         return false;
     }
 
+    // Prevent the category+flag combination from colliding with the reserved metadata file name
+    {
+        char reserved_check[MAX_PATH_LENGTH];
+        snprintf(reserved_check, sizeof(reserved_check), "%s%s", category, flag ? flag : "");
+        if (strcasecmp(reserved_check, "advancely_template") == 0) {
+            snprintf(error_message, error_msg_size,
+                     "Error: 'advancely_template' is a reserved name and cannot be used.");
+            return false;
+        }
+    }
+
     // Prevent using reserved "_snapshot" suffix in legacy versions
     MC_Version version_enum = settings_get_version_from_string(version);
     if (version_enum <= MC_VERSION_1_6_4) {
@@ -477,6 +488,16 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     if (!is_valid_filename_part(dest_flag)) {
         snprintf(error_message, error_msg_size, "Error: New flag contains invalid characters.");
         return false;
+    }
+    // Prevent the category+flag combination from colliding with the reserved metadata file name
+    {
+        char reserved_check[MAX_PATH_LENGTH];
+        snprintf(reserved_check, sizeof(reserved_check), "%s%s", dest_category, dest_flag ? dest_flag : "");
+        if (strcasecmp(reserved_check, "advancely_template") == 0) {
+            snprintf(error_message, error_msg_size,
+                     "Error: 'advancely_template' is a reserved name and cannot be used.");
+            return false;
+        }
     }
     // Check if destination is the same as source
     if (strcmp(src_version, dest_version) == 0 && strcmp(src_category, dest_category) == 0 && strcmp(
@@ -1680,6 +1701,7 @@ cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, si
         mz_zip_archive_file_stat fs;
         if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
         const char *name = fs.m_filename;
+        if (strcmp(name, TEMPLATE_META_FILENAME) == 0) continue; // skip metadata file
         const char *ext = strstr(name, ".json");
         if (!ext) continue;
         if (strstr(name, "_lang")) continue;
