@@ -1563,6 +1563,7 @@ This way templates don't need to be copied for each subversion.
 | `all_advancements` | 1.16.1, 26.1, 26.2                              | `_categorical`      | Default, ger, zh_cn |
 | `all_advancements` | 1.16.1, 1.17                                    | `_aatool_optimized` | Default, ger, zh_cn |
 | `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2 | `_optimized`        | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                          | `_ssg_blackcat`     | Default, ger, zh_cn |
 | `miku%`            | 1.21                                            |                     | Default             |
 | `all_trims`        | 1.21                                            |                     | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine      | `1`                 | Default             |
@@ -1718,7 +1719,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
 * **[ScrambledMC](https://www.youtube.com/@scrambledmc3772)**: Made the fantastic `_categorical` `all_advancements` template for 1.16.
 * **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates. Helped testing coop on Windows.
-* **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` `all_advancements` template for 1.16.
+* **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` and `_ssg_keimaseed` templates.
 * **Jaykeycakey** (`jaykeycakey_` on Discord): Windows coop tester.
 * **[DCMii](https://www.twitch.tv/dcmii)**: Windows coop tester.
 * **[Lune](https://www.twitch.tv/lunemcsr)**: Fantastic Linux coop tester.
