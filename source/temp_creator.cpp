@@ -16337,6 +16337,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         error_msg, sizeof(error_msg))) {
                     status_message[0] = '\0'; // Ensure status message is clear
                     show_copy_view = false;
+                    // Switch UI to the version the copy was created in same as import
+                    strncpy(creator_version_str, dest_version, sizeof(creator_version_str) - 1);
+                    creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                    creator_version_idx = copy_template_version_idx;
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     last_scanned_version[0] = '\0'; // Force rescan
                 } else {
