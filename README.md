@@ -971,7 +971,8 @@ the live tracker map instead of typing coordinates by hand.
   inside the rectangle are selected and highlighted. You can then drag any selected item to move the entire group
   together. Hold `Ctrl` (`Cmd` on macOS) and click individual items to add or remove them from the selection without
   clearing it. `Ctrl`+drag on empty space draws a selection rectangle that adds to the existing selection. Click on
-  empty space without `Ctrl` to deselect.
+  empty space without `Ctrl` to deselect. Clicking an already-selected item (without dragging it) removes just that
+  item from the selection.
 * **Saving**: Changes made in the Visual Layout Editor are synced back to the Template Editor in real-time. Click
   **"Stop Visual Editing"** when finished, then click **"Save"** in the Template Editor to persist your layout to
   disk.

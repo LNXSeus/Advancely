@@ -5959,6 +5959,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         ImGuiIO &click_io = ImGui::GetIO();
         bool ctrl_held = click_io.KeyCtrl; // Ctrl on Windows/Linux, Cmd on macOS
         bool is_selected = s_visual_selected_items.count(&target_pos) > 0;
+        t->visual_deselect_candidate = nullptr;
         if (ctrl_held) {
             // Ctrl+Click: toggle this item in the selection
             if (is_selected) {
@@ -5970,8 +5971,11 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             // Normal click on unselected item: clear selection, select only this one
             s_visual_selected_items.clear();
             s_visual_selected_items.insert(&target_pos);
+        } else {
+            // Already selected (without Ctrl): keep the selection for now (allows multi-drag).
+            // A plain click (no drag) on release will deselect it again.
+            t->visual_deselect_candidate = &target_pos;
         }
-        // If already selected (without Ctrl), keep the selection (allows multi-drag)
 
         // Signal the editor to select this goal (without opening Layout Coordinates)
         if (parent_root_name && parent_root_name[0] != '\0') {
@@ -5999,6 +6003,15 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             t->visual_drag_child_root_name[0] = '\0';
         }
         t->visual_layout_just_clicked = true;
+    }
+
+    // A plain click (press + release without dragging) on an already-selected item deselects it.
+    if (ImGui::IsItemDeactivated()) {
+        if (t->visual_deselect_candidate == &target_pos &&
+            !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
+            s_visual_selected_items.erase(&target_pos);
+        }
+        t->visual_deselect_candidate = nullptr;
     }
 
     if (is_dragging) {
@@ -10105,6 +10118,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         bool ctrl_held = click_io.KeyCtrl;
                         bool either_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
                                                s_visual_selected_items.count(&elem->pos2) > 0;
+                        t->visual_deselect_candidate = nullptr;
                         if (ctrl_held) {
                             // Ctrl+Click: toggle both endpoints in the selection
                             if (either_selected) {
@@ -10118,6 +10132,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                             s_visual_selected_items.clear();
                             s_visual_selected_items.insert(&elem->pos);
                             s_visual_selected_items.insert(&elem->pos2);
+                        } else {
+                            // Already selected (without Ctrl): a plain click on release deselects it.
+                            t->visual_deselect_candidate = &elem->pos;
                         }
 
                         // Signal the editor to select this decoration
@@ -10127,6 +10144,16 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
                         t->visual_drag_child_root_name[0] = '\0';
                         t->visual_layout_just_clicked = true;
+                    }
+
+                    // Plain click (no drag) on an already-selected line deselects both endpoints.
+                    if (ImGui::IsItemDeactivated()) {
+                        if (t->visual_deselect_candidate == &elem->pos &&
+                            !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
+                            s_visual_selected_items.erase(&elem->pos);
+                            s_visual_selected_items.erase(&elem->pos2);
+                        }
+                        t->visual_deselect_candidate = nullptr;
                     }
 
                     if (is_line_dragging) {
@@ -10434,6 +10461,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         bool ctrl_held = click_io.KeyCtrl;
                         bool any_point_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
                                                   s_visual_selected_items.count(&elem->pos2) > 0;
+                        t->visual_deselect_candidate = nullptr;
                         if (ctrl_held) {
                             // Ctrl+Click: toggle all arrow points in the selection
                             if (any_point_selected) {
@@ -10456,6 +10484,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                             for (int b = 0; b < elem->bend_count; b++) {
                                 s_visual_selected_items.insert(&elem->bends[b]);
                             }
+                        } else {
+                            // Already selected (without Ctrl): a plain click on release deselects it.
+                            t->visual_deselect_candidate = &elem->pos;
                         }
 
                         // Signal the editor to select this decoration
@@ -10465,6 +10496,19 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
                         t->visual_drag_child_root_name[0] = '\0';
                         t->visual_layout_just_clicked = true;
+                    }
+
+                    // Plain click (no drag) on an already-selected arrow deselects all its points.
+                    if (ImGui::IsItemDeactivated()) {
+                        if (t->visual_deselect_candidate == &elem->pos &&
+                            !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
+                            s_visual_selected_items.erase(&elem->pos);
+                            s_visual_selected_items.erase(&elem->pos2);
+                            for (int b = 0; b < elem->bend_count; b++) {
+                                s_visual_selected_items.erase(&elem->bends[b]);
+                            }
+                        }
+                        t->visual_deselect_candidate = nullptr;
                     }
 
                     if (is_arrow_dragging) {

@@ -112,6 +112,8 @@ struct Tracker {
     bool visual_item_interacted_this_frame; // Set when any draggable item is hovered or active
     bool visual_select_rect_active; // True while drawing a selection rectangle
     ImVec2 visual_select_rect_start; // Screen coords where the selection rectangle started
+    ManualPos *visual_deselect_candidate;
+    // Item that was already selected when pressed; a plain click (no drag) on release deselects it
 
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
