@@ -4967,12 +4967,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // --- VISUAL LAYOUT EDITOR TOGGLE ---
-        const char *vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
-        float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-
-        // Right-align the button on the same line
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - vis_btn_width);
-
         // Check if the template currently loaded in the editor is the same one active in the main tracker
         bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                    strcmp(selected_template_info.category, app_settings->category) == 0 &&
@@ -4987,6 +4981,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves;
+
+        const char *vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
+        float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+        // Right-align the button on the same line
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - vis_btn_width);
 
         if (vis_editor_disabled) {
             ImGui::BeginDisabled();
@@ -5007,8 +5007,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
-            static GoalHidingMode pre_visual_edit_hiding_mode = SHOW_ALL;
-
             if (ImGui::Button(vis_btn_text)) {
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
@@ -5023,8 +5021,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                    status_message, app_settings);
                     }
 
-                    // Remember the current hiding mode before overriding
-                    pre_visual_edit_hiding_mode = app_settings->goal_hiding_mode;
+                    // Remember the current hiding mode before overriding (restored on stop/cancel)
+                    t->pre_visual_edit_hiding_mode = app_settings->goal_hiding_mode;
 
                     // Automatically force "Manual Layout" ON
                     app_settings->use_manual_layout = true;
@@ -5037,7 +5035,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 } else {
                     // Restore the hiding mode that was active before visual editing
-                    app_settings->goal_hiding_mode = pre_visual_edit_hiding_mode;
+                    app_settings->goal_hiding_mode = t->pre_visual_edit_hiding_mode;
                     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }

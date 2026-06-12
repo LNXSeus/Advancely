@@ -2077,6 +2077,28 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            // Auto-cancel the Visual Layout Editor if the tracked saves folder stops being valid
+            // (e.g. Minecraft was closed and no saves folder is being tracked anymore). This runs
+            // every frame so it reacts in real time, regardless of whether the template editor
+            // window is open, focused, or collapsed. Uses the same saves-validity check as the
+            // template editor's "Visual Layout Editor" button and the Settings warning.
+            if (tracker->is_visual_layout_editing) {
+                bool vle_valid_saves = tracker->saves_path[0] != '\0' && path_exists(tracker->saves_path);
+                if (vle_valid_saves) {
+                    size_t sp_len = strlen(tracker->saves_path);
+                    if (sp_len > 0 && tracker->saves_path[sp_len - 1] == '/') sp_len--;
+                    vle_valid_saves = (sp_len >= 6 && strncmp(tracker->saves_path + sp_len - 6, "/saves", 6) == 0);
+                }
+                if (!vle_valid_saves) {
+                    log_message(LOG_INFO,
+                                "[MAIN] Visual Layout Editor auto-cancelled: no valid saves folder is being tracked.\n");
+                    tracker->is_visual_layout_editing = false;
+                    app_settings.goal_hiding_mode = tracker->pre_visual_edit_hiding_mode;
+                    settings_save(&app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                }
+            }
+
             handle_global_events(tracker, nullptr, &app_settings, &is_running, &settings_opened, &deltaTime);
 
             // Tick co-op networking (lightweight per-frame check)

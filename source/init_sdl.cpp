@@ -78,6 +78,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 
     // So one can't be in visual layout editing mode when starting Advancely to place goals manually
     t->is_visual_layout_editing = false;
+    t->pre_visual_edit_hiding_mode = SHOW_ALL;
     t->visual_drag_root_name[0] = '\0';
     t->visual_drag_goal_type[0] = '\0';
     t->visual_drag_child_root_name[0] = '\0';
