@@ -1689,7 +1689,32 @@ static cJSON *parse_zip_entry_as_json(mz_zip_archive *zip, mz_uint file_index) {
     return cJSON_Parse(text.c_str());
 }
 
+// Import-from-template accepts either an exported .zip archive or a raw (unzipped) main
+// template .json file. This helper distinguishes the two so the readers below can branch.
+static bool is_unzipped_template_path(const char *path) {
+    return path != nullptr && ends_with(path, ".json");
+}
+
+// Returns the base filename (no directory, no ".json") of a raw template path into out_base.
+static void unzipped_template_base(const char *path, char *out_base, size_t out_size) {
+    const char *slash = strrchr(path, '/');
+    const char *bslash = strrchr(path, '\\');
+    const char *fname = slash > bslash ? slash : bslash;
+    fname = fname ? fname + 1 : path;
+    snprintf(out_base, out_size, "%s", fname);
+    size_t len = strlen(out_base);
+    if (len >= 5 && strcmp(out_base + len - 5, ".json") == 0) out_base[len - 5] = '\0';
+}
+
 cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, size_t msg_size) {
+    if (is_unzipped_template_path(zip_path)) {
+        cJSON *root = cJSON_from_file(zip_path);
+        if (!root) {
+            snprintf(error_message, msg_size, "Error: Failed to read or parse the template JSON file.");
+            return nullptr;
+        }
+        return root;
+    }
     mz_zip_archive zip = {};
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
         snprintf(error_message, msg_size, "Error: Could not read zip file.");
@@ -1758,6 +1783,18 @@ static std::string lang_flag_from_filename(const char *name) {
 }
 
 cJSON *read_lang_json_from_zip(const char *zip_path, const char *flag) {
+    if (is_unzipped_template_path(zip_path)) {
+        // The lang file sits next to the main template file with a "_lang[_<flag>].json" suffix.
+        std::string lang_path(zip_path);
+        lang_path.erase(lang_path.size() - 5); // strip ".json"
+        lang_path += "_lang";
+        if (flag && flag[0] != '\0') {
+            lang_path += "_";
+            lang_path += flag;
+        }
+        lang_path += ".json";
+        return cJSON_from_file(lang_path.c_str());
+    }
     mz_zip_archive zip = {};
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return nullptr;
     std::string want_flag = (flag ? flag : "");
@@ -1783,6 +1820,48 @@ cJSON *read_lang_json_from_zip(const char *zip_path, const char *flag) {
 
 std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
     std::vector<std::string> out;
+    if (is_unzipped_template_path(zip_path)) {
+        // Scan the template's directory for "<base>_lang*.json" siblings.
+        char dir[MAX_PATH_LENGTH];
+        if (!get_parent_directory(zip_path, dir, sizeof(dir), 1)) return out;
+        char base[MAX_PATH_LENGTH];
+        unzipped_template_base(zip_path, base, sizeof(base));
+        char prefix[MAX_PATH_LENGTH];
+        snprintf(prefix, sizeof(prefix), "%s_lang", base);
+#ifdef _WIN32
+        char search_path[MAX_PATH_LENGTH];
+        snprintf(search_path, sizeof(search_path), "%s\\%s*.json", dir, prefix);
+        WIN32_FIND_DATAA find_data;
+        HANDLE h_find = FindFirstFileA(search_path, &find_data);
+        if (h_find != INVALID_HANDLE_VALUE) {
+            do {
+                std::string got = lang_flag_from_filename(find_data.cFileName);
+                if (got == "<NOMATCH>") continue;
+                bool dup = false;
+                for (const auto &f: out) if (f == got) { dup = true; break; }
+                if (!dup) out.push_back(std::move(got));
+            } while (FindNextFileA(h_find, &find_data) != 0);
+            FindClose(h_find);
+        }
+#else
+        size_t prefix_len = strlen(prefix);
+        DIR *d = opendir(dir);
+        if (d) {
+            struct dirent *entry;
+            while ((entry = readdir(d)) != nullptr) {
+                if (strncmp(entry->d_name, prefix, prefix_len) != 0) continue;
+                if (!strstr(entry->d_name, ".json")) continue;
+                std::string got = lang_flag_from_filename(entry->d_name);
+                if (got == "<NOMATCH>") continue;
+                bool dup = false;
+                for (const auto &f: out) if (f == got) { dup = true; break; }
+                if (!dup) out.push_back(std::move(got));
+            }
+            closedir(d);
+        }
+#endif
+        return out;
+    }
     mz_zip_archive zip = {};
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return out;
     mz_uint num_files = mz_zip_reader_get_num_files(&zip);
@@ -1804,6 +1883,43 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
 
 int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::string> &icon_paths) {
     if (icon_paths.empty()) return 0;
+
+    if (is_unzipped_template_path(zip_path)) {
+        // Pull referenced icons from an "icons/" folder next to the template file (as an
+        // unzipped export would have). If there's no such folder (e.g. importing from a
+        // template already installed locally), the icons are shared already and nothing is copied.
+        char dir[MAX_PATH_LENGTH];
+        if (!get_parent_directory(zip_path, dir, sizeof(dir), 1)) return 0;
+        char icons_base[MAX_PATH_LENGTH];
+        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+
+        std::unordered_set<std::string> seen;
+        int written = 0;
+        for (const auto &p: icon_paths) {
+            if (p.empty() || !seen.insert(p).second) continue;
+            char src_icon[MAX_PATH_LENGTH];
+            snprintf(src_icon, sizeof(src_icon), "%s/icons/%s", dir, p.c_str());
+            if (!path_exists(src_icon)) continue;
+            char dest_path[MAX_PATH_LENGTH];
+            snprintf(dest_path, sizeof(dest_path), "%s/%s", icons_base, p.c_str());
+            if (path_exists(dest_path)) continue;
+            char dest_dir[MAX_PATH_LENGTH];
+            get_parent_directory(dest_path, dest_dir, sizeof(dest_dir), 1);
+            size_t dir_len = strlen(dest_dir);
+            if (dir_len > 0 && dest_dir[dir_len - 1] != '/') {
+                dest_dir[dir_len] = '/';
+                dest_dir[dir_len + 1] = '\0';
+            }
+            fs_ensure_directory_exists(dest_dir);
+            if (fs_copy_file(src_icon, dest_path)) {
+                written++;
+            } else {
+                log_message(LOG_INFO, "[IMPORT FROM TEMPLATE] Warning: Could not copy '%s'.\n", src_icon);
+            }
+        }
+        return written;
+    }
+
     mz_zip_archive zip = {};
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return 0;
 

@@ -3001,9 +3001,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     };
 
     auto open_template_import = [&](ImportFromTemplateScope scope) {
-        const char *zip_filter[1] = {"*.zip"};
-        const char *file = tinyfd_openFileDialog("Select Template Zip", "", 1, zip_filter,
-                                                 "Template Zip (*.zip)", 0);
+        const char *template_filter[2] = {"*.zip", "*.json"};
+        const char *file = tinyfd_openFileDialog("Select Template (.zip or .json)", "", 2, template_filter,
+                                                 "Template (*.zip, *.json)", 0);
         if (!file) return;
 
         strncpy(s_template_import_zip_path, file, sizeof(s_template_import_zip_path) - 1);
@@ -5204,7 +5204,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char tt[256];
                             snprintf(tt, sizeof(tt),
-                                     "Pick an Advancely template zip and merge selected %s into this\n"
+                                     "Pick an Advancely template (.zip or .json) and merge selected %s into this\n"
                                      "template. Referenced icons are extracted automatically.",
                                      advancements_label_plural_lower);
                             ImGui::SetTooltip("%s", tt);
@@ -6716,7 +6716,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                                      "Pick an Advancely template zip, choose a source advancement,\n"
+                                                      "Pick an Advancely template (.zip or .json), choose a source advancement,\n"
                                                       "and tick which criteria to merge into this one. Referenced\n"
                                                       "icons are extracted automatically.");
                                 }
@@ -7844,7 +7844,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected stats into this\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected stats into this\n"
                                               "template. Referenced icons are extracted automatically.");
                         }
                         ImGui::EndPopup();
@@ -9263,7 +9263,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                                      "Pick an Advancely template zip, choose a source stat, and tick\n"
+                                                      "Pick an Advancely template (.zip or .json), choose a source stat, and tick\n"
                                                       "which sub-stats to merge into this one.");
                                 }
                                 ImGui::EndPopup();
@@ -10227,7 +10227,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected unlocks into this\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected unlocks into this\n"
                                               "template. Referenced icons are extracted automatically.");
                         }
                         ImGui::EndPopup();
@@ -11016,7 +11016,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected custom goals\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected custom goals\n"
                                               "into this template. Referenced icons are extracted automatically.\n"
                                               "Existing root names are rejected.");
                         }
@@ -11971,7 +11971,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected multi-stage\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected multi-stage\n"
                                               "goals into this template. Referenced icons are extracted\n"
                                               "automatically. Stages keep their references to advancements,\n"
                                               "stats and criteria; orphan references are left dangling, the\n"
@@ -13170,7 +13170,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 ImGui::SetTooltip("%s",
-                                                  "Pick an Advancely template zip, choose a source multi-stage goal,\n"
+                                                  "Pick an Advancely template (.zip or .json), choose a source multi-stage goal,\n"
                                                   "and tick which stages to merge into this one. Final stages are\n"
                                                   "skipped on import to preserve this goal's own final stage.\n"
                                                   "Referenced stage icons are extracted automatically.");
@@ -14352,7 +14352,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected counters into\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected counters into\n"
                                               "this template. Referenced icons are extracted automatically.\n"
                                               "Linked goals are kept; orphan links are left dangling for you\n"
                                               "to fix in the editor.");
@@ -15327,7 +15327,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             ImGui::SetTooltip("%s",
-                                              "Pick an Advancely template zip and merge selected decorations\n"
+                                              "Pick an Advancely template (.zip or .json) and merge selected decorations\n"
                                               "(text headers, lines, arrows) into this template. Arrows keep\n"
                                               "their goal references; orphan refs are left dangling for you\n"
                                               "to fix in the editor.");
