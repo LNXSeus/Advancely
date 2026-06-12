@@ -988,14 +988,18 @@ options:
   `.dat`) from one of your world saves. A popup lists every advancement, stat or unlock present in that file,
   and you tick what to add. Existing root names are detected and refused so you can't double-import.
 - `...from other template` (all seven tabs: Advancements/Achievements, Stats, Unlocks, Custom Goals, Counters,
-  Multi-Stage Goals, Decorations): pick a zipped Advancely template (`.zip`, the same format the editor exports).
-  A popup lists every item of that tab's type from the source template, you tick what to merge, and
-  `Confirm Import` appends the selected items into the current template. Referenced icons (`icon` paths on
-  advancements, criteria, stats, sub-stats, unlocks, custom goals, counters and multi-stage goal stages) are
-  extracted from the zip's `icons/` directory into `resources/icons/` automatically, skipping any file that
-  already exists. Duplicate root names (or decoration ids) are detected up-front and the import is refused,
+  Multi-Stage Goals, Decorations): pick either a zipped Advancely template (`.zip`, the same format the editor
+  exports) **or** a raw, unzipped template (the main `.json` file, e.g. one straight out of
+  `resources/templates/`). Both behave identically; with a `.json` the editor reads its sibling `_lang*.json`
+  files from the same folder. A popup lists every item of that tab's type from the source template, you tick what
+  to merge, and `Confirm Import` appends the selected items into the current template. Referenced icons (`icon`
+  paths on advancements, criteria, stats, sub-stats, unlocks, custom goals, counters and multi-stage goal stages)
+  are copied into `resources/icons/` automatically, skipping any file that already exists. For a zip these come
+  from its `icons/` directory; for a raw template they come from an `icons/` folder next to the `.json` if present
+  (when importing from a template already installed locally, the icons are shared already so nothing is copied).
+  Duplicate root names (or decoration ids) are detected up-front and the import is refused,
   exactly like the player-file flow. A `Language` dropdown at the top picks which language file from the source
-  zip provides the display names for the items you import; selections are kept when you change it. Any
+  template provides the display names for the items you import; selections are kept when you change it. Any
   `linked_goals` / arrow endpoints / multi-stage `parent_advancement` refs that won't resolve after the import
   (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
   are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /
