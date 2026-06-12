@@ -92,8 +92,10 @@ static bool template_has_layout_data(const char *file_path) {
 
     // Check trackable sections for any items (or their criteria) with position keys
     // These can be JSON arrays or objects depending on the template format
-    const char *section_keys[] = {"advancements", "stats", "unlocks", "custom_goals", "multi_stage_goals"};
-    for (int k = 0; k < 5; k++) {
+    const char *section_keys[] = {
+        "advancements", "stats", "unlocks", "custom_goals", "multi_stage_goals", "counter_goals"
+    };
+    for (int k = 0; k < (int) (sizeof(section_keys) / sizeof(section_keys[0])); k++) {
         cJSON *section = cJSON_GetObjectItem(json, section_keys[k]);
         if (!section || (!cJSON_IsArray(section) && !cJSON_IsObject(section))) continue;
         cJSON *item = nullptr;
