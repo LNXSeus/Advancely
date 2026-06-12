@@ -6123,14 +6123,16 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                 snprintf(tooltip, sizeof(tooltip),
                          "%s: \"%s\" - %s\nPart of \"%s\"\n\n"
                          "X: %.0f   Y: %.0f\n"
-                         "Drag to reposition.",
+                         "Drag to reposition.\n"
+                         "Arrow keys nudge the selection by 1 pixel.",
                          goal_type, display_name, element_type, parent_display_name,
                          display_x, display_y);
             } else {
                 snprintf(tooltip, sizeof(tooltip),
                          "%s: \"%s\" - %s\n\n"
                          "X: %.0f   Y: %.0f\n"
-                         "Drag to reposition.",
+                         "Drag to reposition.\n"
+                         "Arrow keys nudge the selection by 1 pixel.",
                          goal_type, display_name, element_type,
                          display_x, display_y);
             }
@@ -10226,7 +10228,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                      "Decoration: \"%s\" - Line\n\n"
                                      "Endpoint 1:  X: %.0f   Y: %.0f\n"
                                      "Endpoint 2:  X: %.0f   Y: %.0f\n"
-                                     "Drag to reposition entire line.",
+                                     "Drag to reposition entire line.\n"
+                                     "Arrow keys nudge the selection by 1 pixel.",
                                      elem->id,
                                      elem->pos.x, elem->pos.y,
                                      elem->pos2.x, elem->pos2.y);
@@ -10591,7 +10594,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                      "Decoration: \"%s\" - Arrow\n\n"
                                      "Tail:  X: %.0f   Y: %.0f\n"
                                      "Tip:   X: %.0f   Y: %.0f\n"
-                                     "Drag to reposition entire arrow.",
+                                     "Drag to reposition entire arrow.\n"
+                                     "Arrow keys nudge the selection by 1 pixel.",
                                      elem->id,
                                      elem->pos.x, elem->pos.y,
                                      elem->pos2.x, elem->pos2.y);
@@ -10722,6 +10726,26 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                       IM_COL32(settings->text_color.r, settings->text_color.g,
                                                settings->text_color.b, 180),
                                       2.0f, 0, 2.0f);
+            }
+        }
+
+        // Arrow keys nudge the selection 1px (repeats allowed). Goal hotkeys are
+        // already gated off in layout editing, so bound arrow keys won't double-fire.
+        if (!s_visual_selected_items.empty() && !ImGui::IsAnyItemActive()) {
+            float nudge_x = 0.0f, nudge_y = 0.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) nudge_x -= 1.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) nudge_x += 1.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) nudge_y -= 1.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) nudge_y += 1.0f;
+
+            if (nudge_x != 0.0f || nudge_y != 0.0f) {
+                for (ManualPos *sel_pos: s_visual_selected_items) {
+                    init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
+                    sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + nudge_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                    sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + nudge_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                }
+                t->visual_layout_just_dragged = true;
+                SDL_SetAtomicInt(&g_templates_changed, 1);
             }
         }
 
