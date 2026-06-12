@@ -1097,11 +1097,7 @@
 					"root_name":	"minecraft:story/enchant_item"
 				}, {
 					"root_name":	"fish"
-				}],
-			"icon_pos":	{
-				"x":	65,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"overworld",
 			"icon":	"blocks/Grass_Block_JE7_BE6.png",
@@ -1202,11 +1198,7 @@
 					"root_name":	"minecraft:adventure/two_birds_one_arrow"
 				}, {
 					"root_name":	"minecraft:adventure/sleep_in_bed"
-				}],
-			"icon_pos":	{
-				"x":	215,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"village",
 			"icon":	"items/emerald_3d_shareware_v1.34.png",
@@ -1260,11 +1252,7 @@
 				}, {
 					"root_name":	"rabbit_stew",
 					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}],
-			"icon_pos":	{
-				"x":	365,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"ocean",
 			"icon":	"items/tropical_fish_25w14craftmine.png",
@@ -1332,11 +1320,7 @@
 					"root_name":	"minecraft:husbandry/tactical_fishing"
 				}, {
 					"root_name":	"pufferfish"
-				}],
-			"icon_pos":	{
-				"x":	515,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"mushroom",
 			"icon":	"blocks/Mycelium_JE5_BE3.png",
@@ -1356,11 +1340,7 @@
 				}, {
 					"root_name":	"minecraft:mooshroom",
 					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}],
-			"icon_pos":	{
-				"x":	665,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"swamp",
 			"icon":	"items/slime_ball_3d_shareware_v1.34.png",
@@ -1375,11 +1355,7 @@
 					"parent_root":	"minecraft:husbandry/complete_catalogue"
 				}, {
 					"root_name":	"leads2"
-				}],
-			"icon_pos":	{
-				"x":	815,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"jungle",
 			"icon":	"items/bamboo_25w14craftmine.png",
@@ -1410,11 +1386,7 @@
 				}, {
 					"root_name":	"melon_slice",
 					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}],
-			"icon_pos":	{
-				"x":	965,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"bees",
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
@@ -1428,11 +1400,7 @@
 					"root_name":	"minecraft:husbandry/silk_touch_nest"
 				}, {
 					"root_name":	"stat:bee_nests_picked_up"
-				}],
-			"icon_pos":	{
-				"x":	1115,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"taiga",
 			"icon":	"items/sweet_berries_25w14craftmine.png",
@@ -1463,11 +1431,7 @@
 				}, {
 					"root_name":	"sweet_berries",
 					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}],
-			"icon_pos":	{
-				"x":	1265,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"snowy",
 			"icon":	"blocks/Snow_Block_JE2_BE2.png",
@@ -1511,11 +1475,7 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs"
 				}, {
 					"root_name":	"minecraft:adventure/bullseye"
-				}],
-			"icon_pos":	{
-				"x":	1415,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"llamas",
 			"icon":	"blocks/Stone_JE8.png",
@@ -1537,11 +1497,7 @@
 				}, {
 					"root_name":	"minecraft:savanna",
 					"parent_root":	"minecraft:adventure/adventuring_time"
-				}],
-			"icon_pos":	{
-				"x":	1565,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"desert",
 			"icon":	"blocks/Sand_JE5_BE3.png",
@@ -1556,11 +1512,7 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs"
 				}, {
 					"root_name":	"stat:tnt_picked_up"
-				}],
-			"icon_pos":	{
-				"x":	1715,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"mesa",
 			"icon":	"blocks/Red_Sand_JE3_BE2.png",
@@ -1576,11 +1528,7 @@
 				}, {
 					"root_name":	"minecraft:cave_spider",
 					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}],
-			"icon_pos":	{
-				"x":	1865,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"nether",
 			"icon":	"blocks/Netherrack_JE4_BE2.png",
@@ -1640,11 +1588,7 @@
 					"root_name":	"fortress_items"
 				}, {
 					"root_name":	"ghast_tears"
-				}],
-			"icon_pos":	{
-				"x":	2015,
-				"y":	1225
-			}
+				}]
 		}, {
 			"root_name":	"endgame",
 			"icon":	"items/end_crystal_25w14craftmine.png",
@@ -1715,11 +1659,7 @@
 					"root_name":	"stat:debris_picked_up"
 				}, {
 					"root_name":	"stat:gold_blocks_picked_up"
-				}],
-			"icon_pos":	{
-				"x":	2165,
-				"y":	1225
-			}
+				}]
 		}],
 	"decorations":	[]
 }

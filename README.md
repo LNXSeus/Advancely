@@ -964,6 +964,8 @@ the live tracker map instead of typing coordinates by hand.
   pending template changes.
 * **Dragging**: Left-click and drag any goal icon, text label, progress text, decoration, or criterion to reposition
   it. A crosshair appears at the item's anchor point while dragging, and a tooltip shows the current coordinates.
+* **Arrow Keys**: With one or more items selected, the arrow keys nudge the selection by one pixel in that direction
+  (holding a key repeats).
 * **Coop face in `Text Pos.`**: For criteria and sub-stats, the contributor player face is part of the text's
   bounding box. Left/center anchors keep the face on the left of the text; right anchors flip it to the right edge,
   so the face never collides with the criterion icon.
