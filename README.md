@@ -843,7 +843,9 @@ Opening a template reveals a tabbed interface where you can define every goal.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
   selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
-  right-aligned `Bulk Actions...` button appears next to a `Deselect all` button. The dropdown groups every action that
+  right-aligned `Bulk Actions...` button appears next to a `Deselect all` button. Every menu starts with
+  `Invert Selection` (select every row in that list that is not currently selected, and deselect the rest), which is
+  available in all tabs since it is independent of the goal type. The dropdown then groups every action that
   runs across the whole selection: `Set Icon...` (apply the same icon path to every selected row), `Toggle Hidden`
   (flip the Hidden flag, majority-rule for the target state), `Layout Coordinates...`, and `Delete Selected...` (with
   confirmation). Beyond `Toggle Hidden`, each menu also exposes the other boolean toggles available for that goal type
