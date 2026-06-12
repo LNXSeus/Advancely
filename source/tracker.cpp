@@ -58,11 +58,38 @@ struct VisualLayoutItem {
     ImVec2 screen_pos; // Top-left corner on screen
     ImVec2 size; // Size on screen
     ManualPos *pos; // Pointer to the ManualPos being controlled
+    CounterLinkedGoal link{}; // Identity of the goal this item belongs to (valid only if linkable)
+    bool linkable = false; // True for goals that can be used as a linked-goal target
 };
 
 static std::vector<VisualLayoutItem> s_visual_layout_items;
 static std::vector<VisualLayoutItem> s_visual_layout_items_prev; // Previous frame snapshot for lookups during rendering
 static std::unordered_set<ManualPos *> s_visual_selected_items;
+
+// Deduplicated linkable-goal identities for the current visual selection, exposed to the
+// template editor so it can append them as linked goals. Rebuilt every frame while editing.
+static std::vector<CounterLinkedGoal> s_visual_selected_goals;
+static bool s_visual_clear_selection_requested = false;
+
+int tracker_get_visual_selected_goal_count(void) {
+    return (int) s_visual_selected_goals.size();
+}
+
+const CounterLinkedGoal *tracker_get_visual_selected_goals(void) {
+    return s_visual_selected_goals.data();
+}
+
+void tracker_request_clear_visual_selection(void) {
+    s_visual_clear_selection_requested = true;
+}
+
+// Two linked-goal identities refer to the same goal when type, root, parent, and stage all match.
+static bool visual_link_same(const CounterLinkedGoal &a, const CounterLinkedGoal &b) {
+    return a.type == b.type &&
+           strcmp(a.root_name, b.root_name) == 0 &&
+           strcmp(a.parent_root, b.parent_root) == 0 &&
+           strcmp(a.stage_id, b.stage_id) == 0;
+}
 
 // Search-linked sets: items that should remain visible because a matching counter/header links to them
 static std::unordered_set<std::string> s_linked_top; // Top-level items (root_name, no parent_root)
@@ -5946,8 +5973,37 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     bool is_hovered = ImGui::IsItemHovered();
     bool is_just_clicked = ImGui::IsItemActivated();
 
+    // Build this item's linkable-goal identity so a visual selection can be appended as
+    // linked goals in the template editor. Mirrors the section/type mapping used there.
+    CounterLinkedGoal link = {};
+    bool linkable = true;
+    if (strcmp(goal_type, "Stat") == 0 || strcmp(goal_type, "Sub-Stat") == 0) {
+        link.type = LINK_TYPE_STAT;
+    } else if (strcmp(goal_type, "Advancement") == 0 || strcmp(goal_type, "Achievement") == 0 ||
+               strcmp(goal_type, "Criterion") == 0) {
+        link.type = LINK_TYPE_ADVANCEMENT;
+    } else if (strcmp(goal_type, "Unlock") == 0) {
+        link.type = LINK_TYPE_UNLOCK;
+    } else if (strcmp(goal_type, "Custom Goal") == 0) {
+        link.type = LINK_TYPE_CUSTOM;
+    } else if (strcmp(goal_type, "Multi-Stage Goal") == 0) {
+        link.type = LINK_TYPE_MULTI_STAGE;
+    } else if (strcmp(goal_type, "Counter") == 0) {
+        link.type = LINK_TYPE_COUNTER;
+    } else {
+        linkable = false;
+    }
+    if (linkable && root_name && root_name[0] != '\0') {
+        strncpy(link.root_name, root_name, sizeof(link.root_name) - 1);
+        if (parent_root_name && parent_root_name[0] != '\0') {
+            strncpy(link.parent_root, parent_root_name, sizeof(link.parent_root) - 1);
+        }
+    } else {
+        linkable = false;
+    }
+
     // Register this item for selection rectangle hit-testing
-    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos});
+    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable});
 
     // Mark that an item was interacted with (prevents selection rectangle from starting)
     if (is_hovered || ImGui::IsItemActive()) {
@@ -10717,6 +10773,12 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     if (t->is_visual_layout_editing && settings->use_manual_layout) {
         ImDrawList *fg_draw_list = ImGui::GetForegroundDrawList();
 
+        // Honor a clear request from the template editor (after appending linked goals).
+        if (s_visual_clear_selection_requested) {
+            s_visual_selected_items.clear();
+            s_visual_clear_selection_requested = false;
+        }
+
         // Draw highlight around selected items
         for (const auto &item: s_visual_layout_items) {
             if (s_visual_selected_items.count(item.pos) > 0) {
@@ -10801,10 +10863,27 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
         }
 
+        // Rebuild the deduplicated linkable-goal identities for the template editor.
+        s_visual_selected_goals.clear();
+        for (const auto &item: s_visual_layout_items) {
+            if (!item.linkable || s_visual_selected_items.count(item.pos) == 0) continue;
+            bool already = false;
+            for (const auto &g: s_visual_selected_goals) {
+                if (visual_link_same(g, item.link)) {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already) s_visual_selected_goals.push_back(item.link);
+        }
+
         // Clear selection when visual editing is disabled
     } else if (!t->is_visual_layout_editing && !s_visual_selected_items.empty()) {
         s_visual_selected_items.clear();
+        s_visual_selected_goals.clear();
         t->visual_select_rect_active = false;
+    } else if (!t->is_visual_layout_editing) {
+        s_visual_selected_goals.clear();
     }
 
     // --- Info Bar ---

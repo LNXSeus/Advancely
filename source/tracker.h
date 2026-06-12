@@ -644,6 +644,14 @@ int tracker_drain_host_mods(CoopCustomGoalModMsg *out, int max_mods);
  */
 void tracker_recalculate_progress(Tracker *t, const AppSettings *settings);
 
+// --- Visual Layout Editor -> Template Editor linked-goal hand-off ---
+// Rebuilt every frame from the current visual selection (deduplicated, linkable goals only).
+// The template editor reads these to append the visual selection as linked goals.
+int tracker_get_visual_selected_goal_count(void);
+const CounterLinkedGoal *tracker_get_visual_selected_goals(void);
+// Requests the tracker to clear its visual selection on the next frame.
+void tracker_request_clear_visual_selection(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus

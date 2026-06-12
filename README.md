@@ -975,6 +975,12 @@ the live tracker map instead of typing coordinates by hand.
   clearing it. `Ctrl`+drag on empty space draws a selection rectangle that adds to the existing selection. Click on
   empty space without `Ctrl` to deselect. Clicking an already-selected item (without dragging it) removes just that
   item from the selection.
+* **Linking from a Selection**: Keep a selection active, then in the Template Editor open any goal or decoration that
+  supports linked goals (counter, stat category, sub-stat, custom goal, multi-stage stage, or text header) and click
+  the `Add Selected` button next to `Select Goals` to append the selected goals as linked goals (in template order,
+  skipping duplicates). For arrows, use the `Use Selected` button next to `Select`, which works only when exactly one
+  goal is selected. Selecting the icon, text, and progress text of the same goal still counts as one goal. The
+  selection clears after adding, and the button is disabled with an explanatory tooltip when the selection is invalid.
 * **Saving**: Changes made in the Visual Layout Editor are synced back to the Template Editor in real-time. Click
   **"Stop Visual Editing"** when finished, then click **"Save"** in the Template Editor to persist your layout to
   disk.

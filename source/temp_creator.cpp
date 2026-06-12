@@ -2359,6 +2359,152 @@ enum SaveMessageType {
     MSG_ERROR
 };
 
+// True if the goal selected in the Visual Layout Editor matches this identity.
+static bool tc_visual_selection_contains(const char *root_name, const char *parent_root,
+                                         LinkedGoalType type) {
+    int n = tracker_get_visual_selected_goal_count();
+    const CounterLinkedGoal *sel = tracker_get_visual_selected_goals();
+    const char *p = (parent_root && parent_root[0] != '\0') ? parent_root : "";
+    for (int i = 0; i < n; i++) {
+        if (sel[i].type == type && strcmp(sel[i].root_name, root_name) == 0 &&
+            strcmp(sel[i].parent_root, p) == 0 && sel[i].stage_id[0] == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+// True if a linked goal with this identity already exists in the list.
+static bool tc_linked_goals_contains(const std::vector<EditorCounterLinkedGoal> &goals,
+                                     const char *root_name, const char *parent_root,
+                                     LinkedGoalType type) {
+    const char *p = (parent_root && parent_root[0] != '\0') ? parent_root : "";
+    for (const auto &lg: goals) {
+        if (lg.type == type && strcmp(lg.root_name, root_name) == 0 &&
+            strcmp(lg.parent_root, p) == 0 && lg.stage_id[0] == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Appends the Visual Layout Editor selection to a linked-goal list, in template order and
+// without duplicating entries already present. Returns the number of goals added.
+static int tc_append_visual_selection(const EditorTemplate &tpl,
+                                      std::vector<EditorCounterLinkedGoal> &target) {
+    auto add = [&](const char *root_name, const char *parent_root, LinkedGoalType type) {
+        EditorCounterLinkedGoal lg = {};
+        strncpy(lg.root_name, root_name, sizeof(lg.root_name) - 1);
+        if (parent_root && parent_root[0] != '\0')
+            strncpy(lg.parent_root, parent_root, sizeof(lg.parent_root) - 1);
+        lg.type = type;
+        target.push_back(lg);
+    };
+    auto consider = [&](const char *root_name, const char *parent_root, LinkedGoalType type) -> int {
+        if (tc_visual_selection_contains(root_name, parent_root, type) &&
+            !tc_linked_goals_contains(target, root_name, parent_root, type)) {
+            add(root_name, parent_root, type);
+            return 1;
+        }
+        return 0;
+    };
+
+    int added = 0;
+    // Canonical order mirrors the goal selector's flat list.
+    for (const auto &adv: tpl.advancements) {
+        added += consider(adv.root_name, nullptr, LINK_TYPE_ADVANCEMENT);
+        for (const auto &crit: adv.criteria)
+            added += consider(crit.root_name, adv.root_name, LINK_TYPE_ADVANCEMENT);
+    }
+    for (const auto &stat: tpl.stats) {
+        added += consider(stat.root_name, nullptr, LINK_TYPE_STAT);
+        for (const auto &sub: stat.criteria)
+            added += consider(sub.root_name, stat.root_name, LINK_TYPE_STAT);
+    }
+    for (const auto &unlock: tpl.unlocks)
+        added += consider(unlock.root_name, nullptr, LINK_TYPE_UNLOCK);
+    for (const auto &cg: tpl.custom_goals)
+        added += consider(cg.root_name, nullptr, LINK_TYPE_CUSTOM);
+    for (const auto &msg: tpl.multi_stage_goals)
+        added += consider(msg.root_name, nullptr, LINK_TYPE_MULTI_STAGE);
+    for (const auto &counter: tpl.counter_goals)
+        added += consider(counter.root_name, nullptr, LINK_TYPE_COUNTER);
+    return added;
+}
+
+// Renders the "Add Selected (N)" button next to a "Select Goals" button. Appends the Visual
+// Layout Editor selection to the given linked-goal list (deduplicated) and clears the
+// selection. Disabled with an explanatory tooltip when nothing is selected.
+static void tc_render_add_visual_selection_button(const char *id, const EditorTemplate &tpl,
+                                                  std::vector<EditorCounterLinkedGoal> &target,
+                                                  SaveMessageType &save_message_type) {
+    int vsel = tracker_get_visual_selected_goal_count();
+    ImGui::SameLine();
+    char btn_label[96];
+    snprintf(btn_label, sizeof(btn_label), "Add Selected (%d)##addvis_%s", vsel, id);
+    bool disabled = (vsel == 0);
+    if (disabled) ImGui::BeginDisabled();
+    if (ImGui::Button(btn_label)) {
+        tc_append_visual_selection(tpl, target);
+        tracker_request_clear_visual_selection();
+        save_message_type = MSG_NONE;
+    }
+    if (disabled) ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tip[256];
+        if (vsel == 0)
+            snprintf(tip, sizeof(tip),
+                     "Select one or more goals in the Visual Layout Editor first,\n"
+                     "then click here to append them as linked goals.");
+        else
+            snprintf(tip, sizeof(tip),
+                     "Append the %d goal(s) selected in the Visual Layout Editor as linked goals.\n"
+                     "Selecting multiple parts of one goal (icon, text, progress) still adds it once,\n"
+                     "and goals already linked are skipped.", vsel);
+        ImGui::SetTooltip("%s", tip);
+    }
+}
+
+// Renders the "Use Selected" button next to an arrow's Start/End "Select" button. Arrows take a
+// single goal, so this is enabled only when exactly one goal is selected in the Visual Layout
+// Editor; a separate tooltip explains the rule when more than one goal is selected.
+static void tc_render_use_visual_selection_arrow_button(const char *id, char *goal_root, char *goal_stage,
+                                                        size_t root_sz, size_t stage_sz,
+                                                        SaveMessageType &save_message_type) {
+    (void) stage_sz;
+    int vsel = tracker_get_visual_selected_goal_count();
+    ImGui::SameLine();
+    char btn_label[96];
+    snprintf(btn_label, sizeof(btn_label), "Use Selected (%d)##usevis_%s", vsel, id);
+    bool ok = (vsel == 1);
+    if (!ok) ImGui::BeginDisabled();
+    if (ImGui::Button(btn_label)) {
+        const CounterLinkedGoal *sel = tracker_get_visual_selected_goals();
+        strncpy(goal_root, sel[0].root_name, root_sz - 1);
+        goal_root[root_sz - 1] = '\0';
+        goal_stage[0] = '\0'; // The visual selection is always a whole goal, never a stage.
+        tracker_request_clear_visual_selection();
+        save_message_type = MSG_NONE;
+    }
+    if (!ok) ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tip[256];
+        if (vsel == 0)
+            snprintf(tip, sizeof(tip),
+                     "Select exactly one goal in the Visual Layout Editor first,\n"
+                     "then click here to use it for this arrow endpoint.");
+        else if (vsel > 1)
+            snprintf(tip, sizeof(tip),
+                     "An arrow endpoint takes a single goal, but %d goals are selected.\n"
+                     "Selecting an icon, text and progress of the SAME goal counts as one;\n"
+                     "narrow the selection down to one goal in the Visual Layout Editor.", vsel);
+        else
+            snprintf(tip, sizeof(tip),
+                     "Use the goal selected in the Visual Layout Editor for this arrow endpoint.");
+        ImGui::SetTooltip("%s", tip);
+    }
+}
+
 // New helper function to centralize validation and saving
 static bool validate_and_save_template(const char *creator_version_str,
                                        const DiscoveredTemplate &selected_template_info,
@@ -8996,6 +9142,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
+                            tc_render_add_visual_selection_button(select_btn_id, current_template_data,
+                                                                  stat_cat.linked_goals, save_message_type);
+
                             if (!stat_cat.linked_goals.empty()) {
                                 // AND/OR mode toggle
                                 ImGui::SameLine();
@@ -9943,6 +10092,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
+
+                                    tc_render_add_visual_selection_button(crit_select_btn_id, current_template_data,
+                                                                          crit.linked_goals, save_message_type);
 
                                     if (!crit.linked_goals.empty()) {
                                         // AND/OR mode toggle
@@ -11602,6 +11754,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
+                            tc_render_add_visual_selection_button(select_btn_id, current_template_data,
+                                                                  goal.linked_goals, save_message_type);
                             if (!goal.linked_goals.empty()) {
                                 ImGui::SameLine();
                                 int mode_int = (int) goal.linked_goal_mode;
@@ -14002,6 +14156,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
 
+                                    tc_render_add_visual_selection_button(stage_select_btn_id, current_template_data,
+                                                                          stage.linked_goals, save_message_type);
+
                                     if (!stage.linked_goals.empty()) {
                                         // AND/OR mode toggle
                                         ImGui::SameLine();
@@ -15238,6 +15395,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
+                        tc_render_add_visual_selection_button("Counter", current_template_data,
+                                                              counter.linked_goals, save_message_type);
+
                         // Show list of linked goals
                         if (!counter.linked_goals.empty()) {
                             ImGui::BeginChild("LinkedGoalsList", ImVec2(0, 200), true);
@@ -15679,6 +15839,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
+                            tc_render_add_visual_selection_button(select_header_goals_btn, current_template_data,
+                                                                  deco.linked_goals, save_message_type);
+
                             // Show list of linked goals
                             if (!deco.linked_goals.empty()) {
                                 char child_id[64];
@@ -15805,6 +15968,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "When completed, the arrow changes to 'After' opacity.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
+                                tc_render_use_visual_selection_arrow_button(select_btn, deco.start_goal_root,
+                                                                            deco.start_goal_stage,
+                                                                            sizeof(deco.start_goal_root),
+                                                                            sizeof(deco.start_goal_stage),
+                                                                            save_message_type);
                                 if (deco.start_goal_root[0] != '\0') {
                                     ImGui::SameLine();
                                     char clear_btn[64];
@@ -15853,6 +16021,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "the arrow is hidden entirely.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
+                                tc_render_use_visual_selection_arrow_button(select_btn, deco.end_goal_root,
+                                                                            deco.end_goal_stage,
+                                                                            sizeof(deco.end_goal_root),
+                                                                            sizeof(deco.end_goal_stage),
+                                                                            save_message_type);
                                 if (deco.end_goal_root[0] != '\0') {
                                     ImGui::SameLine();
                                     char clear_btn[64];
