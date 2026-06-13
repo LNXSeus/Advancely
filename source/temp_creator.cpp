@@ -17,6 +17,7 @@
 #include "template_scanner.h"
 #include "temp_creator_utils.h"
 #include "path_utils.h"
+#include "format_utils.h" // For format_category_string()
 #include "global_event_handler.h"
 #include "file_utils.h" // For cJSON_from_file
 #include "dialog_utils.h" // For open_icon_file_dialog()
@@ -1880,7 +1881,7 @@ static void apply_layout_to_editor(EditorTemplate &ed, cJSON *layout_json) {
 
 // Main function to load a whole template for editing
 static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
-                                      const std::string &lang_flag,
+                                      const std::string &lang_flag, const std::string &layout_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
     editor_data.advancements.clear();
     editor_data.stats.clear();
@@ -1922,10 +1923,16 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
         lang_json = cJSON_CreateObject(); // Create an empty object if it doesn't exist to prevent crashes
     }
 
-    // Optional separate manual-layout file (default flag). When present it is authoritative:
+    // Optional separate manual-layout file (selected flag). When present it is authoritative:
     // positions and decorations come from it instead of from inline data in the template.
     char layout_path[MAX_PATH_LENGTH];
-    snprintf(layout_path, sizeof(layout_path), "%s_layout.json", base_path_str);
+    char layout_suffix[70];
+    if (!layout_flag.empty()) {
+        snprintf(layout_suffix, sizeof(layout_suffix), "_%s", layout_flag.c_str());
+    } else {
+        layout_suffix[0] = '\0';
+    }
+    snprintf(layout_path, sizeof(layout_path), "%s_layout%s.json", base_path_str, layout_suffix);
     cJSON *layout_json = cJSON_from_file(layout_path);
 
     cJSON *display_category_json = cJSON_GetObjectItem(lang_json, "display_category");
@@ -2357,7 +2364,7 @@ static void strip_inline_layout_from_template(cJSON *root) {
 }
 
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
-                                      const std::string &lang_flag,
+                                      const std::string &lang_flag, const std::string &layout_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
@@ -2380,9 +2387,15 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
     snprintf(lang_path, sizeof(lang_path), "%s_lang%s.json", base_path_str, lang_suffix);
 
-    // Separate layout file (default flag) used when this template stores its layout outside the template.
+    // Separate layout file (selected flag) used when this template stores its layout outside the template.
     char layout_path[MAX_PATH_LENGTH];
-    snprintf(layout_path, sizeof(layout_path), "%s_layout.json", base_path_str);
+    char layout_suffix[70];
+    if (!layout_flag.empty()) {
+        snprintf(layout_suffix, sizeof(layout_suffix), "_%s", layout_flag.c_str());
+    } else {
+        layout_suffix[0] = '\0';
+    }
+    snprintf(layout_path, sizeof(layout_path), "%s_layout%s.json", base_path_str, layout_suffix);
 
     // Read the existing file to preserve sections we aren't editing yet
     cJSON *root = cJSON_from_file(template_path);
@@ -2714,7 +2727,7 @@ static void tc_render_use_visual_selection_arrow_button(const char *id, char *go
 // New helper function to centralize validation and saving
 static bool validate_and_save_template(const char *creator_version_str,
                                        const DiscoveredTemplate &selected_template_info,
-                                       const std::string &lang_flag,
+                                       const std::string &lang_flag, const std::string &layout_flag,
                                        EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
                                        SaveMessageType &save_message_type, char *status_message,
                                        AppSettings *app_settings) {
@@ -2853,8 +2866,8 @@ static bool validate_and_save_template(const char *creator_version_str,
 
     // If all checks passed, attempt to save
     if (validation_passed) {
-        if (save_template_from_editor(creator_version_str, selected_template_info, lang_flag, current_template_data,
-                                      status_message)) {
+        if (save_template_from_editor(creator_version_str, selected_template_info, lang_flag, layout_flag,
+                                      current_template_data, status_message)) {
             // Update snapshot to new clean state
             saved_template_data = current_template_data;
             save_message_type = MSG_SUCCESS;
@@ -2879,6 +2892,76 @@ static bool validate_and_save_template(const char *creator_version_str,
         save_message_type = MSG_ERROR; // A validation check failed
         return false;
     }
+}
+
+// Forces the applied/tracked template (app_settings) to match whatever is currently open in the
+// template editor, so the Settings dropdowns (disabled while editing) and the tracker always follow
+// the editor. Only writes settings.json + triggers a reload when something actually changed.
+static void sync_app_settings_to_editor(AppSettings *app_settings, Tracker *t, const char *editor_version,
+                                        const DiscoveredTemplate &template_info, const std::string &lang_flag,
+                                        const std::string &layout_flag, const EditorTemplate &editor_data) {
+    bool changed = false;
+    bool identity_changed = false; // version/category/flag/lang changed -> display name needs refresh
+
+    if (strcmp(app_settings->version_str, editor_version) != 0) {
+        strncpy(app_settings->version_str, editor_version, sizeof(app_settings->version_str) - 1);
+        app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
+        // Note: the Display Version is intentionally left untouched (it's purely cosmetic and the
+        // user controls it independently), unlike the Settings 'Template Version' combo.
+        changed = true;
+        identity_changed = true;
+    }
+    if (strcmp(app_settings->category, template_info.category) != 0) {
+        strncpy(app_settings->category, template_info.category, sizeof(app_settings->category) - 1);
+        app_settings->category[sizeof(app_settings->category) - 1] = '\0';
+        changed = true;
+        identity_changed = true;
+    }
+    if (strcmp(app_settings->optional_flag, template_info.optional_flag) != 0) {
+        strncpy(app_settings->optional_flag, template_info.optional_flag, sizeof(app_settings->optional_flag) - 1);
+        app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
+        changed = true;
+        identity_changed = true;
+    }
+    if (strcmp(app_settings->lang_flag, lang_flag.c_str()) != 0) {
+        strncpy(app_settings->lang_flag, lang_flag.c_str(), sizeof(app_settings->lang_flag) - 1);
+        app_settings->lang_flag[sizeof(app_settings->lang_flag) - 1] = '\0';
+        changed = true;
+        identity_changed = true; // a different language can swap the display-category override
+    }
+    if (strcmp(app_settings->layout_flag, layout_flag.c_str()) != 0) {
+        strncpy(app_settings->layout_flag, layout_flag.c_str(), sizeof(app_settings->layout_flag) - 1);
+        app_settings->layout_flag[sizeof(app_settings->layout_flag) - 1] = '\0';
+        changed = true;
+    }
+
+    if (!changed) return;
+
+    // Refresh the tracker's display name when the template identity changed (unless the user locked it):
+    // prefer the editor's loaded per-language Display Category, otherwise auto-format from category + flag.
+    if (identity_changed && !app_settings->lock_category_display_name) {
+        if (editor_data.display_category[0] != '\0') {
+            strncpy(app_settings->category_display_name, editor_data.display_category,
+                    sizeof(app_settings->category_display_name) - 1);
+            app_settings->category_display_name[sizeof(app_settings->category_display_name) - 1] = '\0';
+        } else {
+            char formatted_category[MAX_PATH_LENGTH];
+            format_category_string(app_settings->category, formatted_category, sizeof(formatted_category));
+            if (app_settings->optional_flag[0] != '\0') {
+                char formatted_flag[MAX_PATH_LENGTH];
+                format_category_string(app_settings->optional_flag, formatted_flag, sizeof(formatted_flag));
+                snprintf(app_settings->category_display_name, sizeof(app_settings->category_display_name), "%s - %s",
+                         formatted_category, formatted_flag);
+            } else {
+                strncpy(app_settings->category_display_name, formatted_category,
+                        sizeof(app_settings->category_display_name) - 1);
+                app_settings->category_display_name[sizeof(app_settings->category_display_name) - 1] = '\0';
+            }
+        }
+    }
+
+    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+    SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a tracker reload onto the edited template
 }
 
 // New function to automatically manage hidden legacy stats for multi-stage goals
@@ -3127,7 +3210,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     if (!*p_open) {
-        if (t) t->is_temp_creator_focused = false;
+        if (t) {
+            t->is_temp_creator_focused = false;
+            // The editor only owns the applied template while its window is open. Closing it must
+            // release the Settings template dropdowns immediately, even though the edited template is
+            // remembered (the editing_template state below persists for the next open).
+            t->template_editor_is_editing = false;
+        }
         return;
     }
 
@@ -3172,6 +3261,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTemplate saved_template_data; // A snapshot of the last saved state
     static DiscoveredTemplate selected_template_info;
     static std::string selected_lang_flag; // The language currently being edited
+    static std::string selected_layout_flag; // The layout file currently being edited ("" = default)
     static bool show_advancement_display_names = true;
     static bool show_stat_display_names = true;
     static bool show_ms_goal_display_names = true;
@@ -3525,6 +3615,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Communicate unsaved changes state to settings window via tracker
     if (t) {
         t->template_editor_has_unsaved_changes = editing_template && editor_has_unsaved_changes;
+        t->template_editor_is_editing = editing_template;
+    }
+
+    // While editing, the editor owns the applied template: force the tracker + Settings dropdowns
+    // (which are disabled while editing) to follow whatever template/language/layout is open here.
+    if (t && editing_template) {
+        sync_app_settings_to_editor(app_settings, t, creator_version_str, selected_template_info,
+                                    selected_lang_flag, selected_layout_flag, current_template_data);
     }
 
     // Check if the selected template is the one currently in use
@@ -3608,8 +3706,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_S)) {
         validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
-                                   current_template_data, saved_template_data, save_message_type,
-                                   status_message, app_settings);
+                                   selected_layout_flag, current_template_data, saved_template_data,
+                                   save_message_type, status_message, app_settings);
     }
 
     if (roboto_font) {
@@ -3883,11 +3981,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             selected_template_index = i;
             selected_lang_index = -1; // Reset language selection
             selected_lang_flag = ""; // default
+            selected_layout_flag = ""; // default
             // If we are in the editor, we must update the loaded data
             if (editing_template) {
                 selected_template_info = discovered_templates[i];
                 if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                              current_template_data,
+                                              selected_layout_flag, current_template_data,
                                               status_message)) {
                     // Also update the 'saved' snapshot to reflect the newly loaded state
                     saved_template_data = current_template_data;
@@ -3968,9 +4067,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             selected_template_info = discovered_templates[selected_template_index];
             selected_lang_flag = selected_template_info.available_lang_flags[selected_lang_index];
+            selected_layout_flag = ""; // default layout
+
+            // When opening the template that's already applied, adopt its current language + layout
+            // from Settings so entering the editor doesn't reset them (the editor now drives Settings).
+            if (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0) {
+                selected_lang_flag = app_settings->lang_flag;
+                selected_layout_flag = app_settings->layout_flag;
+            }
 
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                          current_template_data, status_message)) {
+                                          selected_layout_flag, current_template_data, status_message)) {
                 saved_template_data = current_template_data;
             }
         }
@@ -5204,7 +5313,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          (int) lang_display_names.size())) {
             selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                          current_template_data, status_message)) {
+                                          selected_layout_flag, current_template_data, status_message)) {
                 saved_template_data = current_template_data;
                 save_message_type = MSG_NONE;
                 status_message[0] = '\0';
@@ -5250,6 +5359,63 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", display_category_tooltip_buffer);
         }
 
+        // --- Layout Selector inside Editor (parallel to Language) ---
+        ImGui::BeginDisabled(template_switching_disabled);
+        ImGui::SetNextItemWidth(250);
+        // Always offer the default layout, plus any discovered non-default layout flags.
+        std::vector<std::string> layout_flags = selected_template_info.available_layout_flags;
+        if (std::find(layout_flags.begin(), layout_flags.end(), std::string("")) == layout_flags.end()) {
+            layout_flags.insert(layout_flags.begin(), "");
+        }
+        std::vector<const char *> layout_display_names;
+        for (const auto &flag: layout_flags) {
+            layout_display_names.push_back(flag.empty() ? "Default" : flag.c_str());
+        }
+        int current_layout_idx = -1;
+        for (size_t i = 0; i < layout_flags.size(); ++i) {
+            if (layout_flags[i] == selected_layout_flag) {
+                current_layout_idx = i;
+                break;
+            }
+        }
+        if (current_layout_idx == -1) current_layout_idx = 0; // fall back to default
+
+        if (ImGui::Combo("Layout", &current_layout_idx, layout_display_names.data(),
+                         (int) layout_display_names.size())) {
+            selected_layout_flag = layout_flags[current_layout_idx];
+            if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                          selected_layout_flag, current_template_data, status_message)) {
+                saved_template_data = current_template_data;
+                save_message_type = MSG_NONE;
+                status_message[0] = '\0';
+                // The per-frame sync_app_settings_to_editor pushes this new layout into Settings + the
+                // tracker, so no explicit settings update is needed here.
+            }
+        }
+        // Layout selector tooltip
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char select_layout_file_tooltip_buffer[1024];
+            if (visual_editing_active) {
+                snprintf(select_layout_file_tooltip_buffer, sizeof(select_layout_file_tooltip_buffer),
+                         "Cannot change layout while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(select_layout_file_tooltip_buffer, sizeof(select_layout_file_tooltip_buffer),
+                         "Cannot change layout while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else {
+                snprintf(select_layout_file_tooltip_buffer, sizeof(select_layout_file_tooltip_buffer),
+                         "Select the layout file for editing goal positions and decorations.\n\n"
+                         "• Loading: Changing this selection reloads all positions and decorations from the chosen file.\n"
+                         "• Saving: Position and decoration edits are saved to the layout selected here when you click the main 'Save' button.\n\n"
+                         "While editing, this template is the applied one, so changing the layout here\n"
+                         "updates the tracker and the Settings layout immediately.\n\n"
+                         "This keeps the template's core structure separate from its visual layout.");
+            }
+            ImGui::SetTooltip("%s", select_layout_file_tooltip_buffer);
+        }
+        ImGui::EndDisabled(); // template_switching_disabled (layout selector)
+
         ImGui::Separator();
 
         // Save when creator window is focused
@@ -5258,7 +5424,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
             validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
-                                       current_template_data,
+                                       selected_layout_flag, current_template_data,
                                        saved_template_data, save_message_type, status_message, app_settings);
         }
 
@@ -5332,7 +5498,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             vis_has_valid_saves = (vis_sp_len >= 6 && strncmp(t->saves_path + vis_sp_len - 6, "/saves", 6) == 0);
         }
 
-        bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves;
+        // The visual editor reloads the tracker from disk using settings.layout_flag, so the editor's
+        // selected layout must match the one active in Settings or it would edit a different file than
+        // the map shows. (Only guard when starting: never block the "Stop" button mid-session.)
+        bool vis_layout_mismatch = !t->is_visual_layout_editing && (selected_layout_flag != app_settings->layout_flag);
+
+        bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves || vis_layout_mismatch;
 
         const char *vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
         float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -5350,11 +5521,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "You must apply this template in the main Settings window\n"
                              "to use the visual map editor.");
-                } else {
+                } else if (!vis_has_valid_saves) {
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "No valid Minecraft saves folder is currently being tracked.\n"
                              "The visual layout editor requires an active world to function properly.\n"
                              "Make sure Minecraft is running or check your saves path in Settings.");
+                } else {
+                    char editor_layout_name[80];
+                    char settings_layout_name[80];
+                    snprintf(editor_layout_name, sizeof(editor_layout_name), "%s",
+                             selected_layout_flag.empty() ? "Default" : selected_layout_flag.c_str());
+                    snprintf(settings_layout_name, sizeof(settings_layout_name), "%s",
+                             app_settings->layout_flag[0] == '\0' ? "Default" : app_settings->layout_flag);
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "The Layout selected here (%s) must match the Layout selected\n"
+                             "in the main Settings window (%s) to use the visual map editor.\n"
+                             "Select the same Layout in both places.",
+                             editor_layout_name, settings_layout_name);
                 }
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
@@ -5368,7 +5551,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     bool has_unsaved = are_editor_templates_different(current_template_data, saved_template_data);
                     if (has_unsaved) {
                         validate_and_save_template(creator_version_str, selected_template_info,
-                                                   selected_lang_flag, current_template_data,
+                                                   selected_lang_flag, selected_layout_flag, current_template_data,
                                                    saved_template_data, save_message_type,
                                                    status_message, app_settings);
                     }
@@ -5408,8 +5591,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "All selected items can be dragged together.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
-                         "Official default templates get overwritten on updates.\n"
-                         "Always work on a 'Copy' if you want to keep your custom layout!");
+                         "Make sure to always work on your own 'Layout' to keep your custom positions,\n"
+                         "since the default layout of official templates can be overwritten on updates.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }

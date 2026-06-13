@@ -531,6 +531,37 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Don't clear coop_room_code_buf - it's only valid while hosting
     }
 
+    // While a template is open in the editor, the editor owns the applied template: it pushes its
+    // selection straight into app_settings. Mirror those template-identity fields into both editing
+    // buffers every frame so the (now disabled) Version/Category/Optional Flag/Language/Layout and the
+    // derived Display Category control reflect the editor live, without raising a spurious "unsaved
+    // changes" diff or letting Apply revert the editor's choice. (Display Version is left untouched.)
+    bool template_editor_is_editing = t && t->template_editor_is_editing;
+    if (template_editor_is_editing) {
+        auto mirror_field = [](char *dst_a, char *dst_b, const char *src, size_t n) {
+            strncpy(dst_a, src, n - 1);
+            dst_a[n - 1] = '\0';
+            strncpy(dst_b, src, n - 1);
+            dst_b[n - 1] = '\0';
+        };
+        mirror_field(temp_settings.version_str, saved_settings.version_str, app_settings->version_str,
+                     sizeof(temp_settings.version_str));
+        mirror_field(temp_settings.category, saved_settings.category, app_settings->category,
+                     sizeof(temp_settings.category));
+        mirror_field(temp_settings.optional_flag, saved_settings.optional_flag, app_settings->optional_flag,
+                     sizeof(temp_settings.optional_flag));
+        mirror_field(temp_settings.lang_flag, saved_settings.lang_flag, app_settings->lang_flag,
+                     sizeof(temp_settings.lang_flag));
+        mirror_field(temp_settings.layout_flag, saved_settings.layout_flag, app_settings->layout_flag,
+                     sizeof(temp_settings.layout_flag));
+        mirror_field(temp_settings.category_display_name, saved_settings.category_display_name,
+                     app_settings->category_display_name, sizeof(temp_settings.category_display_name));
+    }
+    const char *template_editor_lock_tooltip =
+            "Locked while a template is open in the Template Creator.\n"
+            "The editor controls the applied template, language and layout,\n"
+            "so close the editor (or stop editing) to change this here.";
+
     // Position the settings window to the right half of the viewport when force-opened,
     // so it doesn't overlap the welcome window which ImGui places near the top-left.
     if (just_opened && force_open_reason && *force_open_reason != FORCE_OPEN_NONE) {
@@ -1149,7 +1180,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     break;
                 }
             }
-            if (coop_template_locked) ImGui::BeginDisabled();
+            bool version_disabled = coop_template_locked || template_editor_is_editing;
+            if (version_disabled) ImGui::BeginDisabled();
             if (ImGui::Combo("Template Version", &current_template_version_idx, version_display_c_strs.data(),
                              version_display_c_strs.size())) {
                 if (current_template_version_idx >= 0) {
@@ -1169,7 +1201,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char version_tooltip_buffer[1024];
-                if (coop_template_locked) {
+                if (template_editor_is_editing) {
+                    snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "%s",
+                             template_editor_lock_tooltip);
+                } else if (coop_template_locked) {
                     snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
                              "%s", coop_template_locked_tooltip);
                 } else {
@@ -1184,7 +1219,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
                 ImGui::SetTooltip("%s", version_tooltip_buffer);
             }
-            if (coop_template_locked) ImGui::EndDisabled();
+            if (version_disabled) ImGui::EndDisabled();
 
             // "Display Version" dropdown
             int current_display_version_idx = -1;
@@ -1428,7 +1463,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (coop_template_locked) ImGui::BeginDisabled();
+            bool category_disabled = coop_template_locked || template_editor_is_editing;
+            if (category_disabled) ImGui::BeginDisabled();
             if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
                 if (category_idx >= 0 && (size_t) category_idx < unique_category_values.size()) {
                     // Use the raw category value, not the display name with "(has layout)"
@@ -1458,7 +1494,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char category_tooltip_buffer[1024];
-                if (coop_template_locked) {
+                if (template_editor_is_editing) {
+                    snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer), "%s",
+                             template_editor_lock_tooltip);
+                } else if (coop_template_locked) {
                     snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
                              "%s", coop_template_locked_tooltip);
                 } else {
@@ -1472,7 +1511,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
                 ImGui::SetTooltip("%s", category_tooltip_buffer);
             }
-            if (coop_template_locked) ImGui::EndDisabled();
+            if (category_disabled) ImGui::EndDisabled();
 
 
             // --- OPTIONAL FLAG DROPDOWN ---
@@ -1511,7 +1550,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (coop_template_locked) ImGui::BeginDisabled();
+            bool flag_disabled = coop_template_locked || template_editor_is_editing;
+            if (flag_disabled) ImGui::BeginDisabled();
             if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
                 if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
                     // Use the raw flag value, not the display name with "(has layout)"
@@ -1528,7 +1568,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char flag_tooltip_buffer[1024];
-                if (coop_template_locked) {
+                if (template_editor_is_editing) {
+                    snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer), "%s",
+                             template_editor_lock_tooltip);
+                } else if (coop_template_locked) {
                     snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
                              "%s", coop_template_locked_tooltip);
                 } else {
@@ -1540,7 +1583,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
                 ImGui::SetTooltip("%s", flag_tooltip_buffer);
             }
-            if (coop_template_locked) ImGui::EndDisabled();
+            if (flag_disabled) ImGui::EndDisabled();
 
             // --- LANGUAGE DROPDOWN ---
             // (Display Category InputText now lives below the Language dropdown, since the
@@ -1570,6 +1613,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         }
                     }
 
+                    if (template_editor_is_editing) ImGui::BeginDisabled();
                     if (ImGui::Combo("Language", &lang_idx, lang_display_names.data(),
                                      (int) lang_display_names.size())) {
                         if (lang_idx >= 0 && (size_t) lang_idx < selected_template->available_lang_flags.size()) {
@@ -1582,15 +1626,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             update_temp_display_category();
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char lang_tooltip_buffer[1024];
-                        snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer),
-                                 "Choose between available language files for the selected template.\n"
-                                 "The Default `_lang.json` is usually english and comes with every template.\n\n"
-                                 "If a language file declares a 'display_category' field, that value is used\n"
-                                 "to pre-fill the 'Display Category' field below (unless it is locked).");
+                        if (template_editor_is_editing) {
+                            snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer), "%s",
+                                     template_editor_lock_tooltip);
+                        } else {
+                            snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer),
+                                     "Choose between available language files for the selected template.\n"
+                                     "The Default `_lang.json` is usually english and comes with every template.\n\n"
+                                     "If a language file declares a 'display_category' field, that value is used\n"
+                                     "to pre-fill the 'Display Category' field below (unless it is locked).");
+                        }
                         ImGui::SetTooltip("%s", lang_tooltip_buffer);
                     }
+                    if (template_editor_is_editing) ImGui::EndDisabled();
 
                     // --- Layout file dropdown (only shown when the template has layout data) ---
                     // Lives directly below the Language dropdown and mirrors its behavior.
@@ -1608,6 +1658,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             }
                         }
 
+                        if (template_editor_is_editing) ImGui::BeginDisabled();
                         if (ImGui::Combo("Layout", &layout_idx, layout_display_names.data(),
                                          (int) layout_display_names.size())) {
                             if (layout_idx >= 0 &&
@@ -1619,16 +1670,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                 temp_settings.layout_flag[sizeof(temp_settings.layout_flag) - 1] = '\0';
                             }
                         }
-                        if (ImGui::IsItemHovered()) {
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char layout_tooltip_buffer[1024];
-                            snprintf(layout_tooltip_buffer, sizeof(layout_tooltip_buffer),
-                                     "Choose between available layout files for the selected template.\n"
-                                     "A layout file stores manual positions and decorations separately from the\n"
-                                     "template, so a custom layout can survive official template updates.\n\n"
-                                     "'Default' uses the template's `_layout.json`, or its built-in positions\n"
-                                     "if it has no separate layout file.");
+                            if (template_editor_is_editing) {
+                                snprintf(layout_tooltip_buffer, sizeof(layout_tooltip_buffer), "%s",
+                                         template_editor_lock_tooltip);
+                            } else {
+                                snprintf(layout_tooltip_buffer, sizeof(layout_tooltip_buffer),
+                                         "Choose between available layout files for the selected template.\n"
+                                         "A layout file stores manual positions and decorations separately from the\n"
+                                         "template, so a custom layout can survive official template updates.\n\n"
+                                         "'Default' uses the template's `_layout.json`, or its built-in positions\n"
+                                         "if it has no separate layout file.");
+                            }
                             ImGui::SetTooltip("%s", layout_tooltip_buffer);
                         }
+                        if (template_editor_is_editing) ImGui::EndDisabled();
                     }
                 }
             }
@@ -1639,14 +1696,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 float standard_width = ImGui::CalcItemWidth();
                 ImGui::SetNextItemWidth(standard_width);
 
-                if (temp_settings.lock_category_display_name) ImGui::BeginDisabled();
+                bool display_name_disabled = temp_settings.lock_category_display_name || template_editor_is_editing;
+                if (display_name_disabled) ImGui::BeginDisabled();
                 ImGui::InputText("Display Category", temp_settings.category_display_name,
                                  sizeof(temp_settings.category_display_name));
-                if (temp_settings.lock_category_display_name) ImGui::EndDisabled();
+                if (display_name_disabled) ImGui::EndDisabled();
 
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                     char tooltip_buffer[768];
-                    if (temp_settings.lock_category_display_name) {
+                    if (template_editor_is_editing) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "%s", template_editor_lock_tooltip);
+                    } else if (temp_settings.lock_category_display_name) {
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Display Name is currently locked.\n"
                                  "Uncheck the box to edit or auto-update.");
