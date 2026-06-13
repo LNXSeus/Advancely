@@ -284,6 +284,26 @@ static bool is_valid_filename_part(const char *part) {
     return true;
 }
 
+// Local helper: rejects a combined category+flag name that contains a reserved sibling-file
+// suffix token (_lang, _layout, _notes). The template scanner skips any file whose name contains
+// one of these, so such a template would be undiscoverable and could clobber another template's
+// language, layout, or notes file in the same category folder.
+static bool name_uses_reserved_suffix_token(const char *category, const char *flag,
+                                            char *error_message, size_t error_msg_size) {
+    char combo[MAX_PATH_LENGTH];
+    snprintf(combo, sizeof(combo), "%s%s", category ? category : "", flag ? flag : "");
+    const char *tokens[] = {"_lang", "_layout", "_notes"};
+    for (const char *tok: tokens) {
+        if (strstr(combo, tok)) {
+            snprintf(error_message, error_msg_size,
+                     "Error: Template name cannot contain '%s'. That suffix is reserved for "
+                     "language, layout, and notes files.", tok);
+            return true;
+        }
+    }
+    return false;
+}
+
 // NLocal helper to check if a string ends with a specific suffix
 static bool ends_with(const char *str, const char *suffix) {
     if (!str || !suffix) {
@@ -409,6 +429,10 @@ bool validate_and_create_template(const char *version, const char *category, con
         }
     }
 
+    if (name_uses_reserved_suffix_token(category, flag, error_message, error_msg_size)) {
+        return false;
+    }
+
     // Prevent using reserved "_snapshot" suffix in legacy versions
     MC_Version version_enum = settings_get_version_from_string(version);
     if (version_enum <= MC_VERSION_1_6_4) {
@@ -498,6 +522,10 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
                      "Error: 'advancely_template' is a reserved name and cannot be used.");
             return false;
         }
+    }
+
+    if (name_uses_reserved_suffix_token(dest_category, dest_flag, error_message, error_msg_size)) {
+        return false;
     }
     // Check if destination is the same as source
     if (strcmp(src_version, dest_version) == 0 && strcmp(src_category, dest_category) == 0 && strcmp(

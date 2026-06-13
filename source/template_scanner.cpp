@@ -73,7 +73,21 @@ static void version_to_filename_format(const char *version_in, char *version_out
 }
 
 // Checks if a template JSON file contains any manual layout data (position keys or decorations).
+// Also returns true when a separate default layout file (<base>_layout.json) exists, since after
+// splitting a template the layout lives there instead of inline.
 static bool template_has_layout_data(const char *file_path) {
+    // A sibling default layout file counts as having layout (positions were split out).
+    size_t path_len = strlen(file_path);
+    if (path_len > 5 && strcmp(file_path + path_len - 5, ".json") == 0) {
+        char layout_path[MAX_PATH_LENGTH];
+        snprintf(layout_path, sizeof(layout_path), "%.*s_layout.json", (int) (path_len - 5), file_path);
+        FILE *lf = fopen(layout_path, "r");
+        if (lf) {
+            fclose(lf);
+            return true;
+        }
+    }
+
     cJSON *json = cJSON_from_file(file_path);
     if (!json) return false;
 
@@ -163,8 +177,9 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 
                 // --- Phase 1: Find main template files ---
                 const char *ext = strrchr(filename, '.');
-                // Universal filters for language, notes, and non-json files
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes"))
+                // Universal filters for language, layout, notes, and non-json files
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") ||
+                    strstr(filename, "_layout") || strstr(filename, "_notes"))
                     continue;
 
                 // Legacy-only filter for _snapshot files
@@ -266,7 +281,8 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 
                 // --- Phase 1: Find main template files ---
                 const char *ext = strrchr(filename, '.');
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes"))
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") ||
+                    strstr(filename, "_layout") || strstr(filename, "_notes"))
                     continue;
 
                 // Legacy-only filter for _snapshot files

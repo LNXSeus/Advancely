@@ -1822,6 +1822,62 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
     }
 }
 
+// Overlays positions from a separate layout file onto the in-memory editor data. Authoritative:
+// every goal's positions are reset then re-read from the layout file (goals absent reset to auto).
+// Keys mirror the language-file scheme (only advancement roots fold ':' and '/' to '.').
+static void apply_layout_to_editor(EditorTemplate &ed, cJSON *layout_json) {
+    if (!layout_json) return;
+    auto ap = [&](const char *key, ManualPos &icon, ManualPos &text, ManualPos &prog) {
+        cJSON *entry = cJSON_GetObjectItem(layout_json, key);
+        parse_editor_manual_pos(entry, "icon_pos", &icon);
+        parse_editor_manual_pos(entry, "text_pos", &text);
+        parse_editor_manual_pos(entry, "progress_pos", &prog);
+    };
+    for (auto &cat: ed.advancements) {
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "advancement.%s", cat.root_name);
+        for (char *p = cat_key; *p; p++) if (*p == ':' || *p == '/') *p = '.';
+        ap(cat_key, cat.icon_pos, cat.text_pos, cat.progress_pos);
+        for (auto &crit: cat.criteria) {
+            char crit_key[512];
+            snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit.root_name);
+            ap(crit_key, crit.icon_pos, crit.text_pos, crit.progress_pos);
+        }
+    }
+    for (auto &cat: ed.stats) {
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "stat.%s", cat.root_name);
+        ap(cat_key, cat.icon_pos, cat.text_pos, cat.progress_pos);
+        if (!cat.is_simple_stat) {
+            for (auto &crit: cat.criteria) {
+                char crit_key[512];
+                snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit.root_name);
+                ap(crit_key, crit.icon_pos, crit.text_pos, crit.progress_pos);
+            }
+        }
+    }
+    for (auto &it: ed.unlocks) {
+        char key[256];
+        snprintf(key, sizeof(key), "unlock.%s", it.root_name);
+        ap(key, it.icon_pos, it.text_pos, it.progress_pos);
+    }
+    for (auto &it: ed.custom_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "custom.%s", it.root_name);
+        ap(key, it.icon_pos, it.text_pos, it.progress_pos);
+    }
+    for (auto &g: ed.multi_stage_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "multi_stage_goal.%s", g.root_name);
+        ap(key, g.icon_pos, g.text_pos, g.progress_pos);
+    }
+    for (auto &g: ed.counter_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "counter.%s", g.root_name);
+        ap(key, g.icon_pos, g.text_pos, g.progress_pos);
+    }
+}
+
 // Main function to load a whole template for editing
 static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag,
@@ -1866,6 +1922,12 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
         lang_json = cJSON_CreateObject(); // Create an empty object if it doesn't exist to prevent crashes
     }
 
+    // Optional separate manual-layout file (default flag). When present it is authoritative:
+    // positions and decorations come from it instead of from inline data in the template.
+    char layout_path[MAX_PATH_LENGTH];
+    snprintf(layout_path, sizeof(layout_path), "%s_layout.json", base_path_str);
+    cJSON *layout_json = cJSON_from_file(layout_path);
+
     cJSON *display_category_json = cJSON_GetObjectItem(lang_json, "display_category");
     if (display_category_json && cJSON_IsString(display_category_json) && display_category_json->valuestring) {
         strncpy(editor_data.display_category, display_category_json->valuestring,
@@ -1882,10 +1944,19 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals,
                                    lang_json);
     parse_editor_counter_goals(cJSON_GetObjectItem(root, "counter_goals"), editor_data.counter_goals, lang_json);
-    parse_editor_decorations(cJSON_GetObjectItem(root, "decorations"), editor_data.decorations, lang_json);
+
+    // Decorations come from the layout file when one is present (authoritative); otherwise inline.
+    // Decoration display text always comes from the language file.
+    cJSON *deco_src = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
+                                  : cJSON_GetObjectItem(root, "decorations");
+    parse_editor_decorations(deco_src, editor_data.decorations, lang_json);
+
+    // Override the inline positions parsed above with the layout file's positions.
+    apply_layout_to_editor(editor_data, layout_json);
 
     cJSON_Delete(root);
     cJSON_Delete(lang_json);
+    if (layout_json) cJSON_Delete(layout_json);
     return true;
 }
 
@@ -2197,6 +2268,94 @@ static void serialize_editor_decorations(cJSON *parent,
 }
 
 // Main function to save the in-memory editor data back to a file
+// Builds a separate layout JSON (flat keyed map of positions + a decorations array) from the
+// editor data. Keys mirror apply_layout_to_editor / the language-file scheme. Goals with no set
+// or hidden positions are omitted. Used when a template stores its layout in a separate file.
+static cJSON *build_editor_layout_json(const EditorTemplate &ed) {
+    cJSON *root = cJSON_CreateObject();
+    auto add = [&](const char *key, const ManualPos &icon, const ManualPos &text, const ManualPos &prog) {
+        bool any = icon.is_set || icon.is_hidden_in_layout || text.is_set || text.is_hidden_in_layout ||
+                   prog.is_set || prog.is_hidden_in_layout;
+        if (!any) return;
+        cJSON *entry = cJSON_CreateObject();
+        save_editor_manual_pos(entry, "icon_pos", icon);
+        save_editor_manual_pos(entry, "text_pos", text);
+        save_editor_manual_pos(entry, "progress_pos", prog);
+        cJSON_AddItemToObject(root, key, entry);
+    };
+    for (const auto &cat: ed.advancements) {
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "advancement.%s", cat.root_name);
+        for (char *p = cat_key; *p; p++) if (*p == ':' || *p == '/') *p = '.';
+        add(cat_key, cat.icon_pos, cat.text_pos, cat.progress_pos);
+        for (const auto &crit: cat.criteria) {
+            char crit_key[512];
+            snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit.root_name);
+            add(crit_key, crit.icon_pos, crit.text_pos, crit.progress_pos);
+        }
+    }
+    for (const auto &cat: ed.stats) {
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "stat.%s", cat.root_name);
+        add(cat_key, cat.icon_pos, cat.text_pos, cat.progress_pos);
+        if (!cat.is_simple_stat) {
+            for (const auto &crit: cat.criteria) {
+                char crit_key[512];
+                snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit.root_name);
+                add(crit_key, crit.icon_pos, crit.text_pos, crit.progress_pos);
+            }
+        }
+    }
+    for (const auto &it: ed.unlocks) {
+        char key[256];
+        snprintf(key, sizeof(key), "unlock.%s", it.root_name);
+        add(key, it.icon_pos, it.text_pos, it.progress_pos);
+    }
+    for (const auto &it: ed.custom_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "custom.%s", it.root_name);
+        add(key, it.icon_pos, it.text_pos, it.progress_pos);
+    }
+    for (const auto &g: ed.multi_stage_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "multi_stage_goal.%s", g.root_name);
+        add(key, g.icon_pos, g.text_pos, g.progress_pos);
+    }
+    for (const auto &g: ed.counter_goals) {
+        char key[256];
+        snprintf(key, sizeof(key), "counter.%s", g.root_name);
+        add(key, g.icon_pos, g.text_pos, g.progress_pos);
+    }
+    serialize_editor_decorations(root, ed.decorations);
+    return root;
+}
+
+// Removes inline manual-layout data (position keys on every goal/criterion and the decorations
+// array) from a template JSON object, used when the layout is stored in a separate file instead.
+static void strip_inline_layout_from_template(cJSON *root) {
+    const char *sections[] = {"advancements", "stats", "unlocks", "custom", "multi_stage_goals", "counter_goals"};
+    for (const char *name: sections) {
+        cJSON *sec = cJSON_GetObjectItem(root, name);
+        if (!sec) continue;
+        cJSON *item = nullptr;
+        cJSON_ArrayForEach(item, sec) {
+            cJSON_DeleteItemFromObject(item, "icon_pos");
+            cJSON_DeleteItemFromObject(item, "text_pos");
+            cJSON_DeleteItemFromObject(item, "progress_pos");
+            cJSON *criteria = cJSON_GetObjectItem(item, "criteria");
+            if (criteria) {
+                cJSON *crit = nullptr;
+                cJSON_ArrayForEach(crit, criteria) {
+                    cJSON_DeleteItemFromObject(crit, "icon_pos");
+                    cJSON_DeleteItemFromObject(crit, "text_pos");
+                    cJSON_DeleteItemFromObject(crit, "progress_pos");
+                }
+            }
+        }
+    }
+    cJSON_DeleteItemFromObject(root, "decorations");
+}
+
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
@@ -2221,6 +2380,10 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
     snprintf(lang_path, sizeof(lang_path), "%s_lang%s.json", base_path_str, lang_suffix);
 
+    // Separate layout file (default flag) used when this template stores its layout outside the template.
+    char layout_path[MAX_PATH_LENGTH];
+    snprintf(layout_path, sizeof(layout_path), "%s_layout.json", base_path_str);
+
     // Read the existing file to preserve sections we aren't editing yet
     cJSON *root = cJSON_from_file(template_path);
     if (!root) {
@@ -2243,6 +2406,10 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     serialize_editor_counter_goals(root, editor_data.counter_goals);
     serialize_editor_decorations(root, editor_data.decorations);
 
+    // The template editor stores manual layout in a separate _layout file, never inline. Strip any
+    // inline positions/decorations from the template before writing so the two never diverge.
+    strip_inline_layout_from_template(root);
+
     // Write the modified JSON object back to the file
     FILE *file = fopen(template_path, "w");
     if (file) {
@@ -2260,6 +2427,35 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
 
     cJSON_Delete(root);
+
+    // Write the manual-layout file when the template has any layout data (positions or
+    // decorations), pruned to the goals that actually exist. When there is none, remove any
+    // existing layout file so nothing stale is left behind. This auto-creates the _layout file
+    // on save without a separate "split" step.
+    {
+        cJSON *layout_json = build_editor_layout_json(editor_data);
+        cJSON *layout_deco = cJSON_GetObjectItem(layout_json, "decorations");
+        bool has_layout_data = cJSON_GetArraySize(layout_json) > 1 ||
+                               (layout_deco && cJSON_GetArraySize(layout_deco) > 0);
+        if (has_layout_data) {
+            FILE *layout_file = fopen(layout_path, "w");
+            if (layout_file) {
+                char *layout_str = cJSON_Print(layout_json);
+                if (layout_str) {
+                    fputs(layout_str, layout_file);
+                    free(layout_str);
+                }
+                fclose(layout_file);
+            } else {
+                snprintf(status_message_buffer, 256, "Error: Failed to open layout file for writing.");
+                cJSON_Delete(layout_json);
+                return false;
+            }
+        } else {
+            remove(layout_path); // no layout data: drop any stale layout file
+        }
+        cJSON_Delete(layout_json);
+    }
 
 
     // SAVE LANG FILE WITH SPECIFIC ORDER
@@ -16717,6 +16913,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else if (strcasecmp(combined_name, "advancely_template") == 0) {
                     snprintf(status_message, sizeof(status_message),
                              "Error: 'advancely_template' is a reserved name and cannot be used.");
+                    save_message_type = MSG_ERROR;
+                } else if (strstr(combined_name, "_lang") || strstr(combined_name, "_layout") ||
+                           strstr(combined_name, "_notes")) {
+                    snprintf(status_message, sizeof(status_message),
+                             "Error: Template name cannot contain '_lang', '_layout', or '_notes'.\n"
+                             "Those suffixes are reserved for language, layout, and notes files.");
                     save_message_type = MSG_ERROR;
                 } else if (version_enum <= MC_VERSION_1_6_4 && ends_with(combined_name, "_snapshot")) {
                     // BLOCKING _snapshot for legacy versions

@@ -165,6 +165,7 @@ struct Tracker {
     // --- File Paths ---
     char advancement_template_path[MAX_PATH_LENGTH]; // Full path to the current template .json file.
     char lang_path[MAX_PATH_LENGTH]; // Full path to the current language .json file.
+    char layout_path[MAX_PATH_LENGTH]; // Full path to the current manual-layout .json file (may not exist).
     char saves_path[MAX_PATH_LENGTH]; // Path to the .minecraft/saves directory.
     char world_name[MAX_PATH_LENGTH]; // Name of the most recently played world.
     char advancements_path[MAX_PATH_LENGTH]; // Full path to the player's advancements .json file for the current world.

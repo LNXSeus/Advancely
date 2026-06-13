@@ -468,6 +468,7 @@ void settings_set_defaults(AppSettings *settings) {
                                    settings->category_display_name, sizeof(settings->category_display_name));
 
     settings->lang_flag[0] = '\0';
+    settings->layout_flag[0] = '\0';
 
     // Set the default section order
     for (int i = 0; i < SECTION_COUNT; i++) {
@@ -777,6 +778,16 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
     } else {
         settings->lang_flag[0] = '\0';
         defaults_were_used = true;
+    }
+
+    // layout_flag is optional and backwards compatible: when absent, positions fall back to
+    // the default _layout file (if present) or to inline positions inside the template.
+    const cJSON *layout_flag_json = cJSON_GetObjectItem(json, "layout_flag");
+    if (layout_flag_json && cJSON_IsString(layout_flag_json)) {
+        strncpy(settings->layout_flag, layout_flag_json->valuestring, sizeof(settings->layout_flag) - 1);
+        settings->layout_flag[sizeof(settings->layout_flag) - 1] = '\0';
+    } else {
+        settings->layout_flag[0] = '\0';
     }
 
     // Run Completion Threshold
@@ -1753,6 +1764,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateBool(settings->lock_category_display_name));
         cJSON_DeleteItemFromObject(root, "lang_flag");
         cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
+        cJSON_DeleteItemFromObject(root, "layout_flag");
+        cJSON_AddItemToObject(root, "layout_flag", cJSON_CreateString(settings->layout_flag));
 
         // Run Completion Threshold
         cJSON_DeleteItemFromObject(root, "completion_use_adv_threshold");
@@ -2238,7 +2251,16 @@ void construct_template_paths(AppSettings *settings) {
         lang_suffix[0] = '\0';
     }
 
+    // Construct the layout file suffix (e.g., "_eng" or "") independently of the language flag
+    char layout_suffix[70];
+    if (settings->layout_flag[0] != '\0') {
+        snprintf(layout_suffix, sizeof(layout_suffix), "_%s", settings->layout_flag);
+    } else {
+        layout_suffix[0] = '\0';
+    }
+
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
     snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang%s.json", base_path, lang_suffix);
+    snprintf(settings->layout_path, MAX_PATH_LENGTH, "%s_layout%s.json", base_path, layout_suffix);
     snprintf(settings->notes_path, MAX_PATH_LENGTH, "%s_notes.txt", base_path);
 }

@@ -11924,6 +11924,8 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
     strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
     t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
+    strncpy(t->layout_path, settings->layout_path, MAX_PATH_LENGTH - 1);
+    t->layout_path[MAX_PATH_LENGTH - 1] = '\0';
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -13107,6 +13109,91 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
 // =============================================================================
 
 
+// Applies positions from a separate manual-layout file over the parsed template data.
+// When a layout file is present it is authoritative: every goal's positions are reset and
+// then re-read from the layout file (so any leftover inline positions are ignored). Goals
+// absent from the layout file fall back to auto-layout. Keys mirror the language-file scheme
+// so the same key is used everywhere (only advancement roots have ':' and '/' folded to '.').
+static void tracker_apply_layout_overlay(TemplateData *td, cJSON *layout_json) {
+    if (!td || !layout_json) return;
+
+    auto apply = [&](const char *key, ManualPos *icon, ManualPos *text, ManualPos *progress) {
+        cJSON *entry = cJSON_GetObjectItem(layout_json, key);
+        parse_manual_pos(entry, "icon_pos", icon);
+        parse_manual_pos(entry, "text_pos", text);
+        if (progress) parse_manual_pos(entry, "progress_pos", progress);
+    };
+
+    // Advancements (and their criteria)
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *cat = td->advancements ? td->advancements[i] : nullptr;
+        if (!cat) continue;
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "advancement.%s", cat->root_name);
+        for (char *p = cat_key; *p; p++) if (*p == ':' || *p == '/') *p = '.';
+        apply(cat_key, &cat->icon_pos, &cat->text_pos, &cat->progress_pos);
+        for (int c = 0; c < cat->criteria_count; c++) {
+            TrackableItem *crit = cat->criteria ? cat->criteria[c] : nullptr;
+            if (!crit) continue;
+            char crit_key[512];
+            snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit->root_name);
+            apply(crit_key, &crit->icon_pos, &crit->text_pos, &crit->progress_pos);
+        }
+    }
+
+    // Stats (and their sub-stats)
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *cat = td->stats ? td->stats[i] : nullptr;
+        if (!cat) continue;
+        char cat_key[256];
+        snprintf(cat_key, sizeof(cat_key), "stat.%s", cat->root_name);
+        apply(cat_key, &cat->icon_pos, &cat->text_pos, &cat->progress_pos);
+        for (int c = 0; c < cat->criteria_count; c++) {
+            TrackableItem *crit = cat->criteria ? cat->criteria[c] : nullptr;
+            if (!crit) continue;
+            char crit_key[512];
+            snprintf(crit_key, sizeof(crit_key), "%s.criteria.%s", cat_key, crit->root_name);
+            apply(crit_key, &crit->icon_pos, &crit->text_pos, &crit->progress_pos);
+        }
+    }
+
+    // Unlocks
+    for (int i = 0; i < td->unlock_count; i++) {
+        TrackableItem *item = td->unlocks ? td->unlocks[i] : nullptr;
+        if (!item) continue;
+        char key[256];
+        snprintf(key, sizeof(key), "unlock.%s", item->root_name);
+        apply(key, &item->icon_pos, &item->text_pos, &item->progress_pos);
+    }
+
+    // Custom goals
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        TrackableItem *item = td->custom_goals ? td->custom_goals[i] : nullptr;
+        if (!item) continue;
+        char key[256];
+        snprintf(key, sizeof(key), "custom.%s", item->root_name);
+        apply(key, &item->icon_pos, &item->text_pos, &item->progress_pos);
+    }
+
+    // Multi-stage goals (the goal itself; stages have no manual position)
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = td->multi_stage_goals ? td->multi_stage_goals[i] : nullptr;
+        if (!goal) continue;
+        char key[256];
+        snprintf(key, sizeof(key), "multi_stage_goal.%s", goal->root_name);
+        apply(key, &goal->icon_pos, &goal->text_pos, &goal->progress_pos);
+    }
+
+    // Counter goals
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        CounterGoal *goal = td->counter_goals ? td->counter_goals[i] : nullptr;
+        if (!goal) continue;
+        char key[256];
+        snprintf(key, sizeof(key), "counter.%s", goal->root_name);
+        apply(key, &goal->icon_pos, &goal->text_pos, &goal->progress_pos);
+    }
+}
+
 bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
 
@@ -13156,6 +13243,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
         t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
 
+        strncpy(t->layout_path, settings->layout_path, MAX_PATH_LENGTH - 1);
+        t->layout_path[MAX_PATH_LENGTH - 1] = '\0';
+
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
         t->notes_path[MAX_PATH_LENGTH - 1] = '\0';
 
@@ -13185,6 +13275,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         lang_json = cJSON_CreateObject();
     }
 
+    // Optional separate manual-layout file. When present it is authoritative for positions
+    // and decorations; when absent, positions/decorations fall back to the template (inline),
+    // preserving backwards compatibility. NULL simply means "no layout file".
+    cJSON *layout_json = cJSON_from_file(t->layout_path);
+
     // Load settings.json to check for custom progress
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
     if (!settings_json) {
@@ -13199,7 +13294,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     cJSON *custom_json = cJSON_GetObjectItem(template_json, "custom"); // Custom goals, manually checked of by user
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
     cJSON *counter_goals_json = cJSON_GetObjectItem(template_json, "counter_goals");
-    cJSON *decorations_json = cJSON_GetObjectItem(template_json, "decorations");
+    // Decorations come from the layout file when one is present (authoritative); otherwise
+    // from the template itself. Decoration display text always stays in the language file.
+    cJSON *decorations_json = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
+                                          : cJSON_GetObjectItem(template_json, "decorations");
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -13246,6 +13344,12 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     tracker_parse_decorations(decorations_json, lang_json,
                               &t->template_data->decorations,
                               &t->template_data->decoration_count);
+
+    // When a separate layout file is present, override the (inline) positions parsed above
+    // with the layout file's positions. Authoritative: goals absent from the file reset to auto.
+    if (layout_json) {
+        tracker_apply_layout_overlay(t->template_data, layout_json);
+    }
 
 
     // Detect and flag criteria that are shared between multiple advancements
@@ -13442,6 +13546,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     cJSON_Delete(template_json);
     if (lang_json) {
         cJSON_Delete(lang_json);
+    }
+    if (layout_json) {
+        cJSON_Delete(layout_json);
     }
 
     // After parsing everything, determine the correct notes path and do an initial load.

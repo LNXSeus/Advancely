@@ -277,6 +277,7 @@ struct AppSettings {
     char category_display_name[MAX_PATH_LENGTH]; // The user-configurable display name for the category.
     bool lock_category_display_name; // If true, the category display name cannot be changed
     char lang_flag[64]; // Selected language flag (e.g., "eng", "pl") empty for default
+    char layout_flag[64]; // Selected manual-layout flag (empty = default _layout file or inline positions)
 
     // --- Run Completion Threshold (per active template; reset on template change) ---
     // Optional early-completion criteria (e.g. Half%). When neither toggle is enabled the
@@ -293,6 +294,7 @@ struct AppSettings {
     // --- Constructed Paths (from above settings) ---
     char template_path[MAX_PATH_LENGTH]; // The final, constructed path to the template .json file.
     char lang_path[MAX_PATH_LENGTH]; // The final, constructed path to the language .json file.
+    char layout_path[MAX_PATH_LENGTH]; // The final, constructed path to the manual-layout .json file.
     char notes_path[MAX_PATH_LENGTH]; // The final, constructed path to the notes .txt file.
 
     // --- Hotkeys ---
