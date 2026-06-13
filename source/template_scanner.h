@@ -25,6 +25,7 @@ typedef struct {
     char category[MAX_PATH_LENGTH];
     char optional_flag[MAX_PATH_LENGTH];
     std::vector<std::string> available_lang_flags;
+    std::vector<std::string> available_layout_flags; // Available _layout file flags ("" = default)
     bool has_layout; // True if the template has any manual layout positions or decorations
 } DiscoveredTemplate;
 

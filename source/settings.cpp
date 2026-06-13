@@ -112,6 +112,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->category_display_name, b->category_display_name) != 0 ||
         a->lock_category_display_name != b->lock_category_display_name ||
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
+        strcmp(a->layout_flag, b->layout_flag) != 0 ||
         a->completion_use_adv_threshold != b->completion_use_adv_threshold ||
         a->completion_adv_threshold != b->completion_adv_threshold ||
         a->completion_use_percent_threshold != b->completion_use_percent_threshold ||
@@ -349,7 +350,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char preset_status_msg[256] = "";
     static bool preset_status_is_error = false;
 
-    // Helper lambda to auto-select a language for the currently selected template
+    // Helper lambda to auto-select a language (and layout) for the currently selected template
     auto auto_select_language = [&]() {
         DiscoveredTemplate *selected_template = nullptr;
         for (int i = 0; i < discovered_template_count; ++i) {
@@ -370,33 +371,44 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            // If the current language is valid, keep it (fixes reset on startup)
-            if (current_is_valid) return;
+            // Keep a valid language; otherwise prefer the default, then the first available one.
+            if (!current_is_valid) {
+                bool default_lang_found = false;
+                for (const auto &flag: selected_template->available_lang_flags) {
+                    if (flag.empty()) {
+                        // ".empty()" is true for the default "" flag
+                        default_lang_found = true;
+                        break;
+                    }
+                }
 
-            bool default_lang_found = false;
-            for (const auto &flag: selected_template->available_lang_flags) {
-                if (flag.empty()) {
-                    // ".empty()" is true for the default "" flag
-                    default_lang_found = true;
-                    break;
+                if (default_lang_found || selected_template->available_lang_flags.empty()) {
+                    // Prioritize default language (and fall back to it if none were found)
+                    temp_settings.lang_flag[0] = '\0';
+                } else {
+                    // If no default, pick the first available one
+                    strncpy(temp_settings.lang_flag, selected_template->available_lang_flags[0].c_str(),
+                            sizeof(temp_settings.lang_flag) - 1);
+                    temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
                 }
             }
 
-            if (default_lang_found) {
-                // Prioritize default language
-                temp_settings.lang_flag[0] = '\0';
-            } else if (!selected_template->available_lang_flags.empty()) {
-                // If no default, pick the first available one
-                strncpy(temp_settings.lang_flag, selected_template->available_lang_flags[0].c_str(),
-                        sizeof(temp_settings.lang_flag) - 1);
-                temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
-            } else {
-                // No languages found (unlikely), set to default
-                temp_settings.lang_flag[0] = '\0';
+            // Keep a valid layout flag; otherwise fall back to the default ("" = _layout.json or
+            // the template's built-in positions), which is always available when it has layout.
+            bool layout_is_valid = false;
+            for (const auto &flag: selected_template->available_layout_flags) {
+                if (flag == temp_settings.layout_flag) {
+                    layout_is_valid = true;
+                    break;
+                }
+            }
+            if (!layout_is_valid) {
+                temp_settings.layout_flag[0] = '\0';
             }
         } else {
             // No matching template found, reset to default
             temp_settings.lang_flag[0] = '\0';
+            temp_settings.layout_flag[0] = '\0';
         }
     };
 
@@ -1578,6 +1590,45 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "If a language file declares a 'display_category' field, that value is used\n"
                                  "to pre-fill the 'Display Category' field below (unless it is locked).");
                         ImGui::SetTooltip("%s", lang_tooltip_buffer);
+                    }
+
+                    // --- Layout file dropdown (only shown when the template has layout data) ---
+                    // Lives directly below the Language dropdown and mirrors its behavior.
+                    if (selected_template->has_layout && !selected_template->available_layout_flags.empty()) {
+                        std::vector<const char *> layout_display_names;
+                        for (const auto &flag: selected_template->available_layout_flags) {
+                            layout_display_names.push_back(flag.empty() ? "Default" : flag.c_str());
+                        }
+
+                        int layout_idx = -1;
+                        for (size_t i = 0; i < selected_template->available_layout_flags.size(); ++i) {
+                            if (selected_template->available_layout_flags[i] == temp_settings.layout_flag) {
+                                layout_idx = (int) i;
+                                break;
+                            }
+                        }
+
+                        if (ImGui::Combo("Layout", &layout_idx, layout_display_names.data(),
+                                         (int) layout_display_names.size())) {
+                            if (layout_idx >= 0 &&
+                                (size_t) layout_idx < selected_template->available_layout_flags.size()) {
+                                const std::string &selected_flag_str =
+                                        selected_template->available_layout_flags[layout_idx];
+                                strncpy(temp_settings.layout_flag, selected_flag_str.c_str(),
+                                        sizeof(temp_settings.layout_flag) - 1);
+                                temp_settings.layout_flag[sizeof(temp_settings.layout_flag) - 1] = '\0';
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char layout_tooltip_buffer[1024];
+                            snprintf(layout_tooltip_buffer, sizeof(layout_tooltip_buffer),
+                                     "Choose between available layout files for the selected template.\n"
+                                     "A layout file stores manual positions and decorations separately from the\n"
+                                     "template, so a custom layout can survive official template updates.\n\n"
+                                     "'Default' uses the template's `_layout.json`, or its built-in positions\n"
+                                     "if it has no separate layout file.");
+                            ImGui::SetTooltip("%s", layout_tooltip_buffer);
+                        }
                     }
                 }
             }

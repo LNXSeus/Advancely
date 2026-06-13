@@ -136,6 +136,43 @@ static bool template_has_layout_data(const char *file_path) {
     return false;
 }
 
+// Adds the layout flag carried by `filename` to `flags` when it is a layout sibling of `base_name`.
+// "<base>_layout.json" yields "" (default); "<base>_layout_<flag>.json" yields "<flag>".
+static void collect_layout_flag(const char *filename, const char *base_name, std::vector<std::string> &flags) {
+    const char *layout_part = strstr(filename, "_layout");
+    if (!layout_part) return;
+    size_t n = (size_t) (layout_part - filename);
+    if (n >= MAX_PATH_LENGTH) return;
+    char layout_base_name[MAX_PATH_LENGTH];
+    strncpy(layout_base_name, filename, n);
+    layout_base_name[n] = '\0';
+    if (strcmp(base_name, layout_base_name) != 0) return;
+
+    if (strcmp(layout_part, "_layout.json") == 0) {
+        flags.emplace_back(""); // Default
+    } else if (strncmp(layout_part, "_layout_", strlen("_layout_")) == 0) {
+        const char *flag_start = layout_part + strlen("_layout_");
+        const char *flag_end = strstr(flag_start, ".json");
+        if (flag_end) {
+            flags.emplace_back(flag_start, flag_end - flag_start);
+        }
+    }
+}
+
+// Finalizes a template's layout-flag list: any layout file means the template has layout, and a
+// template with layout always offers the default ("") option. Sorted so the default sorts first.
+static void finalize_layout_flags(DiscoveredTemplate &dt) {
+    if (!dt.available_layout_flags.empty()) dt.has_layout = true;
+    if (dt.has_layout) {
+        bool has_default = false;
+        for (const auto &f: dt.available_layout_flags) {
+            if (f.empty()) { has_default = true; break; }
+        }
+        if (!has_default) dt.available_layout_flags.emplace_back("");
+    }
+    std::sort(dt.available_layout_flags.begin(), dt.available_layout_flags.end());
+}
+
 void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templates, int *out_count) {
     *out_templates = nullptr;
     *out_count = 0;
@@ -244,6 +281,17 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 snprintf(template_file_path, sizeof(template_file_path), "%s/%s", cat_path_str, filename);
                 dt.has_layout = template_has_layout_data(template_file_path);
 
+                // --- Phase 2b: Find all associated layout files for this template ---
+                WIN32_FIND_DATAA find_layout_data;
+                HANDLE h_find_layout = FindFirstFileA(file_search_path, &find_layout_data);
+                if (h_find_layout != INVALID_HANDLE_VALUE) {
+                    do {
+                        collect_layout_flag(D_FILENAME(find_layout_data), base_name, dt.available_layout_flags);
+                    } while (FindNextFileA(h_find_layout, &find_layout_data) != 0);
+                    FindClose(h_find_layout);
+                }
+                finalize_layout_flags(dt);
+
                 found_templates_vec.push_back(std::move(dt));
             } while (FindNextFileA(h_find_file, &find_file_data) != 0);
             FindClose(h_find_file);
@@ -342,6 +390,12 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 char template_file_path[MAX_PATH_LENGTH];
                 snprintf(template_file_path, sizeof(template_file_path), "%s/%s", cat_path_str, filename);
                 dt.has_layout = template_has_layout_data(template_file_path);
+
+                // --- Phase 2b: Find all associated layout files for THIS template ---
+                for (const auto &layout_filename_str: file_list) {
+                    collect_layout_flag(layout_filename_str.c_str(), base_name, dt.available_layout_flags);
+                }
+                finalize_layout_flags(dt);
 
                 found_templates_vec.push_back(std::move(dt));
             }
