@@ -3233,6 +3233,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char lang_flag_buffer[64] = "";
     static std::string lang_to_copy_from = "";
 
+    // Layout Management State (mirrors language management)
+    static int selected_layout_mgmt_index = -1;
+    static bool show_create_layout_popup = false;
+    static bool show_copy_layout_popup = false;
+    static char layout_flag_buffer[64] = "";
+    static std::string layout_to_copy_from = "";
+    static bool show_import_layout_popup = false;
+    static char import_layout_source_path[MAX_PATH_LENGTH] = "";
+    static char import_layout_flag_buffer[64] = "";
+    static bool import_layout_delete_after = false;
+
     // State for the creator's independent version selection
     static bool was_open_last_frame = false;
     static int creator_version_idx = -1;
@@ -3304,6 +3315,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     enum TemplateSearchScope {
         SCOPE_TEMPLATES,
         SCOPE_LANGUAGES,
+        SCOPE_LAYOUTS,
         SCOPE_ADVANCEMENTS,
         SCOPE_STATS,
         SCOPE_UNLOCKS,
@@ -3578,6 +3590,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         show_create_lang_popup = false;
         show_copy_lang_popup = false;
         show_import_lang_popup = false;
+        show_create_layout_popup = false;
+        show_copy_layout_popup = false;
+        show_import_layout_popup = false;
         show_export_options_popup = false;
         show_import_advancements_popup = false;
         show_import_stats_popup = false;
@@ -3640,12 +3655,79 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Rescan templates if the creator's version selection changes
     if (strcmp(last_scanned_version, creator_version_str) != 0) {
+        // A genuine version change (old version string still present) resets the selection; a forced
+        // rescan from a lifecycle op (which clears last_scanned_version to "") preserves it so that
+        // creating/copying/importing/deleting a language or layout file does not deselect the template.
+        bool forced_rescan = (last_scanned_version[0] == '\0');
+
+        char preserved_category[MAX_PATH_LENGTH] = {0};
+        char preserved_flag[MAX_PATH_LENGTH] = {0};
+        std::string preserved_lang_flag;
+        std::string preserved_layout_flag;
+        bool had_lang_selection = false;
+        bool had_layout_selection = false;
+        bool had_selection = forced_rescan && selected_template_index != -1 &&
+                             selected_template_index < discovered_template_count;
+        if (had_selection) {
+            const DiscoveredTemplate &prev = discovered_templates[selected_template_index];
+            strncpy(preserved_category, prev.category, sizeof(preserved_category) - 1);
+            strncpy(preserved_flag, prev.optional_flag, sizeof(preserved_flag) - 1);
+            if (selected_lang_index >= 0 && selected_lang_index < (int) prev.available_lang_flags.size()) {
+                preserved_lang_flag = prev.available_lang_flags[selected_lang_index];
+                had_lang_selection = true;
+            }
+            if (selected_layout_mgmt_index >= 0 &&
+                selected_layout_mgmt_index < (int) prev.available_layout_flags.size()) {
+                preserved_layout_flag = prev.available_layout_flags[selected_layout_mgmt_index];
+                had_layout_selection = true;
+            }
+        }
+
         free_discovered_templates(&discovered_templates, &discovered_template_count);
         scan_for_templates(creator_version_str, &discovered_templates, &discovered_template_count);
         strncpy(last_scanned_version, creator_version_str, sizeof(last_scanned_version) - 1);
         last_scanned_version[sizeof(last_scanned_version) - 1] = '\0';
-        selected_template_index = -1; // Reset selection
-        selected_lang_index = -1;
+
+        // Try to re-find the previously selected template by identity after a forced rescan.
+        int restored_index = -1;
+        if (had_selection) {
+            for (int i = 0; i < discovered_template_count; i++) {
+                if (strcmp(discovered_templates[i].category, preserved_category) == 0 &&
+                    strcmp(discovered_templates[i].optional_flag, preserved_flag) == 0) {
+                    restored_index = i;
+                    break;
+                }
+            }
+        }
+
+        if (restored_index != -1) {
+            selected_template_index = restored_index;
+            // Re-find the language/layout management sub-selections by value (their indices may have
+            // shifted, or the entry may have been deleted, in which case fall back to no selection).
+            const DiscoveredTemplate &restored = discovered_templates[restored_index];
+            selected_lang_index = -1;
+            if (had_lang_selection) {
+                for (size_t i = 0; i < restored.available_lang_flags.size(); i++) {
+                    if (restored.available_lang_flags[i] == preserved_lang_flag) {
+                        selected_lang_index = (int) i;
+                        break;
+                    }
+                }
+            }
+            selected_layout_mgmt_index = -1;
+            if (had_layout_selection) {
+                for (size_t i = 0; i < restored.available_layout_flags.size(); i++) {
+                    if (restored.available_layout_flags[i] == preserved_layout_flag) {
+                        selected_layout_mgmt_index = (int) i;
+                        break;
+                    }
+                }
+            }
+        } else {
+            selected_template_index = -1; // Reset selection
+            selected_lang_index = -1;
+            selected_layout_mgmt_index = -1;
+        }
         status_message[0] = '\0'; // Clear status message
     }
 
@@ -3810,8 +3892,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  : "Adv. Details";
 
         const char *scope_names[] = {
-            "Templates", "Languages", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals",
-            "Counters", "Decorations",
+            "Templates", "Languages", "Layouts", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals",
+            "Multi-Stage Goals", "Counters", "Decorations",
             adv_details_scope_name, "Stat Details", "MS Goal Details"
         };
 
@@ -3821,6 +3903,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             case SCOPE_TEMPLATES: current_scope_name = scope_names[SCOPE_TEMPLATES];
                 break;
             case SCOPE_LANGUAGES: current_scope_name = scope_names[SCOPE_LANGUAGES];
+                break;
+            case SCOPE_LAYOUTS: current_scope_name = scope_names[SCOPE_LAYOUTS];
                 break;
             case SCOPE_ADVANCEMENTS: current_scope_name = adv_ach_scope_name;
                 break;
@@ -3853,10 +3937,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 tc_search_buffer[0] = '\0'; // Clear search on change
             }
 
-            // Available only when viewing a template's language list (not in editor)
+            // Available only when viewing a template's language/layout lists (not in editor)
             if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
                 if (ImGui::Selectable(scope_names[SCOPE_LANGUAGES], current_search_scope == SCOPE_LANGUAGES)) {
                     current_search_scope = SCOPE_LANGUAGES;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_LAYOUTS], current_search_scope == SCOPE_LAYOUTS)) {
+                    current_search_scope = SCOPE_LAYOUTS;
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
             }
@@ -3980,6 +4068,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
             selected_template_index = i;
             selected_lang_index = -1; // Reset language selection
+            selected_layout_mgmt_index = -1; // Reset layout selection
             selected_lang_flag = ""; // default
             selected_layout_flag = ""; // default
             // If we are in the editor, we must update the loaded data
@@ -4892,6 +4981,179 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
     } // End of Language Selector
+
+
+    // --- Layout Management UI (mirrors the Language Management UI; appears when a template is selected) ---
+    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view && !
+        show_import_confirmation_view) {
+        ImGui::Separator();
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+        ImGui::Text("Layouts for '%s%s'", selected.category, selected.optional_flag);
+
+        bool is_layout_search_active = (current_search_scope == SCOPE_LAYOUTS && tc_search_buffer[0] != '\0');
+
+        // Build a filtered list of indices into available_layout_flags
+        std::vector<int> layouts_to_render_indices;
+        for (size_t i = 0; i < selected.available_layout_flags.size(); ++i) {
+            const auto &flag = selected.available_layout_flags[i];
+            const char *display_name = flag.empty() ? "Default (_layout.json)" : flag.c_str();
+            if (!is_layout_search_active || str_contains_insensitive(display_name, tc_search_buffer)) {
+                layouts_to_render_indices.push_back((int) i);
+            }
+        }
+
+        // Right-aligned counter
+        char layout_counter_text[128];
+        snprintf(layout_counter_text, sizeof(layout_counter_text), "%zu %s", layouts_to_render_indices.size(),
+                 layouts_to_render_indices.size() == 1 ? "Layout" : "Layouts");
+        float layout_text_width = ImGui::CalcTextSize(layout_counter_text).x;
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - layout_text_width);
+        ImGui::TextDisabled("%s", layout_counter_text);
+
+        ImGui::BeginChild("LayoutListChild", ImVec2(-1, 125), true);
+        if (selected.available_layout_flags.empty()) {
+            ImGui::TextDisabled("No layout files yet. Click 'Create Layout' to add one.");
+        }
+        for (int i: layouts_to_render_indices) {
+            const auto &flag = selected.available_layout_flags[i];
+            const char *display_name = flag.empty() ? "Default (_layout.json)" : flag.c_str();
+            if (ImGui::Selectable(display_name, selected_layout_mgmt_index == i)) {
+                selected_layout_mgmt_index = i;
+            }
+        }
+        ImGui::EndChild();
+
+        // --- Create Layout ---
+        if (ImGui::Button("Create Layout")) {
+            show_create_layout_popup = true;
+            layout_flag_buffer[0] = '\0';
+            status_message[0] = '\0';
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Create a new, empty layout file for this template.\n"
+                     "It starts blank (no positions or decorations); build it with the Visual Layout Editor.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+
+        // --- Copy Layout ---
+        ImGui::BeginDisabled(selected_layout_mgmt_index == -1);
+        if (ImGui::Button("Copy Layout")) {
+            show_copy_layout_popup = true;
+            layout_flag_buffer[0] = '\0';
+            status_message[0] = '\0';
+            layout_to_copy_from = selected.available_layout_flags[selected_layout_mgmt_index];
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[512];
+            if (selected_layout_mgmt_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a layout to copy.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Create a new layout file by copying the contents of the selected layout.\n"
+                         "Copying the Default when it has no separate layout file creates a blank layout.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+
+        // --- Delete Layout (cannot delete default or the layout currently in use) ---
+        bool layout_can_delete = false;
+        const char *layout_disabled_tooltip = "";
+        if (selected_layout_mgmt_index != -1) {
+            const std::string &selected_layout_in_creator =
+                    selected.available_layout_flags[selected_layout_mgmt_index];
+            bool is_default_layout = selected_layout_in_creator.empty();
+            if (is_default_layout) {
+                layout_disabled_tooltip = "Cannot delete the default layout file.";
+            }
+            bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                       strcmp(selected.category, app_settings->category) == 0 &&
+                                       strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+            bool is_active_layout = (selected_layout_in_creator == app_settings->layout_flag);
+            if (is_active_template && is_active_layout) {
+                layout_disabled_tooltip = "Cannot delete the layout currently in use by the tracker.";
+            }
+            if (!is_default_layout && !(is_active_template && is_active_layout)) {
+                layout_can_delete = true;
+            }
+        } else {
+            layout_disabled_tooltip = "Select a layout to delete.";
+        }
+
+        ImGui::BeginDisabled(!layout_can_delete);
+        if (ImGui::Button("Delete Layout")) {
+            ImGui::OpenPopup("Delete Layout?");
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (layout_can_delete) {
+                char tooltip_buffer[256];
+                const auto &layout_to_delete = selected.available_layout_flags[selected_layout_mgmt_index];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Delete the '%s' layout file.\n"
+                         "This action cannot be undone.", layout_to_delete.c_str());
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            } else {
+                ImGui::SetTooltip("%s", layout_disabled_tooltip);
+            }
+        }
+        ImGui::SameLine();
+
+        // --- Import Layout ---
+        if (ImGui::Button("Import Layout")) {
+#ifdef __APPLE__
+            const char *filter_patterns[2] = {"*.json", "public.json"};
+            int filter_count = 2;
+#else
+            const char *filter_patterns[1] = {"*.json"};
+            int filter_count = 1;
+#endif
+            const char *open_path = tinyfd_openFileDialog("Import Layout File", "",
+                                                          filter_count, filter_patterns, "JSON files", 0);
+            if (open_path) {
+                strncpy(import_layout_source_path, open_path, sizeof(import_layout_source_path) - 1);
+                import_layout_source_path[sizeof(import_layout_source_path) - 1] = '\0';
+                import_layout_flag_buffer[0] = '\0';
+                show_import_layout_popup = true;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Import a layout file (.json) for the selected template '%s%s'\n"
+                     "under a new layout flag.",
+                     selected.category, selected.optional_flag);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+
+        // --- Export Layout ---
+        ImGui::BeginDisabled(selected_layout_mgmt_index == -1);
+        if (ImGui::Button("Export Layout")) {
+            if (selected_layout_mgmt_index != -1) {
+                const auto &layout_to_export = selected.available_layout_flags[selected_layout_mgmt_index];
+                handle_export_layout(creator_version_str, selected.category, selected.optional_flag,
+                                     layout_to_export.c_str());
+            }
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[256];
+            if (selected_layout_mgmt_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a layout to export.");
+            } else {
+                const auto &layout_to_export = selected.available_layout_flags[selected_layout_mgmt_index];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Open the folder containing the layout file for '%s' and select it.",
+                         layout_to_export.empty() ? "Default" : layout_to_export.c_str());
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+    } // End of Layout Selector
 
 
     // "Editing Template" Form
@@ -17323,6 +17585,184 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                      "Press ESC to cancel.");
             ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
+        ImGui::EndPopup();
+    }
+
+    // --- LAYOUT LIFECYCLE POPUPS (mirror the language popups above) ---
+    if (show_create_layout_popup) ImGui::OpenPopup("Create New Layout");
+    if (ImGui::BeginPopupModal("Create New Layout", &show_create_layout_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static char popup_error_msg[256] = "";
+        const auto &selected = discovered_templates[selected_template_index];
+        ImGui::Text("Create new layout for '%s%s'", selected.category, selected.optional_flag);
+        ImGui::InputText("New Layout Flag", layout_flag_buffer, sizeof(layout_flag_buffer));
+        if (ImGui::IsItemHovered()) {
+            char create_layout_tooltip_buffer[1024];
+            snprintf(create_layout_tooltip_buffer, sizeof(create_layout_tooltip_buffer),
+                     "E.g., 'compact', 'my_setup'. Cannot be empty or contain special characters besides the %% sign.\n"
+                     "The new layout starts blank (no positions or decorations).");
+            ImGui::SetTooltip("%s", create_layout_tooltip_buffer);
+        }
+        if (popup_error_msg[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
+        }
+        if (ImGui::Button("Create", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            popup_error_msg[0] = '\0';
+            if (validate_and_create_layout_file(creator_version_str, selected.category, selected.optional_flag,
+                                                layout_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
+                SDL_SetAtomicInt(&g_templates_changed, 1);
+                last_scanned_version[0] = '\0';
+                ImGui::CloseCurrentPopup();
+                show_create_layout_popup = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ENTER to confirm.");
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            popup_error_msg[0] = '\0';
+            ImGui::CloseCurrentPopup();
+            show_create_layout_popup = false;
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ESC to cancel.");
+        ImGui::EndPopup();
+    }
+
+    if (show_copy_layout_popup) ImGui::OpenPopup("Copy Layout");
+    if (ImGui::BeginPopupModal("Copy Layout", &show_copy_layout_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static char popup_error_msg[256] = "";
+        static bool show_fallback_warning = false;
+        const auto &selected = discovered_templates[selected_template_index];
+        ImGui::Text("Copy layout '%s' to a new flag.",
+                    layout_to_copy_from.empty() ? "Default" : layout_to_copy_from.c_str());
+
+        ImGui::BeginDisabled(show_fallback_warning);
+        ImGui::InputText("New Layout Flag", layout_flag_buffer, sizeof(layout_flag_buffer));
+        ImGui::EndDisabled();
+
+        if (popup_error_msg[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
+        }
+        if (show_fallback_warning) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                               "Note: Default had no layout file. Created a blank layout instead.");
+        }
+
+        if (ImGui::Button("Copy", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            if (show_fallback_warning) {
+                ImGui::CloseCurrentPopup();
+                show_copy_layout_popup = false;
+                show_fallback_warning = false;
+            } else {
+                popup_error_msg[0] = '\0';
+                CopyLangResult result = copy_layout_file(creator_version_str, selected.category, selected.optional_flag,
+                                                         layout_to_copy_from.c_str(), layout_flag_buffer,
+                                                         popup_error_msg, sizeof(popup_error_msg));
+                if (result == COPY_LANG_SUCCESS_DIRECT) {
+                    SDL_SetAtomicInt(&g_templates_changed, 1);
+                    last_scanned_version[0] = '\0';
+                    ImGui::CloseCurrentPopup();
+                    show_copy_layout_popup = false;
+                } else if (result == COPY_LANG_SUCCESS_FALLBACK) {
+                    SDL_SetAtomicInt(&g_templates_changed, 1);
+                    last_scanned_version[0] = '\0';
+                    show_fallback_warning = true;
+                }
+            }
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ENTER to confirm.");
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            popup_error_msg[0] = '\0';
+            show_fallback_warning = false;
+            ImGui::CloseCurrentPopup();
+            show_copy_layout_popup = false;
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ESC to cancel.");
+        ImGui::EndPopup();
+    }
+
+    if (show_import_layout_popup) ImGui::OpenPopup("Import Layout");
+    if (ImGui::BeginPopupModal("Import Layout", &show_import_layout_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static char popup_error_msg[256] = "";
+        const auto &selected = discovered_templates[selected_template_index];
+
+        ImGui::Text("Importing for: '%s%s' for version %s.", selected.category, selected.optional_flag,
+                    creator_version_str);
+        ImGui::TextWrapped("Source: %s", import_layout_source_path);
+        ImGui::Separator();
+        ImGui::InputText("New Layout Flag", import_layout_flag_buffer, sizeof(import_layout_flag_buffer));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Enter a flag for the new layout (e.g., 'compact').\n"
+                     "Cannot be empty or contain special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::Checkbox("Delete source file after import", &import_layout_delete_after);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "If checked, the source .json file will be deleted from disk after a successful import.\n"
+                     "Source: %s", import_layout_source_path);
+            ImGui::TextUnformatted(tooltip_buffer);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        if (popup_error_msg[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
+        }
+
+        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            popup_error_msg[0] = '\0';
+            if (execute_import_layout_file(creator_version_str, selected.category, selected.optional_flag,
+                                           import_layout_source_path, import_layout_flag_buffer, popup_error_msg,
+                                           sizeof(popup_error_msg))) {
+                if (import_layout_delete_after) {
+                    remove(import_layout_source_path);
+                }
+                SDL_SetAtomicInt(&g_templates_changed, 1);
+                last_scanned_version[0] = '\0';
+                ImGui::CloseCurrentPopup();
+                show_import_layout_popup = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ENTER to confirm the import.");
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            popup_error_msg[0] = '\0';
+            ImGui::CloseCurrentPopup();
+            show_import_layout_popup = false;
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ESC to cancel.");
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Delete Layout?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto &selected = discovered_templates[selected_template_index];
+        const auto &layout_to_delete = selected.available_layout_flags[selected_layout_mgmt_index];
+        ImGui::Text("Are you sure you want to delete the '%s' layout file?", layout_to_delete.c_str());
+        ImGui::Separator();
+        if (ImGui::Button("Delete", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            char error_msg[256];
+            if (delete_layout_file(creator_version_str, selected.category, selected.optional_flag,
+                                   layout_to_delete.c_str(), error_msg, sizeof(error_msg))) {
+                SDL_SetAtomicInt(&g_templates_changed, 1);
+                last_scanned_version[0] = '\0';
+                selected_layout_mgmt_index = -1;
+            } else {
+                strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                status_message[sizeof(status_message) - 1] = '\0';
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ENTER to confirm.");
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Press ESC to cancel.");
         ImGui::EndPopup();
     }
 

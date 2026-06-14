@@ -400,6 +400,18 @@ void fs_create_empty_lang_file(const char *path) {
     log_message(LOG_INFO, "[TEMP CREATE UTILS] Created language file: %s\n", path);
 }
 
+void fs_create_empty_layout_file(const char *path) {
+    FILE *file = fopen(path, "w");
+    if (!file) {
+        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to create layout file: %s\n", path);
+        return;
+    }
+    // An empty layout has no positions and no decorations: everything falls back to auto-layout.
+    fputs("{\n}\n", file);
+    fclose(file);
+    log_message(LOG_INFO, "[TEMP CREATE UTILS] Created layout file: %s\n", path);
+}
+
 bool validate_and_create_template(const char *version, const char *category, const char *flag, char *error_message,
                                   size_t error_msg_size) {
     // 1. Validate Inputs
@@ -918,6 +930,111 @@ bool delete_lang_file(const char *version, const char *category, const char *fla
     }
 
     log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted lang file: %s\n", lang_path);
+    return true;
+}
+
+
+// --- LAYOUT FILE LIFECYCLE (mirrors the language-file functions above) ---
+
+bool validate_and_create_layout_file(const char *version, const char *category, const char *flag,
+                                     const char *new_layout_flag, char *error_message, size_t error_msg_size) {
+    if (!new_layout_flag || new_layout_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Layout flag cannot be empty.");
+        return false;
+    }
+    if (!is_valid_filename_part(new_layout_flag)) {
+        snprintf(error_message, error_msg_size, "Error: Layout flag contains invalid characters.");
+        return false;
+    }
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char new_layout_path[MAX_PATH_LENGTH];
+    snprintf(new_layout_path, sizeof(new_layout_path), "%s_layout_%s.json", base_path, new_layout_flag);
+
+    if (path_exists(new_layout_path)) {
+        snprintf(error_message, error_msg_size, "Error: A layout file with the flag '%s' already exists.",
+                 new_layout_flag);
+        return false;
+    }
+
+    fs_create_empty_layout_file(new_layout_path);
+    return true;
+}
+
+CopyLangResult copy_layout_file(const char *version, const char *category, const char *flag,
+                                const char *src_layout_flag, const char *dest_layout_flag, char *error_message,
+                                size_t error_msg_size) {
+    if (!dest_layout_flag || dest_layout_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Destination layout flag cannot be empty.");
+        return COPY_LANG_FAIL;
+    }
+    if (!is_valid_filename_part(dest_layout_flag)) {
+        snprintf(error_message, error_msg_size, "Error: Destination layout flag contains invalid characters.");
+        return COPY_LANG_FAIL;
+    }
+    if (strcmp(src_layout_flag, dest_layout_flag) == 0) {
+        snprintf(error_message, error_msg_size, "Error: Destination flag must be different from the source.");
+        return COPY_LANG_FAIL;
+    }
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char src_path[MAX_PATH_LENGTH];
+    if (src_layout_flag[0] == '\0') {
+        snprintf(src_path, sizeof(src_path), "%s_layout.json", base_path);
+    } else {
+        snprintf(src_path, sizeof(src_path), "%s_layout_%s.json", base_path, src_layout_flag);
+    }
+
+    char dest_path[MAX_PATH_LENGTH];
+    snprintf(dest_path, sizeof(dest_path), "%s_layout_%s.json", base_path, dest_layout_flag);
+
+    if (path_exists(dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: A layout file with the flag '%s' already exists.",
+                 dest_layout_flag);
+        return COPY_LANG_FAIL;
+    }
+
+    // The "Default" source layout file may not exist for a template that only has inline/auto positions.
+    // In that case there is nothing concrete to copy, so create a blank layout instead of failing.
+    if (!path_exists(src_path)) {
+        fs_create_empty_layout_file(dest_path);
+        log_message(LOG_INFO, "[TEMP CREATE UTILS] Source layout '%s' missing, created blank layout: %s\n",
+                    src_layout_flag, dest_path);
+        return COPY_LANG_SUCCESS_FALLBACK;
+    }
+
+    if (!fs_copy_file(src_path, dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: Failed to copy the layout file.");
+        return COPY_LANG_FAIL;
+    }
+
+    return COPY_LANG_SUCCESS_DIRECT;
+}
+
+bool delete_layout_file(const char *version, const char *category, const char *flag, const char *layout_flag_to_delete,
+                        char *error_message, size_t error_msg_size) {
+    if (!layout_flag_to_delete || layout_flag_to_delete[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Cannot delete the default layout file.");
+        return false;
+    }
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char layout_path[MAX_PATH_LENGTH];
+    snprintf(layout_path, sizeof(layout_path), "%s_layout_%s.json", base_path, layout_flag_to_delete);
+
+    if (remove(layout_path) != 0) {
+        snprintf(error_message, error_msg_size, "Error: Failed to delete layout file: %s", layout_path);
+        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete layout file: %s\n", layout_path);
+        return false;
+    }
+
+    log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted layout file: %s\n", layout_path);
     return true;
 }
 
@@ -1534,6 +1651,75 @@ bool execute_import_language_file(const char *version, const char *category, con
     }
 
     log_message(LOG_INFO, "[TEMP CREATE UTILS] Imported language file from '%s' to '%s'\n", source_path, dest_path);
+    return true;
+}
+
+void handle_export_layout(const char *version, const char *category, const char *flag,
+                          const char *layout_flag_to_export) {
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char layout_path[MAX_PATH_LENGTH];
+    if (layout_flag_to_export[0] == '\0') {
+        snprintf(layout_path, sizeof(layout_path), "%s_layout.json", base_path);
+    } else {
+        snprintf(layout_path, sizeof(layout_path), "%s_layout_%s.json", base_path, layout_flag_to_export);
+    }
+
+#ifdef _WIN32
+    char command[MAX_PATH_LENGTH + 64];
+    path_to_windows_native(layout_path);
+    snprintf(command, sizeof(command), "/select,\"%s\"", layout_path);
+    ShellExecuteA(nullptr, "open", "explorer", command, nullptr, SW_SHOW);
+#else // macOS and Linux
+    pid_t pid = fork();
+    if (pid == 0) {  // Child process
+#if __APPLE__
+    char *args[] = {(char *) "open", (char *) "-R", layout_path, nullptr};
+    execvp(args[0], args);
+#else // Linux
+    char parent_dir[MAX_PATH_LENGTH];
+    if (get_parent_directory(layout_path, parent_dir, sizeof(parent_dir), 1)) {
+        char *args[] = {(char *) "xdg-open", parent_dir, nullptr};
+        execvp(args[0], args);
+    }
+#endif
+    _exit(127); // Exit if exec fails
+    } else if (pid < 0) {
+        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to fork process to open folder.\n");
+    }
+#endif
+}
+
+bool execute_import_layout_file(const char *version, const char *category, const char *flag, const char *source_path,
+                                const char *new_layout_flag, char *error_message, size_t error_msg_size) {
+    if (!new_layout_flag || new_layout_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: New layout flag cannot be empty.");
+        return false;
+    }
+    if (!is_valid_filename_part(new_layout_flag)) {
+        snprintf(error_message, error_msg_size, "Error: New layout flag contains invalid characters.");
+        return false;
+    }
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char dest_path[MAX_PATH_LENGTH];
+    snprintf(dest_path, sizeof(dest_path), "%s_layout_%s.json", base_path, new_layout_flag);
+
+    if (path_exists(dest_path)) {
+        snprintf(error_message, error_msg_size,
+                 "Error: A layout file with the flag '%s' already exists for this template.", new_layout_flag);
+        return false;
+    }
+
+    if (!fs_copy_file(source_path, dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: Failed to copy the layout file.");
+        return false;
+    }
+
+    log_message(LOG_INFO, "[TEMP CREATE UTILS] Imported layout file from '%s' to '%s'\n", source_path, dest_path);
     return true;
 }
 

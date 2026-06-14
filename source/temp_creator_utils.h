@@ -100,6 +100,12 @@ void fs_create_empty_template_file(const char *path);
 void fs_create_empty_lang_file(const char *path);
 
 /**
+ * @brief Creates a new, empty layout JSON file (no positions or decorations -> auto-layout).
+ * @param path The full path where the file should be created.
+ */
+void fs_create_empty_layout_file(const char *path);
+
+/**
 * @brief Validates inputs and creates a new template with its language file.
 * This is the main function called by the UI to perform the creation logic.
 * It validates the actual filepath and not ambiguous combinations of the category and flag.
@@ -188,6 +194,38 @@ bool delete_lang_file(const char *version, const char *category, const char *fla
                       char *error_message, size_t error_msg_size);
 
 /**
+* @brief Validates inputs and creates a new, empty layout file (`_layout_<flag>.json`) for a template.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param new_layout_flag The new layout flag to create. Cannot be empty.
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool validate_and_create_layout_file(const char *version, const char *category, const char *flag,
+                                     const char *new_layout_flag, char *error_message, size_t error_msg_size);
+
+/**
+* @brief Copies an existing layout file to a new layout flag for the same template. Reuses CopyLangResult.
+* If the source is the (possibly non-existent) default layout, a blank layout is created instead.
+* @param src_layout_flag The source layout flag ("" for the default `_layout.json`).
+* @param dest_layout_flag The new destination layout flag.
+* @return CopyLangResult value (FAIL / SUCCESS_DIRECT / SUCCESS_FALLBACK for the blank-default case).
+*/
+CopyLangResult copy_layout_file(const char *version, const char *category, const char *flag,
+                                const char *src_layout_flag, const char *dest_layout_flag, char *error_message,
+                                size_t error_msg_size);
+
+/**
+* @brief Deletes a specific, non-default layout file for a template.
+* @param layout_flag_to_delete The layout flag to delete. Cannot be the default.
+* @return true on success, false on failure.
+*/
+bool delete_layout_file(const char *version, const char *category, const char *flag, const char *layout_flag_to_delete,
+                        char *error_message, size_t error_msg_size);
+
+/**
  * @brief Reads a .zip file and attempts to parse template info from its contents.
  * This function does NOT extract any files.
  * @param zip_path Path to the .zip file.
@@ -258,6 +296,22 @@ void handle_export_language(const char *version, const char *category, const cha
 */
 bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path,
                                   const char *new_lang_flag, char *error_message, size_t error_msg_size);
+
+/**
+* @brief Opens the file explorer and highlights the selected layout file.
+* @param layout_flag_to_export The layout flag of the file to show ("" for the default).
+*/
+void handle_export_layout(const char *version, const char *category, const char *flag,
+                          const char *layout_flag_to_export);
+
+/**
+* @brief Imports a user-selected layout file (.json) for a template under a new layout flag.
+* @param source_path The path to the .json file being imported.
+* @param new_layout_flag The new layout flag for the destination file.
+* @return true on success, false on failure.
+*/
+bool execute_import_layout_file(const char *version, const char *category, const char *flag, const char *source_path,
+                                const char *new_layout_flag, char *error_message, size_t error_msg_size);
 
 /**
  * @brief Returns indices into import_advs whose root_name is not present in template_root_names.
