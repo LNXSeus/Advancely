@@ -32,6 +32,7 @@ extern SDL_AtomicInt g_settings_changed;
 extern SDL_AtomicInt g_game_data_changed; // To reset update timer on game data change or completion change (visually)
 extern SDL_AtomicInt g_apply_button_clicked; // To signal when overlay window should restart (on apply button click)
 extern SDL_AtomicInt g_templates_changed; // To signal that the template list needs to be rescanned.
+extern SDL_AtomicInt g_settings_resync_from_app; // App-initiated app_settings change: Settings window re-seeds editing buffers without a spurious unsaved diff.
 extern SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
 extern SDL_AtomicInt g_suppress_settings_watch; // Suppress dmon settings watcher for app-initiated saves
 extern SDL_AtomicInt g_hotkey_capture_armed; // Settings hotkey capture: 1 while waiting for a key press

@@ -688,6 +688,58 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     }
 #endif
 
+    // 8. Find and copy ALL associated layout files using a direct scan (mirrors the language scan above)
+#ifdef _WIN32
+    char layout_search_path[MAX_PATH_LENGTH];
+    snprintf(layout_search_path, sizeof(layout_search_path), "%s\\%s_layout*.json", src_category_path,
+             src_base_filename);
+    WIN32_FIND_DATAA layout_find_data;
+    HANDLE h_find_layout = FindFirstFileA(layout_search_path, &layout_find_data);
+
+    if (h_find_layout != INVALID_HANDLE_VALUE) {
+        do {
+            const char *layout_suffix_start = strstr(layout_find_data.cFileName, "_layout");
+            if (layout_suffix_start) {
+                char src_layout_path[MAX_PATH_LENGTH];
+                snprintf(src_layout_path, sizeof(src_layout_path), "%s/%s", src_category_path,
+                         layout_find_data.cFileName);
+
+                char dest_layout_path[MAX_PATH_LENGTH];
+                // layout_suffix_start already contains the full suffix (e.g. "_layout.json" or "_layout_<flag>.json").
+                snprintf(dest_layout_path, sizeof(dest_layout_path), "%s%s", dest_base_path, layout_suffix_start);
+
+                if (!fs_copy_file(src_layout_path, dest_layout_path)) {
+                    log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to copy layout file: %s\n", src_layout_path);
+                }
+            }
+        } while (FindNextFileA(h_find_layout, &layout_find_data) != 0);
+        FindClose(h_find_layout);
+    }
+#else // POSIX
+    DIR *layout_dir = opendir(src_category_path);
+    if (layout_dir) {
+        struct dirent *entry;
+        while ((entry = readdir(layout_dir)) != nullptr) {
+            if (strncmp(entry->d_name, src_base_filename, strlen(src_base_filename)) == 0 &&
+                strstr(entry->d_name, "_layout") && strstr(entry->d_name, ".json")) {
+                const char *layout_suffix_start = strstr(entry->d_name, "_layout");
+
+                char src_layout_path[MAX_PATH_LENGTH];
+                snprintf(src_layout_path, sizeof(src_layout_path), "%s/%s", src_category_path, entry->d_name);
+
+                char dest_layout_path[MAX_PATH_LENGTH];
+                // layout_suffix_start already contains the full suffix (e.g. "_layout.json" or "_layout_<flag>.json").
+                snprintf(dest_layout_path, sizeof(dest_layout_path), "%s%s", dest_base_path, layout_suffix_start);
+
+                if (!fs_copy_file(src_layout_path, dest_layout_path)) {
+                    log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to copy layout file: %s\n", src_layout_path);
+                }
+            }
+        }
+        closedir(layout_dir);
+    }
+#endif
+
     return true;
 }
 
@@ -724,7 +776,8 @@ bool delete_template_files(const char *version, const char *category, const char
                 if (strcmp(suffix, ".json") == 0 ||
                     strcmp(suffix, "_snapshot.json") == 0 ||
                     strcmp(suffix, "_notes.txt") == 0 ||
-                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_...json
+                    strncmp(suffix, "_lang", 5) == 0 || // Catches _lang.json and _lang_...json
+                    strncmp(suffix, "_layout", 7) == 0) // Catches _layout.json and _layout_...json
                 {
                     char file_to_delete[MAX_PATH_LENGTH];
                     snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, filename);
@@ -754,7 +807,8 @@ bool delete_template_files(const char *version, const char *category, const char
                 if (strcmp(suffix, ".json") == 0 ||
                     strcmp(suffix, "_snapshot.json") == 0 ||
                     strcmp(suffix, "_notes.txt") == 0 ||
-                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_...json
+                    strncmp(suffix, "_lang", 5) == 0 || // Catches _lang.json and _lang_...json
+                    strncmp(suffix, "_layout", 7) == 0) // Catches _layout.json and _layout_...json
                 {
                     char file_to_delete[MAX_PATH_LENGTH];
                     snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, filename);

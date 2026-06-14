@@ -531,6 +531,36 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Don't clear coop_room_code_buf - it's only valid while hosting
     }
 
+    // Mirror an app_settings identity field into BOTH editing buffers, so it reflects the live value
+    // without showing up as an unsaved diff. Shared by the editor live-sync and the app-initiated resync.
+    auto mirror_field = [](char *dst_a, char *dst_b, const char *src, size_t n) {
+        strncpy(dst_a, src, n - 1);
+        dst_a[n - 1] = '\0';
+        strncpy(dst_b, src, n - 1);
+        dst_b[n - 1] = '\0';
+    };
+
+    // An automatic, app-initiated change (e.g. the Template Creator deleting the in-use
+    // template/language/layout and falling back to default) writes straight into app_settings. Re-seed
+    // the affected identity fields in both editing buffers so the open Settings window follows WITHOUT a
+    // spurious "unsaved changes" diff (reverting which would point back at the now-deleted file). Only the
+    // identity fields are touched, preserving any unrelated unsaved edits the user has in this window.
+    if (SDL_GetAtomicInt(&g_settings_resync_from_app)) {
+        SDL_SetAtomicInt(&g_settings_resync_from_app, 0);
+        mirror_field(temp_settings.version_str, saved_settings.version_str, app_settings->version_str,
+                     sizeof(temp_settings.version_str));
+        mirror_field(temp_settings.category, saved_settings.category, app_settings->category,
+                     sizeof(temp_settings.category));
+        mirror_field(temp_settings.optional_flag, saved_settings.optional_flag, app_settings->optional_flag,
+                     sizeof(temp_settings.optional_flag));
+        mirror_field(temp_settings.lang_flag, saved_settings.lang_flag, app_settings->lang_flag,
+                     sizeof(temp_settings.lang_flag));
+        mirror_field(temp_settings.layout_flag, saved_settings.layout_flag, app_settings->layout_flag,
+                     sizeof(temp_settings.layout_flag));
+        mirror_field(temp_settings.category_display_name, saved_settings.category_display_name,
+                     app_settings->category_display_name, sizeof(temp_settings.category_display_name));
+    }
+
     // While a template is open in the editor, the editor owns the applied template: it pushes its
     // selection straight into app_settings. Mirror those template-identity fields into both editing
     // buffers every frame so the (now disabled) Version/Category/Optional Flag/Language/Layout and the
@@ -538,12 +568,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // changes" diff or letting Apply revert the editor's choice. (Display Version is left untouched.)
     bool template_editor_is_editing = t && t->template_editor_is_editing;
     if (template_editor_is_editing) {
-        auto mirror_field = [](char *dst_a, char *dst_b, const char *src, size_t n) {
-            strncpy(dst_a, src, n - 1);
-            dst_a[n - 1] = '\0';
-            strncpy(dst_b, src, n - 1);
-            dst_b[n - 1] = '\0';
-        };
         mirror_field(temp_settings.version_str, saved_settings.version_str, app_settings->version_str,
                      sizeof(temp_settings.version_str));
         mirror_field(temp_settings.category, saved_settings.category, app_settings->category,

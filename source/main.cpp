@@ -97,6 +97,10 @@ SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to 
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
+SDL_AtomicInt g_settings_resync_from_app;
+// Signal that an app-initiated change (e.g. Template Creator deleting the in-use template/language/layout)
+// wrote straight into app_settings; the open Settings window should re-seed its editing buffers WITHOUT
+// raising a spurious "unsaved changes" diff.
 SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
 SDL_AtomicInt g_hotkey_capture_armed;
 SDL_AtomicInt g_hotkey_captured_scancode;

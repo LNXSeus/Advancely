@@ -2964,6 +2964,55 @@ static void sync_app_settings_to_editor(AppSettings *app_settings, Tracker *t, c
     SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a tracker reload onto the edited template
 }
 
+// Recompute app_settings->category_display_name for the current version/category/flag/lang_flag,
+// honoring a per-language "display_category" override in the selected lang file (falling back to an
+// auto-formatted "Category - Flag"). No-op when the user locked the display name. Mirrors the Settings
+// window's update_temp_display_category so a programmatic template/language switch shows the right name.
+static void recompute_display_category(AppSettings *s) {
+    if (s->lock_category_display_name) return;
+
+    char version_filename[64];
+    strncpy(version_filename, s->version_str, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char lang_suffix[80];
+    if (s->lang_flag[0] != '\0') {
+        snprintf(lang_suffix, sizeof(lang_suffix), "_%s", s->lang_flag);
+    } else {
+        lang_suffix[0] = '\0';
+    }
+
+    char lang_path[MAX_PATH_LENGTH];
+    snprintf(lang_path, sizeof(lang_path), "%s/templates/%s/%s/%s_%s%s_lang%s.json",
+             get_resources_path(), s->version_str, s->category,
+             version_filename, s->category, s->optional_flag, lang_suffix);
+
+    cJSON *lang_json = cJSON_from_file(lang_path);
+    if (lang_json) {
+        cJSON *dc = cJSON_GetObjectItem(lang_json, "display_category");
+        if (dc && cJSON_IsString(dc) && dc->valuestring && dc->valuestring[0] != '\0') {
+            strncpy(s->category_display_name, dc->valuestring, sizeof(s->category_display_name) - 1);
+            s->category_display_name[sizeof(s->category_display_name) - 1] = '\0';
+            cJSON_Delete(lang_json);
+            return;
+        }
+        cJSON_Delete(lang_json);
+    }
+
+    char formatted_category[MAX_PATH_LENGTH];
+    format_category_string(s->category, formatted_category, sizeof(formatted_category));
+    if (s->optional_flag[0] != '\0') {
+        char formatted_flag[MAX_PATH_LENGTH];
+        format_category_string(s->optional_flag, formatted_flag, sizeof(formatted_flag));
+        snprintf(s->category_display_name, sizeof(s->category_display_name), "%s - %s",
+                 formatted_category, formatted_flag);
+    } else {
+        strncpy(s->category_display_name, formatted_category, sizeof(s->category_display_name) - 1);
+        s->category_display_name[sizeof(s->category_display_name) - 1] = '\0';
+    }
+}
+
 // New function to automatically manage hidden legacy stats for multi-stage goals
 static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
     // 1. Gather all unique stat root_names required by all multi-stage goal stages
@@ -4287,9 +4336,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Disable if nothing is selected or the selected template is in use or default
+    // Disable if nothing is selected, the selected template is the default, or the editor is in a
+    // state that would lose work. The in-use template IS deletable now (the tracker falls back to the
+    // default template afterwards) because opening a template in the editor makes it the in-use one.
     ImGui::BeginDisabled(
-        selected_template_index == -1 || is_current_template || is_default_template);
+        selected_template_index == -1 || is_default_template ||
+        visual_editing_active || has_unsaved_changes_in_editor);
     if (ImGui::Button("Delete Template")) {
         if (selected_template_index != -1) {
             ImGui::OpenPopup("Delete Template?");
@@ -4308,10 +4360,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                      "Save or revert your changes first.");
         } else if (is_default_template) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
-        } else if (selected_template_index != -1 && is_current_template) {
-            // Selected template is in use
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot delete the template currently in use.");
         } else if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
             if (selected.optional_flag[0] != '\0') {
@@ -4352,6 +4400,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "This action cannot be undone.",
                              creator_version_str, selected.category);
                 }
+            }
+            // The in-use template is deletable; warn that the tracker falls back to the default template.
+            if (is_current_template) {
+                size_t info_len = strlen(tooltip_buffer);
+                snprintf(tooltip_buffer + info_len, sizeof(tooltip_buffer) - info_len,
+                         "\n\nThis template is currently in use; deleting it switches the tracker to the "
+                         "default template.");
             }
         } else {
             // Nothing selected
@@ -4551,6 +4606,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(status_message, sizeof(status_message), "Template '%s' deleted.", selected.category);
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     editing_template = false; // Exit the editor view
+
+                    // If we just deleted the template the tracker is using, fall back to the default
+                    // template so the tracker isn't left pointing at files that no longer exist.
+                    if (is_current_template && app_settings && t) {
+                        strncpy(app_settings->version_str, "1.16.1", sizeof(app_settings->version_str) - 1);
+                        app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
+                        strncpy(app_settings->category, "all_advancements", sizeof(app_settings->category) - 1);
+                        app_settings->category[sizeof(app_settings->category) - 1] = '\0';
+                        strncpy(app_settings->optional_flag, "_aatool_optimized",
+                                sizeof(app_settings->optional_flag) - 1);
+                        app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
+                        app_settings->lang_flag[0] = '\0'; // default language
+                        app_settings->layout_flag[0] = '\0'; // default layout
+                        recompute_display_category(app_settings);
+                        settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                        SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the default template
+                        SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved Settings change
+                    }
                 } else {
                     snprintf(status_message, sizeof(status_message), "Error: Failed to delete template '%s'.",
                              selected.category);
@@ -4878,31 +4951,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
 
-        // DELETION LOGIC FOR LANGUAGES -> Only allow deletion if not default and not currently active
+        // DELETION LOGIC FOR LANGUAGES -> Only block the default; the in-use language IS deletable
+        // (the tracker falls back to the default language afterwards).
         bool can_delete = false;
+        bool lang_in_use = false;
         const char *disabled_tooltip = "";
         if (selected_lang_index != -1) {
             const std::string &selected_lang_in_creator = selected.available_lang_flags[selected_lang_index];
 
-            // Rule 1: Cannot delete the default language file.
+            // Rule: Cannot delete the default language file.
             bool is_default_lang = selected_lang_in_creator.empty();
             if (is_default_lang) {
                 disabled_tooltip = "Cannot delete the default language file.";
-            }
-
-            // Rule 2: Cannot delete the language file currently active in the main settings.
-            bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                       strcmp(selected.category, app_settings->category) == 0 &&
-                                       strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
-            bool is_active_lang = (selected_lang_in_creator == app_settings->lang_flag);
-
-            if (is_active_template && is_active_lang) {
-                disabled_tooltip = "Cannot delete the language currently in use by the tracker.";
-            }
-
-            // The button is enabled only if neither rule is broken.
-            if (!is_default_lang && !(is_active_template && is_active_lang)) {
+            } else {
                 can_delete = true;
+                // Note when this is the language the tracker is currently using.
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected.category, app_settings->category) == 0 &&
+                                           strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+                lang_in_use = is_active_template && (selected_lang_in_creator == app_settings->lang_flag);
             }
         } else {
             disabled_tooltip = "Select a language to delete.";
@@ -4917,11 +4984,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             if (can_delete) {
                 // Tooltip for ENABLED state
-                char tooltip_buffer[256];
+                char tooltip_buffer[512];
                 const auto &lang_to_delete = selected.available_lang_flags[selected_lang_index];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Delete the '%s' language file.\n"
-                         "This action cannot be undone.", lang_to_delete.c_str());
+                if (lang_in_use) {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete the '%s' language file.\n"
+                             "It is currently in use; the tracker will fall back to the default language.\n"
+                             "This action cannot be undone.", lang_to_delete.c_str());
+                } else {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete the '%s' language file.\n"
+                             "This action cannot be undone.", lang_to_delete.c_str());
+                }
                 ImGui::SetTooltip("%s", tooltip_buffer);
             } else {
                 // Tooltip for DISABLED state (original logic)
@@ -5060,8 +5134,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
 
-        // --- Delete Layout (cannot delete default or the layout currently in use) ---
+        // --- Delete Layout (only the default is blocked; the in-use layout IS deletable and the
+        // tracker falls back to the default layout afterwards) ---
         bool layout_can_delete = false;
+        bool layout_in_use = false;
         const char *layout_disabled_tooltip = "";
         if (selected_layout_mgmt_index != -1) {
             const std::string &selected_layout_in_creator =
@@ -5069,16 +5145,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             bool is_default_layout = selected_layout_in_creator.empty();
             if (is_default_layout) {
                 layout_disabled_tooltip = "Cannot delete the default layout file.";
-            }
-            bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                       strcmp(selected.category, app_settings->category) == 0 &&
-                                       strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
-            bool is_active_layout = (selected_layout_in_creator == app_settings->layout_flag);
-            if (is_active_template && is_active_layout) {
-                layout_disabled_tooltip = "Cannot delete the layout currently in use by the tracker.";
-            }
-            if (!is_default_layout && !(is_active_template && is_active_layout)) {
+            } else {
                 layout_can_delete = true;
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected.category, app_settings->category) == 0 &&
+                                           strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+                layout_in_use = is_active_template && (selected_layout_in_creator == app_settings->layout_flag);
             }
         } else {
             layout_disabled_tooltip = "Select a layout to delete.";
@@ -5091,11 +5163,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             if (layout_can_delete) {
-                char tooltip_buffer[256];
+                char tooltip_buffer[512];
                 const auto &layout_to_delete = selected.available_layout_flags[selected_layout_mgmt_index];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Delete the '%s' layout file.\n"
-                         "This action cannot be undone.", layout_to_delete.c_str());
+                if (layout_in_use) {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete the '%s' layout file.\n"
+                             "It is currently in use; the tracker will fall back to the default layout.\n"
+                             "This action cannot be undone.", layout_to_delete.c_str());
+                } else {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete the '%s' layout file.\n"
+                             "This action cannot be undone.", layout_to_delete.c_str());
+                }
                 ImGui::SetTooltip("%s", tooltip_buffer);
             } else {
                 ImGui::SetTooltip("%s", layout_disabled_tooltip);
@@ -17561,6 +17640,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0';
                 selected_lang_index = -1;
+
+                // If we deleted the language the tracker is using, fall back to the default language.
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected.category, app_settings->category) == 0 &&
+                                           strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+                if (t && is_active_template &&
+                    strcmp(app_settings->lang_flag, lang_to_delete.c_str()) == 0) {
+                    app_settings->lang_flag[0] = '\0'; // default language
+                    recompute_display_category(app_settings);
+                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                    SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the default language
+                    SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved Settings change
+                }
             } else {
                 strncpy(status_message, error_msg, sizeof(status_message) - 1);
                 status_message[sizeof(status_message) - 1] = '\0';
@@ -17751,6 +17843,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0';
                 selected_layout_mgmt_index = -1;
+
+                // If we deleted the layout the tracker is using, fall back to the default layout.
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected.category, app_settings->category) == 0 &&
+                                           strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+                if (t && is_active_template &&
+                    strcmp(app_settings->layout_flag, layout_to_delete.c_str()) == 0) {
+                    app_settings->layout_flag[0] = '\0'; // default layout
+                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                    SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the default layout
+                    SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved Settings change
+                }
             } else {
                 strncpy(status_message, error_msg, sizeof(status_message) - 1);
                 status_message[sizeof(status_message) - 1] = '\0';
