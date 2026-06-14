@@ -5050,10 +5050,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             const char *open_path = tinyfd_openFileDialog("Import Language File", "",
                                                           filter_count, filter_patterns, "JSON files", 0);
             if (open_path) {
-                strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
-                import_lang_source_path[sizeof(import_lang_source_path) - 1] = '\0';
-                import_lang_flag_buffer[0] = '\0'; // Clear buffer for new import
-                show_import_lang_popup = true;
+                const char *src_name = open_path;
+                for (const char *p = open_path; *p; ++p) {
+                    if (*p == '/' || *p == '\\') src_name = p + 1;
+                }
+                if (!strstr(src_name, "_lang")) {
+                    snprintf(status_message, sizeof(status_message), "The selected file is not a language file.");
+                    ImGui::OpenPopup("Import Error");
+                } else {
+                    strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
+                    import_lang_source_path[sizeof(import_lang_source_path) - 1] = '\0';
+                    import_lang_flag_buffer[0] = '\0'; // Clear buffer for new import
+                    show_import_lang_popup = true;
+                }
             }
         }
         if (ImGui::IsItemHovered()) {
@@ -5229,10 +5238,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             const char *open_path = tinyfd_openFileDialog("Import Layout File", "",
                                                           filter_count, filter_patterns, "JSON files", 0);
             if (open_path) {
-                strncpy(import_layout_source_path, open_path, sizeof(import_layout_source_path) - 1);
-                import_layout_source_path[sizeof(import_layout_source_path) - 1] = '\0';
-                import_layout_flag_buffer[0] = '\0';
-                show_import_layout_popup = true;
+                const char *src_name = open_path;
+                for (const char *p = open_path; *p; ++p) {
+                    if (*p == '/' || *p == '\\') src_name = p + 1;
+                }
+                if (!strstr(src_name, "_layout")) {
+                    snprintf(status_message, sizeof(status_message), "The selected file is not a layout file.");
+                    ImGui::OpenPopup("Import Error");
+                } else {
+                    strncpy(import_layout_source_path, open_path, sizeof(import_layout_source_path) - 1);
+                    import_layout_source_path[sizeof(import_layout_source_path) - 1] = '\0';
+                    import_layout_flag_buffer[0] = '\0';
+                    show_import_layout_popup = true;
+                }
             }
         }
         if (ImGui::IsItemHovered()) {
