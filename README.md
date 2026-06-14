@@ -151,8 +151,12 @@ import, create, copy, and modify any template directly within Advancely.
   sequential steps, or add manual counters with hotkeys for objectives that can't be tracked automatically.
 * **Easy Translation:** Every template has separate language files, allowing you to easily edit display names or provide
   translations without altering the core template logic.
-* **Share Your Templates:** You can export any template - including all its language files - into a single `.zip` file to
-  share with the Advancely community. Likewise, you can import (`.zip`) templates created by others.
+* **Separate Layout Files:** Manual layout positions and decorations live in their own `_layout` files alongside the
+  language files, never inside the core template. This means a custom layout survives official template updates, a
+  single template can carry multiple alternative layouts, and you can create, copy, import, and export layouts
+  independently (just like language files).
+* **Share Your Templates:** You can export any template - including all its language and layout files - into a single
+  `.zip` file to share with the Advancely community. Likewise, you can import (`.zip`) templates created by others.
 * **Manual Layout & Visual Layout Editor:** Position every goal, criterion, and decoration precisely on the tracker map.
   Enable "Manual Layout" in settings, then use the **Visual Layout Editor** in the Template Editor to drag-and-drop
   items directly on the live tracker. Select multiple items at once with a selection rectangle or `Ctrl`/`Cmd`+Click and
@@ -240,11 +244,15 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
       at zero, half-done for partial progress, and done when all linked goals are completed. Searching for a counter's
       display name also shows its exact linked goals in the search results.
 * **Manual Layout Mode**: Break free from the automatic grid and position every goal exactly where you want it. When
-  enabled, each item's position is defined by coordinates stored in the template file. Use the built-in **Visual
-  Layout Editor** to drag items directly on the tracker map, or set coordinates numerically in the Template Editor.
-  Templates with existing layout data are marked with **(has layout)** in the settings dropdowns so you can easily
-  find them. Each position (icon, text, progress) can be individually hidden using per-position `Hide` checkboxes
-  in the Template Editor, giving you fine-grained control over what appears on your layout.
+  enabled, each item's position (and all decorations) are stored in a **separate `_layout` file** that sits next to
+  the template, just like its `_lang` language files. Because the layout lives outside the template's core `.json`,
+  a custom layout survives official template updates and a single template can carry several alternative layouts.
+  Use the built-in **Visual Layout Editor** to drag items directly on the tracker map, or set coordinates
+  numerically in the Template Editor. Templates with layout data are marked with **(has layout)** in the settings
+  dropdowns so you can easily find them, and a `Layout` dropdown in the settings lets you pick which layout file to
+  apply (or `Default` for the template's `_layout.json`). Each position (icon, text, progress) can be individually
+  hidden using per-position `Hide` checkboxes in the Template Editor, giving you fine-grained control over what
+  appears on your layout.
 * **Decorations**: Add purely visual elements to your manual layout. **Text Headers** render custom text using the
   tracker's font and size, perfect for labeling sections of your map. Text headers can also have **Linked Goals** (any
   combination of goals and counters) so that searching for the header's text keeps all linked items visible, allowing
@@ -509,6 +517,13 @@ while still allowing the underlying template structure (the goals, criteria, ico
 2. In the "Languages" section, select the "Default" language and click **Copy Language**.
 3. Give your new language a unique flag (e.g., `custom` or `mypack`).
 4. You can now select your custom language in the main settings, and your display names will be safe from updates.
+
+**If you only want to change the manual layout (positions and decorations):**
+
+Layout data lives in its own `_layout` file, so the same trick works for layouts. In the "Layouts" section, copy the
+`Default` layout to a unique flag (or build a fresh one with **Create Layout**), then select it via the `Layout`
+dropdown in settings. Your custom positions stay separate while the official template structure keeps receiving
+updates.
 
 **If you have changed goals, criteria, or icons (core functionality):**
 
@@ -796,9 +811,10 @@ From the main editor view, you can manage entire template packages:
 
 * **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique
   `Category Name` and an `Optional Flag`.
-* **Copy Template**: Duplicates an existing template, including all its language files. This is the perfect starting
-  point for creating a variation of a complex template.
-* **Delete Template**: Permanently removes a template and all of its associated language **and notes files**.
+* **Copy Template**: Duplicates an existing template, including all its language **and layout files**. This is the
+  perfect starting point for creating a variation of a complex template.
+* **Delete Template**: Permanently removes a template and all of its associated language, layout, **and notes files**.
+  A template that is currently in use can also be deleted; the tracker simply falls back to the default template.
 * **Import Template**: Imports a full template package from a `.zip` file. Exported zips embed their exact version,
   category, and flag, so the import fields are pre-filled correctly (important for COOP) without guessing from the filename (older zips fall
   back to filename parsing). An `Exported as` line shows the zip's original identity so you can spot any accidental
@@ -807,7 +823,8 @@ From the main editor view, you can manage entire template packages:
   files are added. If the zip contains bundled icon files, an **Import bundled icon
   files** checkbox will appear and enabling it extracts those icons directly into your `resources/icons/` folder so
   they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
-* **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for
+* **Export Template**: Packages the selected template and all its language **and layout files** into a single `.zip`
+  file, perfect for
   sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz). Clicking the button opens a
   small confirmation popup where you can optionally enable **Bundle icon files** before confirming and this copies all
   icon files referenced by the template into an `icons/` folder inside the zip. This is strictly a **copy** operation and
@@ -825,6 +842,23 @@ template:
 * **Delete Language**: Removes a specific language file (you cannot delete the default `_lang.json`).
 * **Import/Export Language**: Import a single `.json` language file from an external source or open the folder
   containing the selected language file to export it.
+
+### Layout File Management
+
+Manual layout positions and decorations no longer live inside the core template `.json`; they sit in their own
+`_layout` files next to the language files (the default is `_layout.json`, named variants are `_layout_<flag>.json`).
+This mirrors the language system exactly, so the same `(has layout)` marker, settings `Layout` dropdown, and editor
+management buttons apply. A template can carry several layouts, and a custom layout you build on an official template
+survives that template's automatic updates.
+
+* **Create Layout**: Creates a new, blank layout file (no positions or decorations). Build it up afterward with the
+  **Visual Layout Editor**.
+* **Copy Layout**: Duplicates an existing layout file to a new flag. Copying the `Default` when the template has no
+  separate layout file yet produces a blank layout.
+* **Delete Layout**: Removes a specific layout file (you cannot delete the default `_layout.json`). The layout that is
+  currently in use **can** be deleted; the tracker then falls back to the default layout.
+* **Import/Export Layout**: Import a single `_layout` `.json` file from an external source under a new flag (the editor
+  refuses files that aren't layout files), or open the folder containing the selected layout file to export it.
 
 ### Editing a Template
 
@@ -1009,7 +1043,9 @@ options:
   (when importing from a template already installed locally, the icons are shared already so nothing is copied).
   Duplicate root names (or decoration ids) are detected up-front and the import is refused,
   exactly like the player-file flow. A `Language` dropdown at the top picks which language file from the source
-  template provides the display names for the items you import; selections are kept when you change it. Any
+  template provides the display names for the items you import, and (for position/decoration scopes) a `Layout`
+  dropdown next to it picks which of the source's `_layout` files supplies the manual positions and decoration
+  geometry; selections are kept when you change either one. Any
   `linked_goals` / arrow endpoints / multi-stage `parent_advancement` refs that won't resolve after the import
   (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
   are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /
@@ -1390,7 +1426,7 @@ Options → add Advancely and allow incoming connections. Alternatively use `pfc
 
 When a Receiver joins, Advancely hashes the *structural* content of both players' template files with a 64-bit
 FNV-1a hash and refuses to connect unless the hashes are identical. The hash is
-computed from the raw template `.json` so language file differences are irrelevant.
+computed from the raw template `.json` so language file and layout file differences are irrelevant.
 
 _The hash **INCLUDES** (these must match exactly on host and receiver):_
 
