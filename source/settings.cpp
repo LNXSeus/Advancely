@@ -4066,7 +4066,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                             }
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
-                                char tooltip_buf[256];
+                                char tooltip_buf[256] = "";
                                 if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
                                 } else if (relay_outdated) {
@@ -4077,19 +4077,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 } else if (has_unsaved_changes) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Apply settings before starting a lobby.");
-                                } else if (!ip_valid && !port_valid) {
+                                } else if (transport_direct && !ip_valid && !port_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "A valid IP address and port are required to start a lobby.");
-                                } else if (!ip_valid) {
+                                } else if (transport_direct && !ip_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "A valid IP address is required to start a lobby.");
-                                } else if (!port_valid) {
+                                } else if (transport_direct && !port_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "A valid port is required to start a lobby.");
-                                } else if (!pub_ip_valid) {
+                                } else if (transport_direct && !pub_ip_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "The public IP/domain is not valid.");
-                                } else if (pub_ip_duplicate) {
+                                } else if (transport_direct && pub_ip_duplicate) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Public IP must be different from the bind IP.");
                                 } else if (editor_open) {
