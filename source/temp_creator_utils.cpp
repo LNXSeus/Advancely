@@ -1215,7 +1215,8 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
             size_t base_len = strlen(base_filename);
             if (strncmp(filename, base_filename, base_len) == 0) {
                 const char *suffix = filename + base_len;
-                if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0) {
+                if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0 ||
+                    strncmp(suffix, "_layout", 7) == 0) {
                     if (!add_template_file(filename)) {
                         mz_zip_writer_end(&zip_archive);
                         FindClose(h_find);
@@ -1236,7 +1237,8 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
                 size_t base_len = strlen(base_filename);
                 if (strncmp(filename, base_filename, base_len) == 0) {
                     const char *suffix = filename + base_len;
-                    if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0) {
+                    if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0 ||
+                        strncmp(suffix, "_layout", 7) == 0) {
                         if (!add_template_file(filename)) {
                             mz_zip_writer_end(&zip_archive);
                             closedir(dir);
