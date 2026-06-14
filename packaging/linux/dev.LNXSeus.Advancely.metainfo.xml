@@ -15,6 +15,19 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.5.3" date="2026-06-14">
+      <description>
+        <ul>
+          <li>Layout coordinates now live in their own per-template _layout file (like language files): a Layout dropdown in both settings and the template editor lets you keep multiple position sets per template, and create/copy/import/export/delete flows all respect layout files.</li>
+          <li>Settings Presets: save and switch between named settings configurations.</li>
+          <li>Template editor: invert-selection bulk action, selected goals can be added directly as linked goals, arrow keys nudge the selection in the visual layout editor, and goals can be imported from unzipped (unpacked) templates.</li>
+          <li>New templates: 1.16.1 all_advancements _ssg_blackcat, 1.16.1 all_blocks, and 26.1 / 26.2 all_advancements _aatool_optimized.</li>
+          <li>Template updates: 1.21 all_trims (added counter, renamed "Trims Counter" to "Trims") and the 26.1 / 26.2 categorical templates.</li>
+          <li>Coop: heartbeat hardening for more reliable syncing, and a lobby can no longer be started while the template editor is open.</li>
+          <li>Fixes: settings file read/write is now centralized to prevent corruption and partial reads, multiple Advancely instances can no longer run at once, and the auto-updater was overhauled to look cleaner.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.2" date="2026-06-05">
       <description>
         <ul>
