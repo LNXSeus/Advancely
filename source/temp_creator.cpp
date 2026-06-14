@@ -3446,6 +3446,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTemplate s_template_import_data;
     static std::vector<std::string> s_template_import_lang_flags;
     static int s_template_import_lang_index = 0;
+    static std::vector<std::string> s_template_import_layout_flags;
+    static int s_template_import_layout_index = 0;
     static std::vector<bool> s_template_import_selected;
     static char s_template_import_zip_path[MAX_PATH_LENGTH] = "";
     static char s_template_import_search[256] = "";
@@ -3475,6 +3477,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         cJSON *lang_json = read_lang_json_from_zip(s_template_import_zip_path, flag_cstr);
         if (!lang_json) lang_json = cJSON_CreateObject();
 
+        // Manual positions and decorations live in a separate _layout file (parallel to _lang). When the
+        // source has one, it is authoritative for positions/decorations; otherwise they come from inline
+        // data in the template JSON (backwards compatible with pre-split exports).
+        const char *layout_flag_cstr = nullptr;
+        if (s_template_import_layout_index >= 0 &&
+            s_template_import_layout_index < (int) s_template_import_layout_flags.size()) {
+            layout_flag_cstr = s_template_import_layout_flags[s_template_import_layout_index].c_str();
+        }
+        cJSON *layout_json = read_layout_json_from_zip(s_template_import_zip_path, layout_flag_cstr);
+
         s_template_import_data.advancements.clear();
         s_template_import_data.stats.clear();
         s_template_import_data.unlocks.clear();
@@ -3495,11 +3507,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                        s_template_import_data.multi_stage_goals, lang_json);
         parse_editor_counter_goals(cJSON_GetObjectItem(root_json, "counter_goals"),
                                    s_template_import_data.counter_goals, lang_json);
-        parse_editor_decorations(cJSON_GetObjectItem(root_json, "decorations"),
-                                 s_template_import_data.decorations, lang_json);
+
+        // Decorations come from the layout file when present (authoritative), else inline in the template.
+        cJSON *deco_src = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
+                                      : cJSON_GetObjectItem(root_json, "decorations");
+        parse_editor_decorations(deco_src, s_template_import_data.decorations, lang_json);
+
+        // Override the inline positions parsed above with the layout file's positions (no-op when null).
+        apply_layout_to_editor(s_template_import_data, layout_json);
 
         cJSON_Delete(root_json);
         cJSON_Delete(lang_json);
+        if (layout_json) cJSON_Delete(layout_json);
         return true;
     };
 
@@ -3520,6 +3539,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (!has_default) s_template_import_lang_flags.insert(s_template_import_lang_flags.begin(), std::string());
         s_template_import_lang_index = 0;
+
+        // Discover the source's layout files. Unlike languages, layouts are optional: if the source has
+        // none we leave the list empty (the Layout picker stays hidden and decorations/positions fall back
+        // to inline template data). When some exist but the default isn't among them, offer it too.
+        s_template_import_layout_flags = list_layout_flags_in_zip(file);
+        if (!s_template_import_layout_flags.empty()) {
+            bool has_default_layout = false;
+            for (const auto &f: s_template_import_layout_flags) if (f.empty()) {
+                has_default_layout = true;
+                break;
+            }
+            if (!has_default_layout) {
+                s_template_import_layout_flags.insert(s_template_import_layout_flags.begin(), std::string());
+            }
+        }
+        s_template_import_layout_index = 0;
 
         if (!reparse_template_import_data()) return;
 
@@ -21217,8 +21252,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_template_import_focus_search = true;
             }
 
+            // Source pickers (Language + Layout) share one line. Language sources the display names;
+            // Layout sources the manual positions / decorations.
+            bool show_import_lang_combo = !s_template_import_lang_flags.empty();
+            bool show_import_layout_combo = scope_has_positions() && !s_template_import_layout_flags.empty();
+
             // Language file picker. Display names of imported items will be sourced from this lang file.
-            if (!s_template_import_lang_flags.empty()) {
+            if (show_import_lang_combo) {
                 auto lang_label = [&](int i) -> const char * {
                     if (i < 0 || i >= (int) s_template_import_lang_flags.size()) return "?";
                     return s_template_import_lang_flags[i].empty()
@@ -21248,8 +21288,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       "_lang.json. Changing this re-reads the source data; your current\n"
                                       "selections are kept.");
                 }
-                ImGui::Separator();
             }
+
+            // Layout file picker on the SAME line as the Language picker. Provides the manual positions
+            // (and, for the Decorations scope, the decorations) pulled from the source. Only shown for
+            // position/decoration scopes when the source actually has layout files.
+            if (show_import_lang_combo && show_import_layout_combo) ImGui::SameLine();
+            if (show_import_layout_combo) {
+                auto layout_label = [&](int i) -> const char * {
+                    if (i < 0 || i >= (int) s_template_import_layout_flags.size()) return "?";
+                    return s_template_import_layout_flags[i].empty()
+                               ? "(default)"
+                               : s_template_import_layout_flags[i].c_str();
+                };
+                ImGui::SetNextItemWidth(220.0f);
+                if (ImGui::BeginCombo("Layout", layout_label(s_template_import_layout_index))) {
+                    for (int i = 0; i < (int) s_template_import_layout_flags.size(); i++) {
+                        bool sel = (i == s_template_import_layout_index);
+                        ImGui::PushID(i);
+                        if (ImGui::Selectable(layout_label(i), sel)) {
+                            if (i != s_template_import_layout_index) {
+                                s_template_import_layout_index = i;
+                                reparse_template_import_data();
+                            }
+                        }
+                        if (sel) ImGui::SetItemDefaultFocus();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Pick which layout file inside the source template provides the manual\n"
+                                      "positions (and, for decorations, the decoration geometry). '(default)'\n"
+                                      "is the un-flagged _layout.json. Positions are only applied when 'Layout\n"
+                                      "positions' is kept. Changing this re-reads the source data; your current\n"
+                                      "selections are kept.");
+                }
+            }
+            if (show_import_lang_combo || show_import_layout_combo) ImGui::Separator();
 
             if (is_parented_scope()) {
                 int pcount = parent_count_in_scope();

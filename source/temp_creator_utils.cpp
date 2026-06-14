@@ -1474,8 +1474,9 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
         if (strcmp(file_stat.m_filename, TEMPLATE_META_FILENAME) == 0) continue; // skip metadata file
-        if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") && !
-            strstr(file_stat.m_filename, "_lang")) {
+        if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") &&
+            !strstr(file_stat.m_filename, "_lang") &&
+            !strstr(file_stat.m_filename, "_layout")) {
             if (main_template_filename[0] != '\0') {
                 snprintf(error_message, msg_size, "Error: Zip file contains multiple main template files.");
                 mz_zip_reader_end(&zip_archive);
@@ -2000,6 +2001,7 @@ cJSON *read_template_json_from_zip(const char *zip_path, char *error_message, si
         const char *ext = strstr(name, ".json");
         if (!ext) continue;
         if (strstr(name, "_lang")) continue;
+        if (strstr(name, "_layout")) continue; // layout files are siblings, not the main template
         if (main_index >= 0) {
             snprintf(error_message, msg_size, "Error: Zip contains multiple main template files.");
             mz_zip_reader_end(&zip);
@@ -2139,6 +2141,132 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
         mz_zip_archive_file_stat fs;
         if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
         std::string got = lang_flag_from_filename(fs.m_filename);
+        if (got == "<NOMATCH>") continue;
+        bool dup = false;
+        for (const auto &f: out) if (f == got) {
+            dup = true;
+            break;
+        }
+        if (!dup) out.push_back(std::move(got));
+    }
+    mz_zip_reader_end(&zip);
+    return out;
+}
+
+// Returns the layout flag encoded in a layout filename, or empty string for the default file.
+// Returns "<NOMATCH>" when the name is not a layout file (mirrors lang_flag_from_filename).
+static std::string layout_flag_from_filename(const char *name) {
+    const char *base = strrchr(name, '/');
+    base = base ? base + 1 : name;
+    const char *dot = strstr(base, ".json");
+    if (!dot) return "<NOMATCH>";
+    const char *layout_marker = nullptr;
+    for (const char *p = base; p < dot - 6; p++) {
+        if (strncmp(p, "_layout", 7) == 0) {
+            const char *after = p + 7;
+            if (after == dot) {
+                layout_marker = p;
+                break;
+            } // _layout.json
+            if (*after == '_' && after < dot) {
+                layout_marker = p;
+                break;
+            } // _layout_<flag>.json
+        }
+    }
+    if (!layout_marker) return "<NOMATCH>";
+    const char *after = layout_marker + 7;
+    if (after == dot) return std::string(); // default
+    return std::string(after + 1, dot - (after + 1));
+}
+
+cJSON *read_layout_json_from_zip(const char *zip_path, const char *flag) {
+    if (is_unzipped_template_path(zip_path)) {
+        // The layout file sits next to the main template file with a "_layout[_<flag>].json" suffix.
+        std::string layout_path(zip_path);
+        layout_path.erase(layout_path.size() - 5); // strip ".json"
+        layout_path += "_layout";
+        if (flag && flag[0] != '\0') {
+            layout_path += "_";
+            layout_path += flag;
+        }
+        layout_path += ".json";
+        return cJSON_from_file(layout_path.c_str());
+    }
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return nullptr;
+    std::string want_flag = (flag ? flag : "");
+    int layout_index = -1;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        std::string got = layout_flag_from_filename(fs.m_filename);
+        if (got == "<NOMATCH>") continue;
+        if (got != want_flag) continue;
+        layout_index = (int) i;
+        break;
+    }
+    if (layout_index < 0) {
+        mz_zip_reader_end(&zip);
+        return nullptr;
+    }
+    cJSON *root = parse_zip_entry_as_json(&zip, (mz_uint) layout_index);
+    mz_zip_reader_end(&zip);
+    return root;
+}
+
+std::vector<std::string> list_layout_flags_in_zip(const char *zip_path) {
+    std::vector<std::string> out;
+    if (is_unzipped_template_path(zip_path)) {
+        // Scan the template's directory for "<base>_layout*.json" siblings.
+        char dir[MAX_PATH_LENGTH];
+        if (!get_parent_directory(zip_path, dir, sizeof(dir), 1)) return out;
+        char base[MAX_PATH_LENGTH];
+        unzipped_template_base(zip_path, base, sizeof(base));
+        char prefix[MAX_PATH_LENGTH];
+        snprintf(prefix, sizeof(prefix), "%s_layout", base);
+#ifdef _WIN32
+        char search_path[MAX_PATH_LENGTH];
+        snprintf(search_path, sizeof(search_path), "%s\\%s*.json", dir, prefix);
+        WIN32_FIND_DATAA find_data;
+        HANDLE h_find = FindFirstFileA(search_path, &find_data);
+        if (h_find != INVALID_HANDLE_VALUE) {
+            do {
+                std::string got = layout_flag_from_filename(find_data.cFileName);
+                if (got == "<NOMATCH>") continue;
+                bool dup = false;
+                for (const auto &f: out) if (f == got) { dup = true; break; }
+                if (!dup) out.push_back(std::move(got));
+            } while (FindNextFileA(h_find, &find_data) != 0);
+            FindClose(h_find);
+        }
+#else
+        size_t prefix_len = strlen(prefix);
+        DIR *d = opendir(dir);
+        if (d) {
+            struct dirent *entry;
+            while ((entry = readdir(d)) != nullptr) {
+                if (strncmp(entry->d_name, prefix, prefix_len) != 0) continue;
+                if (!strstr(entry->d_name, ".json")) continue;
+                std::string got = layout_flag_from_filename(entry->d_name);
+                if (got == "<NOMATCH>") continue;
+                bool dup = false;
+                for (const auto &f: out) if (f == got) { dup = true; break; }
+                if (!dup) out.push_back(std::move(got));
+            }
+            closedir(d);
+        }
+#endif
+        return out;
+    }
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return out;
+    mz_uint num_files = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        std::string got = layout_flag_from_filename(fs.m_filename);
         if (got == "<NOMATCH>") continue;
         bool dup = false;
         for (const auto &f: out) if (f == got) {

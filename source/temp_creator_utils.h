@@ -460,6 +460,22 @@ cJSON *read_lang_json_from_zip(const char *zip_path, const char *flag = nullptr)
 std::vector<std::string> list_lang_flags_in_zip(const char *zip_path);
 
 /**
+ * @brief Reads a layout JSON inside the zip and returns the parsed cJSON tree.
+ * Pass an empty/null @p flag to load the default _layout.json. A non-empty flag matches
+ * a _layout_<flag>.json file. Returns nullptr when no such file exists (not an error).
+ * @param zip_path Path to the zip (or a raw unzipped main template .json path).
+ * @param flag Optional layout flag (e.g. "compact"). Empty/null means the default file.
+ * @return Parsed cJSON root (caller must cJSON_Delete) or nullptr.
+ */
+cJSON *read_layout_json_from_zip(const char *zip_path, const char *flag = nullptr);
+
+/**
+ * @brief Lists every layout flag present in the zip. The default _layout.json (no flag)
+ * is reported as an empty string. The returned vector preserves zip-iteration order.
+ */
+std::vector<std::string> list_layout_flags_in_zip(const char *zip_path);
+
+/**
  * @brief Extracts the named icons from a zip's icons/ directory to resources/icons/.
  * Each path in @p icon_paths is relative to the icons/ root (e.g. "vanilla/stick.png").
  * Files that already exist on disk are skipped. Returns the number of files actually
