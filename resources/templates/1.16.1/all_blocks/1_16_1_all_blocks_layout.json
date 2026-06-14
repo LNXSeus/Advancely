@@ -1,0 +1,7877 @@
+{
+	"stat.mob_heads":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	1000
+		}
+	},
+	"stat.mob_heads.criteria.minecraft:picked_up/minecraft:creeper_head":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1065
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.mob_heads.criteria.minecraft:picked_up/minecraft:skeleton_skull":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1035
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.mob_heads.criteria.minecraft:picked_up/minecraft:zombie_head":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1005
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_door":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:acacia_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:activator_rail":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:allium":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:ancient_debris":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:andesite":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:andesite_slab":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:andesite_stairs":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:andesite_wall":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:anvil":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:azure_bluet":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bamboo_tall":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:barrel":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:basalt":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:beacon_block":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bee_nest":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:beehive":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:beetroots":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bell":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_door":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:birch_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_banner":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_bed":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_carpet":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_concrete":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_concrete_powder":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_shulker_box":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_stained_glass":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_terracotta":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:black_wool":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone_slab":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone_stairs":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blackstone_wall":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blast_furnace":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_banner":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_bed":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_carpet":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_concrete":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_ice":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_orchid":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_shulker_box":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_stained_glass":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_terracotta":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:blue_wool":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bone_block":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bookshelf":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brain_coral":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brain_coral_block":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brain_coral_fan":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brewing_stand":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brick_slab":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brick_stairs":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brick_wall":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bricks":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_banner":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_bed":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_carpet":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_concrete":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_mushroom":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_mushroom_block":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_shulker_box":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_stained_glass":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_terracotta":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:brown_wool":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bubble_coral":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bubble_coral_block":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:bubble_coral_fan":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cactus_tall":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cake":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:campfire":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:carrots":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cartography_table":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:carved_pumpkin":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cauldron":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chain":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chest":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chipped_anvil":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_nether_bricks":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_polished_blackstone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_quartz_block":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_red_sandstone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_sandstone":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chiseled_stone_bricks":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:chorus_flower":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:clay":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:coal_block":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:coal_ore_old":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:coarse_dirt":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cobblestone":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cobblestone_slab":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cobblestone_stairs":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cobblestone_wall":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cobweb":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cocoa_beans":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:comparator":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:composter":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:conduit":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cornflower":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cracked_nether_bricks":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cracked_polished_blackstone_bricks":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cracked_stone_bricks":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crafting_table":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:creeper_head":	{
+		"icon_pos":	{
+			"x":	3300,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_door":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_fungus":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_hyphae":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_nylium":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_roots":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_stem":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crimson_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:crying_obsidian":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cut_red_sandstone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cut_red_sandstone_slab":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cut_sandstone":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cut_sandstone_slab":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_banner":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_bed":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_carpet":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_concrete":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_shulker_box":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_stained_glass":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_terracotta":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:cyan_wool":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:damaged_anvil":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dandelion":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_door":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_oak_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_prismarine":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_prismarine_slab":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dark_prismarine_stairs":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:daylight_detector":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_brain_coral":	{
+		"icon_pos":	{
+			"x":	3700,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_brain_coral_block":	{
+		"icon_pos":	{
+			"x":	3700,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_brain_coral_fan":	{
+		"icon_pos":	{
+			"x":	3700,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_bubble_coral":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_bubble_coral_block":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_bubble_coral_fan":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_bush":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_fire_coral":	{
+		"icon_pos":	{
+			"x":	3300,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_fire_coral_block":	{
+		"icon_pos":	{
+			"x":	3300,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_fire_coral_fan":	{
+		"icon_pos":	{
+			"x":	3300,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_horn_coral":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_horn_coral_block":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_horn_coral_fan":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_tube_coral":	{
+		"icon_pos":	{
+			"x":	3500,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_tube_coral_block":	{
+		"icon_pos":	{
+			"x":	3500,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dead_tube_coral_fan":	{
+		"icon_pos":	{
+			"x":	3500,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:detector_rail":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diamond_block":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diamond_ore_old":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diorite":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diorite_slab":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diorite_stairs":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:diorite_wall":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dirt":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dispenser":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dragon_egg_block":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dragon_head":	{
+		"icon_pos":	{
+			"x":	3700,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dried_kelp_block":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:dropper":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:emerald_block":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:emerald_ore_old":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:enchanting_table":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_rod":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_stone":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_stone_brick_slab":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_stone_brick_stairs":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_stone_brick_wall":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:end_stone_bricks":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:ender_chest_block":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:fern":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:fire_coral":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:fire_coral_block":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:fire_coral_fan":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:fletching_table":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:flower_pot":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:furnace":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gilded_blackstone":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:glass":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:glass_pane":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:glowstone":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gold_block":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gold_ore_old":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:granite":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:granite_slab":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:granite_stairs":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:granite_wall":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:grass_block":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gravel":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_banner":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_bed":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_carpet":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_concrete":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_concrete_powder":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_shulker_box":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_stained_glass":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_terracotta":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:gray_wool":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_banner":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_bed":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_carpet":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_concrete":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_shulker_box":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_stained_glass":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_terracotta":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:green_wool":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:grindstone":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:hay_block":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:heavy_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:honey_block":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:honeycomb_block":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:hopper":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:horn_coral":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:horn_coral_block":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:horn_coral_fan":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:ice":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:iron_bars":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:iron_block":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:iron_door":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:iron_ore_old":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:iron_trapdoor":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jack_o_lantern":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jukebox":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_door":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:jungle_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:kelp":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:ladder":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lantern":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lapis_block":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lapis_ore_old":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:large_fern":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lava":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lectern_block":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lever":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_banner":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_bed":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_carpet":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_concrete":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_shulker_box":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_stained_glass":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_terracotta":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_blue_wool":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_banner":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_bed":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_carpet":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_concrete":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_concrete_powder":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_shulker_box":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_stained_glass":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_terracotta":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_gray_wool":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:light_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lilac":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lily_of_the_valley":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_banner":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_bed":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_carpet":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_concrete":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_shulker_box":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_stained_glass":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_terracotta":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lime_wool":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:lodestone":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:loom":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_banner":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_bed":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_carpet":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_concrete":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_shulker_box":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_stained_glass":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_terracotta":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magenta_wool":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:magma_block":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:melon":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:melon_stem":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_cobblestone":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_cobblestone_slab":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_cobblestone_stairs":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_cobblestone_wall":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_stone_brick_slab":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_stone_brick_stairs":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_stone_brick_wall":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mossy_stone_bricks":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mushroom_stem":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:mycelium":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_brick_fence":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_brick_slab":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_brick_stairs":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_brick_wall":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_bricks":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_gold_ore":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_quartz_ore":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_sprouts":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_wart_block":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:nether_wart_planted":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:netherite_block":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:netherrack_block":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:note_block":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_door":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oak_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:observer":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:obsidian":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_banner":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_bed":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_carpet":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_concrete":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_concrete_powder":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_shulker_box":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_stained_glass":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_terracotta":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_tulip":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:orange_wool":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:oxeye_daisy":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:packed_ice":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:peony":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_banner":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_bed":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_carpet":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_concrete":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_shulker_box":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_stained_glass":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_terracotta":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_tulip":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pink_wool":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:piston":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:podzol":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_andesite":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_andesite_slab":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_andesite_stairs":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_basalt":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_brick_slab":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_brick_stairs":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_brick_wall":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_bricks":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_slab":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_stairs":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_blackstone_wall":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_diorite":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_diorite_slab":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_diorite_stairs":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_granite":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_granite_slab":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:polished_granite_stairs":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:poppy":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:potatoes":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:powered_rail":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_brick_slab":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_brick_stairs":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_bricks":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_slab":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_stairs":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:prismarine_wall":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pumpkin":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:pumpkin_stem":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_banner":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_bed":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_carpet":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_concrete":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_shulker_box":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_stained_glass":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_terracotta":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purple_wool":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purpur_block":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purpur_pillar":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purpur_slab":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:purpur_stairs":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:quartz_block":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:quartz_bricks":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:quartz_pillar":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:quartz_slab":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:quartz_stairs":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:rail":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_banner":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_bed":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_carpet":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_concrete":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_concrete_powder":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_mushroom":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_mushroom_block":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_nether_brick_slab":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_nether_brick_stairs":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_nether_brick_wall":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_nether_bricks":	{
+		"icon_pos":	{
+			"x":	800,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_sand":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_sandstone":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_sandstone_slab":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_sandstone_stairs":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_sandstone_wall":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_shulker_box":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_stained_glass":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_terracotta":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_tulip":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:red_wool":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:redstone_block":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:redstone_dust":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:redstone_lamp":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:redstone_ore_old":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:redstone_torch":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:repeater":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:respawn_anchor":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:rose_bush":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sand":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sandstone":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sandstone_slab":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sandstone_stairs":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sandstone_wall":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:scaffolding":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sea_lantern":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sea_pickle":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:seagrass":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:short_grass":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:shroomlight":	{
+		"icon_pos":	{
+			"x":	1000,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:shulker_box":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:skeleton_skull":	{
+		"icon_pos":	{
+			"x":	3500,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:slime_block":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1000
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smithing_table":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smoker":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_quartz":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_quartz_slab":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_quartz_stairs":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_red_sandstone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_red_sandstone_slab":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_red_sandstone_stairs":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_sandstone":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_sandstone_slab":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_sandstone_stairs":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_stone":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:smooth_stone_slab":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:snow":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:snow_block":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:soul_campfire":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:soul_lantern":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:soul_sand":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:soul_soil":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:soul_torch":	{
+		"icon_pos":	{
+			"x":	100,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sponge":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_door":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_leaves":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_log":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_sapling":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:spruce_wood":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sticky_piston":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_brick_slab":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_brick_stairs":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_brick_wall":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_bricks":	{
+		"icon_pos":	{
+			"x":	1200,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_cutter":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_slab":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stone_stairs":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:string":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_acacia_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_acacia_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_birch_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_birch_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_crimson_hyphae":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_crimson_stem":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_dark_oak_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_dark_oak_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_jungle_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_jungle_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_oak_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_oak_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	0
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_spruce_log":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_spruce_wood":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_warped_hyphae":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:stripped_warped_stem":	{
+		"icon_pos":	{
+			"x":	2200,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sugarcane_tall":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sunflower":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:sweet_berry_bush":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tall_grass":	{
+		"icon_pos":	{
+			"x":	500,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:target":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:terracotta_block":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tnt_block":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:torch":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:trapped_chest":	{
+		"icon_pos":	{
+			"x":	2300,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tripwire_hook":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tube_coral":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tube_coral_block":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:tube_coral_fan":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:turtle_egg":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	1300
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:twisting_vines":	{
+		"icon_pos":	{
+			"x":	1500,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:vine":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_button":	{
+		"icon_pos":	{
+			"x":	3100,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_door":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_fence":	{
+		"icon_pos":	{
+			"x":	2700,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_fence_gate":	{
+		"icon_pos":	{
+			"x":	2800,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_fungus":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_hyphae":	{
+		"icon_pos":	{
+			"x":	2100,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_nylium":	{
+		"icon_pos":	{
+			"x":	200,
+			"y":	800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_planks":	{
+		"icon_pos":	{
+			"x":	2400,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_pressure_plate":	{
+		"icon_pos":	{
+			"x":	3000,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_roots":	{
+		"icon_pos":	{
+			"x":	1800,
+			"y":	900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_sign":	{
+		"icon_pos":	{
+			"x":	3200,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_slab":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_stairs":	{
+		"icon_pos":	{
+			"x":	2500,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_stem":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_trapdoor":	{
+		"icon_pos":	{
+			"x":	2900,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:warped_wart_block":	{
+		"icon_pos":	{
+			"x":	1900,
+			"y":	700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:water":	{
+		"icon_pos":	{
+			"x":	1100,
+			"y":	1100
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:weeping_vines":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	200
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:wet_sponge":	{
+		"icon_pos":	{
+			"x":	2600,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:wheat":	{
+		"icon_pos":	{
+			"x":	600,
+			"y":	600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_banner":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_bed":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_carpet":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_concrete":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_concrete_powder":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_shulker_box":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_stained_glass":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_terracotta":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_tulip":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:white_wool":	{
+		"icon_pos":	{
+			"x":	0,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:wither_rose":	{
+		"icon_pos":	{
+			"x":	1700,
+			"y":	400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:wither_skeleton_skull":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_banner":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1400
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_bed":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_carpet":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_concrete":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_concrete_powder":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_glazed_terracotta":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_shulker_box":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1800
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_stained_glass":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1500
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_stained_glass_pane":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_terracotta":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	1900
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:yellow_wool":	{
+		"icon_pos":	{
+			"x":	300,
+			"y":	1700
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"stat.placed:zombie_head":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	1600
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"multi_stage_goal.ms_goal:trident":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	800
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"multi_stage_goal.ms_goal:shulker_shells":	{
+		"icon_pos":	{
+			"x":	3600,
+			"y":	600
+		}
+	},
+	"multi_stage_goal.ms_goal:nautilus_shells":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	600
+		}
+	},
+	"multi_stage_goal.ms_goal:beacon":	{
+		"icon_pos":	{
+			"x":	3400,
+			"y":	800
+		}
+	},
+	"counter.block_counter":	{
+		"icon_pos":	{
+			"x":	3500,
+			"y":	400
+		}
+	},
+	"decorations":	[{
+			"id":	"credits",
+			"type":	"text_header",
+			"pos":	{
+				"x":	3794,
+				"y":	2003,
+				"anchor":	2
+			}
+		}]
+}

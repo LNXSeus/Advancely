@@ -5,36 +5,18 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3021,
-				"y":	-3033,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/upgrade_tools":	{
 			"icon":	"items/stone_pickaxe_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	0,
-				"y":	0
 			}
 		},
 		"minecraft:story/iron_tools":	{
 			"icon":	"items/iron_pickaxe_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	100,
-				"y":	0
 			}
 		},
 		"minecraft:story/smelt_iron":	{
@@ -42,16 +24,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3092,
-				"y":	-3027,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/mine_diamond":	{
@@ -59,26 +31,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3088,
-				"y":	-3037,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/lava_bucket":	{
 			"icon":	"items/lava_bucket_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	200,
-				"y":	0
 			}
 		},
 		"minecraft:story/form_obsidian":	{
@@ -86,16 +44,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3049,
-				"y":	-3019,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/enter_the_nether":	{
@@ -103,26 +51,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-2985,
-				"y":	-2967,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/obtain_armor":	{
 			"icon":	"items/iron_chestplate_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	300,
-				"y":	0
 			}
 		},
 		"minecraft:story/shiny_gear":	{
@@ -130,26 +64,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3113,
-				"y":	-3038,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/cure_zombie_villager":	{
 			"icon":	"items/golden_apple_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	400,
-				"y":	0
 			}
 		},
 		"minecraft:story/root":	{
@@ -157,26 +77,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/deflect_arrow":	{
 			"icon":	"items/Invicon_Shield.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	300,
-				"y":	140
 			}
 		},
 		"minecraft:story/follow_ender_eye":	{
@@ -184,16 +90,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/enter_the_end":	{
@@ -201,16 +97,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:story/enchant_item":	{
@@ -218,26 +104,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/return_to_sender":	{
 			"icon":	"items/fire_charge_25w14craftmine.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	200,
-				"y":	140
 			}
 		},
 		"minecraft:nether/find_fortress":	{
@@ -245,16 +117,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/root":	{
@@ -262,36 +124,18 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/uneasy_alliance":	{
 			"icon":	"items/ghast_tear_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	400,
-				"y":	140
 			}
 		},
 		"minecraft:nether/fast_travel":	{
 			"icon":	"items/map_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	0,
-				"y":	140
 			}
 		},
 		"minecraft:nether/brew_potion":	{
@@ -299,16 +143,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/obtain_blaze_rod":	{
@@ -316,26 +150,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/all_effects":	{
 			"icon":	"items/bucket_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	100,
-				"y":	140
 			}
 		},
 		"minecraft:nether/all_potions":	{
@@ -343,16 +163,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/create_full_beacon":	{
@@ -360,16 +170,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/create_beacon":	{
@@ -377,16 +177,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/summon_wither":	{
@@ -394,16 +184,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:nether/get_wither_skull":	{
@@ -411,16 +191,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:end/root":	{
@@ -428,36 +198,18 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:end/kill_dragon":	{
 			"icon":	"blocks/Dragon_Head.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	300,
-				"y":	280
 			}
 		},
 		"minecraft:end/dragon_egg":	{
 			"icon":	"blocks/Dragon_Egg_JE5.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	400,
-				"y":	280
 			}
 		},
 		"minecraft:end/enter_end_gateway":	{
@@ -465,16 +217,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:end/find_end_city":	{
@@ -482,36 +224,18 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:end/dragon_breath":	{
 			"icon":	"items/dragon_breath_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	200,
-				"y":	280
 			}
 		},
 		"minecraft:end/respawn_dragon":	{
 			"icon":	"items/end_crystal_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	300,
-				"y":	420
 			}
 		},
 		"minecraft:end/elytra":	{
@@ -519,26 +243,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:end/levitate":	{
 			"icon":	"items/shulker_shell_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	400,
-				"y":	420
 			}
 		},
 		"minecraft:husbandry/root":	{
@@ -546,16 +256,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:husbandry/plant_seed":	{
@@ -563,16 +263,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:husbandry/breed_an_animal":	{
@@ -580,16 +270,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:husbandry/tame_an_animal":	{
@@ -597,46 +277,24 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:husbandry/fishy_business":	{
 			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	500,
-				"y":	0
 			}
 		},
 		"minecraft:husbandry/tactical_fishing":	{
 			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	500,
-				"y":	280
 			}
 		},
 		"minecraft:husbandry/break_diamond_hoe":	{
 			"icon":	"items/diamond_hoe_20w14infinite.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	600,
-				"y":	420
 			}
 		},
 		"minecraft:husbandry/bred_all_animals":	{
@@ -688,10 +346,6 @@
 				"minecraft:bee":	{
 					"icon":	"animals/bee.png"
 				}
-			},
-			"icon_pos":	{
-				"x":	0,
-				"y":	560
 			}
 		},
 		"minecraft:husbandry/balanced_diet":	{
@@ -699,406 +353,122 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"bread":	{
-					"icon":	"items/bread_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	714
-					}
+					"icon":	"items/bread_3d_shareware_v1.34.png"
 				},
 				"cooked_porkchop":	{
-					"icon":	"items/cooked_porkchop_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	750
-					}
+					"icon":	"items/cooked_porkchop_3d_shareware_v1.34.png"
 				},
 				"porkchop":	{
-					"icon":	"items/porkchop_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	786
-					}
+					"icon":	"items/porkchop_3d_shareware_v1.34.png"
 				},
 				"cooked_beef":	{
-					"icon":	"items/cooked_beef_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	822
-					}
+					"icon":	"items/cooked_beef_3d_shareware_v1.34.png"
 				},
 				"beef":	{
-					"icon":	"items/beef_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	858
-					}
+					"icon":	"items/beef_3d_shareware_v1.34.png"
 				},
 				"cooked_chicken":	{
-					"icon":	"items/cooked_chicken_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	894
-					}
+					"icon":	"items/cooked_chicken_3d_shareware_v1.34.png"
 				},
 				"chicken":	{
-					"icon":	"items/chicken_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	930
-					}
+					"icon":	"items/chicken_3d_shareware_v1.34.png"
 				},
 				"cooked_mutton":	{
-					"icon":	"items/cooked_mutton_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	966
-					}
+					"icon":	"items/cooked_mutton_3d_shareware_v1.34.png"
 				},
 				"mutton":	{
-					"icon":	"items/mutton_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	1002
-					}
+					"icon":	"items/mutton_3d_shareware_v1.34.png"
 				},
 				"cooked_rabbit":	{
-					"icon":	"items/cooked_rabbit_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	1030
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	1038
-					}
+					"icon":	"items/cooked_rabbit_3d_shareware_v1.34.png"
 				},
 				"rabbit":	{
-					"icon":	"items/rabbit_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	850,
-						"y":	1066
-					},
-					"text_pos":	{
-						"x":	886,
-						"y":	1074
-					}
+					"icon":	"items/rabbit_3d_shareware_v1.34.png"
 				},
 				"cooked_cod":	{
-					"icon":	"items/cooked_cod_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	1036,
-						"y":	714
-					}
+					"icon":	"items/cooked_cod_1.13.png"
 				},
 				"cod":	{
-					"icon":	"items/cod_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	1036,
-						"y":	750
-					}
+					"icon":	"items/cod_1.13.png"
 				},
 				"tropical_fish":	{
-					"icon":	"items/tropical_fish_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	1036,
-						"y":	786
-					}
+					"icon":	"items/tropical_fish_1.13.png"
 				},
 				"cooked_salmon":	{
-					"icon":	"items/cooked_salmon_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	1036,
-						"y":	822
-					}
+					"icon":	"items/cooked_salmon_1.13.png"
 				},
 				"salmon":	{
-					"icon":	"items/salmon_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	1036,
-						"y":	858
-					}
+					"icon":	"items/salmon_1.13.png"
 				},
 				"pufferfish":	{
-					"icon":	"items/pufferfish_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	1101
-					}
+					"icon":	"items/pufferfish_1.13.png"
 				},
 				"cookie":	{
-					"icon":	"items/cookie_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	714
-					}
+					"icon":	"items/cookie_3d_shareware_v1.34.png"
 				},
 				"pumpkin_pie":	{
-					"icon":	"items/pumpkin_pie_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	750
-					}
+					"icon":	"items/pumpkin_pie_3d_shareware_v1.34.png"
 				},
 				"apple":	{
-					"icon":	"items/apple_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	786
-					}
+					"icon":	"items/apple_3d_shareware_v1.34.png"
 				},
 				"golden_apple":	{
-					"icon":	"items/golden_apple_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	822
-					}
+					"icon":	"items/golden_apple_3d_shareware_v1.34.png"
 				},
 				"enchanted_golden_apple":	{
-					"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	858
-					}
+					"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif"
 				},
 				"golden_carrot":	{
-					"icon":	"items/golden_carrot_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	894
-					}
+					"icon":	"items/golden_carrot_3d_shareware_v1.34.png"
 				},
 				"carrot":	{
-					"icon":	"items/carrot_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	930
-					}
+					"icon":	"items/carrot_3d_shareware_v1.34.png"
 				},
 				"melon_slice":	{
-					"icon":	"items/melon_slice_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	966
-					}
+					"icon":	"items/melon_slice_3d_shareware_v1.34.png"
 				},
 				"baked_potato":	{
-					"icon":	"items/baked_potato_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	1002
-					}
+					"icon":	"items/baked_potato_3d_shareware_v1.34.png"
 				},
 				"potato":	{
-					"icon":	"items/potato_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	1030
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	1038
-					}
+					"icon":	"items/potato_3d_shareware_v1.34.png"
 				},
 				"poisonous_potato":	{
-					"icon":	"items/poisonous_potato_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	1066
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	1074
-					}
+					"icon":	"items/poisonous_potato_3d_shareware_v1.34.png"
 				},
 				"beetroot":	{
-					"icon":	"items/beetroot_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	1102
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	1110
-					}
+					"icon":	"items/beetroot_3d_shareware_v1.34.png"
 				},
 				"sweet_berries":	{
-					"icon":	"items/sweet_berries_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1145,
-						"y":	1138
-					},
-					"text_pos":	{
-						"x":	1181,
-						"y":	1146
-					}
+					"icon":	"items/sweet_berries_3d_shareware_v1.34.png"
 				},
 				"chorus_fruit":	{
-					"icon":	"items/chorus_fruit_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	852,
-						"y":	1099
-					},
-					"text_pos":	{
-						"x":	888,
-						"y":	1107
-					}
+					"icon":	"items/chorus_fruit_3d_shareware_v1.34.png"
 				},
 				"mushroom_stew":	{
-					"icon":	"items/mushroom_stew_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	997
-					}
+					"icon":	"items/mushroom_stew_3d_shareware_v1.34.png"
 				},
 				"suspicious_stew":	{
-					"icon":	"items/suspicious_stew_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	10070,
-						"y":	1136
-					}
+					"icon":	"items/suspicious_stew_3d_shareware_v1.34.png"
 				},
 				"rabbit_stew":	{
-					"icon":	"items/rabbit_stew_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	1033
-					}
+					"icon":	"items/rabbit_stew_3d_shareware_v1.34.png"
 				},
 				"beetroot_soup":	{
-					"icon":	"items/beetroot_soup_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	1069
-					}
+					"icon":	"items/beetroot_soup_3d_shareware_v1.34.png"
 				},
 				"dried_kelp":	{
-					"icon":	"items/dried_kelp_1.13.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	887
-					}
+					"icon":	"items/dried_kelp_1.13.png"
 				},
 				"rotten_flesh":	{
-					"icon":	"items/rotten_flesh_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	923
-					}
+					"icon":	"items/rotten_flesh_3d_shareware_v1.34.png"
 				},
 				"spider_eye":	{
-					"icon":	"items/spider_eye_3d_shareware_v1.34.png",
-					"icon_pos":	{
-						"x":	1000,
-						"y":	959
-					}
+					"icon":	"items/spider_eye_3d_shareware_v1.34.png"
 				},
 				"honey_bottle":	{
-					"icon":	"items/honey_bottle_1.15.png",
-					"icon_pos":	{
-						"x":	851,
-						"y":	1134
-					},
-					"text_pos":	{
-						"x":	887,
-						"y":	1143
-					}
+					"icon":	"items/honey_bottle_1.15.png"
 				}
-			},
-			"icon_pos":	{
-				"x":	850,
-				"y":	560
 			}
 		},
 		"minecraft:husbandry/complete_catalogue":	{
@@ -1138,10 +508,6 @@
 				"textures/entity/cat/siamese.png":	{
 					"icon":	"cats/siamese.png"
 				}
-			},
-			"icon_pos":	{
-				"x":	200,
-				"y":	560
 			}
 		},
 		"minecraft:adventure/root":	{
@@ -1149,16 +515,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/kill_a_mob":	{
@@ -1166,16 +522,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/ol_betsy":	{
@@ -1183,72 +529,36 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/whos_the_pillager_now":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	200,
-				"y":	420
 			}
 		},
 		"minecraft:adventure/sleep_in_bed":	{
 			"icon":	"blocks/red_bed_3d.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	500,
-				"y":	140
 			}
 		},
 		"minecraft:adventure/trade":	{
 			"icon":	"items/emerald_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3028,
-				"y":	-2984,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3014,
-				"y":	-2908,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/two_birds_one_arrow":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	500,
-				"y":	420
 			}
 		},
 		"minecraft:adventure/arbalistic":	{
 			"icon":	"items/crossbow_standby_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	600,
-				"y":	0
 			}
 		},
 		"minecraft:adventure/shoot_arrow":	{
@@ -1256,26 +566,12 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/sniper_duel":	{
 			"icon":	"items/arrow_25w14craftmine.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	600,
-				"y":	140
 			}
 		},
 		"minecraft:adventure/voluntary_exile":	{
@@ -1283,16 +579,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/hero_of_the_village":	{
@@ -1300,16 +586,6 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/throw_trident":	{
@@ -1317,46 +593,24 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-3046,
-				"y":	-3020,
-				"hidden":	true
 			}
 		},
 		"minecraft:adventure/very_very_frightening":	{
 			"icon":	"items/trident_1.13.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	0,
-				"y":	420
 			}
 		},
 		"minecraft:adventure/summon_iron_golem":	{
 			"icon":	"blocks/Carved_Pumpkin_(S)_JE5.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	100,
-				"y":	420
 			}
 		},
 		"minecraft:adventure/totem_of_undying":	{
 			"icon":	"items/totem_of_undying_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	600,
-				"y":	280
 			}
 		},
 		"minecraft:adventure/adventuring_time":	{
@@ -1364,479 +618,131 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:plains":	{
-					"icon":	"ovBiomes/plains.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	714
-					}
+					"icon":	"ovBiomes/plains.png"
 				},
 				"minecraft:forest":	{
-					"icon":	"ovBiomes/forest.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	750
-					}
+					"icon":	"ovBiomes/forest.png"
 				},
 				"minecraft:wooded_hills":	{
-					"icon":	"ovBiomes/wooded_hills.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	786
-					}
+					"icon":	"ovBiomes/wooded_hills.png"
 				},
 				"minecraft:birch_forest":	{
-					"icon":	"ovBiomes/birch_forest.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	822
-					}
+					"icon":	"ovBiomes/birch_forest.png"
 				},
 				"minecraft:birch_forest_hills":	{
-					"icon":	"ovBiomes/birch_forest_hills.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	858
-					}
+					"icon":	"ovBiomes/birch_forest_hills.png"
 				},
 				"minecraft:dark_forest":	{
-					"icon":	"ovBiomes/dark_forest.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	894
-					}
+					"icon":	"ovBiomes/dark_forest.png"
 				},
 				"minecraft:swamp":	{
-					"icon":	"ovBiomes/swamp.png",
-					"icon_pos":	{
-						"x":	1330,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	1366,
-						"y":	930
-					}
+					"icon":	"ovBiomes/swamp.png"
 				},
 				"minecraft:taiga":	{
-					"icon":	"ovBiomes/taiga.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	966
-					}
+					"icon":	"ovBiomes/taiga.png"
 				},
 				"minecraft:taiga_hills":	{
-					"icon":	"ovBiomes/taiga_hills.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	1002
-					}
+					"icon":	"ovBiomes/taiga_hills.png"
 				},
 				"minecraft:giant_tree_taiga":	{
-					"icon":	"ovBiomes/giant_tree_taiga.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	1029
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	1037
-					}
+					"icon":	"ovBiomes/giant_tree_taiga.png"
 				},
 				"minecraft:giant_tree_taiga_hills":	{
-					"icon":	"ovBiomes/giant_tree_taiga_hills.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	1065
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	1073
-					}
+					"icon":	"ovBiomes/giant_tree_taiga_hills.png"
 				},
 				"minecraft:snowy_taiga":	{
-					"icon":	"ovBiomes/snowy_taiga.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1101
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1109
-					}
+					"icon":	"ovBiomes/snowy_taiga.png"
 				},
 				"minecraft:snowy_taiga_hills":	{
-					"icon":	"ovBiomes/snowy_taiga_hills.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1137
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1145
-					}
+					"icon":	"ovBiomes/snowy_taiga_hills.png"
 				},
 				"minecraft:snowy_tundra":	{
-					"icon":	"ovBiomes/snowy_tundra.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1175
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1183
-					}
+					"icon":	"ovBiomes/snowy_tundra.png"
 				},
 				"minecraft:snowy_mountains":	{
-					"icon":	"ovBiomes/snowy_mountains.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1211
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1219
-					}
+					"icon":	"ovBiomes/snowy_mountains.png"
 				},
 				"minecraft:snowy_beach":	{
-					"icon":	"ovBiomes/snowy_beach.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1247
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1255
-					}
+					"icon":	"ovBiomes/snowy_beach.png"
 				},
 				"minecraft:frozen_river":	{
-					"icon":	"ovBiomes/frozen_river.png",
-					"icon_pos":	{
-						"x":	1491,
-						"y":	1283
-					},
-					"text_pos":	{
-						"x":	1527,
-						"y":	1291
-					}
+					"icon":	"ovBiomes/frozen_river.png"
 				},
 				"minecraft:river":	{
-					"icon":	"ovBiomes/river.png",
-					"icon_pos":	{
-						"x":	1331,
-						"y":	959
-					},
-					"text_pos":	{
-						"x":	1367,
-						"y":	967
-					}
+					"icon":	"ovBiomes/river.png"
 				},
 				"minecraft:desert":	{
-					"icon":	"ovBiomes/desert.png",
-					"icon_pos":	{
-						"x":	1331,
-						"y":	995
-					},
-					"text_pos":	{
-						"x":	1367,
-						"y":	1003
-					}
+					"icon":	"ovBiomes/desert.png"
 				},
 				"minecraft:desert_hills":	{
-					"icon":	"ovBiomes/desert_hills.png",
-					"icon_pos":	{
-						"x":	1331,
-						"y":	1031
-					},
-					"text_pos":	{
-						"x":	1367,
-						"y":	1039
-					}
+					"icon":	"ovBiomes/desert_hills.png"
 				},
 				"minecraft:savanna":	{
-					"icon":	"ovBiomes/savanna.png",
-					"icon_pos":	{
-						"x":	1331,
-						"y":	1067
-					},
-					"text_pos":	{
-						"x":	1367,
-						"y":	1075
-					}
+					"icon":	"ovBiomes/savanna.png"
 				},
 				"minecraft:savanna_plateau":	{
-					"icon":	"ovBiomes/savanna_plateau.png",
-					"icon_pos":	{
-						"x":	1331,
-						"y":	1103
-					},
-					"text_pos":	{
-						"x":	1367,
-						"y":	1111
-					}
+					"icon":	"ovBiomes/savanna_plateau.png"
 				},
 				"minecraft:jungle":	{
-					"icon":	"ovBiomes/jungle.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	714
-					}
+					"icon":	"ovBiomes/jungle.png"
 				},
 				"minecraft:jungle_edge":	{
-					"icon":	"ovBiomes/jungle_edge.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	750
-					}
+					"icon":	"ovBiomes/jungle_edge.png"
 				},
 				"minecraft:jungle_hills":	{
-					"icon":	"ovBiomes/jungle_hills.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	786
-					}
+					"icon":	"ovBiomes/jungle_hills.png"
 				},
 				"minecraft:bamboo_jungle":	{
-					"icon":	"ovBiomes/bamboo_jungle.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	822
-					}
+					"icon":	"ovBiomes/bamboo_jungle.png"
 				},
 				"minecraft:bamboo_jungle_hills":	{
-					"icon":	"ovBiomes/bamboo_jungle_hills.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	858
-					}
+					"icon":	"ovBiomes/bamboo_jungle_hills.png"
 				},
 				"minecraft:stone_shore":	{
-					"icon":	"ovBiomes/stone_shore.png",
-					"icon_pos":	{
-						"x":	1332,
-						"y":	1136
-					},
-					"text_pos":	{
-						"x":	1368,
-						"y":	1144
-					}
+					"icon":	"ovBiomes/stone_shore.png"
 				},
 				"minecraft:mountains":	{
-					"icon":	"ovBiomes/mountains.png",
-					"icon_pos":	{
-						"x":	1332,
-						"y":	1172
-					},
-					"text_pos":	{
-						"x":	1368,
-						"y":	1180
-					}
+					"icon":	"ovBiomes/mountains.png"
 				},
 				"minecraft:wooded_mountains":	{
-					"icon":	"ovBiomes/wooded_mountains.png",
-					"icon_pos":	{
-						"x":	1332,
-						"y":	1208
-					},
-					"text_pos":	{
-						"x":	1368,
-						"y":	1216
-					}
+					"icon":	"ovBiomes/wooded_mountains.png"
 				},
 				"minecraft:badlands":	{
-					"icon":	"ovBiomes/badlands.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	894
-					}
+					"icon":	"ovBiomes/badlands.png"
 				},
 				"minecraft:badlands_plateau":	{
-					"icon":	"ovBiomes/badlands_plateau.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	930
-					}
+					"icon":	"ovBiomes/badlands_plateau.png"
 				},
 				"minecraft:wooded_badlands_plateau":	{
-					"icon":	"ovBiomes/wooded_badlands_plateau.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	966
-					}
+					"icon":	"ovBiomes/wooded_badlands_plateau.png"
 				},
 				"minecraft:mushroom_fields":	{
-					"icon":	"ovBiomes/mushroom_fields.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	1002
-					}
+					"icon":	"ovBiomes/mushroom_fields.png"
 				},
 				"minecraft:mushroom_field_shore":	{
-					"icon":	"ovBiomes/mushroom_field_shore.png",
-					"icon_pos":	{
-						"x":	1673,
-						"y":	1030
-					},
-					"text_pos":	{
-						"x":	1709,
-						"y":	1038
-					}
+					"icon":	"ovBiomes/mushroom_field_shore.png"
 				},
 				"minecraft:beach":	{
-					"icon":	"ovBiomes/beach.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	714
-					}
+					"icon":	"ovBiomes/beach.png"
 				},
 				"minecraft:warm_ocean":	{
-					"icon":	"ovBiomes/warm_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	750
-					}
+					"icon":	"ovBiomes/warm_ocean.png"
 				},
 				"minecraft:lukewarm_ocean":	{
-					"icon":	"ovBiomes/lukewarm_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	786
-					}
+					"icon":	"ovBiomes/lukewarm_ocean.png"
 				},
 				"minecraft:deep_lukewarm_ocean":	{
-					"icon":	"ovBiomes/deep_lukewarm_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	823
-					}
+					"icon":	"ovBiomes/deep_lukewarm_ocean.png"
 				},
 				"minecraft:cold_ocean":	{
-					"icon":	"ovBiomes/cold_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	858
-					}
+					"icon":	"ovBiomes/cold_ocean.png"
 				},
 				"minecraft:deep_cold_ocean":	{
-					"icon":	"ovBiomes/deep_cold_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	894
-					}
+					"icon":	"ovBiomes/deep_cold_ocean.png"
 				},
 				"minecraft:deep_frozen_ocean":	{
-					"icon":	"ovBiomes/deep_frozen_ocean.png",
-					"icon_pos":	{
-						"x":	1493,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	1529,
-						"y":	930
-					}
+					"icon":	"ovBiomes/deep_frozen_ocean.png"
 				}
-			},
-			"icon_pos":	{
-				"x":	1330,
-				"y":	560
-			},
-			"text_pos":	{
-				"x":	1368,
-				"y":	660
-			},
-			"progress_pos":	{
-				"x":	1355,
-				"y":	680
 			}
 		},
 		"minecraft:adventure/kill_all_mobs":	{
@@ -1844,284 +750,80 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:creeper":	{
-					"icon":	"monsters/creeper.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	437,
-						"y":	715
-					}
+					"icon":	"monsters/creeper.png"
 				},
 				"minecraft:zombie":	{
-					"icon":	"monsters/zombie.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	436,
-						"y":	750
-					}
+					"icon":	"monsters/zombie.png"
 				},
 				"minecraft:skeleton":	{
-					"icon":	"monsters/skeleton.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	437,
-						"y":	787
-					}
+					"icon":	"monsters/skeleton.png"
 				},
 				"minecraft:husk":	{
-					"icon":	"monsters/husk.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	436,
-						"y":	822
-					}
+					"icon":	"monsters/husk.png"
 				},
 				"minecraft:drowned":	{
-					"icon":	"monsters/drowned.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	437,
-						"y":	859
-					}
+					"icon":	"monsters/drowned.png"
 				},
 				"minecraft:stray":	{
-					"icon":	"monsters/stray.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	436,
-						"y":	894
-					}
+					"icon":	"monsters/stray.png"
 				},
 				"minecraft:spider":	{
-					"icon":	"monsters/spider.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	436,
-						"y":	930
-					}
+					"icon":	"monsters/spider.png"
 				},
 				"minecraft:cave_spider":	{
-					"icon":	"monsters/cave_spider.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	437,
-						"y":	967
-					}
+					"icon":	"monsters/cave_spider.png"
 				},
 				"minecraft:enderman":	{
-					"icon":	"monsters/enderman.png",
-					"icon_pos":	{
-						"x":	400,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	437,
-						"y":	1003
-					}
+					"icon":	"monsters/enderman.png"
 				},
 				"minecraft:slime":	{
-					"icon":	"monsters/slime.png",
-					"icon_pos":	{
-						"x":	398,
-						"y":	1028
-					},
-					"text_pos":	{
-						"x":	434,
-						"y":	1036
-					}
+					"icon":	"monsters/slime.png"
 				},
 				"minecraft:magma_cube":	{
-					"icon":	"monsters/magma_cube.png",
-					"icon_pos":	{
-						"x":	398,
-						"y":	1064
-					},
-					"text_pos":	{
-						"x":	434,
-						"y":	1072
-					}
+					"icon":	"monsters/magma_cube.png"
 				},
 				"minecraft:ghast":	{
-					"icon":	"monsters/ghast.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	714
-					}
+					"icon":	"monsters/ghast.png"
 				},
 				"minecraft:blaze":	{
-					"icon":	"monsters/blaze.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	742
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	750
-					}
+					"icon":	"monsters/blaze.png"
 				},
 				"minecraft:wither_skeleton":	{
-					"icon":	"monsters/wither_skeleton.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	778
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	786
-					}
+					"icon":	"monsters/wither_skeleton.png"
 				},
 				"minecraft:zombie_pigman":	{
-					"icon":	"monsters/zombie_pigman.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	814
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	822
-					}
+					"icon":	"monsters/zombie_pigman.png"
 				},
 				"minecraft:silverfish":	{
-					"icon":	"monsters/silverfish.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	850
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	858
-					}
+					"icon":	"monsters/silverfish.png"
 				},
 				"minecraft:shulker":	{
-					"icon":	"monsters/shulker.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	886
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	894
-					}
+					"icon":	"monsters/shulker.png"
 				},
 				"minecraft:phantom":	{
-					"icon":	"monsters/phantom.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	922
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	930
-					}
+					"icon":	"monsters/phantom.png"
 				},
 				"minecraft:guardian":	{
-					"icon":	"monsters/guardian.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	958
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	966
-					}
+					"icon":	"monsters/guardian.png"
 				},
 				"minecraft:zombie_villager":	{
-					"icon":	"monsters/zombie_villager.png",
-					"icon_pos":	{
-						"x":	535,
-						"y":	994
-					},
-					"text_pos":	{
-						"x":	571,
-						"y":	1002
-					}
+					"icon":	"monsters/zombie_villager.png"
 				},
 				"minecraft:witch":	{
-					"icon":	"monsters/witch.png",
-					"icon_pos":	{
-						"x":	677,
-						"y":	706
-					},
-					"text_pos":	{
-						"x":	713,
-						"y":	714
-					}
+					"icon":	"monsters/witch.png"
 				},
 				"minecraft:pillager":	{
-					"icon":	"monsters/pillager.png",
-					"icon_pos":	{
-						"x":	677,
-						"y":	743
-					},
-					"text_pos":	{
-						"x":	713,
-						"y":	751
-					}
+					"icon":	"monsters/pillager.png"
 				},
 				"minecraft:vindicator":	{
-					"icon":	"monsters/vindicator.png",
-					"icon_pos":	{
-						"x":	677,
-						"y":	779
-					},
-					"text_pos":	{
-						"x":	713,
-						"y":	787
-					}
+					"icon":	"monsters/vindicator.png"
 				},
 				"minecraft:evoker":	{
-					"icon":	"monsters/evoker.png",
-					"icon_pos":	{
-						"x":	677,
-						"y":	815
-					},
-					"text_pos":	{
-						"x":	713,
-						"y":	823
-					}
+					"icon":	"monsters/evoker.png"
 				},
 				"minecraft:ravager":	{
-					"icon":	"monsters/ravager.png",
-					"icon_pos":	{
-						"x":	677,
-						"y":	851
-					},
-					"text_pos":	{
-						"x":	713,
-						"y":	859
-					}
+					"icon":	"monsters/ravager.png"
 				}
-			},
-			"icon_pos":	{
-				"x":	400,
-				"y":	560
 			}
 		},
 		"minecraft:husbandry/safely_harvest_honey":	{
@@ -2129,36 +831,18 @@
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	-3016,
-				"y":	-2993,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"x":	-2979,
-				"y":	-3038,
-				"hidden":	true
 			}
 		},
 		"minecraft:husbandry/silk_touch_nest":	{
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	0,
-				"y":	280
 			}
 		},
 		"minecraft:adventure/honey_block_slide":	{
 			"icon":	"blocks/Honey_Block_JE1_BE2.png",
 			"groups_enabled":	false,
 			"criteria":	{
-			},
-			"icon_pos":	{
-				"x":	100,
-				"y":	280
 			}
 		}
 	},
@@ -2169,11 +853,7 @@
 			"target":	164,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/create_full_beacon"
-				}],
-			"icon_pos":	{
-				"x":	745,
-				"y":	70
-			}
+				}]
 		},
 		"stat:drowneds_killed":	{
 			"icon":	"monsters/Drowned_mob.png",
@@ -2185,11 +865,7 @@
 				}, {
 					"root_name":	"ms_goal:hdwgh",
 					"stage_id":	"1"
-				}],
-			"icon_pos":	{
-				"x":	1020,
-				"y":	70
-			}
+				}]
 		},
 		"stat:wither_skeletons_killed":	{
 			"icon":	"blocks/Wither_Skeleton_Skull.png",
@@ -2198,11 +874,7 @@
 			"linked_goals":	[{
 					"root_name":	"ms_goal:beacon",
 					"stage_id":	"1"
-				}],
-			"icon_pos":	{
-				"x":	1020,
-				"y":	210
-			}
+				}]
 		},
 		"stat:bee_nests_picked_up":	{
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
@@ -2213,28 +885,13 @@
 				}, {
 					"root_name":	"ms_goal:bees",
 					"stage_id":	"2"
-				}],
-			"icon_pos":	{
-				"x":	1020,
-				"y":	350
-			}
+				}]
 		},
 		"conduit_crafted_helper":	{
 			"icon":	"blocks/Conduit_JE1_BE1.png",
 			"hidden":	true,
 			"root_name":	"minecraft:crafted/minecraft:conduit",
-			"target":	1,
-			"icon_pos":	{
-				"x":	-3000,
-				"y":	-3000,
-				"hidden":	true
-			},
-			"text_pos":	{
-				"hidden":	true
-			},
-			"progress_pos":	{
-				"hidden":	true
-			}
+			"target":	1
 		}
 	},
 	"unlocks":	[],
@@ -2278,11 +935,7 @@
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"final",
 					"root_name":	""
-				}],
-			"icon_pos":	{
-				"x":	745,
-				"y":	210
-			}
+				}]
 		}, {
 			"root_name":	"ms_goal:hdwgh",
 			"icon":	"items/bucket_3d_shareware_v1.34.png",
@@ -2325,11 +978,7 @@
 					"icon":	"items/bucket_3d_shareware_v1.34.png",
 					"type":	"final",
 					"root_name":	""
-				}],
-			"icon_pos":	{
-				"x":	745,
-				"y":	350
-			}
+				}]
 		}, {
 			"root_name":	"ms_goal:thunder",
 			"icon":	"items/trident_1.13.png",
@@ -2347,11 +996,7 @@
 					"stage_id":	"final",
 					"type":	"final",
 					"root_name":	""
-				}],
-			"icon_pos":	{
-				"x":	875,
-				"y":	210
-			}
+				}]
 		}, {
 			"root_name":	"ms_goal:egap",
 			"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
@@ -2364,11 +1009,7 @@
 					"stage_id":	"final",
 					"type":	"final",
 					"root_name":	""
-				}],
-			"icon_pos":	{
-				"x":	875,
-				"y":	70
-			}
+				}]
 		}, {
 			"root_name":	"ms_goal:bees",
 			"icon":	"animals/Bee_unoptimized.gif",
@@ -2402,20 +1043,7 @@
 					"icon":	"animals/Bee_unoptimized.gif",
 					"type":	"final",
 					"root_name":	""
-				}],
-			"icon_pos":	{
-				"x":	875,
-				"y":	350
-			}
+				}]
 		}],
-	"counter_goals":	[],
-	"decorations":	[{
-			"id":	"credits",
-			"type":	"text_header",
-			"pos":	{
-				"x":	922,
-				"y":	65,
-				"anchor":	7
-			}
-		}]
+	"counter_goals":	[]
 }

@@ -1,0 +1,192 @@
+{
+	"advancement.minecraft.story.deflect_arrow":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	600
+		},
+		"text_pos":	{
+			"x":	400,
+			"y":	-200
+		}
+	},
+	"advancement.minecraft.mines.all_special_mines_completed":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	-500
+		},
+		"text_pos":	{
+			"x":	400,
+			"y":	200
+		},
+		"progress_pos":	{
+			"x":	400,
+			"y":	300
+		}
+	},
+	"advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:wither_boss":	{
+		"icon_pos":	{
+			"x":	400,
+			"y":	260
+		},
+		"text_pos":	{
+			"x":	450,
+			"y":	270
+		}
+	},
+	"stat.stat_category:inf_dirt_collection":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	100
+		},
+		"text_pos":	{
+			"x":	700,
+			"y":	200
+		}
+	},
+	"stat.stat_category:inf_dirt_collection.criteria.minecraft:mined/minecraft:dirt":	{
+		"icon_pos":	{
+			"x":	700,
+			"y":	260
+		},
+		"text_pos":	{
+			"x":	750,
+			"y":	270
+		}
+	},
+	"unlock.minecraft:exploration":	{
+		"icon_pos":	{
+			"x":	2000,
+			"y":	100
+		},
+		"text_pos":	{
+			"x":	1000,
+			"y":	200
+		}
+	},
+	"custom.custom:unbreaking_3_book":	{
+		"icon_pos":	{
+			"x":	1300,
+			"y":	100
+		},
+		"text_pos":	{
+			"x":	1300,
+			"y":	200
+		}
+	},
+	"multi_stage_goal.ms_goal:getting_started":	{
+		"icon_pos":	{
+			"x":	1600,
+			"y":	100
+		},
+		"text_pos":	{
+			"x":	1600,
+			"y":	200
+		},
+		"progress_pos":	{
+			"x":	1750,
+			"y":	120
+		}
+	},
+	"decorations":	[{
+			"id":	"blas_copy",
+			"type":	"line",
+			"thickness":	0.5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	852,
+				"y":	366
+			},
+			"pos":	{
+				"x":	860,
+				"y":	550,
+				"anchor":	4
+			}
+		}, {
+			"id":	"blas",
+			"type":	"line",
+			"thickness":	0.5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1137,
+				"y":	118
+			},
+			"pos":	{
+				"x":	912,
+				"y":	529,
+				"anchor":	4
+			}
+		}, {
+			"id":	"bla",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1302,
+				"y":	424
+			}
+		}, {
+			"id":	"arrow_1",
+			"type":	"arrow",
+			"thickness":	5.1999998092651367,
+			"arrowhead_size":	30.299999237060547,
+			"pos2":	{
+				"x":	2164,
+				"y":	1146
+			},
+			"bends":	[{
+					"x":	148,
+					"y":	113
+				}, {
+					"x":	172,
+					"y":	42
+				}, {
+					"x":	205,
+					"y":	35
+				}, {
+					"x":	393,
+					"y":	-3
+				}, {
+					"x":	198,
+					"y":	-53
+				}, {
+					"x":	247,
+					"y":	-82
+				}, {
+					"x":	351,
+					"y":	-77
+				}, {
+					"x":	1288,
+					"y":	-223
+				}, {
+					"x":	1250,
+					"y":	-79
+				}, {
+					"x":	1587,
+					"y":	9
+				}, {
+					"x":	1417,
+					"y":	408
+				}, {
+					"x":	620,
+					"y":	269
+				}, {
+					"x":	353,
+					"y":	238
+				}, {
+					"x":	449,
+					"y":	-3
+				}, {
+					"x":	718,
+					"y":	-76
+				}, {
+					"x":	1224,
+					"y":	709
+				}],
+			"start_goal_root":	"counter_0_yayy",
+			"end_goal_root":	"minecraft:used/minecraft:sentry_armor_trim_smithing_template",
+			"opacity_before":	0.39215686917305,
+			"opacity_after":	1,
+			"pos":	{
+				"x":	1285,
+				"y":	137
+			}
+		}]
+}
