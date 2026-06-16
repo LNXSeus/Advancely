@@ -301,6 +301,16 @@ struct TrackableItem {
     // this custom goal (progress > 0 or done). HOST_ONLY mode: host UUID iff
     // host contributed. ANY_PLAYER mode: lone contributor or empty if 0/2+.
     char custom_contributor_uuid[48];
+
+    // Cached display-name width for the auto-layout width pre-pass. display_name is
+    // immutable, so this is only re-measured when the font size changes.
+    float cached_name_w;
+    float cached_name_w_font;
+
+    // Cached progress-text width for the pre-pass (re-measured when text or font changes).
+    char cached_prog_text[32];
+    float cached_prog_w;
+    float cached_prog_font;
 };
 
 
@@ -379,6 +389,15 @@ struct TrackableCategory {
     ManualPos icon_pos;
     ManualPos text_pos;
     ManualPos progress_pos;
+
+    // Cached display-name width for the auto-layout width pre-pass (see TrackableItem).
+    float cached_name_w;
+    float cached_name_w_font;
+
+    // Cached progress-text width for the pre-pass (see TrackableItem).
+    char cached_prog_text[32];
+    float cached_prog_w;
+    float cached_prog_font;
 };
 
 
@@ -445,6 +464,15 @@ struct MultiStageGoal {
     ManualPos icon_pos;
     ManualPos text_pos;
     ManualPos progress_pos;
+
+    // Cached display-name width for the auto-layout width pre-pass (see TrackableItem).
+    float cached_name_w;
+    float cached_name_w_font;
+
+    // Cached stage-text width for the pre-pass (re-measured when text or font changes).
+    char cached_prog_text[256];
+    float cached_prog_w;
+    float cached_prog_font;
 };
 
 // --------- COUNTER GOALS (Completion Counters) ---------
@@ -482,6 +510,15 @@ struct CounterGoal {
     ManualPos icon_pos;
     ManualPos text_pos;
     ManualPos progress_pos;
+
+    // Cached display-name width for the auto-layout width pre-pass (see TrackableItem).
+    float cached_name_w;
+    float cached_name_w_font;
+
+    // Cached progress-text width for the pre-pass (see TrackableItem).
+    char cached_prog_text[32];
+    float cached_prog_w;
+    float cached_prog_font;
 };
 
 // --------- DECORATIONS (Manual Layout Elements) ---------
