@@ -420,28 +420,28 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/spire_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/rib_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/wayfinder_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/ward_armor_trim_smithing_template_25w14craftmine.png"
 				},
 				"armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"blocks/placeholder.png"
+					"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png"
 				}
 			}
 		},
