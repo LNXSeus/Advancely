@@ -1828,8 +1828,6 @@
 			"target":	16,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/netherite_armor"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
 				}],
 			"linked_goal_mode":	"or"
 		},
@@ -1859,8 +1857,6 @@
 			"target":	8,
 			"linked_goals":	[{
 					"root_name":	"mace"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
 				}]
 		},
 		"pufferfish_obtained":	{
@@ -2649,7 +2645,7 @@
 				}]
 		}, {
 			"root_name":	"tundra",
-			"icon":	"blocks/Snow_Block_JE2_BE2.png",
+			"icon":	"items/snowball_1.20.2.png",
 			"linked_goals":	[{
 					"root_name":	"minecraft:snowy_plains",
 					"parent_root":	"minecraft:adventure/adventuring_time"

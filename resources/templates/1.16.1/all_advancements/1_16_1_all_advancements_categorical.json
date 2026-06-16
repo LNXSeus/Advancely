@@ -18,12 +18,6 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:story/form_obsidian":	{
-			"icon":	"blocks/Obsidian_JE3_BE2.png",
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
 		"minecraft:story/obtain_armor":	{
 			"icon":	"items/iron_chestplate_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
@@ -965,6 +959,13 @@
 			"criteria":	{
 			}
 		},
+		"minecraft:story/form_obsidian":	{
+			"icon":	"blocks/Obsidian_JE3_BE2.png",
+			"hidden":	true,
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
 		"minecraft:husbandry/breed_an_animal":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
@@ -980,8 +981,7 @@
 			"target":	-1,
 			"linked_goals":	[{
 					"root_name":	"tnt2"
-				}],
-			"linked_goal_mode":	"or"
+				}]
 		},
 		"stat:gold_blocks_picked_up_copy":	{
 			"icon":	"blocks/Block_of_Gold_JE6_BE3.png",
@@ -989,6 +989,15 @@
 			"target":	164,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/create_full_beacon"
+				}, {
+					"root_name":	"minecraft:husbandry/obtain_netherite_hoe",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:nether/netherite_armor",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:nether/use_lodestone",
+					"type":	"advancement"
 				}]
 		},
 		"azure_bluet":	{
@@ -997,7 +1006,8 @@
 			"root_name":	"minecraft:picked_up/minecraft:azure_bluet",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"sus_stew"
+					"root_name":	"azure_bluet2",
+					"type":	"stat"
 				}]
 		},
 		"carrots":	{
@@ -1059,6 +1069,9 @@
 			"target":	-1,
 			"linked_goals":	[{
 					"root_name":	"tnt2"
+				}, {
+					"root_name":	"stat:tnt_picked_up_copy",
+					"type":	"stat"
 				}],
 			"linked_goal_mode":	"or"
 		},
@@ -1205,13 +1218,8 @@
 			"root_name":	"minecraft:picked_up/minecraft:gold_block",
 			"target":	164,
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/create_full_beacon"
-				}, {
-					"root_name":	"minecraft:nether/netherite_armor"
-				}, {
-					"root_name":	"minecraft:husbandry/obtain_netherite_hoe"
-				}, {
-					"root_name":	"minecraft:nether/use_lodestone"
+					"root_name":	"stat:gold_blocks_picked_up_copy",
+					"type":	"stat"
 				}]
 		},
 		"fermented":	{
@@ -1243,6 +1251,13 @@
 			"target":	2,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/honey_block_slide"
+				}, {
+					"root_name":	"honey_bottle",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:husbandry/safely_harvest_honey",
+					"type":	"advancement"
 				}]
 		},
 		"tnt2":	{
@@ -1262,7 +1277,11 @@
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
 			"root_name":	"minecraft:crafted/minecraft:lead",
-			"target":	1
+			"target":	1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:nether/all_effects",
+					"type":	"advancement"
+				}]
 		},
 		"golden_carrots":	{
 			"icon":	"blocks/placeholder.png",
@@ -1281,8 +1300,6 @@
 				}, {
 					"root_name":	"golden_carrot",
 					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
 				}]
 		},
 		"carrots_obtained":	{
@@ -1297,6 +1314,23 @@
 					"root_name":	"carrot",
 					"parent_root":	"minecraft:husbandry/balanced_diet"
 				}]
+		},
+		"azure_bluet2":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:picked_up/minecraft:azure_bluet",
+			"target":	4,
+			"linked_goals":	[{
+					"root_name":	"sus_stew",
+					"type":	"stat"
+				}, {
+					"root_name":	"minecraft:bee",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:husbandry/safely_harvest_honey",
+					"type":	"advancement"
+				}]
 		}
 	},
 	"unlocks":	[],
@@ -1306,7 +1340,11 @@
 			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
-				}]
+				}, {
+					"root_name":	"minecraft:story/enchant_item",
+					"type":	"advancement"
+				}],
+			"linked_goal_mode":	"or"
 		}],
 	"multi_stage_goals":	[{
 			"root_name":	"ms_goal:egap",
@@ -1805,7 +1843,7 @@
 				}]
 		}, {
 			"root_name":	"snowy",
-			"icon":	"blocks/Snow_Block_JE2_BE2.png",
+			"icon":	"items/snowball_1.20.2.png",
 			"linked_goals":	[{
 					"root_name":	"minecraft:snowy_tundra",
 					"parent_root":	"minecraft:adventure/adventuring_time"
@@ -1870,7 +1908,7 @@
 					"parent_root":	"minecraft:adventure/adventuring_time"
 				}]
 		}, {
-			"root_name":	"desert",
+			"root_name":	"desert_mesa",
 			"icon":	"blocks/Sand_JE5_BE3.png",
 			"linked_goals":	[{
 					"root_name":	"minecraft:desert",
@@ -1883,22 +1921,22 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs"
 				}, {
 					"root_name":	"stat:tnt_picked_up"
-				}]
-		}, {
-			"root_name":	"mesa",
-			"icon":	"blocks/Red_Sand_JE3_BE2.png",
-			"linked_goals":	[{
+				}, {
 					"root_name":	"minecraft:wooded_badlands_plateau",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:badlands_plateau",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:badlands",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:cave_spider",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}]
 		}, {
 			"root_name":	"nether",

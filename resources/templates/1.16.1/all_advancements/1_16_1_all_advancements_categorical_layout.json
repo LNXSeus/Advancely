@@ -1,23 +1,17 @@
 {
 	"advancement.minecraft.story.upgrade_tools":	{
 		"icon_pos":	{
-			"x":	485,
-			"y":	20
-		}
-	},
-	"advancement.minecraft.story.iron_tools":	{
-		"icon_pos":	{
 			"x":	35,
 			"y":	155
 		}
 	},
-	"advancement.minecraft.story.lava_bucket":	{
+	"advancement.minecraft.story.iron_tools":	{
 		"icon_pos":	{
 			"x":	185,
 			"y":	155
 		}
 	},
-	"advancement.minecraft.story.form_obsidian":	{
+	"advancement.minecraft.story.lava_bucket":	{
 		"icon_pos":	{
 			"x":	335,
 			"y":	155
@@ -85,8 +79,8 @@
 	},
 	"advancement.minecraft.adventure.very_very_frightening":	{
 		"icon_pos":	{
-			"x":	645,
-			"y":	440
+			"x":	1215,
+			"y":	275
 		}
 	},
 	"advancement.minecraft.adventure.two_birds_one_arrow":	{
@@ -470,19 +464,19 @@
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:badlands":	{
 		"icon_pos":	{
 			"x":	1760,
-			"y":	1055
+			"y":	972
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:badlands_plateau":	{
 		"icon_pos":	{
 			"x":	1760,
-			"y":	1091
+			"y":	1008
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_badlands_plateau":	{
 		"icon_pos":	{
 			"x":	1760,
-			"y":	1127
+			"y":	1044
 		}
 	},
 	"advancement.minecraft.nether.explore_nether":	{
@@ -716,8 +710,8 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:husk":	{
 		"icon_pos":	{
-			"x":	1845,
-			"y":	935
+			"x":	1890,
+			"y":	900
 		},
 		"text_pos":	{
 			"x":	-3200,
@@ -727,8 +721,8 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:cave_spider":	{
 		"icon_pos":	{
-			"x":	1940,
-			"y":	1055
+			"x":	1890,
+			"y":	972
 		},
 		"text_pos":	{
 			"x":	-3200,
@@ -2032,6 +2026,18 @@
 			"hidden":	true
 		}
 	},
+	"advancement.minecraft.story.form_obsidian":	{
+		"icon_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		},
+		"text_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
 	"advancement.minecraft.husbandry.breed_an_animal":	{
 		"icon_pos":	{
 			"x":	-3000,
@@ -2094,8 +2100,8 @@
 	},
 	"stat.stat:tnt_picked_up":	{
 		"icon_pos":	{
-			"x":	1895,
-			"y":	860
+			"x":	1890,
+			"y":	1040
 		}
 	},
 	"stat.fortress_items":	{
@@ -2271,6 +2277,23 @@
 			"hidden":	true
 		}
 	},
+	"stat.azure_bluet2":	{
+		"icon_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		},
+		"text_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
 	"custom.shulker_transport":	{
 		"icon_pos":	{
 			"x":	185,
@@ -2303,91 +2326,85 @@
 	},
 	"counter.early_game":	{
 		"icon_pos":	{
-			"x":	65,
+			"x":	75,
 			"y":	1225
 		}
 	},
 	"counter.overworld":	{
 		"icon_pos":	{
-			"x":	215,
+			"x":	235,
 			"y":	1225
 		}
 	},
 	"counter.village":	{
 		"icon_pos":	{
-			"x":	365,
+			"x":	395,
 			"y":	1225
 		}
 	},
 	"counter.ocean":	{
 		"icon_pos":	{
-			"x":	515,
+			"x":	555,
 			"y":	1225
 		}
 	},
 	"counter.mushroom":	{
 		"icon_pos":	{
-			"x":	665,
+			"x":	715,
 			"y":	1225
 		}
 	},
 	"counter.swamp":	{
 		"icon_pos":	{
-			"x":	815,
+			"x":	875,
 			"y":	1225
 		}
 	},
 	"counter.jungle":	{
 		"icon_pos":	{
-			"x":	965,
+			"x":	1035,
 			"y":	1225
 		}
 	},
 	"counter.bees":	{
 		"icon_pos":	{
-			"x":	1115,
+			"x":	1195,
 			"y":	1225
 		}
 	},
 	"counter.taiga":	{
 		"icon_pos":	{
-			"x":	1265,
+			"x":	1355,
 			"y":	1225
 		}
 	},
 	"counter.snowy":	{
 		"icon_pos":	{
-			"x":	1415,
+			"x":	1515,
 			"y":	1225
 		}
 	},
 	"counter.llamas":	{
 		"icon_pos":	{
-			"x":	1565,
+			"x":	1675,
 			"y":	1225
 		}
 	},
-	"counter.desert":	{
+	"counter.desert_mesa":	{
 		"icon_pos":	{
-			"x":	1715,
-			"y":	1225
-		}
-	},
-	"counter.mesa":	{
-		"icon_pos":	{
-			"x":	1865,
+			"x":	1835,
 			"y":	1225
 		}
 	},
 	"counter.nether":	{
 		"icon_pos":	{
-			"x":	2015,
+			"x":	1995,
 			"y":	1225
 		}
 	},
 	"counter.endgame":	{
 		"icon_pos":	{
-			"x":	2165,
+			"x":	2155,
 			"y":	1225
 		}
 	},
@@ -2966,26 +2983,6 @@
 				"y":	585
 			}
 		}, {
-			"id":	"mesa",
-			"type":	"text_header",
-			"linked_goals":	[{
-					"root_name":	"minecraft:badlands",
-					"parent_root":	"minecraft:adventure/adventuring_time"
-				}, {
-					"root_name":	"minecraft:badlands_plateau",
-					"parent_root":	"minecraft:adventure/adventuring_time"
-				}, {
-					"root_name":	"minecraft:wooded_badlands_plateau",
-					"parent_root":	"minecraft:adventure/adventuring_time"
-				}, {
-					"root_name":	"minecraft:cave_spider",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}],
-			"pos":	{
-				"x":	1760,
-				"y":	1020
-			}
-		}, {
 			"id":	"tundra",
 			"type":	"text_header",
 			"linked_goals":	[{
@@ -3055,7 +3052,7 @@
 				"y":	865
 			}
 		}, {
-			"id":	"desert",
+			"id":	"desert_mesa",
 			"type":	"text_header",
 			"linked_goals":	[{
 					"root_name":	"minecraft:desert",
@@ -3068,6 +3065,22 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs"
 				}, {
 					"root_name":	"stat:tnt_picked_up"
+				}, {
+					"root_name":	"minecraft:wooded_badlands_plateau",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:badlands",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:badlands_plateau",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:cave_spider",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}],
 			"pos":	{
 				"x":	1760,
@@ -3165,32 +3178,6 @@
 				"y":	850
 			}
 		}, {
-			"id":	"line_3_copy_copy",
-			"type":	"line",
-			"thickness":	2,
-			"opacity":	1,
-			"pos2":	{
-				"x":	2010,
-				"y":	1005
-			},
-			"pos":	{
-				"x":	1725,
-				"y":	1005
-			}
-		}, {
-			"id":	"line_4",
-			"type":	"line",
-			"thickness":	2,
-			"opacity":	1,
-			"pos2":	{
-				"x":	2325,
-				"y":	570
-			},
-			"pos":	{
-				"x":	610,
-				"y":	570
-			}
-		}, {
 			"id":	"line_4_copy2",
 			"type":	"line",
 			"thickness":	5,
@@ -3201,6 +3188,19 @@
 			},
 			"pos":	{
 				"x":	0,
+				"y":	570
+			}
+		}, {
+			"id":	"line_4_copy2_copy",
+			"type":	"line",
+			"thickness":	2,
+			"opacity":	1,
+			"pos2":	{
+				"x":	2325,
+				"y":	570
+			},
+			"pos":	{
+				"x":	610,
 				"y":	570
 			}
 		}, {
