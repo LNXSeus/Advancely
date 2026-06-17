@@ -7873,5 +7873,13 @@
 				"y":	2003,
 				"anchor":	2
 			}
+		}, {
+			"id":	"performance_notice",
+			"type":	"text_header",
+			"pos":	{
+				"x":	5,
+				"y":	-5,
+				"anchor":	6
+			}
 		}]
 }

@@ -668,5 +668,6 @@
 	"multi_stage_goal.ms_goal:beacon.stage.kill_wither":	"Wither",
 	"multi_stage_goal.ms_goal:beacon.stage.final":	"Wither killed",
 	"counter.block_counter":	"Blocks Placed",
-	"decoration.credits":	"Template by magnissima"
+	"decoration.credits":	"Template by magnissima",
+	"decoration.performance_notice":	"For better performance: Go into Settings -> Tracker Visuals -> Performance -> Reveal Checkboxes/Text Near Cursor (both settings)"
 }
