@@ -15,6 +15,18 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.5.4" date="2026-06-18">
+      <description>
+        <ul>
+          <li>Major rendering performance improvements for huge templates (like all_blocks): off-screen per-element culling now also applies to the manual layout, and text width calculations (CalcTextSize) are gated so they no longer run every frame for text that isn't even rendered.</li>
+          <li>New Cursor Reveal Radius setting: a radius around the moving mouse cursor reveals otherwise-hidden text and checkboxes, a massive performance win for dense templates like all_blocks. Max raised to 1024, and text now appears within the radius using its anchor point.</li>
+          <li>Welcome window: improved supporter message that now opens every 10 launches and after an auto-update.</li>
+          <li>New templates: 1.12 categorical template by ScrambledMC, plus an all_advancements coop template by magnissima. All other categorical templates updated, and the all_blocks template now carries a performance notice.</li>
+          <li>New textures: 26.2 icon textures, "Style" advancement textures in the newer categorical templates, and kittymmeow's half-done texture.</li>
+          <li>Fixes: settings.json writing now only carries forward existing true tracker-sync overrides, and saving no longer writes unnecessary .criteria keys.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.3" date="2026-06-14">
       <description>
         <ul>
