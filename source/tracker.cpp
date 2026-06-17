@@ -13621,7 +13621,13 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         }
     }
 
-    // Sync stat_progress_override — per-UUID schema, same pattern as custom_progress.
+    // Sync stat_progress_override — per-UUID schema. Unlike custom_progress (which materializes a
+    // default entry per goal so counters have a place to store numeric progress), stat overrides are
+    // pure manual-completion booleans where a missing key reads as false on every path. So we only
+    // carry forward the existing `true` entries: stats dropped from the template fall away, and a
+    // 650-stat template no longer writes 650 `false` rows every time it reloads. Single-criterion
+    // stats share the parent key (their `.criteria.` key is never read), so only multi-criterion
+    // stats get per-sub-stat keys.
     {
         cJSON *old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
         cJSON *new_stat_override = cJSON_CreateObject();
@@ -13642,10 +13648,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
             for (int i = 0; i < t->template_data->stat_count; i++) {
                 TrackableCategory *stat_cat = t->template_data->stats[i];
                 cJSON *old_cat_item = old_subtree ? cJSON_GetObjectItem(old_subtree, stat_cat->root_name) : nullptr;
-                if (old_cat_item) {
+                if (old_cat_item && cJSON_IsTrue(old_cat_item)) {
                     cJSON_AddItemToObject(new_sub, stat_cat->root_name, cJSON_Duplicate(old_cat_item, 1));
-                } else {
-                    cJSON_AddBoolToObject(new_sub, stat_cat->root_name, false);
                 }
                 if (stat_cat->criteria_count > 1) {
                     for (int j = 0; j < stat_cat->criteria_count; j++) {
@@ -13654,10 +13658,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
                         snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s",
                                  stat_cat->root_name, sub_stat->root_name);
                         cJSON *old_sub_item = old_subtree ? cJSON_GetObjectItem(old_subtree, sub_stat_key) : nullptr;
-                        if (old_sub_item) {
+                        if (old_sub_item && cJSON_IsTrue(old_sub_item)) {
                             cJSON_AddItemToObject(new_sub, sub_stat_key, cJSON_Duplicate(old_sub_item, 1));
-                        } else {
-                            cJSON_AddBoolToObject(new_sub, sub_stat_key, false);
                         }
                     }
                 }

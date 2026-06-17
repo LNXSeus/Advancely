@@ -2157,6 +2157,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                                           cJSON_CreateBool(stat_cat->is_manually_completed));
                 }
 
+                // Single-criterion stats share the parent's override entry (every read path derives the
+                // lone sub-stat's state from the parent key), so a ".criteria." entry for them is
+                // redundant. Only multi-criterion stats need per-sub-stat keys; for single ones we still
+                // delete any stale key written by older builds.
                 for (int j = 0; j < stat_cat->criteria_count; j++) {
                     TrackableItem *sub_stat = stat_cat->criteria[j];
                     char sub_stat_key[512];
@@ -2164,7 +2168,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                              sub_stat->root_name);
 
                     cJSON_DeleteItemFromObject(override_obj, sub_stat_key);
-                    if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
+                    if (stat_cat->criteria_count > 1 && sub_stat->is_manually_completed) {
                         cJSON_AddItemToObject(override_obj, sub_stat_key,
                                               cJSON_CreateBool(sub_stat->is_manually_completed));
                     }
