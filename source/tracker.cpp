@@ -5899,20 +5899,58 @@ static bool rect_in_reveal_radius(const ImVec2 &mn, const ImVec2 &mx, bool enabl
     return (dx * dx + dy * dy) <= radius_px * radius_px;
 }
 
+// Cursor-reveal test against a single point: true when the mode is off, or when pt lies within
+// radius_px of the mouse.
+static bool point_in_reveal_radius(const ImVec2 &pt, bool enabled, float radius_px) {
+    if (!enabled) return true;
+    ImVec2 m = ImGui::GetIO().MousePos;
+    float dx = m.x - pt.x;
+    float dy = m.y - pt.y;
+    return (dx * dx + dy * dy) <= radius_px * radius_px;
+}
+
+// Returns the screen-space anchor point of rect [mn, mx] for the given anchor. This is the same
+// reference point the template editor uses for an element's coordinates, so text reveals when the
+// cursor reaches where the text is anchored rather than when it sweeps past the text's mid-point.
+static ImVec2 rect_anchor_point(const ImVec2 &mn, const ImVec2 &mx, AnchorPoint anchor) {
+    float cx = (mn.x + mx.x) * 0.5f;
+    float cy = (mn.y + mx.y) * 0.5f;
+    float x = cx, y = cy;
+    switch (anchor) {
+        case ANCHOR_TOP_LEFT: x = mn.x; y = mn.y; break;
+        case ANCHOR_TOP_CENTER: x = cx; y = mn.y; break;
+        case ANCHOR_TOP_RIGHT: x = mx.x; y = mn.y; break;
+        case ANCHOR_CENTER_LEFT: x = mn.x; y = cy; break;
+        case ANCHOR_CENTER: x = cx; y = cy; break;
+        case ANCHOR_CENTER_RIGHT: x = mx.x; y = cy; break;
+        case ANCHOR_BOTTOM_LEFT: x = mn.x; y = mx.y; break;
+        case ANCHOR_BOTTOM_CENTER: x = cx; y = mx.y; break;
+        case ANCHOR_BOTTOM_RIGHT: x = mx.x; y = mx.y; break;
+    }
+    return ImVec2(x, y);
+}
+
 // Scales the configured reveal radius by the current zoom so the revealed region covers a constant
 // amount of template space at any zoom (the radius setting is in template pixels, not screen pixels).
 static float reveal_radius_screen_px(const AppSettings *settings, const Tracker *t) {
     return settings->checkbox_reveal_radius * t->zoom_level;
 }
 
+// Resolves the anchor used for a text reveal test: the element's configured anchor when it has a
+// manual position, otherwise the fallback that matches its auto-layout draw (centred or inline).
+static AnchorPoint reveal_anchor(const AppSettings *settings, const ManualPos &pos, AnchorPoint fallback) {
+    return (settings->use_manual_layout && pos.is_set) ? pos.anchor : fallback;
+}
+
 // Combined on-screen + cursor-reveal test for text draws. When "Also Reveal Text Near Cursor" is on
-// (and not visual-editing), item text only renders within the shared reveal radius of the cursor.
-static bool text_reveal_ok(const ImVec2 &mn, const ImVec2 &mx, const ImVec2 &display_size,
-                           const AppSettings *settings, const Tracker *t) {
+// (and not visual-editing), item text only renders within the reveal radius of the cursor, measured
+// from the text's anchor point so it reveals in step with where the element is placed.
+static bool text_reveal_ok(const ImVec2 &mn, const ImVec2 &mx, AnchorPoint anchor,
+                           const ImVec2 &display_size, const AppSettings *settings, const Tracker *t) {
     return rect_on_screen(mn, mx, display_size) &&
-           rect_in_reveal_radius(mn, mx,
-                                 settings->text_reveal_enabled && !t->is_visual_layout_editing,
-                                 reveal_radius_screen_px(settings, t));
+           point_in_reveal_radius(rect_anchor_point(mn, mx, anchor),
+                                  settings->text_reveal_enabled && !t->is_visual_layout_editing,
+                                  reveal_radius_screen_px(settings, t));
 }
 
 // Returns CalcTextSize(name).x for the given font size, cached on the caller's fields. Display
@@ -7336,7 +7374,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     ImVec2 main_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y);
                     if (text_reveal_ok(main_text_pos,
                                        ImVec2(main_text_pos.x + text_size.x * t->zoom_level,
-                                              main_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize,
+                                              main_text_pos.y + text_size.y * t->zoom_level),
+                                       reveal_anchor(settings, cat->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
                                        settings, t))
                         draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                            main_text_pos, current_text_color, cat->display_name);
@@ -7361,7 +7400,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         if (text_reveal_ok(snap_text_pos,
                                            ImVec2(snap_text_pos.x + snapshot_text_size.x * t->zoom_level,
                                                   snap_text_pos.y + snapshot_text_size.y * t->zoom_level),
-                                           io.DisplaySize, settings, t))
+                                           ANCHOR_TOP_CENTER, io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                snap_text_pos, text_color_faded, snapshot_text);
                     }
@@ -7389,6 +7428,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         if (text_reveal_ok(prog_text_pos,
                                            ImVec2(prog_text_pos.x + progress_text_size.x * t->zoom_level,
                                                   prog_text_pos.y + progress_text_size.y * t->zoom_level),
+                                           reveal_anchor(settings, cat->progress_pos, ANCHOR_TOP_CENTER),
                                            io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                prog_text_pos, current_text_color, progress_text);
@@ -7908,6 +7948,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             if (text_reveal_ok(child_text_pos,
                                                ImVec2(child_text_pos.x + child_text_size.x * t->zoom_level,
                                                       child_text_pos.y + child_text_size.y * t->zoom_level),
+                                               reveal_anchor(settings, crit->text_pos, ANCHOR_TOP_LEFT),
                                                io.DisplaySize, settings, t))
                                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
                                                    current_child_text_color, crit->display_name);
@@ -7953,6 +7994,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     if (text_reveal_ok(crit_progress_pos,
                                                        ImVec2(crit_progress_pos.x + crit_progress_size.x * t->zoom_level,
                                                               crit_progress_pos.y + crit_progress_size.y * t->zoom_level),
+                                                       reveal_anchor(settings, crit->progress_pos, ANCHOR_TOP_LEFT),
                                                        io.DisplaySize, settings, t))
                                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
                                                            current_child_text_color, crit_progress_text);
@@ -8617,7 +8659,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 ImVec2 unlock_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 if (text_reveal_ok(unlock_text_pos,
                                    ImVec2(unlock_text_pos.x + text_size.x * t->zoom_level,
-                                          unlock_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                          unlock_text_pos.y + text_size.y * t->zoom_level),
+                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        unlock_text_pos, current_text_color, item->display_name);
 
@@ -8640,7 +8683,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                         if (text_reveal_ok(unlock_prog_pos,
                                            ImVec2(unlock_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   unlock_prog_pos.y + progress_text_size.y * t->zoom_level),
-                                           io.DisplaySize, settings, t))
+                                           ANCHOR_TOP_CENTER, io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                unlock_prog_pos, current_text_color, progress_text);
                     }
@@ -9105,7 +9148,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 ImVec2 cg_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 if (text_reveal_ok(cg_text_pos,
                                    ImVec2(cg_text_pos.x + text_size.x * t->zoom_level,
-                                          cg_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                          cg_text_pos.y + text_size.y * t->zoom_level),
+                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        cg_text_pos, current_text_color, item->display_name);
 
@@ -9138,7 +9182,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                     prog_y);
                         if (text_reveal_ok(cg_prog_pos,
                                            ImVec2(cg_prog_pos.x + progress_text_size.x * t->zoom_level,
-                                                  cg_prog_pos.y + progress_text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                                  cg_prog_pos.y + progress_text_size.y * t->zoom_level),
+                                           reveal_anchor(settings, item->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                cg_prog_pos, current_text_color, progress_text);
 
@@ -9611,7 +9656,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 ImVec2 counter_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 if (text_reveal_ok(counter_text_pos,
                                    ImVec2(counter_text_pos.x + text_size.x * t->zoom_level,
-                                          counter_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                          counter_text_pos.y + text_size.y * t->zoom_level),
+                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        counter_text_pos, current_text_color, goal->display_name);
 
@@ -9643,6 +9689,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                         if (text_reveal_ok(counter_prog_pos,
                                            ImVec2(counter_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   counter_prog_pos.y + progress_text_size.y * t->zoom_level),
+                                           reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER),
                                            io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                counter_prog_pos, current_text_color, progress_text);
@@ -10116,7 +10163,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 if (!hide_goal_text_in_layout &&
                     text_reveal_ok(ms_text_pos,
                                    ImVec2(ms_text_pos.x + text_size.x * t->zoom_level,
-                                          ms_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                          ms_text_pos.y + text_size.y * t->zoom_level),
+                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                        ms_text_pos, current_text_color, goal->display_name);
 
@@ -10150,7 +10198,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 if (!hide_goal_progress_in_layout &&
                     text_reveal_ok(ms_stage_pos,
                                    ImVec2(ms_stage_pos.x + stage_text_size.x * t->zoom_level,
-                                          ms_stage_pos.y + stage_text_size.y * t->zoom_level), io.DisplaySize, settings, t))
+                                          ms_stage_pos.y + stage_text_size.y * t->zoom_level),
+                                   reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                        ms_stage_pos, current_text_color, stage_text); // Use formatted stage text
 
@@ -10242,7 +10291,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                 if (t->zoom_level > settings->lod_text_main_threshold) {
                     ImVec2 header_min(text_x, text_y);
                     ImVec2 header_max(text_x + text_size.x * t->zoom_level, text_y + text_size.y * t->zoom_level);
-                    if (text_reveal_ok(header_min, header_max, ImGui::GetIO().DisplaySize, settings, t)) {
+                    if (text_reveal_ok(header_min, header_max,
+                                       elem->pos.is_set ? elem->pos.anchor : ANCHOR_TOP_LEFT,
+                                       ImGui::GetIO().DisplaySize, settings, t)) {
                         draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                            ImVec2(text_x, text_y),
                                            text_color, elem->display_text);

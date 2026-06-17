@@ -2049,7 +2049,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
 
             ImGui::BeginDisabled(!temp_settings.checkbox_reveal_enabled && !temp_settings.text_reveal_enabled);
-            if (ImGui::DragFloat("Cursor Reveal Radius", &temp_settings.checkbox_reveal_radius, 1.0f, 20.0f, 1000.0f,
+            if (ImGui::DragFloat("Cursor Reveal Radius", &temp_settings.checkbox_reveal_radius, 1.0f, 20.0f, 1024.0f,
                                  "%.0f px")) {
                 if (temp_settings.checkbox_reveal_radius < 20.0f) temp_settings.checkbox_reveal_radius = 20.0f;
                 if (temp_settings.checkbox_reveal_radius > 1000.0f) temp_settings.checkbox_reveal_radius = 1000.0f;
@@ -2072,6 +2072,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(text_reveal_tooltip, sizeof(text_reveal_tooltip),
                          "When enabled, item names, progress text, and text headers also only appear\n"
                          "within the same Cursor Reveal Radius, using the radius above.\n"
+                         "Each text reveals once the cursor reaches its anchor point (the reference\n"
+                         "point its coordinates use in the template editor), not its mid-point.\n"
                          "Default: %s", DEFAULT_TEXT_REVEAL_ENABLED ? "On" : "Off");
                 ImGui::SetTooltip("%s", text_reveal_tooltip);
             }
@@ -5391,10 +5393,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Category: %s, Optional Flag: %s, Display Category: %s (lock: %s), Language: Default\n"
                  "[Tracker Visuals]\n"
                  "  - Always On Top: %s; Tracker FPS Limit: %d\n"
+                 "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
+                 "  - Cursor Reveal: Checkbox %s, Text %s, Radius %.0f px\n"
+                 "  - Scrollable List Threshold: %d; List Scroll Speed: %.0f px\n"
                  "  - Section Order: Counters -> %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Tracker Vertical Spacing: %.1f px; Custom Section Width: %s (%.0f px)\n"
-                 "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
-                 "  - Scrollable List Threshold: %d; List Scroll Speed: %.0f px\n"
                  "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt)\n"
                  "  - Colors: Default Dark Theme\n"
                  "  - Backgrounds: Default: %s, Half-Done: %s, Done: %s\n"
@@ -5425,12 +5428,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  DEFAULT_LOCK_CATEGORY_DISPLAY_NAME ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_FPS,
+                 DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
+                 DEFAULT_CHECKBOX_REVEAL_ENABLED ? "On" : "Off", DEFAULT_TEXT_REVEAL_ENABLED ? "On" : "Off",
+                 DEFAULT_CHECKBOX_REVEAL_RADIUS,
+                 DEFAULT_SCROLLABLE_LIST_THRESHOLD, DEFAULT_TRACKER_LIST_SCROLL_SPEED,
                  advancements_label_plural_uppercase,
                  DEFAULT_TRACKER_VERTICAL_SPACING,
                  DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
-                 DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
-                 DEFAULT_SCROLLABLE_LIST_THRESHOLD, DEFAULT_TRACKER_LIST_SCROLL_SPEED,
                  DEFAULT_TRACKER_FONT, DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE,
                  DEFAULT_TRACKER_UI_FONT_SIZE,
                  DEFAULT_ADV_BG_PATH, DEFAULT_ADV_BG_HALF_DONE_PATH, DEFAULT_ADV_BG_DONE_PATH,
