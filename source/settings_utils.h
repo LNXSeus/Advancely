@@ -187,6 +187,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_LOD_TEXT_MAIN_THRESHOLD 0.25f
 #define DEFAULT_LOD_ICON_DETAIL_THRESHOLD 0.25f
 
+// Cursor Reveal Defaults
+#define DEFAULT_CHECKBOX_REVEAL_ENABLED false
+#define DEFAULT_CHECKBOX_REVEAL_RADIUS 120.0f
+#define DEFAULT_TEXT_REVEAL_ENABLED false
+
 // TrackerMap Defaults
 #define DEFAULT_TRACKER_VIEW_PAN_X 0.0f
 #define DEFAULT_TRACKER_VIEW_PAN_Y 0.0f
@@ -330,6 +335,9 @@ struct AppSettings {
     float lod_text_sub_threshold; // Zoom level below which sub-item text/progress is hidden
     float lod_text_main_threshold; // Zoom level below which main item text/checkboxes are hidden
     float lod_icon_detail_threshold; // Zoom level below which icons become simple squares
+    bool checkbox_reveal_enabled; // If true, manual-completion checkboxes only render near the mouse cursor
+    float checkbox_reveal_radius; // Screen-pixel radius around the cursor within which checkboxes appear
+    bool text_reveal_enabled; // If true, item text (names/progress) also only renders within the reveal radius
 
     // --- Custom Tracker Spacing ---
     int scrollable_list_threshold; // Number of items before list becomes scrollable

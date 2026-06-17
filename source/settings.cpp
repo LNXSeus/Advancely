@@ -145,6 +145,9 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->lod_text_sub_threshold != b->lod_text_sub_threshold ||
         a->lod_text_main_threshold != b->lod_text_main_threshold ||
         a->lod_icon_detail_threshold != b->lod_icon_detail_threshold ||
+        a->checkbox_reveal_enabled != b->checkbox_reveal_enabled ||
+        a->checkbox_reveal_radius != b->checkbox_reveal_radius ||
+        a->text_reveal_enabled != b->text_reveal_enabled ||
 
         a->scrollable_list_threshold != b->scrollable_list_threshold ||
         a->tracker_list_scroll_speed != b->tracker_list_scroll_speed ||
@@ -1975,6 +1978,139 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Separator();
             ImGui::Spacing();
 
+            ImGui::Text("Performance");
+
+            // --- Level of Detail Settings ---
+
+            if (ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f,
+                                 "%.3f")) {
+                if (temp_settings.lod_text_sub_threshold < 0.05f) temp_settings.lod_text_sub_threshold = 0.05f;
+                if (temp_settings.lod_text_sub_threshold > 10.0f) temp_settings.lod_text_sub_threshold = 10.0f;
+            }
+            if (ImGui::IsItemHovered()) {
+                char lod_sub_tooltip[1024];
+                snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
+                         "The zoom threshold below which sub-item text is hidden.\n"
+                         "Higher values are more zoomed in.\n"
+                         "Affects:\n"
+                         " - Names of Criteria, Sub-Stats, and Stages.\n"
+                         " - Progress Text like '(5/10)'.\n"
+                         "Default: %.3f", DEFAULT_LOD_TEXT_SUB_THRESHOLD);
+                ImGui::SetTooltip("%s", lod_sub_tooltip);
+            }
+
+            if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f,
+                                 10.0f,
+                                 "%.3f")) {
+                if (temp_settings.lod_text_main_threshold < 0.05f) temp_settings.lod_text_main_threshold = 0.05f;
+                if (temp_settings.lod_text_main_threshold > 10.0f) temp_settings.lod_text_main_threshold = 10.0f;
+            }
+            if (ImGui::IsItemHovered()) {
+                char lod_main_tooltip[1024];
+                snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
+                         "The zoom threshold below which main item text and interactive elements are hidden.\n"
+                         "Higher values are more zoomed in.\n"
+                         "Affects:\n"
+                         " - Main Category Names (e.g., 'Monster Hunter').\n"
+                         " - Checkboxes for manual completion (Parent and Sub-Stat checkboxes).\n"
+                         "Default: %.3f", DEFAULT_LOD_TEXT_MAIN_THRESHOLD);
+                ImGui::SetTooltip("%s", lod_main_tooltip);
+            }
+
+            if (ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f,
+                                 "%.3f")) {
+                if (temp_settings.lod_icon_detail_threshold < 0.05f) temp_settings.lod_icon_detail_threshold = 0.05f;
+                if (temp_settings.lod_icon_detail_threshold > 10.0f) temp_settings.lod_icon_detail_threshold = 10.0f;
+            }
+            if (ImGui::IsItemHovered()) {
+                char lod_icon_tooltip[1024];
+                snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
+                         "The zoom threshold below which sub-item icons are simplified.\n"
+                         "Higher values are more zoomed in.\n"
+                         "Affects:\n"
+                         " - Criteria and Sub-Stat icons turn into simple colored squares.\n"
+                         " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
+                         " - The scroll bar on the side of scrolling lists.\n"
+                         "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
+                ImGui::SetTooltip("%s", lod_icon_tooltip);
+            }
+
+            // --- Cursor Reveal Settings ---
+            ImGui::Checkbox("Reveal Checkboxes Near Cursor", &temp_settings.checkbox_reveal_enabled);
+            if (ImGui::IsItemHovered()) {
+                char cb_reveal_tooltip[512];
+                snprintf(cb_reveal_tooltip, sizeof(cb_reveal_tooltip),
+                         "When enabled, manual-completion checkboxes only appear within a radius of the\n"
+                         "mouse cursor instead of being drawn for every goal.\n"
+                         "Completion is still shown by the goal background, so the checkbox is only an\n"
+                         "input affordance. Useful for very large templates.\n"
+                         "Default: %s", DEFAULT_CHECKBOX_REVEAL_ENABLED ? "On" : "Off");
+                ImGui::SetTooltip("%s", cb_reveal_tooltip);
+            }
+
+            ImGui::BeginDisabled(!temp_settings.checkbox_reveal_enabled && !temp_settings.text_reveal_enabled);
+            if (ImGui::DragFloat("Cursor Reveal Radius", &temp_settings.checkbox_reveal_radius, 1.0f, 20.0f, 1000.0f,
+                                 "%.0f px")) {
+                if (temp_settings.checkbox_reveal_radius < 20.0f) temp_settings.checkbox_reveal_radius = 20.0f;
+                if (temp_settings.checkbox_reveal_radius > 1000.0f) temp_settings.checkbox_reveal_radius = 1000.0f;
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered()) {
+                char cb_radius_tooltip[512];
+                snprintf(cb_radius_tooltip, sizeof(cb_radius_tooltip),
+                         "Radius around the cursor within which checkboxes (and text, if enabled) are\n"
+                         "revealed. The radius is in template pixels, so it scales with the zoom level and\n"
+                         "covers the same area regardless of how far you are zoomed in or out.\n"
+                         "A faint ring shows the current radius while the mouse moves.\n"
+                         "Default: %.0f px", DEFAULT_CHECKBOX_REVEAL_RADIUS);
+                ImGui::SetTooltip("%s", cb_radius_tooltip);
+            }
+
+            ImGui::Checkbox("Also Reveal Text Near Cursor", &temp_settings.text_reveal_enabled);
+            if (ImGui::IsItemHovered()) {
+                char text_reveal_tooltip[512];
+                snprintf(text_reveal_tooltip, sizeof(text_reveal_tooltip),
+                         "When enabled, item names, progress text, and text headers also only appear\n"
+                         "within the same Cursor Reveal Radius, using the radius above.\n"
+                         "Default: %s", DEFAULT_TEXT_REVEAL_ENABLED ? "On" : "Off");
+                ImGui::SetTooltip("%s", text_reveal_tooltip);
+            }
+
+            // Slider for Scroll Threshold
+            if (ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048)) {
+                if (temp_settings.scrollable_list_threshold < 1) temp_settings.scrollable_list_threshold = 1;
+                if (temp_settings.scrollable_list_threshold > 2048) temp_settings.scrollable_list_threshold = 2048;
+            }
+            if (ImGui::IsItemHovered()) {
+                char scroll_tooltip[512];
+                snprintf(scroll_tooltip, sizeof(scroll_tooltip),
+                         "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
+                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
+                         "\n\nNote: Scrollable lists are automatically disabled for a specific goal\n"
+                         "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates."
+                         "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
+                ImGui::SetTooltip("%s", scroll_tooltip);
+            }
+
+            // List Scroll Speed Slider
+            if (ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f,
+                                 "%.0f px")) {
+                if (temp_settings.tracker_list_scroll_speed < 1.0f) temp_settings.tracker_list_scroll_speed = 1.0f;
+                if (temp_settings.tracker_list_scroll_speed > 1024.0f)
+                    temp_settings.tracker_list_scroll_speed = 1024.0f;
+            }
+            if (ImGui::IsItemHovered()) {
+                char speed_tooltip[256];
+                snprintf(speed_tooltip, sizeof(speed_tooltip),
+                         "How many pixels the list scrolls per mouse wheel notch.\n"
+                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
+                         "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
+                ImGui::SetTooltip("%s", speed_tooltip);
+            }
+
+            ImGui::Separator();
+            ImGui::Spacing();
+
             ImGui::Text("Layout & Spacing");
 
             // --- Section Order ---
@@ -2189,98 +2325,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
             ImGui::Unindent();
 
-
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            ImGui::Text("Level of Detail & Lists");
-
-            // --- Level of Detail Settings ---
-
-            if (ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f,
-                                 "%.3f")) {
-                if (temp_settings.lod_text_sub_threshold < 0.05f) temp_settings.lod_text_sub_threshold = 0.05f;
-                if (temp_settings.lod_text_sub_threshold > 10.0f) temp_settings.lod_text_sub_threshold = 10.0f;
-            }
-            if (ImGui::IsItemHovered()) {
-                char lod_sub_tooltip[1024];
-                snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
-                         "The zoom threshold below which sub-item text is hidden.\n"
-                         "Higher values are more zoomed in.\n"
-                         "Affects:\n"
-                         " - Names of Criteria, Sub-Stats, and Stages.\n"
-                         " - Progress Text like '(5/10)'.\n"
-                         "Default: %.3f", DEFAULT_LOD_TEXT_SUB_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_sub_tooltip);
-            }
-
-            if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f,
-                                 10.0f,
-                                 "%.3f")) {
-                if (temp_settings.lod_text_main_threshold < 0.05f) temp_settings.lod_text_main_threshold = 0.05f;
-                if (temp_settings.lod_text_main_threshold > 10.0f) temp_settings.lod_text_main_threshold = 10.0f;
-            }
-            if (ImGui::IsItemHovered()) {
-                char lod_main_tooltip[1024];
-                snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
-                         "The zoom threshold below which main item text and interactive elements are hidden.\n"
-                         "Higher values are more zoomed in.\n"
-                         "Affects:\n"
-                         " - Main Category Names (e.g., 'Monster Hunter').\n"
-                         " - Checkboxes for manual completion (Parent and Sub-Stat checkboxes).\n"
-                         "Default: %.3f", DEFAULT_LOD_TEXT_MAIN_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_main_tooltip);
-            }
-
-            if (ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f,
-                                 "%.3f")) {
-                if (temp_settings.lod_icon_detail_threshold < 0.05f) temp_settings.lod_icon_detail_threshold = 0.05f;
-                if (temp_settings.lod_icon_detail_threshold > 10.0f) temp_settings.lod_icon_detail_threshold = 10.0f;
-            }
-            if (ImGui::IsItemHovered()) {
-                char lod_icon_tooltip[1024];
-                snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
-                         "The zoom threshold below which sub-item icons are simplified.\n"
-                         "Higher values are more zoomed in.\n"
-                         "Affects:\n"
-                         " - Criteria and Sub-Stat icons turn into simple colored squares.\n"
-                         " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
-                         " - The scroll bar on the side of scrolling lists.\n"
-                         "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_icon_tooltip);
-            }
-
-            // Slider for Scroll Threshold
-            if (ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048)) {
-                if (temp_settings.scrollable_list_threshold < 1) temp_settings.scrollable_list_threshold = 1;
-                if (temp_settings.scrollable_list_threshold > 2048) temp_settings.scrollable_list_threshold = 2048;
-            }
-            if (ImGui::IsItemHovered()) {
-                char scroll_tooltip[512];
-                snprintf(scroll_tooltip, sizeof(scroll_tooltip),
-                         "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
-                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
-                         "\n\nNote: Scrollable lists are automatically disabled for a specific goal\n"
-                         "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates."
-                         "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
-                ImGui::SetTooltip("%s", scroll_tooltip);
-            }
-
-            // List Scroll Speed Slider
-            if (ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f,
-                                 "%.0f px")) {
-                if (temp_settings.tracker_list_scroll_speed < 1.0f) temp_settings.tracker_list_scroll_speed = 1.0f;
-                if (temp_settings.tracker_list_scroll_speed > 1024.0f)
-                    temp_settings.tracker_list_scroll_speed = 1024.0f;
-            }
-            if (ImGui::IsItemHovered()) {
-                char speed_tooltip[256];
-                snprintf(speed_tooltip, sizeof(speed_tooltip),
-                         "How many pixels the list scrolls per mouse wheel notch.\n"
-                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
-                         "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
-                ImGui::SetTooltip("%s", speed_tooltip);
-            }
 
             ImGui::Separator();
             ImGui::Spacing();

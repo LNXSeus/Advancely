@@ -572,6 +572,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
     settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
     settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
+    settings->checkbox_reveal_enabled = DEFAULT_CHECKBOX_REVEAL_ENABLED;
+    settings->checkbox_reveal_radius = DEFAULT_CHECKBOX_REVEAL_RADIUS;
+    settings->text_reveal_enabled = DEFAULT_TEXT_REVEAL_ENABLED;
 
     // Scrollable List
     settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
@@ -1331,6 +1334,30 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *cb_reveal = cJSON_GetObjectItem(visual_settings, "checkbox_reveal_enabled");
+        if (cb_reveal && cJSON_IsBool(cb_reveal))
+            settings->checkbox_reveal_enabled = cJSON_IsTrue(cb_reveal);
+        else {
+            settings->checkbox_reveal_enabled = DEFAULT_CHECKBOX_REVEAL_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *cb_reveal_radius = cJSON_GetObjectItem(visual_settings, "checkbox_reveal_radius");
+        if (cb_reveal_radius && cJSON_IsNumber(cb_reveal_radius))
+            settings->checkbox_reveal_radius = (float) cb_reveal_radius->valuedouble;
+        else {
+            settings->checkbox_reveal_radius = DEFAULT_CHECKBOX_REVEAL_RADIUS;
+            defaults_were_used = true;
+        }
+
+        const cJSON *text_reveal = cJSON_GetObjectItem(visual_settings, "text_reveal_enabled");
+        if (text_reveal && cJSON_IsBool(text_reveal))
+            settings->text_reveal_enabled = cJSON_IsTrue(text_reveal);
+        else {
+            settings->text_reveal_enabled = DEFAULT_TEXT_REVEAL_ENABLED;
+            defaults_were_used = true;
+        }
+
         const cJSON *scroll_thresh = cJSON_GetObjectItem(visual_settings, "scrollable_list_threshold");
         if (scroll_thresh && cJSON_IsNumber(scroll_thresh))
             settings->scrollable_list_threshold = scroll_thresh->valueint;
@@ -1361,6 +1388,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
         settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
         settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
+        settings->checkbox_reveal_enabled = DEFAULT_CHECKBOX_REVEAL_ENABLED;
+        settings->checkbox_reveal_radius = DEFAULT_CHECKBOX_REVEAL_RADIUS;
+        settings->text_reveal_enabled = DEFAULT_TEXT_REVEAL_ENABLED;
 
         settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
         settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
@@ -2065,6 +2095,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "lod_icon_detail_threshold");
         cJSON_AddItemToObject(visuals_obj, "lod_icon_detail_threshold",
                               cJSON_CreateNumber(settings->lod_icon_detail_threshold));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "checkbox_reveal_enabled");
+        cJSON_AddItemToObject(visuals_obj, "checkbox_reveal_enabled",
+                              cJSON_CreateBool(settings->checkbox_reveal_enabled));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "checkbox_reveal_radius");
+        cJSON_AddItemToObject(visuals_obj, "checkbox_reveal_radius",
+                              cJSON_CreateNumber(settings->checkbox_reveal_radius));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "text_reveal_enabled");
+        cJSON_AddItemToObject(visuals_obj, "text_reveal_enabled",
+                              cJSON_CreateBool(settings->text_reveal_enabled));
 
         cJSON_DeleteItemFromObject(visuals_obj, "scrollable_list_threshold");
         cJSON_AddItemToObject(visuals_obj, "scrollable_list_threshold",

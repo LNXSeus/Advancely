@@ -5886,6 +5886,35 @@ static bool rect_on_screen(const ImVec2 &mn, const ImVec2 &mx, const ImVec2 &dis
     return !(mn.x > display_size.x || mx.x < 0.0f || mn.y > display_size.y || mx.y < 0.0f);
 }
 
+// Cursor-reveal test: when the reveal mode is on, returns true only if the screen-space rect
+// [mn, mx] lies within radius_px of the mouse (measured from the rect centre). Always true when
+// the mode is off, so callers can fold it straight into their existing visibility test.
+static bool rect_in_reveal_radius(const ImVec2 &mn, const ImVec2 &mx, bool enabled, float radius_px) {
+    if (!enabled) return true;
+    ImVec2 m = ImGui::GetIO().MousePos;
+    float cx = (mn.x + mx.x) * 0.5f;
+    float cy = (mn.y + mx.y) * 0.5f;
+    float dx = m.x - cx;
+    float dy = m.y - cy;
+    return (dx * dx + dy * dy) <= radius_px * radius_px;
+}
+
+// Scales the configured reveal radius by the current zoom so the revealed region covers a constant
+// amount of template space at any zoom (the radius setting is in template pixels, not screen pixels).
+static float reveal_radius_screen_px(const AppSettings *settings, const Tracker *t) {
+    return settings->checkbox_reveal_radius * t->zoom_level;
+}
+
+// Combined on-screen + cursor-reveal test for text draws. When "Also Reveal Text Near Cursor" is on
+// (and not visual-editing), item text only renders within the shared reveal radius of the cursor.
+static bool text_reveal_ok(const ImVec2 &mn, const ImVec2 &mx, const ImVec2 &display_size,
+                           const AppSettings *settings, const Tracker *t) {
+    return rect_on_screen(mn, mx, display_size) &&
+           rect_in_reveal_radius(mn, mx,
+                                 settings->text_reveal_enabled && !t->is_visual_layout_editing,
+                                 reveal_radius_screen_px(settings, t));
+}
+
 // Returns CalcTextSize(name).x for the given font size, cached on the caller's fields. Display
 // names are immutable, so the width is only re-measured when the font size changes (the auto-layout
 // width pre-pass would otherwise measure every item every frame).
@@ -7305,9 +7334,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Main Name
                 if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_text_in_layout) {
                     ImVec2 main_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y);
-                    if (rect_on_screen(main_text_pos,
+                    if (text_reveal_ok(main_text_pos,
                                        ImVec2(main_text_pos.x + text_size.x * t->zoom_level,
-                                              main_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize))
+                                              main_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize,
+                                       settings, t))
                         draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                            main_text_pos, current_text_color, cat->display_name);
 
@@ -7328,10 +7358,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                         ImVec2 snap_text_pos = ImVec2(text_x_center - (snapshot_text_size.x * t->zoom_level) * 0.5f,
                                                       current_text_y);
-                        if (rect_on_screen(snap_text_pos,
+                        if (text_reveal_ok(snap_text_pos,
                                            ImVec2(snap_text_pos.x + snapshot_text_size.x * t->zoom_level,
                                                   snap_text_pos.y + snapshot_text_size.y * t->zoom_level),
-                                           io.DisplaySize))
+                                           io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                snap_text_pos, text_color_faded, snapshot_text);
                     }
@@ -7356,10 +7386,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         ImVec2 prog_text_pos = ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
                                                       prog_y);
-                        if (rect_on_screen(prog_text_pos,
+                        if (text_reveal_ok(prog_text_pos,
                                            ImVec2(prog_text_pos.x + progress_text_size.x * t->zoom_level,
                                                   prog_text_pos.y + progress_text_size.y * t->zoom_level),
-                                           io.DisplaySize))
+                                           io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                prog_text_pos, current_text_color, progress_text);
 
@@ -7592,7 +7622,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImRect checkbox_rect(
                                 check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
                             bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                            bool crit_cb_visible = rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize);
+                            bool crit_cb_visible = rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
+                                                   rect_in_reveal_radius(checkbox_rect.Min, checkbox_rect.Max,
+                                                                         settings->checkbox_reveal_enabled &&
+                                                                         !t->is_visual_layout_editing,
+                                                                         reveal_radius_screen_px(settings, t));
 
                             // Coop: face under the manual-completion checkbox when a
                             // single player ticked it. Drawn before the semi-transparent
@@ -7871,10 +7905,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     draw_list->AddImage((void *) crit_text_face_tex, face_min, face_max);
                             }
 
-                            if (rect_on_screen(child_text_pos,
+                            if (text_reveal_ok(child_text_pos,
                                                ImVec2(child_text_pos.x + child_text_size.x * t->zoom_level,
                                                       child_text_pos.y + child_text_size.y * t->zoom_level),
-                                               io.DisplaySize))
+                                               io.DisplaySize, settings, t))
                                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
                                                    current_child_text_color, crit->display_name);
 
@@ -7916,10 +7950,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                             camera_offset.y);
                                     }
 
-                                    if (rect_on_screen(crit_progress_pos,
+                                    if (text_reveal_ok(crit_progress_pos,
                                                        ImVec2(crit_progress_pos.x + crit_progress_size.x * t->zoom_level,
                                                               crit_progress_pos.y + crit_progress_size.y * t->zoom_level),
-                                                       io.DisplaySize))
+                                                       io.DisplaySize, settings, t))
                                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
                                                            current_child_text_color, crit_progress_text);
 
@@ -8059,7 +8093,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     bool is_hovered_parent = ImGui::IsMouseHoveringRect(checkbox_rect_parent.Min,
                                                                         checkbox_rect_parent.Max);
                     bool parent_cb_visible = rect_on_screen(checkbox_rect_parent.Min, checkbox_rect_parent.Max,
-                                                            io.DisplaySize);
+                                                            io.DisplaySize) &&
+                                             rect_in_reveal_radius(checkbox_rect_parent.Min, checkbox_rect_parent.Max,
+                                                                   settings->checkbox_reveal_enabled &&
+                                                                   !t->is_visual_layout_editing,
+                                                                   reveal_radius_screen_px(settings, t));
 
                     // Coop: face under the full-goal manual-completion checkbox when
                     // a single player ticked it. Drawn before the semi-transparent
@@ -8577,9 +8615,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
                 // Draw Main Name (centered)
                 ImVec2 unlock_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
-                if (rect_on_screen(unlock_text_pos,
+                if (text_reveal_ok(unlock_text_pos,
                                    ImVec2(unlock_text_pos.x + text_size.x * t->zoom_level,
-                                          unlock_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize))
+                                          unlock_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        unlock_text_pos, current_text_color, item->display_name);
 
@@ -8599,10 +8637,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         ImVec2 unlock_prog_pos = ImVec2(text_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
                                                         text_y_pos);
-                        if (rect_on_screen(unlock_prog_pos,
+                        if (text_reveal_ok(unlock_prog_pos,
                                            ImVec2(unlock_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   unlock_prog_pos.y + progress_text_size.y * t->zoom_level),
-                                           io.DisplaySize))
+                                           io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                unlock_prog_pos, current_text_color, progress_text);
                     }
@@ -9065,9 +9103,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                 // Draw Main Name (centered)
                 ImVec2 cg_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
-                if (rect_on_screen(cg_text_pos,
+                if (text_reveal_ok(cg_text_pos,
                                    ImVec2(cg_text_pos.x + text_size.x * t->zoom_level,
-                                          cg_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize))
+                                          cg_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        cg_text_pos, current_text_color, item->display_name);
 
@@ -9098,9 +9136,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         ImVec2 cg_prog_pos = ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
                                                     prog_y);
-                        if (rect_on_screen(cg_prog_pos,
+                        if (text_reveal_ok(cg_prog_pos,
                                            ImVec2(cg_prog_pos.x + progress_text_size.x * t->zoom_level,
-                                                  cg_prog_pos.y + progress_text_size.y * t->zoom_level), io.DisplaySize))
+                                                  cg_prog_pos.y + progress_text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                cg_prog_pos, current_text_color, progress_text);
 
@@ -9132,7 +9170,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
 
                 bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                bool cg_cb_visible = rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize);
+                bool cg_cb_visible = rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
+                                     rect_in_reveal_radius(checkbox_rect.Min, checkbox_rect.Max,
+                                                           settings->checkbox_reveal_enabled &&
+                                                           !t->is_visual_layout_editing,
+                                                           reveal_radius_screen_px(settings, t));
 
                 // Coop: face under the manual-completion checkbox when a single
                 // player ticked it. Drawn before the semi-transparent fill so the
@@ -9567,9 +9609,9 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
 
                 // Draw Main Name (centered)
                 ImVec2 counter_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
-                if (rect_on_screen(counter_text_pos,
+                if (text_reveal_ok(counter_text_pos,
                                    ImVec2(counter_text_pos.x + text_size.x * t->zoom_level,
-                                          counter_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize))
+                                          counter_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        counter_text_pos, current_text_color, goal->display_name);
 
@@ -9598,10 +9640,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         ImVec2 counter_prog_pos = ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
                                                          prog_y);
-                        if (rect_on_screen(counter_prog_pos,
+                        if (text_reveal_ok(counter_prog_pos,
                                            ImVec2(counter_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   counter_prog_pos.y + progress_text_size.y * t->zoom_level),
-                                           io.DisplaySize))
+                                           io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                counter_prog_pos, current_text_color, progress_text);
 
@@ -10072,9 +10114,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 ImVec2 ms_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 if (!hide_goal_text_in_layout &&
-                    rect_on_screen(ms_text_pos,
+                    text_reveal_ok(ms_text_pos,
                                    ImVec2(ms_text_pos.x + text_size.x * t->zoom_level,
-                                          ms_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize))
+                                          ms_text_pos.y + text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                        ms_text_pos, current_text_color, goal->display_name);
 
@@ -10106,9 +10148,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 ImVec2 ms_stage_pos = ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f,
                                              stage_text_y);
                 if (!hide_goal_progress_in_layout &&
-                    rect_on_screen(ms_stage_pos,
+                    text_reveal_ok(ms_stage_pos,
                                    ImVec2(ms_stage_pos.x + stage_text_size.x * t->zoom_level,
-                                          ms_stage_pos.y + stage_text_size.y * t->zoom_level), io.DisplaySize))
+                                          ms_stage_pos.y + stage_text_size.y * t->zoom_level), io.DisplaySize, settings, t))
                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                        ms_stage_pos, current_text_color, stage_text); // Use formatted stage text
 
@@ -10198,9 +10240,13 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                 // LOD: Use main text threshold
                 if (t->zoom_level > settings->lod_text_main_threshold) {
-                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                       ImVec2(text_x, text_y),
-                                       text_color, elem->display_text);
+                    ImVec2 header_min(text_x, text_y);
+                    ImVec2 header_max(text_x + text_size.x * t->zoom_level, text_y + text_size.y * t->zoom_level);
+                    if (text_reveal_ok(header_min, header_max, ImGui::GetIO().DisplaySize, settings, t)) {
+                        draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                           ImVec2(text_x, text_y),
+                                           text_color, elem->display_text);
+                    }
 
                     // Visual layout dragging
                     char drag_id[128];
@@ -11018,6 +11064,29 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->visual_select_rect_active = false;
     } else if (!t->is_visual_layout_editing) {
         s_visual_selected_goals.clear();
+    }
+
+    // --- Cursor Reveal Ring ---
+    // When a reveal mode is active, draw a faint ring at the cursor showing the reveal radius.
+    // It only appears while the mouse is moving over the tracker and fades out shortly after.
+    {
+        static float s_reveal_ring_alpha = 0.0f;
+        ImGuiIO &io = ImGui::GetIO();
+        bool reveal_active = (settings->checkbox_reveal_enabled || settings->text_reveal_enabled) &&
+                             !t->is_visual_layout_editing;
+        bool mouse_moving = (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f);
+        if (reveal_active && mouse_moving && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)) {
+            s_reveal_ring_alpha = 1.0f;
+        } else {
+            s_reveal_ring_alpha -= io.DeltaTime * 4.0f; // ~0.25s fade-out after the mouse stops
+            if (s_reveal_ring_alpha < 0.0f) s_reveal_ring_alpha = 0.0f;
+        }
+        if (reveal_active && s_reveal_ring_alpha > 0.0f) {
+            ImU32 ring_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                        (int) (s_reveal_ring_alpha * 90.0f));
+            ImGui::GetForegroundDrawList()->AddCircle(io.MousePos, reveal_radius_screen_px(settings, t), ring_color, 64,
+                                                      1.5f);
+        }
     }
 
     // --- Info Bar ---
