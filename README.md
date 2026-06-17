@@ -1668,8 +1668,8 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares
   on the overlay within the first row or being invisible on the tracker). Checking the `advancely_log.txt` or
   `advancely_overlay_log.txt` file will tell you about incompatible images.
-  To fix this, re-save the images in a standard format or use ImageMagick:
-  `magick mogrify -define png:format=png32 -interlace none -strip -depth 8 *.png`.
+  To fix this, re-save the images in a standard format or use ImageMagick (recursive):
+  `for /r %i in (*.png) do magick mogrify -define png:format=png32 -interlace none -strip -depth 8 "%i"`.
 * **Frame drops when no saves folder**: Whenever Advancely is set to track the active instance, 
 but no instance is open, it might hook onto a different java process and unsuccessfully try to locate a saves folder from it.
 
