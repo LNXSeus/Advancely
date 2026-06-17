@@ -136,6 +136,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
+#define DEFAULT_LAUNCH_COUNT 0
+#define DEFAULT_SUPPORT_PROMPT_SHOWN false
+#define SUPPORT_PROMPT_LAUNCH_THRESHOLD 10 // Launches before the one-time support ask appears
 
 // Account Defaults
 #define DEFAULT_ACCOUNT_TYPE ACCOUNT_ONLINE
@@ -410,6 +413,8 @@ struct AppSettings {
     // Separator string drawn between top-bar segments. Default "|". Up to 8 visible characters.
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
+    int launch_count; // Number of times Advancely has been launched
+    bool support_prompt_shown; // If true, the one-time launch-milestone support ask has been shown
 
     // --- Account Settings ---
     AccountType account_type; // Online (Mojang API) or Offline (manual UUID)

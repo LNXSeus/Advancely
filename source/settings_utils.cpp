@@ -510,6 +510,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->per_world_notes = DEFAULT_PER_WORLD_NOTES;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
+    settings->launch_count = DEFAULT_LAUNCH_COUNT;
+    settings->support_prompt_shown = DEFAULT_SUPPORT_PROMPT_SHOWN;
     settings->lock_category_display_name = DEFAULT_LOCK_CATEGORY_DISPLAY_NAME;
 
     // Run Completion Threshold
@@ -1000,6 +1002,21 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         if (show_welcome && cJSON_IsBool(show_welcome)) settings->show_welcome_on_startup = cJSON_IsTrue(show_welcome);
         else {
             settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
+            defaults_were_used = true;
+        }
+
+        const cJSON *launch_count = cJSON_GetObjectItem(general_settings, "launch_count");
+        if (launch_count && cJSON_IsNumber(launch_count)) settings->launch_count = launch_count->valueint;
+        else {
+            settings->launch_count = DEFAULT_LAUNCH_COUNT;
+            defaults_were_used = true;
+        }
+
+        const cJSON *support_prompt_shown = cJSON_GetObjectItem(general_settings, "support_prompt_shown");
+        if (support_prompt_shown && cJSON_IsBool(support_prompt_shown))
+            settings->support_prompt_shown = cJSON_IsTrue(support_prompt_shown);
+        else {
+            settings->support_prompt_shown = DEFAULT_SUPPORT_PROMPT_SHOWN;
             defaults_were_used = true;
         }
 
@@ -1883,6 +1900,11 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "show_welcome_on_startup");
         cJSON_AddItemToObject(general_obj, "show_welcome_on_startup",
                               cJSON_CreateBool(settings->show_welcome_on_startup));
+        cJSON_DeleteItemFromObject(general_obj, "launch_count");
+        cJSON_AddItemToObject(general_obj, "launch_count", cJSON_CreateNumber(settings->launch_count));
+        cJSON_DeleteItemFromObject(general_obj, "support_prompt_shown");
+        cJSON_AddItemToObject(general_obj, "support_prompt_shown",
+                              cJSON_CreateBool(settings->support_prompt_shown));
 
 
         // --- Save Overlay Text Toggles ---

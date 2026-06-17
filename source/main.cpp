@@ -121,6 +121,7 @@ static bool g_show_release_notes_on_startup = false;
 // After auto-installing update it shows link to github release notes
 static bool show_release_notes_window = false; // For rendering the release notes window
 static bool show_welcome_window = false; // For rendering the welcome window on startup
+static bool show_support_milestone_window = false; // For the one-time launch-milestone support ask
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
@@ -769,6 +770,36 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
     }
 }
 
+// Renders the shared "please support Advancely" pitch: a short solo-dev note and a donate button.
+static void render_support_pitch(float wrap_width) {
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
+    ImGui::TextWrapped(
+        "Advancely is a solo-dev project and it's just me (LNXS) building it, maintaining it for future Minecraft versions, "
+        "answering your issues and implementing your suggestions.");
+    ImGui::Spacing();
+    ImGui::TextWrapped(
+        "Advancely is free and it should stay so. The only real cost is the server used for coop, which is around $12 a year, "
+        "and everything beyond that is purely my time.");
+    ImGui::Spacing();
+    ImGui::TextWrapped(
+        "So one simple question: What is Advancely worth to you? If it helped you save time or made your runs more fun, "
+        "a tip of any size genuinely keeps it going. Thank you!");
+    ImGui::PopTextWrapPos();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Support Advancely!")) {
+        SDL_OpenURL("https://streamlabs.com/lnxseus/tip");
+    }
+    if (ImGui::IsItemHovered()) {
+        char support_tooltip[256];
+        snprintf(support_tooltip, sizeof(support_tooltip),
+                 "Opens streamlabs.com/lnxseus/tip in your browser.\n"
+                 "Mention \"Advancely\" with your tip to get your name featured\n"
+                 "in the Settings window and on the Overlay. Thank you!");
+        ImGui::SetTooltip("%s", support_tooltip);
+    }
+}
+
 // Renders a welcome message window with the advancely logo and a small tutorial on startup depending on setting
 static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker *tracker, SDL_Texture *logo_texture) {
     if (!*p_open) {
@@ -818,24 +849,9 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::BulletText("A lot more info can be found when hovering over certain elements.");
     ImGui::Separator();
 
-    ImGui::TextWrapped("Please consider supporting the project at");
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
-    ImGui::Text("streamlabs.com/lnxseus/tip");
-    ImGui::PopStyleColor();
-    if (ImGui::IsItemClicked()) {
-        SDL_OpenURL("https://streamlabs.com/lnxseus/tip");
-    }
-    if (ImGui::IsItemHovered()) {
-        char donate_tooltip[1024];
-        snprintf(donate_tooltip, sizeof(donate_tooltip),
-                 "Opens the donation page in your browser.\n"
-                 "Mention \"Advancely\" with your tip to get your name listed permanently\n"
-                 "in the Settings window and Overlay.");
-        ImGui::SetTooltip("%s", donate_tooltip);
-    }
-    ImGui::SameLine();
-    ImGui::Text(". Thank you!");
+    render_support_pitch(460.0f);
+    ImGui::Spacing();
+    ImGui::Separator();
     ImGui::Spacing();
 
     ImGui::Checkbox("Don't show this again", &dont_show_again);
@@ -847,6 +863,49 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     // If the window was just closed (by button or 'X'), save the setting if it changed.
     if (!*p_open && (dont_show_again != !app_settings->show_welcome_on_startup)) {
         app_settings->show_welcome_on_startup = !dont_show_again;
+        settings_save(app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
+    }
+
+    ImGui::End();
+}
+
+// Renders the one-time support ask shown after a user has launched Advancely several times.
+static void support_milestone_render_gui(bool *p_open, AppSettings *app_settings, Tracker *tracker,
+                                         SDL_Texture *logo_texture) {
+    if (!*p_open) {
+        return;
+    }
+
+    ImGui::Begin("A small ask...", p_open, ImGuiWindowFlags_AlwaysAutoResize);
+
+    if (logo_texture) {
+        float w, h;
+        SDL_GetTextureSize(logo_texture, &w, &h);
+        const float target_width = ADVANCELY_LOGO_SIZE;
+        float aspect_ratio = h / w;
+        ImVec2 new_size = ImVec2(target_width, target_width * aspect_ratio);
+        ImGui::Image((ImTextureID) logo_texture, new_size);
+        ImGui::Spacing();
+    }
+
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 460.0f);
+    ImGui::TextWrapped(
+        "You've opened Advancely quite a few times now, and that honestly means a lot to me.");
+    ImGui::PopTextWrapPos();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    render_support_pitch(460.0f);
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Maybe later")) {
+        *p_open = false;
+    }
+
+    if (!*p_open && !app_settings->support_prompt_shown) {
+        app_settings->support_prompt_shown = true;
         settings_save(app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
     }
 
@@ -1554,6 +1613,15 @@ int main(int argc, char *argv[]) {
 
     // Control welcome window visibility based on settings
     show_welcome_window = app_settings.show_welcome_on_startup;
+
+    // Count this launch and decide whether to show the one-time support ask. It only fires for
+    // users who turned the welcome window off, so they aren't asked twice in one session.
+    app_settings.launch_count++;
+    if (!app_settings.support_prompt_shown && !app_settings.show_welcome_on_startup &&
+        app_settings.launch_count >= SUPPORT_PROMPT_LAUNCH_THRESHOLD) {
+        show_support_milestone_window = true;
+    }
+    settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL);
 
     log_set_settings(&app_settings); // Give the logger access to the settings
 
@@ -3488,6 +3556,9 @@ int main(int argc, char *argv[]) {
             // Load the welcome window
             welcome_render_gui(&show_welcome_window, &app_settings, tracker, g_logo_texture);
 
+            // The one-time launch-milestone support ask (only for users with the welcome off)
+            support_milestone_render_gui(&show_support_milestone_window, &app_settings, tracker, g_logo_texture);
+
             // Release notes window
             if (show_release_notes_window) {
                 ImGui::Begin("Update Successful!", &show_release_notes_window, ImGuiWindowFlags_AlwaysAutoResize);
@@ -3509,6 +3580,13 @@ int main(int argc, char *argv[]) {
 
                 ImGui::Text("Advancely has been updated to the latest version!");
                 ImGui::Separator();
+                ImGui::Spacing();
+
+                render_support_pitch(460.0f);
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
                 ImGui::Text("Click the button below to see what's new on GitHub.");
                 ImGui::Spacing();
                 if (ImGui::Button("View Release Notes")) {
