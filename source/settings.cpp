@@ -66,6 +66,44 @@ static void update_coop_template_sync(const AppSettings *s) {
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
+// Preset sections holding per-world progress, not config. AppSettings doesn't carry
+// these, so settings_save() leaves them untouched and a preset's captured progress
+// would be lost on Apply; copy_preset_progress_to_settings() restores them. Add any
+// future non-AppSettings progress sections here.
+static const char *PRESET_PROGRESS_SECTIONS[] = {
+    "custom_progress",
+    "stat_progress_override",
+};
+
+// Overwrites the progress sections in settings.json with the given preset's versions.
+// Suppresses the settings watcher for the write; the caller drives the reload via
+// g_settings_changed. Safe to call right after settings_save().
+static void copy_preset_progress_to_settings(const char *preset_path) {
+    cJSON *preset_root = cJSON_from_file(preset_path);
+    if (!preset_root) return;
+
+    cJSON *settings_root = cJSON_from_file(get_settings_file_path());
+    if (!settings_root) {
+        cJSON_Delete(preset_root);
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(PRESET_PROGRESS_SECTIONS) / sizeof(PRESET_PROGRESS_SECTIONS[0]); i++) {
+        const char *section = PRESET_PROGRESS_SECTIONS[i];
+        cJSON_DeleteItemFromObject(settings_root, section);
+        cJSON *src = cJSON_GetObjectItem(preset_root, section);
+        if (src) {
+            cJSON_AddItemToObject(settings_root, section, cJSON_Duplicate(src, true));
+        }
+    }
+
+    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+    cJSON_write_to_file_atomic(get_settings_file_path(), settings_root);
+
+    cJSON_Delete(settings_root);
+    cJSON_Delete(preset_root);
+}
+
 // Counts the non-recipe advancements/achievements in the template selected by the
 // given settings (version/category/optional_flag). Used to clamp the completion
 // advancement-count threshold to a valid maximum. Returns 0 if the template file
@@ -352,6 +390,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char new_preset_name[SETTING_PRESET_NAME_LEN] = "";
     static char preset_status_msg[256] = "";
     static bool preset_status_is_error = false;
+    // Path of a preset loaded but not yet applied. Non-empty means its progress
+    // sections should be restored into settings.json on the next Apply.
+    static char pending_preset_progress_path[MAX_PATH_LENGTH] = "";
 
     // Helper lambda to auto-select a language (and layout) for the currently selected template
     auto auto_select_language = [&]() {
@@ -519,6 +560,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         presets_need_rescan = true; // Refresh the preset list every time the window opens
         new_preset_name[0] = '\0';
         preset_status_msg[0] = '\0';
+        pending_preset_progress_path[0] = '\0';
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
         show_hotkey_warning_message = false;
@@ -866,6 +908,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     // adopt (not reset) the loaded values, so the tabs refresh in place.
                     last_scanned_version[0] = '\0';
                     preset_loaded_this_frame = true;
+                    // Remember the source so Apply can restore its captured progress.
+                    strncpy(pending_preset_progress_path, preset_path, sizeof(pending_preset_progress_path) - 1);
+                    pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
                     snprintf(preset_status_msg, sizeof(preset_status_msg),
                              "Loaded preset '%s'. Click 'Apply Settings' to use it.", preset_names[preset_selected]);
                     preset_status_is_error = false;
@@ -5259,6 +5304,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                 settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                // settings_save left the progress sections as-is; if this Apply is for a
+                // loaded preset, restore that preset's captured progress before the reload.
+                if (pending_preset_progress_path[0] != '\0') {
+                    copy_preset_progress_to_settings(pending_preset_progress_path);
+                    pending_preset_progress_path[0] = '\0';
+                }
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
                 SDL_SetAtomicInt(&g_apply_button_clicked, 1);
 
@@ -5316,6 +5367,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Replace the TextColored indicator with a Revert button
         if (ImGui::Button("Revert Changes")) {
             memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
+            pending_preset_progress_path[0] = '\0';
             coop_identity_status_msg[0] = '\0';
             coop_identity_status_is_error = false;
             coop_ip_revealed = false;
@@ -5357,6 +5409,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Clear any previous "Applied!" message and show the "Defaults!" message
         show_applied_message = false;
         show_defaults_applied_message = true;
+        // Resetting to defaults discards any loaded preset, so don't restore its progress.
+        pending_preset_progress_path[0] = '\0';
 
         // Preserve current window geometry before resetting other settings
         WindowRect current_tracker_window = temp_settings.tracker_window;
@@ -5478,6 +5532,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                sizeof(app_settings->coop_adv_assignments));
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+        // Restore a loaded preset's captured progress before the relaunch reads settings.json.
+        if (pending_preset_progress_path[0] != '\0') {
+            copy_preset_progress_to_settings(pending_preset_progress_path);
+            pending_preset_progress_path[0] = '\0';
+        }
         saved_settings = temp_settings; // Sync so has_unsaved_changes stays false on future frames
         if (t) t->settings_has_unsaved_changes = false; // Clear immediately so the quit event skips the unsaved popup
 
