@@ -199,5 +199,6 @@
 	"decoration.mansion_dark":	"Mansion",
 	"decoration.tundra":	"Tundra",
 	"decoration.taiga_jungle":	"Taiga + Jungle",
-	"decoration.savanna_desert_mesa":	"Dry Biomes"
+	"decoration.savanna_desert_mesa":	"Dry Biomes",
+	"decoration.credits":	"Template by ScrambledMC"
 }
