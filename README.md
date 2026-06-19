@@ -1821,6 +1821,6 @@ files.*
 *Massive thanks to Jannox78 for allowing me to use his MacBook Pro for testing.*
 *Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from
 the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
-*Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for
+*Shoutout to [Oskar](https://youtube.com/@oskar-meinkraft) for providing me his project files (kAAmel) and Darwin Baker for
 creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration\!*
 </details>
