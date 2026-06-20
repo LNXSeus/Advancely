@@ -214,6 +214,9 @@ struct EditorSubGoal {
     // Stage auto-completion via linked goals (only used for non-final stages)
     std::vector<EditorCounterLinkedGoal> linked_goals;
     LinkedGoalMode linked_goal_mode = LINKED_GOAL_AND;
+
+    // When true, this (non-final) stage auto-completes if the next stage is completed.
+    bool complete_with_next = false;
 };
 
 struct EditorMultiStageGoal {
@@ -585,6 +588,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            a.required_progress != b.required_progress ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.linked_goal_mode != b.linked_goal_mode ||
+           a.complete_with_next != b.complete_with_next ||
            are_linked_goals_different(a.linked_goals, b.linked_goals);
 }
 
@@ -1607,6 +1611,9 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     parse_linked_goals(stage_json, new_stage.linked_goals, new_stage.linked_goal_mode);
                 }
 
+                // Parse "complete with next stage" auto-completion flag (non-final stages)
+                new_stage.complete_with_next = cJSON_IsTrue(cJSON_GetObjectItem(stage_json, "complete_with_next"));
+
                 new_goal.stages.push_back(new_stage);
             }
         }
@@ -2176,6 +2183,10 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
                 // Serialize stage linked goals (non-final stages only)
                 serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
+                // Auto-complete this stage when the next stage is completed
+                if (stage.complete_with_next) {
+                    cJSON_AddBoolToObject(stage_json, "complete_with_next", true);
+                }
             }
 
             cJSON_AddItemToArray(stages_array, stage_json);
@@ -15041,6 +15052,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
 
+                                // --- Auto-complete this stage when the next stage is completed ---
+                                {
+                                    char cwn_id[128];
+                                    snprintf(cwn_id, sizeof(cwn_id),
+                                             "Auto-complete if next stage is completed##cwn_%s_%zu",
+                                             goal.root_name, j);
+                                    if (ImGui::Checkbox(cwn_id, &stage.complete_with_next)) {
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[320];
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Mark this stage complete automatically once the next stage is\n"
+                                                 "completed (in addition to its own trigger and any linked goals).\n"
+                                                 "Chains backward, so a completed later stage pulls earlier\n"
+                                                 "opted-in stages forward.");
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+                                }
+
                                 // --- Stage Linked Goals (Auto-Completion) ---
                                 {
                                     ImGui::Text("Auto-Complete Goals: %d", (int) stage.linked_goals.size());
@@ -15356,6 +15388,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_stage.required_progress = source_stage.required_progress;
                             new_stage.linked_goals = source_stage.linked_goals;
                             new_stage.linked_goal_mode = source_stage.linked_goal_mode;
+                            new_stage.complete_with_next = source_stage.complete_with_next;
 
                             new_stage.sort_order = 0;
 

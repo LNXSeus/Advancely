@@ -612,6 +612,9 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     // Stage linked_goals + mode (for auto-completion of non-final stages)
                     hash = hash_linked_goals(hash, cJSON_GetObjectItem(stage, "linked_goals"));
                     hash = hash_linked_goal_mode(hash, stage);
+                    // "complete with next stage" auto-completion flag
+                    cJSON *cwn = cJSON_GetObjectItem(stage, "complete_with_next");
+                    hash = fnv1a_int(hash, cJSON_IsTrue(cwn) ? 1 : 0);
                 }
             }
         }

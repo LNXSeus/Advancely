@@ -433,6 +433,10 @@ struct SubGoal {
     CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals
     LinkedGoalMode linked_goal_mode; // AND (all) or OR (any) for auto-completion
 
+    // When true, this (non-final) stage is also considered satisfied if the next stage is satisfied.
+    // Propagated backward, so a completed later stage pulls earlier opted-in stages forward.
+    bool complete_with_next;
+
     char icon_path[256];
     SDL_Texture *texture;
     AnimatedTexture *anim_texture;

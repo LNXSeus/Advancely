@@ -2314,6 +2314,10 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                                                &new_stage->linked_goals, &new_stage->linked_goal_mode);
                 }
 
+                // Parse "complete with next stage" auto-completion flag (non-final stages)
+                cJSON *complete_with_next = cJSON_GetObjectItem(stage_item_json, "complete_with_next");
+                new_stage->complete_with_next = cJSON_IsTrue(complete_with_next);
+
                 // Add the stage to the goal
                 new_goal->stages[j++] = new_stage;
             }
@@ -2967,6 +2971,31 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
     }
 }
 
+// Computes a multi-stage goal's current_stage as the leading run of satisfied stages.
+// base_satisfied[j] holds each stage's own satisfaction (game trigger OR linked goals); the
+// final MANUAL stage must be left false. Stages flagged complete_with_next are additionally
+// satisfied when the next stage is satisfied, propagated backward so a completed later stage
+// pulls earlier opted-in stages forward. The three progression paths share this so the
+// leading-run logic lives in one place.
+static int ms_compute_current_stage(MultiStageGoal *goal, std::vector<bool> &base_satisfied) {
+    int n = goal->stage_count;
+    if (n <= 0) return 0;
+    // Backward propagation of the "complete with next stage" rule.
+    for (int j = n - 2; j >= 0; j--) {
+        if (goal->stages[j] && goal->stages[j]->complete_with_next && base_satisfied[j + 1]) {
+            base_satisfied[j] = true;
+        }
+    }
+    // Leading run of satisfied stages (the final MANUAL stage never counts).
+    int stage = 0;
+    for (int j = 0; j < n; j++) {
+        if (!goal->stages[j] || goal->stages[j]->type == SUBGOAL_MANUAL) break;
+        if (base_satisfied[j]) stage = j + 1;
+        else break;
+    }
+    return stage;
+}
+
 /**
  * @brief Updates multi-stage goal progress from preloaded cJSON objects.
  * @param t A pointer to the Tracker struct.
@@ -2997,7 +3026,7 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
         // Reset and re-evaluate progress from the start (important for world-changes when tracker is running)
         int previous_stage = goal->current_stage;
         goal->current_stage = 0;
-        bool still_advancing = true; // Once a stage is unsatisfied, stop advancing but keep populating flags
+        std::vector<bool> base_satisfied(goal->stage_count, false);
 
         // Loop through each stage sequentially to determine the current progress
         for (int j = 0; j < goal->stage_count; j++) {
@@ -3154,24 +3183,17 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
             // current_stage and regress as well as advance.
             stage_to_check->game_trigger_met = stage_completed;
 
-            // current_stage advances only through the leading run of satisfied stages, but we keep looping
-            // so every stage's game_trigger_met gets populated for later recalculation.
-            if (still_advancing) {
-                // Auto-completion via linked goals (non-final stages only; the final stage breaks above).
-                // Chains of linked goals resolve through the fixed-point iteration in the caller.
-                bool stage_satisfied = stage_completed ||
-                                       (stage_to_check->linked_goal_count > 0 &&
-                                        check_linked_goals_satisfied(t->template_data, stage_to_check->linked_goals,
-                                                                     stage_to_check->linked_goal_count,
-                                                                     stage_to_check->linked_goal_mode));
-                if (stage_satisfied) {
-                    goal->current_stage = j + 1; // Move to the next stage
-                } else {
-                    still_advancing = false;
-                }
-            }
+            // Base satisfaction for this stage: own game trigger OR linked goals. The
+            // "complete with next stage" rule is applied afterwards by ms_compute_current_stage.
+            // Chains of linked goals resolve through the fixed-point iteration in the caller.
+            base_satisfied[j] = stage_completed ||
+                                (stage_to_check->linked_goal_count > 0 &&
+                                 check_linked_goals_satisfied(t->template_data, stage_to_check->linked_goals,
+                                                              stage_to_check->linked_goal_count,
+                                                              stage_to_check->linked_goal_mode));
         }
 
+        goal->current_stage = ms_compute_current_stage(goal, base_satisfied);
         if (goal->current_stage != previous_stage) any_changed = true;
     }
 
@@ -3309,7 +3331,7 @@ static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
         MultiStageGoal *goal = td->multi_stage_goals[i];
         if (!goal) continue;
         int previous_stage = goal->current_stage;
-        goal->current_stage = 0;
+        std::vector<bool> base_satisfied(goal->stage_count, false);
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
             if (!stage || stage->type == SUBGOAL_MANUAL) break;
@@ -3318,16 +3340,12 @@ static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
             bool game_met = (stage->type == SUBGOAL_STAT)
                                 ? (stage->current_stat_progress >= stage->required_progress)
                                 : stage->game_trigger_met;
-            bool stage_satisfied = game_met ||
-                                   (stage->linked_goal_count > 0 &&
-                                    check_linked_goals_satisfied(td, stage->linked_goals,
-                                                                 stage->linked_goal_count, stage->linked_goal_mode));
-            if (stage_satisfied) {
-                goal->current_stage = j + 1;
-            } else {
-                break;
-            }
+            base_satisfied[j] = game_met ||
+                                (stage->linked_goal_count > 0 &&
+                                 check_linked_goals_satisfied(td, stage->linked_goals,
+                                                              stage->linked_goal_count, stage->linked_goal_mode));
         }
+        goal->current_stage = ms_compute_current_stage(goal, base_satisfied);
         if (goal->current_stage != previous_stage) any_changed = true;
     }
     return any_changed;
@@ -4560,8 +4578,7 @@ static bool coop_finalize_multi_stage(TemplateData *td) {
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = td->multi_stage_goals[i];
         int previous_stage = goal->current_stage;
-        goal->current_stage = 0;
-        bool still_advancing = true; // Once a stage is unsatisfied, stop advancing but keep populating flags
+        std::vector<bool> base_satisfied(goal->stage_count, false);
 
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
@@ -4578,22 +4595,17 @@ static bool coop_finalize_multi_stage(TemplateData *td) {
             // Store the game-trigger result so recalculation paths can re-derive current_stage and regress.
             stage->game_trigger_met = stage_completed;
 
-            if (still_advancing) {
-                // Auto-completion via linked goals (non-final stages only; the final stage breaks above).
-                // Chains of linked goals resolve through the fixed-point iteration in the caller.
-                bool stage_satisfied = stage_completed ||
-                                       (stage->linked_goal_count > 0 &&
-                                        check_linked_goals_satisfied(td, stage->linked_goals,
-                                                                     stage->linked_goal_count,
-                                                                     stage->linked_goal_mode));
-                if (stage_satisfied) {
-                    goal->current_stage = j + 1;
-                } else {
-                    still_advancing = false; // Stages are sequential; stop advancing at first incomplete
-                }
-            }
+            // Base satisfaction: own trigger OR linked goals. The "complete with next stage" rule is
+            // applied afterwards by ms_compute_current_stage. Chains of linked goals resolve through
+            // the fixed-point iteration in the caller.
+            base_satisfied[j] = stage_completed ||
+                                (stage->linked_goal_count > 0 &&
+                                 check_linked_goals_satisfied(td, stage->linked_goals,
+                                                              stage->linked_goal_count,
+                                                              stage->linked_goal_mode));
         }
 
+        goal->current_stage = ms_compute_current_stage(goal, base_satisfied);
         if (goal->current_stage != previous_stage) any_changed = true;
     }
 
