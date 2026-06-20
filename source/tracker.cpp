@@ -11455,6 +11455,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     if (t->search_buffer[0] != '\0') {
         if (ImGui::Button("X##ClearSearch", ImVec2(clear_button_width, 0))) {
             t->search_buffer[0] = '\0'; // Clear the buffer
+            t->focus_search_box_requested = true; // Re-focus the search box after clearing
         }
         if (ImGui::IsItemHovered()) {
             char clear_search_tooltip_buffer[1024];

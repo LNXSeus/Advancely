@@ -4002,6 +4002,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (tc_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearTCSearch", ImVec2(clear_button_size, clear_button_size))) {
                 tc_search_buffer[0] = '\0';
+                focus_tc_search_box = true; // Re-focus the search box after clearing
             }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[32];
@@ -18476,7 +18477,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
                     ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
                     if (s_new_advs_search[0] != '\0') {
-                        if (ImGui::Button("X##new_advs_clear", ImVec2(cw, 0))) s_new_advs_search[0] = '\0';
+                        if (ImGui::Button("X##new_advs_clear", ImVec2(cw, 0))) {
+                            s_new_advs_search[0] = '\0';
+                            s_new_advs_focus_search = true; // Re-focus the search box after clearing
+                        }
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
                     } else {
                         ImGui::Dummy(ImVec2(cw, 0));
@@ -18716,7 +18720,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
                     ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
                     if (s_rename_search[0] != '\0') {
-                        if (ImGui::Button("X##rename_clear", ImVec2(cw, 0))) s_rename_search[0] = '\0';
+                        if (ImGui::Button("X##rename_clear", ImVec2(cw, 0))) {
+                            s_rename_search[0] = '\0';
+                            s_rename_focus_search = true; // Re-focus the search box after clearing
+                        }
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
                     } else {
                         ImGui::Dummy(ImVec2(cw, 0));
@@ -19017,7 +19024,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const float right_block = sw + cw + ImGui::GetStyle().ItemSpacing.x;
                     ImGui::SameLine(ImGui::GetWindowWidth() - right_block - ImGui::GetStyle().WindowPadding.x);
                     if (s_stale_search[0] != '\0') {
-                        if (ImGui::Button("X##stale_clear", ImVec2(cw, 0))) s_stale_search[0] = '\0';
+                        if (ImGui::Button("X##stale_clear", ImVec2(cw, 0))) {
+                            s_stale_search[0] = '\0';
+                            s_stale_focus_search = true; // Re-focus the search box after clearing
+                        }
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
                     } else {
                         ImGui::Dummy(ImVec2(cw, 0));
@@ -19369,7 +19379,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::SameLine();
                     if (s_criteria_search[0] != '\0') {
-                        if (ImGui::Button("X##criteria_clear", ImVec2(cw, 0))) s_criteria_search[0] = '\0';
+                        if (ImGui::Button("X##criteria_clear", ImVec2(cw, 0))) {
+                            s_criteria_search[0] = '\0';
+                            s_criteria_focus_search = true; // Re-focus the search box after clearing
+                        }
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
                     } else {
                         ImGui::Dummy(ImVec2(cw, 0));
@@ -19642,6 +19655,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
+                focus_import_search = true; // Re-focus the search box after clearing
             }
         } else {
             ImGui::Dummy(ImVec2(clear_button_width, 0));
@@ -20670,6 +20684,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportStatsSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
+                focus_import_search = true; // Re-focus the search box after clearing
             }
         } else {
             ImGui::Dummy(ImVec2(clear_button_width, 0));
@@ -20967,6 +20982,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportUnlocksSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
+                focus_import_search = true; // Re-focus the search box after clearing
             }
         } else {
             ImGui::Dummy(ImVec2(clear_button_width, 0));
@@ -21594,6 +21610,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (s_template_import_search[0] != '\0') {
                 if (ImGui::Button("X##template_import_clear", ImVec2(tpl_clear_width, 0))) {
                     s_template_import_search[0] = '\0';
+                    s_template_import_focus_search = true; // Re-focus the search box after clearing
                 }
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Clear the search.");
             } else {
@@ -22296,6 +22313,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (goal_selector_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearGoalSearch", ImVec2(clear_button_width_gs, 0))) {
                 goal_selector_search_buffer[0] = '\0';
+                focus_goal_selector_search = true; // Re-focus the search box after clearing
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", "Clear Search");

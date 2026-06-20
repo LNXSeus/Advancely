@@ -585,7 +585,8 @@ You can manipulate the view using several intuitive controls:
 
 To quickly find a specific goal, press `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box in the bottom-right
 corner. The filter is case-insensitive and intelligently searches across different goal types. Using the search filter
-also dynamically updates the completion counters in the section headers.
+also dynamically updates the completion counters in the section headers. Pressing the `X` button to clear any search
+box (here or anywhere in the template editor's search menus) automatically re-focuses it so you can keep typing.
 
 * **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match
   the search term. If only a sub-item matches, it will be the only one shown under its parent. Criterion matches also
