@@ -66,6 +66,26 @@ static std::vector<VisualLayoutItem> s_visual_layout_items;
 static std::vector<VisualLayoutItem> s_visual_layout_items_prev; // Previous frame snapshot for lookups during rendering
 static std::unordered_set<ManualPos *> s_visual_selected_items;
 
+// Maps each draggable element to its immediate hierarchical parent element (icon -> text ->
+// progress; parent icon -> criterion). nullptr parent means a top-level element. The _prev
+// copy is the previous frame's complete map, used during multi-drag (the current map is only
+// partially built while items render).
+static std::unordered_map<ManualPos *, ManualPos *> s_visual_parent_map;
+static std::unordered_map<ManualPos *, ManualPos *> s_visual_parent_map_prev;
+
+// Walks the (previous, complete) parent hierarchy and returns true if any ancestor of `pos`
+// is itself part of the current visual selection.
+static bool visual_pos_has_selected_ancestor(ManualPos *pos) {
+    auto it = s_visual_parent_map_prev.find(pos);
+    int guard = 0;
+    while (it != s_visual_parent_map_prev.end() && it->second != nullptr && guard++ < 32) {
+        ManualPos *parent = it->second;
+        if (s_visual_selected_items.count(parent) > 0) return true;
+        it = s_visual_parent_map_prev.find(parent);
+    }
+    return false;
+}
+
 // Deduplicated linkable-goal identities for the current visual selection, exposed to the
 // template editor so it can append them as linked goals. Rebuilt every frame while editing.
 static std::vector<CounterLinkedGoal> s_visual_selected_goals;
@@ -6063,7 +6083,8 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                                           const char *display_name, const char *element_type,
                                           const char *root_name = nullptr,
                                           const char *parent_display_name = nullptr,
-                                          const char *parent_root_name = nullptr) {
+                                          const char *parent_root_name = nullptr,
+                                          ManualPos *hierarchy_parent_pos = nullptr) {
     if (!t->is_visual_layout_editing) return;
 
     ImGui::PushID(id);
@@ -6106,6 +6127,9 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
     // Register this item for selection rectangle hit-testing
     s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable});
+
+    // Record this element's hierarchical parent so multi-drag can leave automatic children alone.
+    s_visual_parent_map[&target_pos] = hierarchy_parent_pos;
 
     // Mark that an item was interacted with (prevents selection rectangle from starting)
     if (is_hovered || ImGui::IsItemActive()) {
@@ -6226,6 +6250,11 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         if (s_visual_selected_items.count(&target_pos) > 0) {
             for (ManualPos *sel_pos: s_visual_selected_items) {
                 if (sel_pos == &target_pos) continue;
+                // Leave a still-automatic child automatic when one of its ancestors is also part
+                // of the selection: the child follows the parent procedurally, so it must not be
+                // stamped with explicit coordinates. Children that are already manually placed
+                // still move, to keep the whole group together.
+                if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
                 init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
                 sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                 sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dy), -MANUAL_POS_MAX), MANUAL_POS_MAX);
@@ -7388,7 +7417,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                          current_text_y),
                                                   ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
                                                   cat->text_pos, cat_type, cat->display_name, "Text",
-                                                  cat->root_name);
+                                                  cat->root_name, nullptr, nullptr, &cat->icon_pos);
                 }
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
@@ -7443,7 +7472,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                       ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level),
                                                       cat->progress_pos, cat_type, cat->display_name, "Progress",
-                                                      cat->root_name);
+                                                      cat->root_name, nullptr, nullptr, &cat->text_pos);
                     }
                     current_text_y = prog_y + progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
@@ -7600,7 +7629,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                       ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level),
                                                       crit->icon_pos, crit_type, crit->display_name,
                                                       "Icon", crit->root_name,
-                                                      cat->display_name, cat->root_name);
+                                                      cat->display_name, cat->root_name, &cat->icon_pos);
 
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
                         // Icon width + padding
@@ -7960,7 +7989,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                  child_text_size.y * t->zoom_level),
                                                           crit->text_pos, crit_type, crit->display_name,
                                                           "Text", crit->root_name,
-                                                          cat->display_name, cat->root_name);
+                                                          cat->display_name, cat->root_name, &crit->icon_pos);
 
                             current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
 
@@ -8006,7 +8035,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                          crit_progress_size.y * t->zoom_level),
                                                                   crit->progress_pos, crit_type, crit->display_name,
                                                                   "Progress", crit->root_name,
-                                                                  cat->display_name, cat->root_name);
+                                                                  cat->display_name, cat->root_name, &crit->text_pos);
                                 }
                             }
                         }
@@ -8670,7 +8699,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
                                               item->text_pos, "Unlock", item->display_name, "Text",
-                                              item->root_name);
+                                              item->root_name, nullptr, nullptr, &item->icon_pos);
 
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text && !hide_item_progress_in_layout) {
@@ -9159,7 +9188,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
                                               item->text_pos, "Custom Goal", item->display_name, "Text",
-                                              item->root_name);
+                                              item->root_name, nullptr, nullptr, &item->icon_pos);
 
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text && !hide_item_progress_in_layout) {
@@ -9197,7 +9226,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                       ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level),
                                                       item->progress_pos, "Custom Goal", item->display_name, "Progress",
-                                                      item->root_name);
+                                                      item->root_name, nullptr, nullptr, &item->text_pos);
                         // --------------------------------------------
                     }
                 }
@@ -9667,7 +9696,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
                                               goal->text_pos, "Counter", goal->display_name, "Text",
-                                              goal->root_name);
+                                              goal->root_name, nullptr, nullptr, &goal->icon_pos);
 
                 // Draw Progress Text
                 if (!hide_goal_progress_in_layout) {
@@ -9703,7 +9732,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                                       ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level),
                                                       goal->progress_pos, "Counter", goal->display_name, "Progress",
-                                                      goal->root_name);
+                                                      goal->root_name, nullptr, nullptr, &goal->text_pos);
                     }
                 } // End hide_goal_progress_in_layout
             }
@@ -10174,7 +10203,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
                                               goal->text_pos, "Multi-Stage Goal", goal->display_name, "Text",
-                                              goal->root_name);
+                                              goal->root_name, nullptr, nullptr, &goal->icon_pos);
             }
 
             // Draw Current Stage Text (uses sub_font_size)
@@ -10211,7 +10240,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                               ImVec2(stage_text_size.x * t->zoom_level,
                                                      stage_text_size.y * t->zoom_level),
                                               goal->progress_pos, "Multi-Stage Goal", goal->display_name, "Progress",
-                                              goal->root_name);
+                                              goal->root_name, nullptr, nullptr, &goal->text_pos);
             }
         } // End if (is_visible_on_screen)
 
@@ -10486,6 +10515,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         if (line_is_selected) {
                             for (ManualPos *sel_pos: s_visual_selected_items) {
                                 if (sel_pos == &elem->pos || sel_pos == &elem->pos2) continue;
+                                // Keep still-automatic children automatic when an ancestor is selected.
+                                if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
                                 init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
                                 sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX),
                                                    MANUAL_POS_MAX);
@@ -10854,6 +10885,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                     }
                                 }
                                 if (is_own_bend) continue;
+                                // Keep still-automatic children automatic when an ancestor is selected.
+                                if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
                                 init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
                                 sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
@@ -10927,6 +10960,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // then clear the current list so it can be rebuilt as items render this frame.
     s_visual_layout_items_prev.swap(s_visual_layout_items);
     s_visual_layout_items.clear();
+    s_visual_parent_map_prev.swap(s_visual_parent_map);
+    s_visual_parent_map.clear();
     t->visual_item_interacted_this_frame = false;
 
     // This is the starting Y position for all rendering.
@@ -11033,6 +11068,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
             if (nudge_x != 0.0f || nudge_y != 0.0f) {
                 for (ManualPos *sel_pos: s_visual_selected_items) {
+                    // Keep still-automatic children automatic when an ancestor is selected.
+                    if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
                     init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
                     sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + nudge_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                     sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + nudge_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);

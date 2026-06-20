@@ -1018,6 +1018,12 @@ the live tracker map instead of typing coordinates by hand.
   clearing it. `Ctrl`+drag on empty space draws a selection rectangle that adds to the existing selection. Click on
   empty space without `Ctrl` to deselect. Clicking an already-selected item (without dragging it) removes just that
   item from the selection.
+* **Automatic sub-goals stay automatic when moving a group**: Goal elements follow a hierarchy (icon, then text, then
+  progress text; for criteria, the icon then its display name). When you move a multi-selection that includes a parent
+  element, any still-automatic child of that parent is left automatic (it keeps following the parent procedurally)
+  instead of being stamped with explicit coordinates. Children that you have already positioned manually still move
+  with the group. To give a child its own position, move it on its own (or with a selection that doesn't include its
+  parent).
 * **Linking from a Selection**: Keep a selection active, then in the Template Editor open any goal or decoration that
   supports linked goals (counter, stat category, sub-stat, custom goal, multi-stage stage, or text header) and click
   the `Add Selected` button next to `Select Goals` to append the selected goals as linked goals (in template order,
