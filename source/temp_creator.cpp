@@ -2609,8 +2609,20 @@ static bool tc_linked_goals_contains(const std::vector<EditorCounterLinkedGoal> 
 
 // Appends the Visual Layout Editor selection to a linked-goal list, in template order and
 // without duplicating entries already present. Returns the number of goals added.
+// The owner_* parameters identify the goal that owns this linked-goal list; a matching
+// selection is skipped so a goal can never be linked to itself (owner_type LINK_TYPE_ANY
+// disables the self-check).
 static int tc_append_visual_selection(const EditorTemplate &tpl,
-                                      std::vector<EditorCounterLinkedGoal> &target) {
+                                      std::vector<EditorCounterLinkedGoal> &target,
+                                      const char *owner_root = nullptr,
+                                      const char *owner_parent = nullptr,
+                                      LinkedGoalType owner_type = LINK_TYPE_ANY) {
+    auto is_owner = [&](const char *root_name, const char *parent_root, LinkedGoalType type) -> bool {
+        if (owner_type == LINK_TYPE_ANY || !owner_root || owner_root[0] == '\0') return false;
+        const char *op = (owner_parent && owner_parent[0] != '\0') ? owner_parent : "";
+        const char *p = (parent_root && parent_root[0] != '\0') ? parent_root : "";
+        return type == owner_type && strcmp(root_name, owner_root) == 0 && strcmp(p, op) == 0;
+    };
     auto add = [&](const char *root_name, const char *parent_root, LinkedGoalType type) {
         EditorCounterLinkedGoal lg = {};
         strncpy(lg.root_name, root_name, sizeof(lg.root_name) - 1);
@@ -2621,6 +2633,7 @@ static int tc_append_visual_selection(const EditorTemplate &tpl,
     };
     auto consider = [&](const char *root_name, const char *parent_root, LinkedGoalType type) -> int {
         if (tc_visual_selection_contains(root_name, parent_root, type) &&
+            !is_owner(root_name, parent_root, type) &&
             !tc_linked_goals_contains(target, root_name, parent_root, type)) {
             add(root_name, parent_root, type);
             return 1;
@@ -2656,7 +2669,10 @@ static int tc_append_visual_selection(const EditorTemplate &tpl,
 // selection. Disabled with an explanatory tooltip when nothing is selected.
 static void tc_render_add_visual_selection_button(const char *id, const EditorTemplate &tpl,
                                                   std::vector<EditorCounterLinkedGoal> &target,
-                                                  SaveMessageType &save_message_type) {
+                                                  SaveMessageType &save_message_type,
+                                                  const char *owner_root = nullptr,
+                                                  const char *owner_parent = nullptr,
+                                                  LinkedGoalType owner_type = LINK_TYPE_ANY) {
     int vsel = tracker_get_visual_selected_goal_count();
     ImGui::SameLine();
     char btn_label[96];
@@ -2664,13 +2680,13 @@ static void tc_render_add_visual_selection_button(const char *id, const EditorTe
     bool disabled = (vsel == 0);
     if (disabled) ImGui::BeginDisabled();
     if (ImGui::Button(btn_label)) {
-        tc_append_visual_selection(tpl, target);
+        tc_append_visual_selection(tpl, target, owner_root, owner_parent, owner_type);
         tracker_request_clear_visual_selection();
         save_message_type = MSG_NONE;
     }
     if (disabled) ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tip[256];
+        char tip[384];
         if (vsel == 0)
             snprintf(tip, sizeof(tip),
                      "Select one or more goals in the Visual Layout Editor first,\n"
@@ -2679,9 +2695,33 @@ static void tc_render_add_visual_selection_button(const char *id, const EditorTe
             snprintf(tip, sizeof(tip),
                      "Append the %d goal(s) selected in the Visual Layout Editor as linked goals.\n"
                      "Selecting multiple parts of one goal (icon, text, progress) still adds it once,\n"
-                     "and goals already linked are skipped.", vsel);
+                     "and goals already linked are skipped.\n"
+                     "A goal is never linked to itself.", vsel);
         ImGui::SetTooltip("%s", tip);
     }
+}
+
+// Renders a "Remove All" button that clears a linked-goal list. Only drawn when the list is
+// non-empty; placed on the same line as the preceding control. Returns true if it cleared.
+static bool tc_render_remove_all_linked_goals_button(const char *id,
+                                                     std::vector<EditorCounterLinkedGoal> &target,
+                                                     SaveMessageType &save_message_type) {
+    if (target.empty()) return false;
+    ImGui::SameLine();
+    char btn_label[96];
+    snprintf(btn_label, sizeof(btn_label), "Remove All##rmall_%s", id);
+    bool cleared = false;
+    if (ImGui::Button(btn_label)) {
+        target.clear();
+        save_message_type = MSG_NONE;
+        cleared = true;
+    }
+    if (ImGui::IsItemHovered()) {
+        char tip[128];
+        snprintf(tip, sizeof(tip), "Remove every linked goal from this goal at once.");
+        ImGui::SetTooltip("%s", tip);
+    }
+    return cleared;
 }
 
 // Renders the "Use Selected" button next to an arrow's Start/End "Select" button. Arrows take a
@@ -3330,6 +3370,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
     static int selected_counter_index = -1;
+
+    // Reverting reassigns the template vectors, invalidating the advancement/stat/multi-stage
+    // selection pointers. Counters and custom goals survive because they use an index, so this
+    // re-resolves the pointer-based selections by root_name to keep the same goal open instead
+    // of dropping the user back to the list.
+    auto reselect_after_revert = [&](const char *adv_root, const char *stat_root, const char *ms_root) {
+        selected_advancement = nullptr;
+        selected_stat = nullptr;
+        selected_ms_goal = nullptr;
+        if (adv_root[0]) {
+            for (auto &adv : current_template_data.advancements)
+                if (strcmp(adv.root_name, adv_root) == 0) { selected_advancement = &adv; break; }
+        }
+        if (stat_root[0]) {
+            for (auto &stat : current_template_data.stats)
+                if (strcmp(stat.root_name, stat_root) == 0) { selected_stat = &stat; break; }
+        }
+        if (ms_root[0]) {
+            for (auto &g : current_template_data.multi_stage_goals)
+                if (strcmp(g.root_name, ms_root) == 0) { selected_ms_goal = &g; break; }
+        }
+    };
     // Visual drag auto-select: which tab to force-select and which goal's header to force-open
     enum ForceSelectTab {
         FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM,
@@ -3845,6 +3907,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (t && t->is_temp_creator_focused && editor_has_unsaved_changes && !ImGui::IsAnyItemActive() &&
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        // Capture the current selection by root_name before the copy-assignment below
+        // invalidates the pointers, so the same goal stays open after reverting.
+        char prev_adv[192] = "", prev_stat[192] = "", prev_ms[192] = "";
+        if (selected_advancement) strncpy(prev_adv, selected_advancement->root_name, sizeof(prev_adv) - 1);
+        if (selected_stat) strncpy(prev_stat, selected_stat->root_name, sizeof(prev_stat) - 1);
+        if (selected_ms_goal) strncpy(prev_ms, selected_ms_goal->root_name, sizeof(prev_ms) - 1);
+
         current_template_data = saved_template_data;
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
@@ -3856,13 +3925,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (is_active_template) {
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
-        // Pointers into the previous current_template_data vectors are invalidated
-        // by the copy-assignment above; counters use an index and are unaffected.
-        selected_advancement = nullptr;
-        selected_stat = nullptr;
-        selected_ms_goal = nullptr;
         if (is_editor_template_empty(saved_template_data)) {
             editing_template = false;
+            selected_advancement = nullptr;
+            selected_stat = nullptr;
+            selected_ms_goal = nullptr;
+        } else {
+            reselect_after_revert(prev_adv, prev_stat, prev_ms);
         }
     }
 
@@ -5839,6 +5908,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SameLine();
             // Replace the TextColored indicator with a Revert button
             if (ImGui::Button("Revert Changes")) {
+                // Capture the current selection by root_name before the copy-assignment below
+                // invalidates the pointers, so the same goal stays open after reverting.
+                char prev_adv[192] = "", prev_stat[192] = "", prev_ms[192] = "";
+                if (selected_advancement) strncpy(prev_adv, selected_advancement->root_name, sizeof(prev_adv) - 1);
+                if (selected_stat) strncpy(prev_stat, selected_stat->root_name, sizeof(prev_stat) - 1);
+                if (selected_ms_goal) strncpy(prev_ms, selected_ms_goal->root_name, sizeof(prev_ms) - 1);
+
                 current_template_data = saved_template_data;
                 save_message_type = MSG_NONE; // Clear any existing message
                 status_message[0] = '\0'; // Clear the message text
@@ -5851,11 +5927,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (is_active_template) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
-                selected_advancement = nullptr;
-                selected_stat = nullptr;
-                selected_ms_goal = nullptr;
                 if (is_editor_template_empty(saved_template_data)) {
                     editing_template = false;
+                    selected_advancement = nullptr;
+                    selected_stat = nullptr;
+                    selected_ms_goal = nullptr;
+                } else {
+                    reselect_after_revert(prev_adv, prev_stat, prev_ms);
                 }
             }
         }
@@ -9941,12 +10019,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Select goals that will auto-complete this entire stat category\n"
                                          "when the condition (AND/OR) is met.\n"
                                          "Hold Shift and click to select a range.\n"
+                                         "A goal can't be linked to itself.\n"
                                          "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
                             tc_render_add_visual_selection_button(select_btn_id, current_template_data,
-                                                                  stat_cat.linked_goals, save_message_type);
+                                                                  stat_cat.linked_goals, save_message_type,
+                                                                  stat_cat.root_name, nullptr, LINK_TYPE_STAT);
 
                             if (!stat_cat.linked_goals.empty()) {
                                 // AND/OR mode toggle
@@ -9966,6 +10046,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "OR = At least one selected goal must be completed.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
+
+                                tc_render_remove_all_linked_goals_button(stat_cat.root_name, stat_cat.linked_goals,
+                                                                         save_message_type);
 
                                 // Show linked goals list
                                 char child_id[64];
@@ -10897,12 +10980,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Select goals that will auto-complete this sub-stat\n"
                                                  "when the condition (AND/OR) is met.\n"
                                                  "Hold Shift and click to select a range.\n"
+                                                 "A goal can't be linked to itself.\n"
                                                  "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
 
                                     tc_render_add_visual_selection_button(crit_select_btn_id, current_template_data,
-                                                                          crit.linked_goals, save_message_type);
+                                                                          crit.linked_goals, save_message_type,
+                                                                          crit.root_name, stat_cat.root_name, LINK_TYPE_STAT);
 
                                     if (!crit.linked_goals.empty()) {
                                         // AND/OR mode toggle
@@ -10923,6 +11008,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      "OR = At least one selected goal must be completed.");
                                             ImGui::SetTooltip("%s", tooltip_buffer);
                                         }
+
+                                        tc_render_remove_all_linked_goals_button(crit_select_btn_id, crit.linked_goals,
+                                                                                 save_message_type);
 
                                         // Show linked goals list
                                         char crit_child_id[128];
@@ -12570,11 +12658,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char tooltip_buffer[512];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "Select goals that, when completed, will auto-complete this custom goal.\n"
+                                         "A goal can't be linked to itself.\n"
                                          "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             tc_render_add_visual_selection_button(select_btn_id, current_template_data,
-                                                                  goal.linked_goals, save_message_type);
+                                                                  goal.linked_goals, save_message_type,
+                                                                  goal.root_name, nullptr, LINK_TYPE_CUSTOM);
                             if (!goal.linked_goals.empty()) {
                                 ImGui::SameLine();
                                 int mode_int = (int) goal.linked_goal_mode;
@@ -12592,6 +12682,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "OR = At least one selected goal must be completed.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
+
+                                tc_render_remove_all_linked_goals_button(goal.root_name, goal.linked_goals,
+                                                                         save_message_type);
 
                                 char child_id[256];
                                 snprintf(child_id, sizeof(child_id), "CustomGoalLinkedGoals_%s", goal.root_name);
@@ -14982,12 +15075,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Select goals that will auto-complete this stage\n"
                                                  "when the condition (AND/OR) is met.\n"
                                                  "Hold Shift and click to select a range.\n"
+                                                 "A goal can't be linked to itself.\n"
                                                  "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
 
                                     tc_render_add_visual_selection_button(stage_select_btn_id, current_template_data,
-                                                                          stage.linked_goals, save_message_type);
+                                                                          stage.linked_goals, save_message_type,
+                                                                          goal.root_name, nullptr, LINK_TYPE_MULTI_STAGE);
 
                                     if (!stage.linked_goals.empty()) {
                                         // AND/OR mode toggle
@@ -15008,6 +15103,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      "AND = All selected goals must be completed.\n"
                                                      "OR = At least one selected goal must be completed.");
                                             ImGui::SetTooltip("%s", tooltip_buffer);
+                                        }
+
+                                        if (tc_render_remove_all_linked_goals_button(stage_select_btn_id,
+                                                                                     stage.linked_goals,
+                                                                                     save_message_type)) {
+                                            ms_goal_data_changed = true;
                                         }
 
                                         // Show linked goals list
@@ -16227,12 +16328,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Only the exact linked items are shown (e.g., linking a parent advancement\n"
                                      "shows only the parent, not its criteria).\n"
                                      "You can select multiple goals of any type.\n"
-                                     "Hold Shift and click to select a range.");
+                                     "Hold Shift and click to select a range.\n"
+                                     "A goal can't be linked to itself.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         tc_render_add_visual_selection_button("Counter", current_template_data,
-                                                              counter.linked_goals, save_message_type);
+                                                              counter.linked_goals, save_message_type,
+                                                              counter.root_name, nullptr, LINK_TYPE_COUNTER);
+                        tc_render_remove_all_linked_goals_button("Counter", counter.linked_goals,
+                                                                 save_message_type);
 
                         // Show list of linked goals
                         if (!counter.linked_goals.empty()) {
@@ -16684,6 +16789,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             tc_render_add_visual_selection_button(select_header_goals_btn, current_template_data,
                                                                   deco.linked_goals, save_message_type);
+                            tc_render_remove_all_linked_goals_button(select_header_goals_btn, deco.linked_goals,
+                                                                     save_message_type);
 
                             // Show list of linked goals
                             if (!deco.linked_goals.empty()) {
@@ -22122,6 +22229,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- Left-aligned label ---
         bool is_multi_select = (goal_selector_max_selection != 1);
+
+        // Identify the goal being edited so it can never be linked to itself. Only relevant for
+        // multi-select (linked goals); single-select arrow endpoints may target any goal.
+        const char *owner_root = nullptr;
+        const char *owner_parent = nullptr;
+        LinkedGoalType owner_type = LINK_TYPE_ANY;
+        if (is_multi_select) {
+            if (goal_selector_counter_index >= 0 &&
+                goal_selector_counter_index < (int) current_template_data.counter_goals.size()) {
+                owner_root = current_template_data.counter_goals[goal_selector_counter_index].root_name;
+                owner_type = LINK_TYPE_COUNTER;
+            } else if (goal_selector_custom_goal_index >= 0 &&
+                       goal_selector_custom_goal_index < (int) current_template_data.custom_goals.size()) {
+                owner_root = current_template_data.custom_goals[goal_selector_custom_goal_index].root_name;
+                owner_type = LINK_TYPE_CUSTOM;
+            } else if (goal_selector_stat_cat_index >= 0 &&
+                       goal_selector_stat_cat_index < (int) current_template_data.stats.size()) {
+                const auto &owner_stat = current_template_data.stats[goal_selector_stat_cat_index];
+                owner_type = LINK_TYPE_STAT;
+                if (goal_selector_stat_crit_index >= 0 &&
+                    goal_selector_stat_crit_index < (int) owner_stat.criteria.size()) {
+                    owner_root = owner_stat.criteria[goal_selector_stat_crit_index].root_name;
+                    owner_parent = owner_stat.root_name;
+                } else {
+                    owner_root = owner_stat.root_name;
+                }
+            } else if (goal_selector_msg_index >= 0 &&
+                       goal_selector_msg_index < (int) current_template_data.multi_stage_goals.size()) {
+                owner_root = current_template_data.multi_stage_goals[goal_selector_msg_index].root_name;
+                owner_type = LINK_TYPE_MULTI_STAGE;
+            }
+        }
+        auto is_owner_entry = [&](const char *root_name, const char *parent_root, LinkedGoalType type) -> bool {
+            if (owner_type == LINK_TYPE_ANY || !owner_root) return false;
+            const char *op = (owner_parent && owner_parent[0] != '\0') ? owner_parent : "";
+            const char *p = (parent_root && parent_root[0] != '\0') ? parent_root : "";
+            return type == owner_type && strcmp(root_name, owner_root) == 0 && strcmp(p, op) == 0;
+        };
+
         if (is_multi_select) {
             ImGui::Text("Select goals to link (Shift+click for range)");
         } else {
@@ -22232,6 +22378,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Helper: toggle a goal in multi-select, or set in single-select
         auto select_goal = [&](const char *root_name, const char *stage_id,
                                const char *parent_root, LinkedGoalType type, bool checked) {
+            // Never allow a goal to be linked to itself (covers shift-click range selection too).
+            if (checked && is_owner_entry(root_name, parent_root, type)) return;
             if (is_multi_select) {
                 if (checked) {
                     // Add to selections
@@ -22367,6 +22515,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (indent) ImGui::Indent();
             bool checked = is_goal_selected(root_name, stage_id, parent_root);
             int my_flat_index = current_flat_index++;
+            bool is_self = is_owner_entry(root_name, parent_root, type);
+            if (is_self) ImGui::BeginDisabled();
             if (ImGui::Checkbox(label, &checked)) {
                 if (is_multi_select && ImGui::GetIO().KeyShift && goal_selector_last_clicked_flat_index >= 0) {
                     // Shift-click range selection: toggle all between last clicked and this one to match new state
@@ -22383,6 +22533,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     select_goal(root_name, stage_id, parent_root, type, checked);
                 }
                 goal_selector_last_clicked_flat_index = my_flat_index;
+            }
+            if (is_self) {
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    ImGui::SetTooltip("%s", "A goal can't be linked to itself.");
+                }
             }
             if (indent) ImGui::Unindent();
         };
