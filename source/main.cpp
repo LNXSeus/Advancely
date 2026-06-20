@@ -2166,6 +2166,7 @@ int main(int argc, char *argv[]) {
                                 "[MAIN] Visual Layout Editor auto-cancelled: no valid saves folder is being tracked.\n");
                     tracker->is_visual_layout_editing = false;
                     app_settings.goal_hiding_mode = tracker->pre_visual_edit_hiding_mode;
+                    app_settings.use_manual_layout = tracker->pre_visual_edit_use_manual_layout;
                     settings_save(&app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }

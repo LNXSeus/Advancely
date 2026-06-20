@@ -6040,8 +6040,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                    status_message, app_settings);
                     }
 
-                    // Remember the current hiding mode before overriding (restored on stop/cancel)
+                    // Remember the current hiding mode and manual layout setting before
+                    // overriding (restored on stop/cancel)
                     t->pre_visual_edit_hiding_mode = app_settings->goal_hiding_mode;
+                    t->pre_visual_edit_use_manual_layout = app_settings->use_manual_layout;
 
                     // Automatically force "Manual Layout" ON
                     app_settings->use_manual_layout = true;
@@ -6053,8 +6055,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 } else {
-                    // Restore the hiding mode that was active before visual editing
+                    // Restore the hiding mode and manual layout setting that were active before visual editing
                     app_settings->goal_hiding_mode = t->pre_visual_edit_hiding_mode;
+                    app_settings->use_manual_layout = t->pre_visual_edit_use_manual_layout;
                     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }

@@ -1039,7 +1039,8 @@ the live tracker map instead of typing coordinates by hand.
   **"Stop Visual Editing"** when finished, then click **"Save"** in the Template Editor to persist your layout to
   disk.
 * **Restrictions**: While the Visual Layout Editor is active, applying settings and switching templates are disabled
-  to prevent reloads. Custom Goal Hotkeys are also disabled.
+  to prevent reloads. Custom Goal Hotkeys are also disabled. The `Manual Layout` checkbox is locked on, since the
+  editor requires it to stay enabled.
 
 ### Importing from Game Files or Other Templates
 

@@ -11779,22 +11779,31 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     ImGui::SameLine();
 
-    ImGui::BeginDisabled(!t->template_data); // Prevent crashing if template_data is null
+    // Locked while the Visual Layout Editor is active: that mode forces "Manual Layout" ON,
+    // so toggling it off here would break active editing.
+    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); // Prevent crashing if template_data is null
     bool temp_manual = settings->use_manual_layout;
     if (ImGui::Checkbox("Manual Layout", &temp_manual)) {
         settings->use_manual_layout = temp_manual;
         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save the preference instantly
     }
-    if (ImGui::IsItemHovered()) {
+    ImGui::EndDisabled();
+    // Hover text outside the disabled scope so the tooltip still shows while the checkbox is locked.
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[256];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-                 "Any non-manually placed goals get pushed to the right.\n"
-                 "Repositioning for the manual layout is done through the\n"
-                 "Template Editor's Visual Layout Editor.");
+        if (t->is_visual_layout_editing) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Locked while the Visual Layout Editor is active.\n"
+                     "The editor requires 'Manual Layout' to stay enabled.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
+                     "Any non-manually placed goals get pushed to the right.\n"
+                     "Repositioning for the manual layout is done through the\n"
+                     "Template Editor's Visual Layout Editor.");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    ImGui::EndDisabled();
 
     ImGui::SameLine();
 
