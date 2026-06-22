@@ -95,7 +95,6 @@ const char *SUPPORTER_ICONS[] = {
     "emotes/peepoCheer-4x_unoptimized.gif",
     "emotes/peepoCheer2-4x_unoptimized.gif",
     "emotes/peepoHappier-4x_unoptimized.gif",
-    "emotes/peepoRun-4x_unoptimized.gif",
     "emotes/pepeDS-4x_unoptimized.gif",
     "emotes/piglinJAM-4x_unoptimized.gif",
     "emotes/popCat-4x_unoptimized.gif",
