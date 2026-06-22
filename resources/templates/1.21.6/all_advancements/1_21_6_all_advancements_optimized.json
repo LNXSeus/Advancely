@@ -1635,7 +1635,8 @@
 					"icon":	"items/trident_1.13.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
-					"target":	1
+					"target":	1,
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Lightning_Rod_(U)_JE3.png",
