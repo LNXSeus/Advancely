@@ -199,7 +199,6 @@
 	"stat.stat:gold_blocks_picked_up":	"Goldbloecke",
 	"stat.stat:drowneds_killed":	"Ertrunkene",
 	"stat.stat:wither_skeletons_killed":	"Withersk.",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"Leuchtfeuer",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"3 Schaedel",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"Wither rufen",

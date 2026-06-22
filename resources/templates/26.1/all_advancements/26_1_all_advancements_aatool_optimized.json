@@ -1474,16 +1474,6 @@
 				}, {
 					"root_name":	"ms_goal:spire"
 				}]
-		},
-		"conduit_crafted":	{
-			"icon":	"blocks/placeholder.png",
-			"hidden":	true,
-			"root_name":	"minecraft:crafted/minecraft:conduit",
-			"target":	1,
-			"linked_goals":	[{
-					"root_name":	"minecraft:nether/all_effects",
-					"type":	"advancement"
-				}]
 		}
 	},
 	"unlocks":	[],
@@ -1592,10 +1582,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
 					"target":	8,
-					"linked_goals":	[{
-							"root_name":	"conduit_crafted",
-							"type":	"stat"
-						}]
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Conduit_JE1_BE1.png",

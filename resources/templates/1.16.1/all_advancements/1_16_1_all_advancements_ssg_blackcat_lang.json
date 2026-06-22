@@ -241,7 +241,6 @@
 	"stat.stat:drowned_killed":	"Drowned",
 	"stat.stat:skull_count":	"Skull Count",
 	"stat.stat:wither_skeletons_killed":	"W Skellys",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:thunder.display_name":	"Thunder",
 	"multi_stage_goal.ms_goal:thunder.stage.1":	"Obtain Trident",
 	"multi_stage_goal.ms_goal:thunder.stage.2":	"Get VVF",

@@ -322,7 +322,6 @@
 	"stat.stat:bee_nests_picked_up":	"Bienennester",
 	"stat.stat:vaults_opened":	"Tresore geoeffnet",
 	"stat.stat:chests_opened":	"Kisten geoeffnet",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:sniffers.display_name":	"Schnueffler",
 	"multi_stage_goal.ms_goal:sniffers.stage.1":	"Sammle 2 Eier",
 	"multi_stage_goal.ms_goal:sniffers.stage.2":	"Platziere Eier",

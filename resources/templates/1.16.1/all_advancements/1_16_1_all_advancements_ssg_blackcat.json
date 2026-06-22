@@ -984,11 +984,7 @@
 		"stat:nt_shell_count":	{
 			"icon":	"items/nautilus_shell_1.20.2.png",
 			"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-			"target":	8,
-			"linked_goals":	[{
-					"root_name":	"conduit_crafted_helper",
-					"type":	"stat"
-				}]
+			"target":	8
 		},
 		"stat:obtain_trident":	{
 			"icon":	"blocks/placeholder.png",
@@ -1018,12 +1014,6 @@
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
 				}]
-		},
-		"conduit_crafted_helper":	{
-			"icon":	"blocks/placeholder.png",
-			"hidden":	true,
-			"root_name":	"minecraft:crafted/minecraft:conduit",
-			"target":	1
 		}
 	},
 	"unlocks":	[],

@@ -1689,19 +1689,6 @@
 			"y":	350
 		}
 	},
-	"stat.conduit_crafted_helper":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		},
-		"text_pos":	{
-			"hidden":	true
-		},
-		"progress_pos":	{
-			"hidden":	true
-		}
-	},
 	"multi_stage_goal.ms_goal:beacon":	{
 		"icon_pos":	{
 			"x":	745,

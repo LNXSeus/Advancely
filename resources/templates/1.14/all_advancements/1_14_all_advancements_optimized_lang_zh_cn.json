@@ -199,7 +199,6 @@
 	"stat.stat:gold_blocks_picked_up":	"金块",
 	"stat.stat:drowneds_killed":	"溺尸",
 	"stat.stat:wither_skeletons_killed":	"凋零骷髅头",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"信标",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"获取3个凋零骷髅头颅",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"召唤凋零",

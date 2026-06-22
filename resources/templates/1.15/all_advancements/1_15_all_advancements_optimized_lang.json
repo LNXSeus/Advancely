@@ -205,7 +205,6 @@
 	"stat.stat:drowneds_killed":	"Drowneds",
 	"stat.stat:wither_skeletons_killed":	"Wither Sk.",
 	"stat.stat:bee_nests_picked_up":	"Bee Nests",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"Beacon",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"Get 3 Skulls",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"Summon Wither",

@@ -1002,12 +1002,6 @@
 				}, {
 					"root_name":	"minecraft:husbandry/silk_touch_nest"
 				}]
-		},
-		"conduit_crafted_helper":	{
-			"icon":	"blocks/Conduit_JE1_BE1.png",
-			"hidden":	true,
-			"root_name":	"minecraft:crafted/minecraft:conduit",
-			"target":	1
 		}
 	},
 	"unlocks":	[],
@@ -1069,9 +1063,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
 					"target":	8,
-					"linked_goals":	[{
-							"root_name":	"conduit_crafted_helper"
-						}]
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Conduit_JE1_BE1.png",

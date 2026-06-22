@@ -235,7 +235,6 @@
 	"stat.stat:tnt_picked_up":	"TNT",
 	"stat.stat:debris_picked_up":	"远古残骸",
 	"stat.stat:bee_nests_picked_up":	"蜂巢",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"信标",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"获取3个凋零骷髅头颅",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"召唤凋零",

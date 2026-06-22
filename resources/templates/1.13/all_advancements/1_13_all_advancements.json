@@ -706,12 +706,6 @@
 					"root_name":	"minecraft:nether/create_full_beacon"
 				}]
 		},
-		"conduit_crafted_helper":	{
-			"icon":	"blocks/Conduit_JE1_BE1.png",
-			"hidden":	true,
-			"root_name":	"minecraft:crafted/minecraft:conduit",
-			"target":	1
-		},
 		"stat:drowneds_killed":	{
 			"icon":	"monsters/Drowned_mob.png",
 			"root_name":	"minecraft:killed/minecraft:drowned",
@@ -789,9 +783,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
 					"target":	8,
-					"linked_goals":	[{
-							"root_name":	"conduit_crafted_helper"
-						}]
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"icon":	"blocks/Conduit_JE1_BE1.png",
@@ -835,6 +827,5 @@
 					"root_name":	""
 				}]
 		}],
-	"counter_goals":	[],
-	"decorations":	[]
+	"counter_goals":	[]
 }

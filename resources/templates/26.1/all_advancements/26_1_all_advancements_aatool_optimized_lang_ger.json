@@ -327,7 +327,6 @@
 	"stat.stat:bee_nests_picked_up":	"Bienennester",
 	"stat.stat:vaults_opened":	"Tresore geoeffnet",
 	"stat.stat:chests_opened":	"Kisten geoeffnet",
-	"stat.conduit_crafted":	"Aquisator herg.",
 	"multi_stage_goal.ms_goal:sniffers.display_name":	"Schnueffler",
 	"multi_stage_goal.ms_goal:sniffers.stage.1":	"Erhalten",
 	"multi_stage_goal.ms_goal:sniffers.stage.2":	"Platzieren",

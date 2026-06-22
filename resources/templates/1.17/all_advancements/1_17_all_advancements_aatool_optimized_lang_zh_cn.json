@@ -249,7 +249,6 @@
 	"stat.stat:debris_picked_up":	"远古残骸",
 	"stat.stat:bee_nests_picked_up":	"蜂巢",
 	"stat.cauldrons":	"炼药锅",
-	"stat.conduit_crafted_helper":	"",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"需要：",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"头颅",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"召唤凋零",

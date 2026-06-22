@@ -327,7 +327,6 @@
 	"stat.stat:bee_nests_picked_up":	"Nests",
 	"stat.stat:vaults_opened":	"Vaults",
 	"stat.stat:chests_opened":	"Chests",
-	"stat.conduit_crafted":	"Conduit crafted",
 	"multi_stage_goal.ms_goal:sniffers.display_name":	"Sniffers",
 	"multi_stage_goal.ms_goal:sniffers.stage.1":	"Obtain",
 	"multi_stage_goal.ms_goal:sniffers.stage.2":	"Place",
