@@ -15,6 +15,23 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.5.5" date="2026-06-23">
+      <description>
+        <ul>
+          <li>New per-stage option for multi-stage goals: a stage can be skipped automatically when the next stage is completed (used so the shells stage is skipped once the conduit is crafted).</li>
+          <li>Pressing TAB now cycles through the stage fields of multi-stage goals as expected.</li>
+          <li>Template editor: the Manual Layout checkbox is locked while the visual Layout Editor is active (and its previous state is restored afterward); selecting and dragging a goal together with its text no longer gives the text independent positioning (applies down the whole sub-goal hierarchy); pressing X on any search bar now reselects it.</li>
+          <li>Linked goals: a goal can no longer be linked to itself, a "Remove All" option was added, and Always On Top now defaults to off.</li>
+          <li>New templates: 1.16.2 and 1.17 all_advancements _categorical templates, plus 4 new old-block counter textures (grass block, netherrack, podzol, sand) for the 1.12 categorical template.</li>
+          <li>1.21.11 and 26.1 now share identical all_advancements templates (both ship the _categorical and _aatool_optimized variants, plus all their language and layout files), since they only differ in how the game files are read.</li>
+          <li>Template updates: all categorical templates were updated. Trident multi-stage goals were updated to account for tridents being lootable from chests, and shells/conduit stages now use the new skip-stage behavior across templates.</li>
+          <li>New textures: many old spawn egg textures, new end-screen emotes, and an updated old notch texture.</li>
+          <li>Added support for Minecraft 26.4.</li>
+          <li>Credits: added Oskar's YouTube.</li>
+          <li>Fixes: custom manual progress now transfers correctly when loading a settings preset.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.4" date="2026-06-18">
       <description>
         <ul>
