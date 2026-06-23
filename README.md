@@ -1789,7 +1789,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
   on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 * **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
-* **[ScrambledMC](https://www.youtube.com/@scrambledmc3772)**: Made the fantastic `_categorical` `all_advancements` templates.
+* **[ScrambledMC](https://www.twitch.tv/scrambledmc)**: Made the fantastic `_categorical` `all_advancements` templates.
 * **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates. Helped testing coop on Windows.
 * **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` and `_ssg_keimaseed` templates.
 * **Jaykeycakey** (`jaykeycakey_` on Discord): Windows coop tester.
