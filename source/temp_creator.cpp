@@ -6408,12 +6408,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    char counter_text[160];
-                    int adv_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
+                    char counter_text[200];
+                    int adv_counter_pos;
+                    if (creator_selected_version >= MC_VERSION_1_12) {
+                        // Modern versions split the count into advancements and recipes via the is_recipe flag.
+                        size_t recipe_count_disp = 0;
+                        for (const auto *adv_ptr: advancements_to_render) {
+                            if (adv_ptr->is_recipe) recipe_count_disp++;
+                        }
+                        size_t adv_only_count = advancements_to_render.size() - recipe_count_disp;
+                        adv_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s \xC2\xB7 %zu %s",
+                                                   adv_only_count,
+                                                   adv_only_count == 1
+                                                       ? advancements_label_upper
+                                                       : advancements_label_plural_upper,
+                                                   recipe_count_disp,
+                                                   recipe_count_disp == 1 ? "Recipe" : "Recipes");
+                    } else {
+                        adv_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
                                                    advancements_to_render.size(),
                                                    advancements_to_render.size() == 1
                                                        ? advancements_label_upper
                                                        : advancements_label_plural_upper);
+                    }
                     if (!s_adv_selection.empty() && adv_counter_pos < (int) sizeof(counter_text)) {
                         snprintf(counter_text + adv_counter_pos, sizeof(counter_text) - adv_counter_pos,
                                  " \xC2\xB7 %d selected", (int) s_adv_selection.size());
