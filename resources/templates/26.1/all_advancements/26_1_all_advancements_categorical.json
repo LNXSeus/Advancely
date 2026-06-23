@@ -2781,13 +2781,12 @@
 					"root_name":	"minecraft:axolotl",
 					"parent_root":	"minecraft:husbandry/bred_all_animals"
 				}, {
-					"root_name":	"minecraft:husbandry/axolotl_in_a_bucket"
-				}, {
-					"root_name":	"minecraft:husbandry/kill_axolotl_target"
-				}, {
 					"root_name":	"minecraft:husbandry/make_a_sign_glow"
 				}, {
 					"root_name":	"minecraft:nether/ride_strider_in_overworld_lava"
+				}, {
+					"root_name":	"axolotl",
+					"type":	"multi_stage"
 				}]
 		}, {
 			"root_name":	"deep_dark",

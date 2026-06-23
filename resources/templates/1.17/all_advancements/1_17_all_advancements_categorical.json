@@ -1928,17 +1928,14 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:husbandry/axolotl_in_a_bucket",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:husbandry/kill_axolotl_target",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:husbandry/make_a_sign_glow",
 					"type":	"advancement"
 				}, {
 					"root_name":	"spyglass",
 					"type":	"stat"
+				}, {
+					"root_name":	"axolotl",
+					"type":	"multi_stage"
 				}]
 		}, {
 			"root_name":	"ocean",
@@ -2271,6 +2268,12 @@
 					"root_name":	"glow_berries",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:recipes/misc/mojang_banner_pattern",
+					"type":	"advancement"
+				}, {
+					"root_name":	"tnt",
+					"type":	"stat"
 				}]
 		}, {
 			"root_name":	"nether",
