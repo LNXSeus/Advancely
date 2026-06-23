@@ -29,6 +29,7 @@
           <li>Added support for Minecraft 26.4.</li>
           <li>Credits: added Oskar's YouTube.</li>
           <li>Fixes: custom manual progress now transfers correctly when loading a settings preset.</li>
+          <li>For 1.12+ the "Advancements" tab in the template editor distinguishes between advancements and recipes.</li>
         </ul>
       </description>
     </release>
