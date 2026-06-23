@@ -14610,6 +14610,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
 
                             // Group all stage controls to make them a single drag source
+                            ImVec2 stage_item_start_cursor_pos = ImGui::GetCursorScreenPos();
                             ImGui::BeginGroup();
                             static char focused_stage_id[64] = {};
                             if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
@@ -15287,7 +15288,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndGroup();
 
                             ImGui::SameLine();
-                            // To make a non-interactive item a drag source we use the flag
+                            ImGui::SetCursorScreenPos(stage_item_start_cursor_pos);
+                            ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+                            // Use the flag to make the non-interactive group a drag source
                             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                                 ImGui::SetDragDropPayload("MS_STAGE_DND", &j, sizeof(int));
                                 if (s_stage_selection.find((int) j) != s_stage_selection.end() &&
