@@ -228,8 +228,8 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
             float scaled_h = tex_h * scale_factor;
 
             // Calculate padding to center the texture inside the destination box
-            float pad_x = (dest->w - scaled_w) / 2.0f;
-            float pad_y = (dest->h - scaled_h) / 2.0f;
+            float pad_x = snap_px((dest->w - scaled_w) / 2.0f);
+            float pad_y = snap_px((dest->h - scaled_h) / 2.0f);
 
             // Create the final, centered, and correctly scaled destination rectangle
             SDL_FRect final_dest = {dest->x + pad_x, dest->y + pad_y, scaled_w, scaled_h};
