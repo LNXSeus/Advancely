@@ -168,6 +168,10 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SD
     return new_entry->texture;
 }
 
+static inline float snap_px(float v) {
+    return roundf(v);
+}
+
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
  * It also corrects the aspect ratio of the .png textures.
  *
@@ -747,7 +751,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float ROW1_Y_POS = 48.0f;
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SHARED_ICON_SIZE = settings->overlay_row1_shared_icon_size; // Originally 30.0f
-        const float item_full_width = ROW1_ICON_SIZE + settings->overlay_row1_spacing;
+        const float item_full_width = snap_px(ROW1_ICON_SIZE + settings->overlay_row1_spacing);
 
         // Gather items
         std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
@@ -779,7 +783,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             float total_row_width = visible_item_count * item_full_width;
 
             // fmod allows the infinite scrolling
-            float start_pos = fmod(o->scroll_offset_row1, total_row_width);
+            float start_pos = snap_px(fmod(o->scroll_offset_row1, total_row_width));
 
             // Calculate blocks needed to cover screen + buffer
             int blocks_to_draw = (int) ceil((float) window_w / total_row_width) + 2;
@@ -806,6 +810,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         // Negative Scroll (R->L): Anchor to the Left (Start) - Default Behavior
                         x_pos = block_offset + (visible_item_index * item_full_width);
                     }
+                    x_pos = snap_px(x_pos);
 
                     // --- Simple Culling ---
                     // Icons are uniform size, so simple culling is safe here
@@ -935,23 +940,23 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 max_text_width = fmaxf(max_text_width, (float) fmax(name_w, amount_w));
             }
 
-            const float cell_width = fmaxf(ITEM_WIDTH, max_text_width);
+            const float cell_width = snap_px(fmaxf(ITEM_WIDTH, max_text_width));
             const float item_full_width = cell_width + ITEM_SPACING;
 
             float total_row_width = NUM_SUPPORTERS * item_full_width;
-            float start_pos = fmod(o->scroll_offset_row3, total_row_width); // Sync with row 3's speed
+            float start_pos = snap_px(fmod(o->scroll_offset_row3, total_row_width)); // Sync with row 3's speed
             int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
             for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
                 float block_offset = start_pos + (block * total_row_width);
                 for (size_t i = 0; i < static_supporter_render_list.size(); ++i) {
-                    float current_x = block_offset + (i * item_full_width);
+                    float current_x = snap_px(block_offset + (i * item_full_width));
                     if (current_x + item_full_width < 0 || current_x > window_w) continue;
 
                     const auto &render_info = static_supporter_render_list[i];
 
                     // Render background
-                    float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
+                    float bg_x_offset = snap_px((cell_width - ITEM_WIDTH) / 2.0f);
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
                     render_texture_with_alpha(o->renderer, render_info.background_static, render_info.background_anim,
                                               &bg_rect, 255);
@@ -990,7 +995,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     if (name_tex) {
                         float w, h;
                         SDL_GetTextureSize(name_tex, &w, &h);
-                        float text_x = current_x + (cell_width - w) / 2.0f;
+                        float text_x = current_x + snap_px((cell_width - w) / 2.0f);
                         SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                         SDL_RenderTexture(o->renderer, name_tex, nullptr, &dest_rect);
 
@@ -1001,7 +1006,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         if (amount_tex) {
                             float pw, ph;
                             SDL_GetTextureSize(amount_tex, &pw, &ph);
-                            float p_text_x = current_x + (cell_width - pw) / 2.0f;
+                            float p_text_x = current_x + snap_px((cell_width - pw) / 2.0f);
                             SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
                             SDL_RenderTexture(o->renderer, amount_tex, nullptr, &p_dest_rect);
                         }
@@ -1206,10 +1211,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             float item_full_width_row2;
 
             if (settings->overlay_row2_custom_spacing_enabled) {
-                item_full_width_row2 = settings->overlay_row2_custom_spacing;
+                item_full_width_row2 = snap_px(settings->overlay_row2_custom_spacing);
                 cell_width_row2 = item_full_width_row2 - ITEM_SPACING;
             } else {
-                cell_width_row2 = fmaxf(ITEM_WIDTH, max_text_width_row2);
+                cell_width_row2 = snap_px(fmaxf(ITEM_WIDTH, max_text_width_row2));
                 item_full_width_row2 = cell_width_row2 + ITEM_SPACING;
             }
             o->calculated_row2_item_width = item_full_width_row2;
@@ -1224,7 +1229,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 float total_row_width = visible_item_count * item_full_width_row2;
 
                 // Use raw scroll offset (no negation) to match Row 1 and 3 direction
-                float start_pos = fmod(o->scroll_offset_row2, total_row_width);
+                float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width));
 
                 // Calculate blocks to draw, adding buffer for wide text bleeding in
                 int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
@@ -1248,9 +1253,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             // Negative Scroll (R->L): Anchor to the Left
                             current_x = block_offset + (visible_item_index * item_full_width_row2);
                         }
+                        current_x = snap_px(current_x);
 
                         // --- Dynamic Culling ---
-                        float bg_x_offset = (cell_width_row2 - ITEM_WIDTH) / 2.0f;
+                        float bg_x_offset = snap_px((cell_width_row2 - ITEM_WIDTH) / 2.0f);
                         float icon_visual_x = current_x + bg_x_offset;
                         float dynamic_cull_margin = max_text_width_row2 + 50.0f;
 
@@ -1464,7 +1470,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         if (name_texture) {
                             float w, h;
                             SDL_GetTextureSize(name_texture, &w, &h);
-                            float text_x = current_x + (cell_width_row2 - w) / 2.0f;
+                            float text_x = current_x + snap_px((cell_width_row2 - w) / 2.0f);
                             SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                             SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
 
@@ -1474,7 +1480,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 if (progress_texture) {
                                     float pw, ph;
                                     SDL_GetTextureSize(progress_texture, &pw, &ph);
-                                    float p_text_x = current_x + (cell_width_row2 - pw) / 2.0f;
+                                    float p_text_x = current_x + snap_px((cell_width_row2 - pw) / 2.0f);
                                     SDL_FRect p_dest_rect = {
                                         p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph
                                     };
@@ -1695,10 +1701,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (settings->overlay_row3_custom_spacing_enabled) {
             // Use fixed width from setting
-            item_full_width_row3 = settings->overlay_row3_custom_spacing;
+            item_full_width_row3 = snap_px(settings->overlay_row3_custom_spacing);
             cell_width_row3 = item_full_width_row3 - ITEM_SPACING;
         } else {
-            cell_width_row3 = fmaxf(ITEM_WIDTH, max_text_width_row3);
+            cell_width_row3 = snap_px(fmaxf(ITEM_WIDTH, max_text_width_row3));
             item_full_width_row3 = cell_width_row3 + ITEM_SPACING;
         }
 
@@ -1715,7 +1721,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             // Render pass uses the calculated item_full_width_row3
             float total_row_width = visible_item_count * item_full_width_row3;
             // Use current visible count for total width
-            float start_pos = fmod(o->scroll_offset_row3, total_row_width);
+            float start_pos = snap_px(fmod(o->scroll_offset_row3, total_row_width));
             int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
             for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
@@ -1734,10 +1740,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         // Negative Scroll (R->L): Anchor to the Left
                         current_x = block_offset + (visible_item_index * item_full_width_row3);
                     }
+                    current_x = snap_px(current_x);
 
                     // Strict Culling based on Icon Visibility
                     // Calculate where the 96px icon background will sit
-                    float bg_x_offset = (cell_width_row3 - ITEM_WIDTH) / 2.0f;
+                    float bg_x_offset = snap_px((cell_width_row3 - ITEM_WIDTH) / 2.0f);
                     float icon_visual_x = current_x + bg_x_offset;
 
                     // Use the calculated max text width as the safety margin
@@ -1970,7 +1977,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     if (name_texture) {
                         float w, h;
                         SDL_GetTextureSize(name_texture, &w, &h);
-                        float text_x = current_x + (cell_width_row3 - w) / 2.0f; // Center using cell_width_row3
+                        float text_x = current_x + snap_px((cell_width_row3 - w) / 2.0f); // Center using cell_width_row3
                         SDL_FRect dest_rect = {text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                         SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
 
@@ -1980,7 +1987,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             if (progress_texture) {
                                 float pw, ph;
                                 SDL_GetTextureSize(progress_texture, &pw, &ph);
-                                float p_text_x = current_x + (cell_width_row3 - pw) / 2.0f;
+                                float p_text_x = current_x + snap_px((cell_width_row3 - pw) / 2.0f);
                                 // Center using cell_width_row3
                                 SDL_FRect p_dest_rect = {p_text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
                                 SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
