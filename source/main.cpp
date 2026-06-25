@@ -145,11 +145,13 @@ static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
 #if defined(__APPLE__)
     // On macOS, if running from a bundle, the resources folder is outside the .app directory.
     // The executable is at .../Advancely.app/Contents/MacOS/Advancely
-    // The resources are at .../resources/
-    // So we need to go up 3 levels from the executable.
+    // The resources are at .../resources/ (a sibling of Advancely.app)
+    // get_parent_directory strips one trailing component per level starting with the
+    // executable filename, so reaching the .app's parent folder takes 4 levels:
+    // Advancely -> MacOS -> Contents -> Advancely.app.
     if (strstr(exe_path, ".app/") != NULL) {
         char bundle_root_path[MAX_PATH_LENGTH];
-        if (get_parent_directory(exe_path, bundle_root_path, sizeof(bundle_root_path), 3)) {
+        if (get_parent_directory(exe_path, bundle_root_path, sizeof(bundle_root_path), 4)) {
             snprintf(path_buffer, buffer_size, "%s/resources", bundle_root_path);
             if (path_exists(path_buffer)) {
                 return; // Found it.
