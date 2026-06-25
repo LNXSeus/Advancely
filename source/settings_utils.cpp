@@ -690,6 +690,24 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         defaults_were_used = true;
     }
 
+    // === PATHMODE-DEBUG (temporary, remove later) =========================
+    // Diagnose the "instance mode reverts to a specific path" report. Logs what
+    // path_mode was actually read back from disk during load. Only logs when the
+    // value CHANGES from the last load, so repeated reloads don't spam the log.
+    {
+        static int last_loaded_mode = -999;
+        if ((int) settings->path_mode != last_loaded_mode) {
+            log_message(LOG_ERROR,
+                        "[PATHMODE-DEBUG] LOAD: path_mode changed %d -> key=%s -> enum=%d (0=AUTO 1=MANUAL 2=INSTANCE 3=FIXED_WORLD), defaulted=%s\n",
+                        last_loaded_mode,
+                        (path_mode_json && cJSON_IsString(path_mode_json)) ? path_mode_json->valuestring : "<missing/invalid>",
+                        (int) settings->path_mode,
+                        (path_mode_json && cJSON_IsString(path_mode_json)) ? "no" : "yes");
+            last_loaded_mode = (int) settings->path_mode;
+        }
+    }
+    // === END PATHMODE-DEBUG ==============================================
+
     const cJSON *manual_path_json = cJSON_GetObjectItem(json, "manual_saves_path");
     if (manual_path_json && cJSON_IsString(manual_path_json)) {
         strncpy(settings->manual_saves_path, manual_path_json->valuestring,
@@ -1792,6 +1810,22 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         // Insert that mode string into the settings.json file
         cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(mode_str));
+
+        // === PATHMODE-DEBUG (temporary, remove later) =====================
+        // Logs the path_mode being written and the resolved settings file path,
+        // so a silently-failing or mis-targeted write is visible in the log.
+        // Only logs when the value CHANGES, so routine geom/periodic saves don't
+        // spam the log; a revert (instance -> specific path) still gets captured.
+        {
+            static int last_saved_mode = -999;
+            if ((int) settings->path_mode != last_saved_mode) {
+                log_message(LOG_ERROR,
+                            "[PATHMODE-DEBUG] SAVE(ALL): path_mode changed %d -> writing \"%s\" (enum=%d) to file: %s\n",
+                            last_saved_mode, mode_str, (int) settings->path_mode, get_settings_file_path());
+                last_saved_mode = (int) settings->path_mode;
+            }
+        }
+        // === END PATHMODE-DEBUG ==========================================
         cJSON_DeleteItemFromObject(root, "manual_saves_path");
         cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
         cJSON_DeleteItemFromObject(root, "fixed_world_path");
@@ -2237,6 +2271,20 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     // keeps any concurrent reader (file watcher thread, a second process) from
     // ever seeing a truncated settings.json, which is what corrupts it.
     if (cJSON_write_to_file_atomic(get_settings_file_path(), root)) {
+        // === PATHMODE-DEBUG (temporary, remove later) =====================
+        // Only logs when path_mode CHANGES, to avoid spamming on every
+        // geometry/periodic save where the value is unchanged.
+        {
+            static int last_written_mode = -999;
+            if ((int) settings->path_mode != last_written_mode) {
+                log_message(LOG_ERROR,
+                            "[PATHMODE-DEBUG] WRITE OK: path_mode changed %d -> %d, context=%d, file=%s\n",
+                            last_written_mode, (int) settings->path_mode, (int) context, get_settings_file_path());
+                last_written_mode = (int) settings->path_mode;
+            }
+        }
+        // === END PATHMODE-DEBUG ==========================================
+
         // Keep a last-known-good backup so an externally corrupted settings.json
         // (antivirus, cloud sync, disk error) can be recovered without resetting.
         char backup_path[1088];
@@ -2245,6 +2293,11 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     } else {
         log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to write settings file: %s\n",
                     get_settings_file_path());
+        // === PATHMODE-DEBUG (temporary, remove later) =====================
+        log_message(LOG_ERROR,
+                    "[PATHMODE-DEBUG] WRITE FAILED: context=%d, in-memory path_mode=%d, target=%s\n",
+                    (int) context, (int) settings->path_mode, get_settings_file_path());
+        // === END PATHMODE-DEBUG ==========================================
     }
     cJSON_Delete(root);
 }

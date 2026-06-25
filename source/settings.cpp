@@ -5303,6 +5303,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                 memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                // === PATHMODE-DEBUG (temporary, remove later) =============
+                log_message(LOG_ERROR,
+                            "[PATHMODE-DEBUG] APPLY: user applied path_mode=%d (0=AUTO 1=MANUAL 2=INSTANCE 3=FIXED_WORLD) -> saving now\n",
+                            (int) app_settings->path_mode);
+                // === END PATHMODE-DEBUG ==================================
                 settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                 // settings_save left the progress sections as-is; if this Apply is for a
                 // loaded preset, restore that preset's captured progress before the reload.
