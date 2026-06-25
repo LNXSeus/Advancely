@@ -2401,7 +2401,7 @@
 					"icon":	"items/armadillo_scute_24w14potato.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:armadillo_scute",
-					"target":	8,
+					"target":	7,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
