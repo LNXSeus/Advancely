@@ -5483,7 +5483,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Overlay Text Sections: All Enabled\n"
                  "  - Timer Formatting: Both Disabled\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
-                 "  - Sub-Stat Cycle Interval: %.1f s; Overlay Scroll Speed: %.2f\n"
+                 "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
                  "  - Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
                  "  - Overlay Font: %s\n"
@@ -5517,7 +5517,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_FPS,
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED, DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED, DEFAULT_OVERLAY_CLEAR_ANIMATION, DEFAULT_OVERLAY_SCROLL_SPEED,
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_OVERLAY_ROW1_SPACING,
                  DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",

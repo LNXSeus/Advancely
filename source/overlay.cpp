@@ -233,6 +233,11 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
     }
 
     int flow = flow_right ? 1 : -1;
+    // Template-index step that corresponds to moving one tile to the right along
+    // the belt. When scrolling right the spawn edge is the left, so the belt is
+    // laid out in reverse order; that keeps items appearing in template order for
+    // both scroll directions.
+    int order = flow_right ? -1 : 1;
     float frac = scroll_offset - floorf(scroll_offset);
 
     // Reset on first use, template change, direction change or item-count change.
@@ -322,13 +327,13 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
         // Extend on both edges to cover the screen (only the spawn edge grows
         // during steady scrolling; both fill on startup).
         while (b.head_x + (float) b.tiles.size() * iw < right_bound) {
-            int ni = belt_step_active(b.tail_idx, +1, F, removed);
+            int ni = belt_step_active(b.tail_idx, order, F, removed);
             if (ni < 0) break;
             b.tiles.push_back(ni);
             b.tail_idx = ni;
         }
         while (b.head_x > left_bound) {
-            int pi = belt_step_active(b.head_idx, -1, F, removed);
+            int pi = belt_step_active(b.head_idx, -order, F, removed);
             if (pi < 0) break;
             b.tiles.insert(b.tiles.begin(), pi);
             b.head_idx = pi;
