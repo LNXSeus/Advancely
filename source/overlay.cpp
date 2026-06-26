@@ -172,6 +172,155 @@ static inline float snap_px(float v) {
     return roundf(v);
 }
 
+// --- Scrolling conveyor belt ---------------------------------------------
+// A row of fixed-width tiles that scrolls horizontally. Each tile holds a
+// stable item index (into the row's ordered item list) or -1 for a gap. When
+// an item is cleared its on-screen tiles turn into gaps that quietly ride off
+// the exit edge while fresh items keep entering the spawn edge, so nothing ever
+// jumps. If only a few items remain the belt repeats, so one cleared item can
+// leave several gaps at once. Identity is by index (pointers are not stable
+// across IPC rebuilds); a signature of the item ids resets the belt when the
+// template itself changes.
+struct ScrollBelt {
+    std::vector<int> tiles; // item indices left->right; -1 = gap
+    float head_x = 0.0f;    // left edge x of tiles.front()
+    float prev_offset = 0.0f;
+    int head_idx = -1;      // real item index seeding left (prepend) spawns
+    int tail_idx = -1;      // real item index seeding right (append) spawns
+    unsigned long long signature = 0;
+    int flow = 0;           // +1 = scrolls right, -1 = scrolls left, 0 = uninit
+    bool init = false;
+};
+
+// Next/previous not-removed index, searched cyclically from `from` (exclusive).
+static int belt_step_active(int from, int dir, int F, const std::vector<char> &removed) {
+    for (int s = 1; s <= F; ++s) {
+        int i = ((from + dir * s) % F + F) % F;
+        if (!removed[i]) return i;
+    }
+    return -1;
+}
+
+// Advances the belt one frame and fills `out` with (item index or -1, x) pairs
+// covering [left_bound, right_bound]. scroll_offset drives motion (its delta is
+// the per-frame pixel movement); its fractional part is preserved so every row
+// snaps to whole pixels in sync.
+static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
+                        float left_bound, float right_bound,
+                        int F, const std::vector<char> &removed,
+                        bool flow_right, unsigned long long signature,
+                        std::vector<std::pair<int, float> > &out) {
+    out.clear();
+    if (F <= 0 || iw <= 0.0f) {
+        b.tiles.clear();
+        b.init = false;
+        return;
+    }
+
+    int flow = flow_right ? 1 : -1;
+    float frac = scroll_offset - floorf(scroll_offset);
+
+    // Reset on first use, template change or scroll-direction change.
+    if (!b.init || b.signature != signature || b.flow != flow) {
+        b.tiles.clear();
+        b.head_x = left_bound + frac;
+        b.prev_offset = scroll_offset;
+        b.head_idx = b.tail_idx = -1;
+        b.signature = signature;
+        b.flow = flow;
+        b.init = true;
+    }
+
+    // First not-removed item; if none, the belt is empty.
+    int seed = -1;
+    for (int i = 0; i < F; ++i) {
+        if (!removed[i]) { seed = i; break; }
+    }
+    if (seed < 0) {
+        b.tiles.clear();
+        b.prev_offset = scroll_offset;
+        return;
+    }
+
+    // Move with the scroll, then turn cleared items into gaps.
+    b.head_x += scroll_offset - b.prev_offset;
+    b.prev_offset = scroll_offset;
+    for (int &t: b.tiles) {
+        if (t >= 0 && removed[t]) t = -1;
+    }
+
+    // Seed an empty belt (startup, or everything scrolled off).
+    if (b.tiles.empty()) {
+        b.head_x = left_bound + frac;
+        b.tiles.push_back(seed);
+        b.head_idx = b.tail_idx = seed;
+    }
+
+    // Keep the spawn seeds pointing at real (not-removed) items.
+    if (b.head_idx < 0 || removed[b.head_idx]) {
+        int real = seed;
+        for (int t: b.tiles) { if (t >= 0) { real = t; break; } }
+        b.head_idx = real;
+    }
+    if (b.tail_idx < 0 || removed[b.tail_idx]) {
+        int real = seed;
+        for (auto it = b.tiles.rbegin(); it != b.tiles.rend(); ++it) { if (*it >= 0) { real = *it; break; } }
+        b.tail_idx = real;
+    }
+
+    // Drop tiles that have fully left either edge.
+    while (!b.tiles.empty() && b.head_x + iw <= left_bound) {
+        b.tiles.erase(b.tiles.begin());
+        b.head_x += iw;
+    }
+    while (!b.tiles.empty() && b.head_x + (float) (b.tiles.size() - 1) * iw >= right_bound) {
+        b.tiles.pop_back();
+    }
+    if (b.tiles.empty()) {
+        b.head_x = left_bound + frac;
+        b.tiles.push_back(seed);
+        b.head_idx = b.tail_idx = seed;
+    }
+
+    // Extend on both edges to cover the screen (only the spawn edge grows during
+    // steady scrolling; both fill on startup).
+    while (b.head_x + (float) b.tiles.size() * iw < right_bound) {
+        int ni = belt_step_active(b.tail_idx, +1, F, removed);
+        if (ni < 0) break;
+        b.tiles.push_back(ni);
+        b.tail_idx = ni;
+    }
+    while (b.head_x > left_bound) {
+        int pi = belt_step_active(b.head_idx, -1, F, removed);
+        if (pi < 0) break;
+        b.tiles.insert(b.tiles.begin(), pi);
+        b.head_idx = pi;
+        b.head_x -= iw;
+    }
+
+    out.reserve(b.tiles.size());
+    for (size_t j = 0; j < b.tiles.size(); ++j) {
+        out.push_back({b.tiles[j], b.head_x + (float) j * iw});
+    }
+}
+
+// Stable unique id for a row 2/3 display item, used to build the belt signature.
+static const char *overlay_item_root(const OverlayDisplayItem &di) {
+    switch (di.type) {
+        case OverlayDisplayItem::ADVANCEMENT:
+        case OverlayDisplayItem::STAT:
+            return static_cast<TrackableCategory *>(di.item_ptr)->root_name;
+        case OverlayDisplayItem::UNLOCK:
+        case OverlayDisplayItem::CUSTOM:
+            return static_cast<TrackableItem *>(di.item_ptr)->root_name;
+        case OverlayDisplayItem::MULTISTAGE:
+            return static_cast<MultiStageGoal *>(di.item_ptr)->root_name;
+        case OverlayDisplayItem::COUNTER:
+            return static_cast<CounterGoal *>(di.item_ptr)->root_name;
+    }
+    return "";
+}
+
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
  * It also corrects the aspect ratio of the .png textures.
  *
@@ -770,99 +919,72 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
         }
 
-        // Count visible items
-        size_t visible_item_count = 0;
-        for (const auto &pair: row1_items) {
-            if (!pair.first->done && !pair.second->is_hidden && !pair.first->is_hidden) {
-                visible_item_count++;
-            }
+        // Build the removal mask (cleared items become gaps) and a signature so
+        // the belt resets only when the template itself changes.
+        int F = (int) row1_items.size();
+        std::vector<char> removed((size_t) F);
+        unsigned long long signature = 1469598103934665603ULL;
+        for (int i = 0; i < F; i++) {
+            TrackableItem *item = row1_items[i].first;
+            TrackableCategory *parent = row1_items[i].second;
+            removed[i] = (item->done || parent->is_hidden || item->is_hidden) ? 1 : 0;
+            for (const char *s = item->root_name; *s; s++) signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
         }
 
-        if (visible_item_count > 0 && item_full_width > 0) {
-            // --- Block-Based Rendering ---
-            float total_row_width = visible_item_count * item_full_width;
+        if (F > 0 && item_full_width > 0) {
+            static ScrollBelt belt_row1;
+            std::vector<std::pair<int, float> > tiles;
+            belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
+                        -item_full_width, (float) window_w + item_full_width,
+                        F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
 
-            // fmod allows the infinite scrolling
-            float start_pos = snap_px(fmod(o->scroll_offset_row1, total_row_width));
+            for (const auto &tile: tiles) {
+                if (tile.first < 0) continue; // gap
+                TrackableItem *item_to_render = row1_items[tile.first].first;
+                TrackableCategory *parent = row1_items[tile.first].second;
+                float x_pos = snap_px(tile.second);
 
-            // Calculate blocks needed to cover screen + buffer
-            int blocks_to_draw = (int) ceil((float) window_w / total_row_width) + 2;
+                // --- Render Icon ---
+                SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
 
-            for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
-                float block_offset = start_pos + (block * total_row_width);
-                int visible_item_index = 0;
+                SDL_Texture *tex = nullptr;
+                AnimatedTexture *anim_tex = nullptr;
+                if (strstr(item_to_render->icon_path, ".gif")) {
+                    anim_tex = get_animated_texture_from_cache(
+                        o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
+                        item_to_render->icon_path, SDL_SCALEMODE_NEAREST);
+                } else {
+                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                 &o->texture_cache_capacity, item_to_render->icon_path,
+                                                 SDL_SCALEMODE_NEAREST);
+                }
 
-                for (const auto &pair: row1_items) {
-                    TrackableItem *item_to_render = pair.first;
-                    TrackableCategory *parent = pair.second;
+                if (!tex && !anim_tex) {
+                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
+                    SDL_RenderFillRect(o->renderer, &dest_rect);
+                } else {
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
+                }
 
-                    // Skip hidden/done items
-                    if (item_to_render->done || parent->is_hidden || item_to_render->is_hidden) continue;
-
-                    // Calculate absolute position
-                    float x_pos;
-                    if (settings->overlay_scroll_speed > 0) {
-                        // Positive Scroll (L->R): Anchor to the Right (End)
-                        // This puts Index 0 on the Right (Leading), and Index N on the Left (Trailing).
-                        // This ensures Item 0 appears first.
-                        x_pos = block_offset - (visible_item_index * item_full_width);
-                    } else {
-                        // Negative Scroll (R->L): Anchor to the Left (Start) - Default Behavior
-                        x_pos = block_offset + (visible_item_index * item_full_width);
-                    }
-                    x_pos = snap_px(x_pos);
-
-                    // --- Simple Culling ---
-                    // Icons are uniform size, so simple culling is safe here
-                    if (x_pos + item_full_width < 0 || x_pos > window_w) {
-                        visible_item_index++;
-                        continue;
-                    }
-
-                    // --- Render Icon ---
-                    SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
-
-                    SDL_Texture *tex = nullptr;
-                    AnimatedTexture *anim_tex = nullptr;
-                    if (strstr(item_to_render->icon_path, ".gif")) {
-                        anim_tex = get_animated_texture_from_cache(
+                // --- Render Shared Parent Icon Overlay ---
+                if (item_to_render->is_shared && parent) {
+                    SDL_Texture *parent_tex = nullptr;
+                    AnimatedTexture *parent_anim_tex = nullptr;
+                    if (strstr(parent->icon_path, ".gif")) {
+                        parent_anim_tex = get_animated_texture_from_cache(
                             o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
-                            item_to_render->icon_path, SDL_SCALEMODE_NEAREST);
+                            parent->icon_path, SDL_SCALEMODE_NEAREST);
                     } else {
-                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                     &o->texture_cache_capacity, item_to_render->icon_path,
-                                                     SDL_SCALEMODE_NEAREST);
+                        parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache,
+                                                            &o->texture_cache_count,
+                                                            &o->texture_cache_capacity, parent->icon_path,
+                                                            SDL_SCALEMODE_NEAREST);
                     }
 
-                    if (!tex && !anim_tex) {
-                        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
-                        SDL_RenderFillRect(o->renderer, &dest_rect);
-                    } else {
-                        render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
-                    }
-
-                    // --- Render Shared Parent Icon Overlay ---
-                    if (item_to_render->is_shared && parent) {
-                        SDL_Texture *parent_tex = nullptr;
-                        AnimatedTexture *parent_anim_tex = nullptr;
-                        if (strstr(parent->icon_path, ".gif")) {
-                            parent_anim_tex = get_animated_texture_from_cache(
-                                o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
-                                parent->icon_path, SDL_SCALEMODE_NEAREST);
-                        } else {
-                            parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache,
-                                                                &o->texture_cache_count,
-                                                                &o->texture_cache_capacity, parent->icon_path,
-                                                                SDL_SCALEMODE_NEAREST);
-                        }
-
-                        SDL_FRect shared_dest_rect = {
-                            x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
-                        };
-                        render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
-                    }
-
-                    visible_item_index++;
+                    SDL_FRect shared_dest_rect = {
+                        x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
+                    };
+                    render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
                 }
             }
         }
@@ -1219,52 +1341,31 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
             o->calculated_row2_item_width = item_full_width_row2;
 
-            size_t visible_item_count = 0;
-            for (const auto &item: row2_items) {
-                if (!is_display_item_done(item, settings)) visible_item_count++;
+            int F = (int) row2_items.size();
+            std::vector<char> removed((size_t) F);
+            unsigned long long signature = 1469598103934665603ULL;
+            for (int i = 0; i < F; i++) {
+                removed[i] = is_display_item_done(row2_items[i], settings) ? 1 : 0;
+                for (const char *s = overlay_item_root(row2_items[i]); *s; s++)
+                    signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
             }
 
-            if (visible_item_count > 0) {
-                // --- 3. Block-Based Render Loop ---
-                float total_row_width = visible_item_count * item_full_width_row2;
+            if (F > 0 && item_full_width_row2 > 0) {
+                // --- 3. Belt Render Loop (cleared items leave gaps that fill in) ---
+                float coverage = max_text_width_row2 + 50.0f + item_full_width_row2;
+                static ScrollBelt belt_row2;
+                std::vector<std::pair<int, float> > tiles;
+                belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
+                            -coverage, (float) window_w + coverage,
+                            F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
 
-                // Use raw scroll offset (no negation) to match Row 1 and 3 direction
-                float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width));
+                for (size_t ti = 0; ti < tiles.size(); ++ti) {
+                    if (tiles[ti].first < 0) continue; // gap left by a cleared item
+                    const OverlayDisplayItem &display_item = row2_items[tiles[ti].first];
+                    {
+                        float current_x = snap_px(tiles[ti].second);
 
-                // Calculate blocks to draw, adding buffer for wide text bleeding in
-                int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
-                if (total_row_width > 0 && max_text_width_row2 > total_row_width) {
-                    blocks_to_draw += (int) ceilf(max_text_width_row2 / total_row_width);
-                }
-
-                for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
-                    float block_offset = start_pos + (block * total_row_width);
-                    int visible_item_index = 0;
-
-                    for (const auto &display_item: row2_items) {
-                        if (is_display_item_done(display_item, settings)) continue;
-
-                        // --- Directional Gap Filling ---
-                        float current_x;
-                        if (settings->overlay_scroll_speed > 0) {
-                            // Positive Scroll (L->R): Anchor to the Right
-                            current_x = block_offset - (visible_item_index * item_full_width_row2);
-                        } else {
-                            // Negative Scroll (R->L): Anchor to the Left
-                            current_x = block_offset + (visible_item_index * item_full_width_row2);
-                        }
-                        current_x = snap_px(current_x);
-
-                        // --- Dynamic Culling ---
                         float bg_x_offset = snap_px((cell_width_row2 - ITEM_WIDTH) / 2.0f);
-                        float icon_visual_x = current_x + bg_x_offset;
-                        float dynamic_cull_margin = max_text_width_row2 + 50.0f;
-
-                        if (icon_visual_x + ITEM_WIDTH + dynamic_cull_margin < 0 || icon_visual_x - dynamic_cull_margin
-                            > window_w) {
-                            visible_item_index++;
-                            continue;
-                        }
 
                         // --- Render Logic ---
                         std::string icon_path;
@@ -1488,8 +1589,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                             }
                         }
-
-                        visible_item_index++;
                     }
                 }
             }
@@ -1710,52 +1809,31 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         o->calculated_row3_item_width = item_full_width_row3; // Store for next update cycle
 
-        size_t visible_item_count = 0;
-        for (const auto &item: row3_items) {
-            if (!is_display_item_done(item, settings)) {
-                visible_item_count++;
-            }
+        int F = (int) row3_items.size();
+        std::vector<char> removed((size_t) F);
+        unsigned long long signature = 1469598103934665603ULL;
+        for (int i = 0; i < F; i++) {
+            removed[i] = is_display_item_done(row3_items[i], settings) ? 1 : 0;
+            for (const char *s = overlay_item_root(row3_items[i]); *s; s++)
+                signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
         }
 
-        if (visible_item_count > 0) {
-            // Render pass uses the calculated item_full_width_row3
-            float total_row_width = visible_item_count * item_full_width_row3;
-            // Use current visible count for total width
-            float start_pos = snap_px(fmod(o->scroll_offset_row3, total_row_width));
-            int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
+        if (F > 0 && item_full_width_row3 > 0) {
+            // Belt render pass (cleared items leave gaps that quietly fill in)
+            float coverage = max_text_width_row3 + 50.0f + item_full_width_row3;
+            static ScrollBelt belt_row3;
+            std::vector<std::pair<int, float> > tiles;
+            belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
+                        -coverage, (float) window_w + coverage,
+                        F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
 
-            for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
-                float block_offset = start_pos + (block * total_row_width);
-                int visible_item_index = 0;
+            for (size_t ti = 0; ti < tiles.size(); ++ti) {
+                if (tiles[ti].first < 0) continue; // gap left by a cleared item
+                const OverlayDisplayItem &display_item = row3_items[tiles[ti].first];
+                {
+                    float current_x = snap_px(tiles[ti].second);
 
-                for (const auto &display_item: row3_items) {
-                    if (is_display_item_done(display_item, settings)) continue; // Skip currently invisible
-
-                    // --- Directional Gap Filling ---
-                    float current_x;
-                    if (settings->overlay_scroll_speed > 0) {
-                        // Positive Scroll (L->R): Anchor to the Right
-                        current_x = block_offset - (visible_item_index * item_full_width_row3);
-                    } else {
-                        // Negative Scroll (R->L): Anchor to the Left
-                        current_x = block_offset + (visible_item_index * item_full_width_row3);
-                    }
-                    current_x = snap_px(current_x);
-
-                    // Strict Culling based on Icon Visibility
-                    // Calculate where the 96px icon background will sit
                     float bg_x_offset = snap_px((cell_width_row3 - ITEM_WIDTH) / 2.0f);
-                    float icon_visual_x = current_x + bg_x_offset;
-
-                    // Use the calculated max text width as the safety margin
-                    float dynamic_cull_margin = max_text_width_row3 + 50.0f;
-
-                    // Check if the item is completely off-screen
-                    if (icon_visual_x + ITEM_WIDTH + dynamic_cull_margin < 0 || icon_visual_x - dynamic_cull_margin >
-                        window_w) {
-                        visible_item_index++;
-                        continue;
-                    }
 
                     // --- Render the item ---
                     SDL_Texture *static_bg = nullptr;
@@ -1994,11 +2072,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             }
                         }
                     }
-
-                    visible_item_index++;
-                } // End for display_item
-            } // End for block
-        } // End if visible_item_count > 0
+                } // End tile scope
+            } // End belt loop
+        } // End if F > 0
     }
 
     // --- DEBUG: Performance Display ---

@@ -750,6 +750,11 @@ The overlay is organized into three horizontally scrolling rows, each dedicated 
   multi-stage goals, and counters. **It can also include Advancements, Recipes, and Unlocks if forced via the Template
   Editor's `Row 3` checkbox.**
 
+When a goal is completed it never snaps the row into a new position. Instead it leaves a gap where it was, and that gap
+quietly scrolls off-screen while the remaining items keep flowing, so the rows stay perfectly smooth no matter how fast
+goals are completed. If only a few goals are left the row repeats across the screen, so a single completion can briefly
+leave more than one gap before they fill back in.
+
 ### Customization
 
 Nearly every aspect of the overlay can be tailored to your liking from the settings window:
