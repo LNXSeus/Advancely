@@ -497,6 +497,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
+    settings->overlay_clear_animation = DEFAULT_OVERLAY_CLEAR_ANIMATION;
 
     settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
 
@@ -992,6 +993,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->overlay_stat_cycle_speed = (float) cycle_speed->valuedouble;
         else {
             settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *clear_anim = cJSON_GetObjectItem(general_settings, "overlay_clear_animation");
+        if (clear_anim && cJSON_IsNumber(clear_anim))
+            settings->overlay_clear_animation = (float) clear_anim->valuedouble;
+        else {
+            settings->overlay_clear_animation = DEFAULT_OVERLAY_CLEAR_ANIMATION;
             defaults_were_used = true;
         }
 
@@ -1925,6 +1934,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
         cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed",
                               cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_clear_animation");
+        cJSON_AddItemToObject(general_obj, "overlay_clear_animation",
+                              cJSON_CreateNumber(settings->overlay_clear_animation));
         cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
         cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
         cJSON_DeleteItemFromObject(general_obj, "per_world_notes");

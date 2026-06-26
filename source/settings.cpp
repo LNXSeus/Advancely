@@ -177,6 +177,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
+        a->overlay_clear_animation != b->overlay_clear_animation ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
 
         // LOD Settings
@@ -2942,6 +2943,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(substat_cycling_interval_tooltip_buffer, sizeof(substat_cycling_interval_tooltip_buffer),
                              "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
                     ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
+                }
+
+                if (ImGui::DragFloat("Clear Animation (s)", &temp_settings.overlay_clear_animation, 0.01f, -10.0f,
+                                     10.0f,
+                                     "%.2f s")) {
+                    if (temp_settings.overlay_clear_animation < -10.0f) temp_settings.overlay_clear_animation = -10.0f;
+                    if (temp_settings.overlay_clear_animation > 10.0f) temp_settings.overlay_clear_animation = 10.0f;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char clear_animation_tooltip_buffer[512];
+                    snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
+                             "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
+                             "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.");
+                    ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
                 }
 
                 if (ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f,

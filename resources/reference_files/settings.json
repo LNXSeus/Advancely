@@ -21,6 +21,7 @@
 		"overlay_progress_text_align":	"left",
 		"overlay_row3_remove_completed":	false,
 		"overlay_stat_cycle_speed":	3,
+		"overlay_clear_animation":	-1.2,
 		"notes_use_roboto_font":	false,
 		"per_world_notes":	true,
 		"check_for_updates":	true,

@@ -190,6 +190,20 @@ struct ScrollBelt {
     unsigned long long signature = 0;
     int flow = 0;           // +1 = scrolls right, -1 = scrolls left, 0 = uninit
     bool init = false;
+
+    // Clear (crop) animation: seconds elapsed since each item was cleared, so a
+    // tile can shrink away in place before it becomes a gap.
+    std::vector<float> clear_elapsed;
+    std::vector<char> was_removed;
+    Uint32 anim_prev = 0;
+};
+
+// One tile to draw this frame. clear is 0 for a normal item, or (0,1] while the
+// item is animating out (the fraction already cropped away).
+struct BeltTile {
+    int idx;     // item index, or -1 for a gap
+    float x;     // left edge
+    float clear; // 0 = full, 1 = fully cropped
 };
 
 // Next/previous not-removed index, searched cyclically from `from` (exclusive).
@@ -201,15 +215,16 @@ static int belt_step_active(int from, int dir, int F, const std::vector<char> &r
     return -1;
 }
 
-// Advances the belt one frame and fills `out` with (item index or -1, x) pairs
-// covering [left_bound, right_bound]. scroll_offset drives motion (its delta is
-// the per-frame pixel movement); its fractional part is preserved so every row
-// snaps to whole pixels in sync.
+// Advances the belt one frame and fills `out` covering [left_bound, right_bound].
+// scroll_offset drives motion (its delta is the per-frame pixel movement); its
+// fractional part is preserved so every row snaps to whole pixels in sync.
+// A cleared item keeps its tiles (cropping over `duration` seconds) before they
+// turn into gaps; duration <= 0 clears instantly.
 static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
                         float left_bound, float right_bound,
-                        int F, const std::vector<char> &removed,
+                        int F, const std::vector<char> &removed, float duration,
                         bool flow_right, unsigned long long signature,
-                        std::vector<std::pair<int, float> > &out) {
+                        std::vector<BeltTile> &out) {
     out.clear();
     if (F <= 0 || iw <= 0.0f) {
         b.tiles.clear();
@@ -220,52 +235,56 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
     int flow = flow_right ? 1 : -1;
     float frac = scroll_offset - floorf(scroll_offset);
 
-    // Reset on first use, template change or scroll-direction change.
-    if (!b.init || b.signature != signature || b.flow != flow) {
+    // Reset on first use, template change, direction change or item-count change.
+    if (!b.init || b.signature != signature || b.flow != flow || (int) b.clear_elapsed.size() != F) {
         b.tiles.clear();
         b.head_x = left_bound + frac;
         b.prev_offset = scroll_offset;
         b.head_idx = b.tail_idx = -1;
         b.signature = signature;
         b.flow = flow;
+        b.clear_elapsed.assign((size_t) F, 0.0f);
+        b.was_removed.assign((size_t) F, 0);
+        // Treat items that are already cleared as fully gone so they don't play
+        // the crop animation on startup or after a template change.
+        for (int i = 0; i < F; ++i) {
+            if (removed[i]) { b.was_removed[i] = 1; b.clear_elapsed[i] = duration; }
+        }
+        b.anim_prev = SDL_GetTicks();
         b.init = true;
     }
 
-    // First not-removed item; if none, the belt is empty.
+    // Advance the per-item clear timers and decide which items are fully gone.
+    Uint32 now = SDL_GetTicks();
+    float adt = (float) (now - b.anim_prev) / 1000.0f;
+    b.anim_prev = now;
+    if (adt < 0.0f) adt = 0.0f;
+    if (adt > 0.25f) adt = 0.25f; // ignore long stalls (window minimized, etc.)
+
+    std::vector<char> gone((size_t) F);
+    for (int i = 0; i < F; ++i) {
+        if (removed[i]) {
+            if (!b.was_removed[i]) b.clear_elapsed[i] = 0.0f; // just cleared
+            else b.clear_elapsed[i] += adt;
+            gone[i] = (duration <= 0.0f || b.clear_elapsed[i] >= duration) ? 1 : 0;
+        } else {
+            b.clear_elapsed[i] = 0.0f;
+            gone[i] = 0;
+        }
+        b.was_removed[i] = removed[i];
+    }
+
+    // First spawnable (never-cleared) item.
     int seed = -1;
     for (int i = 0; i < F; ++i) {
         if (!removed[i]) { seed = i; break; }
     }
-    if (seed < 0) {
-        b.tiles.clear();
-        b.prev_offset = scroll_offset;
-        return;
-    }
 
-    // Move with the scroll, then turn cleared items into gaps.
+    // Move with the scroll, then turn fully-cleared tiles into gaps.
     b.head_x += scroll_offset - b.prev_offset;
     b.prev_offset = scroll_offset;
     for (int &t: b.tiles) {
-        if (t >= 0 && removed[t]) t = -1;
-    }
-
-    // Seed an empty belt (startup, or everything scrolled off).
-    if (b.tiles.empty()) {
-        b.head_x = left_bound + frac;
-        b.tiles.push_back(seed);
-        b.head_idx = b.tail_idx = seed;
-    }
-
-    // Keep the spawn seeds pointing at real (not-removed) items.
-    if (b.head_idx < 0 || removed[b.head_idx]) {
-        int real = seed;
-        for (int t: b.tiles) { if (t >= 0) { real = t; break; } }
-        b.head_idx = real;
-    }
-    if (b.tail_idx < 0 || removed[b.tail_idx]) {
-        int real = seed;
-        for (auto it = b.tiles.rbegin(); it != b.tiles.rend(); ++it) { if (*it >= 0) { real = *it; break; } }
-        b.tail_idx = real;
+        if (t >= 0 && gone[t]) t = -1;
     }
 
     // Drop tiles that have fully left either edge.
@@ -276,32 +295,81 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
     while (!b.tiles.empty() && b.head_x + (float) (b.tiles.size() - 1) * iw >= right_bound) {
         b.tiles.pop_back();
     }
-    if (b.tiles.empty()) {
-        b.head_x = left_bound + frac;
-        b.tiles.push_back(seed);
-        b.head_idx = b.tail_idx = seed;
-    }
 
-    // Extend on both edges to cover the screen (only the spawn edge grows during
-    // steady scrolling; both fill on startup).
-    while (b.head_x + (float) b.tiles.size() * iw < right_bound) {
-        int ni = belt_step_active(b.tail_idx, +1, F, removed);
-        if (ni < 0) break;
-        b.tiles.push_back(ni);
-        b.tail_idx = ni;
-    }
-    while (b.head_x > left_bound) {
-        int pi = belt_step_active(b.head_idx, -1, F, removed);
-        if (pi < 0) break;
-        b.tiles.insert(b.tiles.begin(), pi);
-        b.head_idx = pi;
-        b.head_x -= iw;
+    // Only spawn / extend when there is a not-cleared item to pull from. Tiles
+    // still animating out are kept even when nothing spawnable remains.
+    if (seed >= 0) {
+        if (b.tiles.empty()) {
+            b.head_x = left_bound + frac;
+            b.tiles.push_back(seed);
+            b.head_idx = b.tail_idx = seed;
+        }
+
+        // Keep the spawn seeds pointing at not-cleared items.
+        if (b.head_idx < 0 || removed[b.head_idx]) {
+            int real = seed;
+            for (int t: b.tiles) { if (t >= 0 && !removed[t]) { real = t; break; } }
+            b.head_idx = real;
+        }
+        if (b.tail_idx < 0 || removed[b.tail_idx]) {
+            int real = seed;
+            for (auto it = b.tiles.rbegin(); it != b.tiles.rend(); ++it) {
+                if (*it >= 0 && !removed[*it]) { real = *it; break; }
+            }
+            b.tail_idx = real;
+        }
+
+        // Extend on both edges to cover the screen (only the spawn edge grows
+        // during steady scrolling; both fill on startup).
+        while (b.head_x + (float) b.tiles.size() * iw < right_bound) {
+            int ni = belt_step_active(b.tail_idx, +1, F, removed);
+            if (ni < 0) break;
+            b.tiles.push_back(ni);
+            b.tail_idx = ni;
+        }
+        while (b.head_x > left_bound) {
+            int pi = belt_step_active(b.head_idx, -1, F, removed);
+            if (pi < 0) break;
+            b.tiles.insert(b.tiles.begin(), pi);
+            b.head_idx = pi;
+            b.head_x -= iw;
+        }
     }
 
     out.reserve(b.tiles.size());
     for (size_t j = 0; j < b.tiles.size(); ++j) {
-        out.push_back({b.tiles[j], b.head_x + (float) j * iw});
+        int idx = b.tiles[j];
+        float clear = 0.0f;
+        if (idx >= 0 && removed[idx] && duration > 0.0f) {
+            clear = b.clear_elapsed[idx] / duration;
+            if (clear < 0.0f) clear = 0.0f;
+            if (clear > 1.0f) clear = 1.0f;
+        }
+        out.push_back({idx, b.head_x + (float) j * iw, clear});
     }
+}
+
+// Sets a renderer clip so an item being cleared is cropped vertically over a
+// [band_top, band_bottom] strip. clear in (0,1] is the fraction removed; a
+// positive animation setting clears upwards (keeps the top), negative clears
+// downwards (keeps the bottom). Returns true if a clip was set (reset it after).
+static bool belt_set_clear_clip(SDL_Renderer *r, int window_w, float clear,
+                                float band_top, float band_bottom, float anim_sign) {
+    if (clear <= 0.0f) return false;
+    float H = band_bottom - band_top;
+    float vis_h = (1.0f - clear) * H;
+    SDL_Rect clip;
+    clip.x = 0;
+    clip.w = window_w;
+    if (anim_sign >= 0.0f) {
+        clip.y = (int) floorf(band_top);
+        clip.h = (int) ceilf(vis_h);
+    } else {
+        clip.y = (int) floorf(band_top + clear * H);
+        clip.h = (int) ceilf(vis_h);
+    }
+    SDL_SetRenderClipRect(r, &clip);
+    return true;
 }
 
 // Stable unique id for a row 2/3 display item, used to build the belt signature.
@@ -933,16 +1001,21 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (F > 0 && item_full_width > 0) {
             static ScrollBelt belt_row1;
-            std::vector<std::pair<int, float> > tiles;
+            std::vector<BeltTile> tiles;
             belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
                         -item_full_width, (float) window_w + item_full_width,
-                        F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
+                        F, removed, fabsf(settings->overlay_clear_animation),
+                        settings->overlay_scroll_speed > 0, signature, tiles);
 
             for (const auto &tile: tiles) {
-                if (tile.first < 0) continue; // gap
-                TrackableItem *item_to_render = row1_items[tile.first].first;
-                TrackableCategory *parent = row1_items[tile.first].second;
-                float x_pos = snap_px(tile.second);
+                if (tile.idx < 0) continue; // gap
+                TrackableItem *item_to_render = row1_items[tile.idx].first;
+                TrackableCategory *parent = row1_items[tile.idx].second;
+                float x_pos = snap_px(tile.x);
+
+                bool clipped = belt_set_clear_clip(o->renderer, window_w, tile.clear,
+                                                   ROW1_Y_POS, ROW1_Y_POS + ROW1_ICON_SIZE,
+                                                   settings->overlay_clear_animation);
 
                 // --- Render Icon ---
                 SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
@@ -986,6 +1059,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     };
                     render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
                 }
+
+                if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
             }
         }
     }
@@ -1353,19 +1428,26 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (F > 0 && item_full_width_row2 > 0) {
                 // --- 3. Belt Render Loop (cleared items leave gaps that fill in) ---
                 float coverage = max_text_width_row2 + 50.0f + item_full_width_row2;
+                float clear_band_bottom = ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + 2.0f * (float) TTF_GetFontHeight(
+                                              o->font);
                 static ScrollBelt belt_row2;
-                std::vector<std::pair<int, float> > tiles;
+                std::vector<BeltTile> tiles;
                 belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
                             -coverage, (float) window_w + coverage,
-                            F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
+                            F, removed, fabsf(settings->overlay_clear_animation),
+                            settings->overlay_scroll_speed > 0, signature, tiles);
 
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
-                    if (tiles[ti].first < 0) continue; // gap left by a cleared item
-                    const OverlayDisplayItem &display_item = row2_items[tiles[ti].first];
+                    if (tiles[ti].idx < 0) continue; // gap left by a cleared item
+                    const OverlayDisplayItem &display_item = row2_items[tiles[ti].idx];
                     {
-                        float current_x = snap_px(tiles[ti].second);
+                        float current_x = snap_px(tiles[ti].x);
 
                         float bg_x_offset = snap_px((cell_width_row2 - ITEM_WIDTH) / 2.0f);
+
+                        bool clipped = belt_set_clear_clip(o->renderer, window_w, tiles[ti].clear,
+                                                           ROW2_Y_POS, clear_band_bottom,
+                                                           settings->overlay_clear_animation);
 
                         // --- Render Logic ---
                         std::string icon_path;
@@ -1589,6 +1671,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                             }
                         }
+
+                        if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
                     }
                 }
             }
@@ -1821,19 +1905,26 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (F > 0 && item_full_width_row3 > 0) {
             // Belt render pass (cleared items leave gaps that quietly fill in)
             float coverage = max_text_width_row3 + 50.0f + item_full_width_row3;
+            float clear_band_bottom = ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + 2.0f * (float) TTF_GetFontHeight(
+                                          o->font);
             static ScrollBelt belt_row3;
-            std::vector<std::pair<int, float> > tiles;
+            std::vector<BeltTile> tiles;
             belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
                         -coverage, (float) window_w + coverage,
-                        F, removed, settings->overlay_scroll_speed > 0, signature, tiles);
+                        F, removed, fabsf(settings->overlay_clear_animation),
+                        settings->overlay_scroll_speed > 0, signature, tiles);
 
             for (size_t ti = 0; ti < tiles.size(); ++ti) {
-                if (tiles[ti].first < 0) continue; // gap left by a cleared item
-                const OverlayDisplayItem &display_item = row3_items[tiles[ti].first];
+                if (tiles[ti].idx < 0) continue; // gap left by a cleared item
+                const OverlayDisplayItem &display_item = row3_items[tiles[ti].idx];
                 {
-                    float current_x = snap_px(tiles[ti].second);
+                    float current_x = snap_px(tiles[ti].x);
 
                     float bg_x_offset = snap_px((cell_width_row3 - ITEM_WIDTH) / 2.0f);
+
+                    bool clipped = belt_set_clear_clip(o->renderer, window_w, tiles[ti].clear,
+                                                       ROW3_Y_POS, clear_band_bottom,
+                                                       settings->overlay_clear_animation);
 
                     // --- Render the item ---
                     SDL_Texture *static_bg = nullptr;
@@ -2072,6 +2163,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             }
                         }
                     }
+
+                    if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
                 } // End tile scope
             } // End belt loop
         } // End if F > 0
