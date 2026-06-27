@@ -286,6 +286,75 @@ struct EditorTemplate {
     char display_category[MAX_PATH_LENGTH] = {0}; // Per-language override for the settings Display Category prefill
 };
 
+// A single compact status tag drawn at the right edge of a goal-list row.
+struct EditorRowTag {
+    const char *text;
+    ImU32 color;
+    const char *tip;
+};
+
+// Draws compact, right-aligned status tags inside the most recently rendered row's
+// rectangle. Call immediately after a list row's Selectable so the tags anchor to it.
+// Tags are drawn with the window draw list so they never intercept the row's click,
+// drag-and-drop, or selection.
+static void draw_editor_row_status_tags(const EditorRowTag *tags, int count) {
+    if (count <= 0) return;
+
+    const ImVec2 row_min = ImGui::GetItemRectMin();
+    const ImVec2 row_max = ImGui::GetItemRectMax();
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+
+    const float gap = 6.0f;
+    const float right_pad = ImGui::GetStyle().ItemInnerSpacing.x;
+    const float text_y = (row_min.y + row_max.y - ImGui::GetTextLineHeight()) * 0.5f;
+
+    float total_w = 0.0f;
+    for (int i = 0; i < count; i++) {
+        total_w += ImGui::CalcTextSize(tags[i].text).x;
+        if (i > 0) total_w += gap;
+    }
+
+    float x = row_max.x - right_pad - total_w;
+    const float cluster_min_x = x;
+    for (int i = 0; i < count; i++) {
+        draw_list->AddText(ImVec2(x, text_y), tags[i].color, tags[i].text);
+        x += ImGui::CalcTextSize(tags[i].text).x + gap;
+    }
+
+    // Single combined tooltip when hovering anywhere over the tag cluster.
+    if (ImGui::IsWindowHovered() &&
+        ImGui::IsMouseHoveringRect(ImVec2(cluster_min_x, row_min.y), row_max)) {
+        char tip[640];
+        tip[0] = '\0';
+        for (int i = 0; i < count; i++) {
+            strncat(tip, tags[i].tip, sizeof(tip) - strlen(tip) - 1);
+            if (i < count - 1) strncat(tip, "\n", sizeof(tip) - strlen(tip) - 1);
+        }
+        ImGui::SetTooltip("%s", tip);
+    }
+}
+
+// Builds and draws the status tags for a goal-list row from its individual flags.
+// Pass in_2nd_row / in_3rd_row / is_recipe as false for goal types that don't support them.
+static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3rd_row,
+                                      bool is_recipe, bool manual_pos_set) {
+    EditorRowTag tags[5];
+    int n = 0;
+    if (in_2nd_row)
+        tags[n++] = {"R2", IM_COL32(100, 180, 255, 255), "Forced to the 2nd overlay row"};
+    if (in_3rd_row)
+        tags[n++] = {"R3", IM_COL32(190, 140, 255, 255), "Forced to the 3rd overlay row"};
+    if (is_hidden)
+        tags[n++] = {"H", IM_COL32(255, 180, 60, 255),
+                     "Hidden from the overlay and automatic tracker layout"};
+    if (is_recipe)
+        tags[n++] = {"rcp", IM_COL32(130, 220, 130, 255),
+                     "Recipe (counts toward progress percentage, not advancements)"};
+    if (manual_pos_set)
+        tags[n++] = {"pos", IM_COL32(90, 210, 200, 255), "Has custom manual-layout coordinates"};
+    draw_editor_row_status_tags(tags, n);
+}
+
 // Helper: propagate a rename through a vector of EditorCounterLinkedGoal
 // If new_name is empty, matching linked goals are removed instead of updated.
 static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal> &linked_goals,
@@ -1181,6 +1250,28 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
                     return false;
                 }
             }
+        }
+    }
+    return true;
+}
+
+// Helper to validate icon paths for counter goals
+static bool validate_counter_icon_paths(const std::vector<EditorCounterGoal> &counters,
+                                        char *error_message_buffer) {
+    for (const auto &counter: counters) {
+        // When path is empty
+        if (counter.icon_path[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: Visible counter '%s' is missing an icon path.",
+                     counter.root_name);
+            return false;
+        }
+        // When path is wrong
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), counter.icon_path);
+        if (!path_exists(full_path)) {
+            snprintf(error_message_buffer, 256, "Error: Icon file not found for counter '%s': '%s'",
+                     counter.root_name, counter.icon_path);
+            return false;
         }
     }
     return true;
@@ -2903,7 +2994,8 @@ static bool validate_and_save_template(const char *creator_version_str,
 
     // --- Counter Goals Validation ---
     if (validation_passed) {
-        if (has_duplicate_counter_root_names(current_template_data.counter_goals, status_message)) {
+        if (has_duplicate_counter_root_names(current_template_data.counter_goals, status_message) ||
+            !validate_counter_icon_paths(current_template_data.counter_goals, status_message)) {
             validation_passed = false;
         }
     }
@@ -7192,6 +7284,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
+                        draw_goal_row_status_tags(
+                            advancement.is_hidden, advancement.in_2nd_row, advancement.in_3rd_row,
+                            advancement.is_recipe,
+                            advancement.icon_pos.is_set || advancement.text_pos.is_set ||
+                            advancement.progress_pos.is_set);
+
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(advancement.root_name, scroll_to_goal_root_name) == 0) {
@@ -9596,6 +9694,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 selected_stat = &stat;
                             }
                         }
+
+                        draw_goal_row_status_tags(
+                            stat.is_hidden, stat.in_2nd_row, stat.in_3rd_row, false,
+                            stat.icon_pos.is_set || stat.text_pos.is_set || stat.progress_pos.is_set);
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -13796,6 +13898,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
+                        draw_goal_row_status_tags(
+                            goal.is_hidden, goal.in_2nd_row, false, false,
+                            goal.icon_pos.is_set || goal.text_pos.is_set || goal.progress_pos.is_set);
+
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
@@ -16044,6 +16150,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::Selectable(label, selected_counter_index == actual_idx)) {
                             selected_counter_index = actual_idx;
                         }
+
+                        draw_goal_row_status_tags(
+                            counter.is_hidden, counter.in_2nd_row, false, false,
+                            counter.icon_pos.is_set || counter.text_pos.is_set ||
+                            counter.progress_pos.is_set);
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&

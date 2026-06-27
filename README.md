@@ -888,6 +888,11 @@ Opening a template reveals a tabbed interface where you can define every goal.
   with the badge sorting for efficient template creation! You can also drag any row by its handle to move it to a new
   position; if the dragged row is part of a bulk selection, the whole selection moves together preserving its relative
   order.
+* **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, multi-stage goals,
+  and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
+  detail pane: `R2`/`R3` (forced to the 2nd/3rd overlay row), `H` (hidden from the overlay and automatic tracker
+  layout), `rcp` (recipe, advancements only), and `pos` (has custom manual-layout coordinates). Hover the tags for a
+  tooltip describing the active ones.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
   selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
