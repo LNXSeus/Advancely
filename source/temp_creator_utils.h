@@ -145,6 +145,28 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 bool delete_template_files(const char *version, const char *category, const char *flag);
 
 /**
+ * @brief Renames (moves) a template and ALL of its associated files to a new identity.
+ *
+ * Unlike copy + delete, this moves the main template file together with every associated
+ * language, layout, notes and snapshot file, so nothing is lost. The destination may differ
+ * in version, category and/or flag. Validation and collision checks mirror copy_template_files.
+ * Empty source directories are removed afterwards.
+ *
+ * @param src_version The version of the template to rename.
+ * @param src_category The category of the template to rename.
+ * @param src_flag The optional flag of the template to rename.
+ * @param dest_version The destination version.
+ * @param dest_category The destination category.
+ * @param dest_flag The destination optional flag.
+ * @param error_message A buffer to store any error message.
+ * @param error_msg_size The size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool rename_template_files(const char *src_version, const char *src_category, const char *src_flag,
+                           const char *dest_version, const char *dest_category, const char *dest_flag,
+                           char *error_message, size_t error_msg_size);
+
+/**
  * @brief Enum to represent the result of a language file copy operation.
 */
 typedef enum {

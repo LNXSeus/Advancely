@@ -3478,6 +3478,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char copy_template_category[MAX_PATH_LENGTH] = "";
     static char copy_template_flag[MAX_PATH_LENGTH] = "";
 
+    // State for the "Rename" view
+    static bool show_rename_view = false;
+    static int rename_template_version_idx = -1;
+    static char rename_template_category[MAX_PATH_LENGTH] = "";
+    static char rename_template_flag[MAX_PATH_LENGTH] = "";
+
     // State for language import
     static bool show_import_lang_popup = false;
     static char import_lang_source_path[MAX_PATH_LENGTH] = "";
@@ -4268,7 +4274,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
 
             // Available only when viewing a template's language/layout lists (not in editor)
-            if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
+            if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view &&
+                !show_rename_view) {
                 if (ImGui::Selectable(scope_names[SCOPE_LANGUAGES], current_search_scope == SCOPE_LANGUAGES)) {
                     current_search_scope = SCOPE_LANGUAGES;
                     tc_search_buffer[0] = '\0'; // Clear search on change
@@ -4424,6 +4431,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // General state changes on any selection
             show_create_new_view = false;
             show_copy_view = false;
+            show_rename_view = false;
             status_message[0] = '\0';
         }
     }
@@ -4444,6 +4452,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::Button("Create New Template")) {
         show_create_new_view = true;
         show_copy_view = false;
+        show_rename_view = false;
         editing_template = false;
         selected_template_index = -1;
         status_message[0] = '\0';
@@ -4480,6 +4489,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         editing_template = true;
         show_create_new_view = false;
         show_copy_view = false;
+        show_rename_view = false;
 
         if (selected_template_index != -1) {
             if (selected_lang_index == -1) selected_lang_index = 0;
@@ -4521,92 +4531,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    ImGui::SameLine();
-
-    // Allow copying of the currently used template
-    ImGui::BeginDisabled(selected_template_index == -1);
-    if (ImGui::Button("Copy Template")) {
-        if (selected_template_index != -1) {
-            show_copy_view = true;
-            show_create_new_view = false;
-            editing_template = false; // Still allow clicking other buttons (e.g., copy, delete, ...) when editing
-            status_message[0] = '\0';
-
-            // Pre-fill with selected template's info and append _copy to the flag
-            const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-            const char *dest_version = creator_version_str;
-
-            // Pre-fill the category and version for the new copy
-            strncpy(copy_template_category, selected.category, sizeof(copy_template_category) - 1);
-            copy_template_category[sizeof(copy_template_category) - 1] = '\0';
-            copy_template_version_idx = creator_version_idx;
-
-            // --- Logic to find a unique name for the new flag ---
-            char base_flag[MAX_PATH_LENGTH];
-            strncpy(base_flag, selected.optional_flag, sizeof(base_flag) - 1);
-            base_flag[sizeof(base_flag) - 1] = '\0';
-
-            char new_flag[MAX_PATH_LENGTH];
-            int copy_counter = 1; // 1 for the first attempt (_copy), 2+ for _copyN
-
-            while (true) {
-                if (copy_counter == 1) {
-                    snprintf(new_flag, sizeof(new_flag), "%s_copy", base_flag);
-                } else {
-                    snprintf(new_flag, sizeof(new_flag), "%s_copy%d", base_flag, copy_counter);
-                }
-
-                // Construct the potential path to check if a template with this name already exists
-                char dest_version_filename[64];
-                strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
-                dest_version_filename[sizeof(dest_version_filename) - 1] = '\0';
-                for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
-
-                char dest_template_path[MAX_PATH_LENGTH];
-                snprintf(dest_template_path, sizeof(dest_template_path), "%s/templates/%s/%s/%s_%s%s.json",
-                         get_resources_path(),
-                         dest_version,
-                         selected.category, // Check against the original category
-                         dest_version_filename,
-                         selected.category,
-                         new_flag);
-
-                if (!path_exists(dest_template_path)) {
-                    break; // Found a unique name
-                }
-                copy_counter++; // Increment and try the next number
-            }
-            // Apply the new unique flag to the copy view's buffer
-            strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
-            copy_template_flag[sizeof(copy_template_flag) - 1] = '\0';
-        }
-    }
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[1024];
-        if (visual_editing_active) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot copy a template while Visual Editing is active.\n"
-                     "Stop Visual Editing first.");
-        } else if (has_unsaved_changes_in_editor) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot copy a template while the template has unsaved changes.\n"
-                     "Save or revert your changes first.");
-        } else if (selected_template_index == -1) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
-        } else {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
-                     "Note: This action copies the main template file and all of its\n"
-                     "associated language files (e.g., _lang.json, _lang_eng.json).");
-        }
-        ImGui::SetTooltip("%s", tooltip_buffer);
-    }
+    ImGui::EndDisabled(); // template_switching_disabled (Create New + Edit)
 
     ImGui::SameLine();
 
-    // Determine if the selected template is the default one
-    // Can't delete it
+    // Determine if the selected template is the default one (it cannot be deleted)
     bool is_default_template = false;
     if (selected_template_index != -1) {
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
@@ -4617,89 +4546,302 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Disable if nothing is selected, the selected template is the default, or the editor is in a
-    // state that would lose work. The in-use template IS deletable now (the tracker falls back to the
-    // default template afterwards) because opening a template in the editor makes it the in-use one.
-    ImGui::BeginDisabled(
-        selected_template_index == -1 || is_default_template ||
-        visual_editing_active || has_unsaved_changes_in_editor);
-    if (ImGui::Button("Delete Template")) {
-        if (selected_template_index != -1) {
-            ImGui::OpenPopup("Delete Template?");
-        }
+    // --- Template Actions Menu ---
+    // Copy, rename, delete, import and export live in this dropdown so the button row stays clear of
+    // the right-aligned "Open World Folder"/"Help" buttons. The menu items only set request flags; the
+    // real work (and any dialogs/popups) runs below at the top level so popups don't nest inside the menu.
+    bool request_copy = false;
+    bool request_rename = false;
+    bool request_delete = false;
+    bool request_import = false;
+    bool request_export = false;
+
+    if (ImGui::Button("Template...")) {
+        ImGui::OpenPopup("TemplateActionsMenu");
     }
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[512];
-        if (visual_editing_active) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot delete a template while Visual Editing is active.\n"
-                     "Stop Visual Editing first.");
-        } else if (has_unsaved_changes_in_editor) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot delete a template while the template has unsaved changes.\n"
-                     "Save or revert your changes first.");
-        } else if (is_default_template) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
-        } else if (selected_template_index != -1) {
-            const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-            if (selected.optional_flag[0] != '\0') {
-                // WITH OPTIONAL FLAG
-                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                    // Legacy snapshot mentioned
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
-                             "This deletes the template, associated language files,\n"
-                             "notes and snapshot file for global stats.\n"
-                             "Empty folders within the 'templates' folder will also be deleted.\n"
-                             "This action cannot be undone.",
-                             creator_version_str, selected.category, selected.optional_flag);
-                } else {
-                    // No snapshot mentioned
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
-                             "This deletes the template, associated language files and notes.\n"
-                             "Empty folders within the 'templates' folder will also be deleted.\n"
-                             "This action cannot be undone.",
-                             creator_version_str, selected.category, selected.optional_flag);
-                }
-            } else {
-                // NO OPTIONAL FLAG
-                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                    // Legacy snapshot mentioned
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
-                             "This deletes the template, associated language files,\n"
-                             "notes and snapshot file for global stats.\n"
-                             "Empty folders within the 'templates' folder will also be deleted.\n"
-                             "This action cannot be undone.",
-                             creator_version_str, selected.category);
-                } else {
-                    // No snapshot mentioned
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
-                             "This deletes the template, associated language files and notes.\n"
-                             "Empty folders within the 'templates' folder will also be deleted.\n"
-                             "This action cannot be undone.",
-                             creator_version_str, selected.category);
-                }
-            }
-            // The in-use template is deletable; warn that the tracker falls back to the default template.
-            if (is_current_template) {
-                size_t info_len = strlen(tooltip_buffer);
-                snprintf(tooltip_buffer + info_len, sizeof(tooltip_buffer) - info_len,
-                         "\n\nThis template is currently in use; deleting it switches the tracker to the "
-                         "default template.");
-            }
-        } else {
-            // Nothing selected
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Select a template from the list to delete.");
-        }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Manage the selected template: copy, rename, delete, import or export.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    ImGui::SameLine();
 
-    // Import Template Button
-    if (ImGui::Button("Import Template")) {
+    if (ImGui::BeginPopup("TemplateActionsMenu")) {
+        // --- Copy ---
+        ImGui::BeginDisabled(selected_template_index == -1 || template_switching_disabled);
+        if (ImGui::MenuItem("Copy Template")) request_copy = true;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[1024];
+            if (visual_editing_active) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot copy a template while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot copy a template while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else if (selected_template_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
+            } else if (creator_selected_version <= MC_VERSION_1_6_4) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+                         "Copies the main template file and all of its language and layout files\n"
+                         "(e.g., _lang.json, _lang_eng.json). Your notes and the global-stats snapshot\n"
+                         "are NOT copied; use Rename instead if you want to keep them.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+                         "Copies the main template file and all of its language and layout files\n"
+                         "(e.g., _lang.json, _lang_eng.json). Your notes are NOT copied;\n"
+                         "use Rename instead if you want to keep them.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        // --- Rename ---
+        // The default template cannot be renamed: a rename moves its files to a new name, which would
+        // leave the protected default identity without files (effectively deleting it).
+        ImGui::BeginDisabled(selected_template_index == -1 || is_default_template || template_switching_disabled);
+        if (ImGui::MenuItem("Rename Template")) request_rename = true;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[1024];
+            if (visual_editing_active) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot rename a template while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot rename a template while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else if (is_default_template) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be renamed.");
+            } else if (selected_template_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to rename.");
+            } else if (creator_selected_version <= MC_VERSION_1_6_4) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Renames the selected template. You can change its version, category, or flag.\n\n"
+                         "Unlike Copy, this moves ALL associated files and keeps your language, layout,\n"
+                         "notes and global-stats snapshot files intact.\n"
+                         "If this template is currently in use, the tracker follows the rename.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Renames the selected template. You can change its version, category, or flag.\n\n"
+                         "Unlike Copy, this moves ALL associated files and keeps your language, layout\n"
+                         "and notes files intact.\n"
+                         "If this template is currently in use, the tracker follows the rename.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::Separator();
+
+        // --- Delete ---
+        ImGui::BeginDisabled(
+            selected_template_index == -1 || is_default_template ||
+            visual_editing_active || has_unsaved_changes_in_editor);
+        if (ImGui::MenuItem("Delete Template")) request_delete = true;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[512];
+            if (visual_editing_active) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot delete a template while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot delete a template while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else if (is_default_template) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
+            } else if (selected_template_index != -1) {
+                const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+                if (selected.optional_flag[0] != '\0') {
+                    // WITH OPTIONAL FLAG
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        // Legacy snapshot mentioned
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
+                                 "This deletes the template, associated language files,\n"
+                                 "notes and snapshot file for global stats.\n"
+                                 "Empty folders within the 'templates' folder will also be deleted.\n"
+                                 "This action cannot be undone.",
+                                 creator_version_str, selected.category, selected.optional_flag);
+                    } else {
+                        // No snapshot mentioned
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
+                                 "This deletes the template, associated language files and notes.\n"
+                                 "Empty folders within the 'templates' folder will also be deleted.\n"
+                                 "This action cannot be undone.",
+                                 creator_version_str, selected.category, selected.optional_flag);
+                    }
+                } else {
+                    // NO OPTIONAL FLAG
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        // Legacy snapshot mentioned
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                                 "This deletes the template, associated language files,\n"
+                                 "notes and snapshot file for global stats.\n"
+                                 "Empty folders within the 'templates' folder will also be deleted.\n"
+                                 "This action cannot be undone.",
+                                 creator_version_str, selected.category);
+                    } else {
+                        // No snapshot mentioned
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                                 "This deletes the template, associated language files and notes.\n"
+                                 "Empty folders within the 'templates' folder will also be deleted.\n"
+                                 "This action cannot be undone.",
+                                 creator_version_str, selected.category);
+                    }
+                }
+                // The in-use template is deletable; warn that the tracker falls back to the default template.
+                if (is_current_template) {
+                    size_t info_len = strlen(tooltip_buffer);
+                    snprintf(tooltip_buffer + info_len, sizeof(tooltip_buffer) - info_len,
+                             "\n\nThis template is currently in use; deleting it switches the tracker to the "
+                             "default template.");
+                }
+            } else {
+                // Nothing selected
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Select a template from the list to delete.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::Separator();
+
+        // --- Import ---
+        ImGui::BeginDisabled(template_switching_disabled);
+        if (ImGui::MenuItem("Import Template")) request_import = true;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[512];
+            if (visual_editing_active) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot import a template while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot import a template while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Import a template from a .zip file.\n"
+                         "Import a full template package, including the main file and all language files.\n"
+                         "You can then configure the version, category and flag before performing the import.\n"
+                         "For legacy versions a template file cannot end in _snapshot.");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        // --- Export ---
+        ImGui::BeginDisabled(selected_template_index == -1 || template_switching_disabled);
+        if (ImGui::MenuItem("Export Template")) request_export = true;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[256];
+            if (visual_editing_active) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot export a template while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Cannot export a template while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else if (selected_template_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Export the selected template as a .zip file, including its main file and all language files.\n\n"
+                         "Feel free to share them on the Official Advancely Discord (discord.gg/TyNgXDz)!");
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::EndPopup();
+    }
+
+    // --- Handle deferred Template menu actions at top level (so popups/dialogs don't nest in the menu) ---
+    if (request_copy && selected_template_index != -1) {
+        show_copy_view = true;
+        show_create_new_view = false;
+        show_rename_view = false;
+        editing_template = false; // Still allow clicking other buttons (e.g., copy, delete, ...) when editing
+        status_message[0] = '\0';
+
+        // Pre-fill with selected template's info and append _copy to the flag
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+        const char *dest_version = creator_version_str;
+
+        // Pre-fill the category and version for the new copy
+        strncpy(copy_template_category, selected.category, sizeof(copy_template_category) - 1);
+        copy_template_category[sizeof(copy_template_category) - 1] = '\0';
+        copy_template_version_idx = creator_version_idx;
+
+        // --- Logic to find a unique name for the new flag ---
+        char base_flag[MAX_PATH_LENGTH];
+        strncpy(base_flag, selected.optional_flag, sizeof(base_flag) - 1);
+        base_flag[sizeof(base_flag) - 1] = '\0';
+
+        char new_flag[MAX_PATH_LENGTH];
+        int copy_counter = 1; // 1 for the first attempt (_copy), 2+ for _copyN
+
+        while (true) {
+            if (copy_counter == 1) {
+                snprintf(new_flag, sizeof(new_flag), "%s_copy", base_flag);
+            } else {
+                snprintf(new_flag, sizeof(new_flag), "%s_copy%d", base_flag, copy_counter);
+            }
+
+            // Construct the potential path to check if a template with this name already exists
+            char dest_version_filename[64];
+            strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
+            dest_version_filename[sizeof(dest_version_filename) - 1] = '\0';
+            for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+            char dest_template_path[MAX_PATH_LENGTH];
+            snprintf(dest_template_path, sizeof(dest_template_path), "%s/templates/%s/%s/%s_%s%s.json",
+                     get_resources_path(),
+                     dest_version,
+                     selected.category, // Check against the original category
+                     dest_version_filename,
+                     selected.category,
+                     new_flag);
+
+            if (!path_exists(dest_template_path)) {
+                break; // Found a unique name
+            }
+            copy_counter++; // Increment and try the next number
+        }
+        // Apply the new unique flag to the copy view's buffer
+        strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
+        copy_template_flag[sizeof(copy_template_flag) - 1] = '\0';
+    }
+
+    if (request_rename && selected_template_index != -1 && !is_default_template) {
+        show_rename_view = true;
+        show_copy_view = false;
+        show_create_new_view = false;
+        editing_template = false;
+        status_message[0] = '\0';
+
+        // Pre-fill the rename fields with the selected template's current identity.
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+        strncpy(rename_template_category, selected.category, sizeof(rename_template_category) - 1);
+        rename_template_category[sizeof(rename_template_category) - 1] = '\0';
+        strncpy(rename_template_flag, selected.optional_flag, sizeof(rename_template_flag) - 1);
+        rename_template_flag[sizeof(rename_template_flag) - 1] = '\0';
+        rename_template_version_idx = creator_version_idx;
+    }
+
+    if (request_delete && selected_template_index != -1) {
+        ImGui::OpenPopup("Delete Template?");
+    }
+
+    if (request_import) {
 #ifdef __APPLE__
         const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
         int filter_count = 2;
@@ -4748,6 +4890,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 import_icons_checkbox = import_zip_has_icons; // default ON if icons present
                 show_create_new_view = false;
                 show_copy_view = false;
+                show_rename_view = false;
                 editing_template = false;
             } else {
                 // On failure, get_info_from_zip already set the status_message
@@ -4755,55 +4898,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
     }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[512];
-        if (visual_editing_active) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot import a template while Visual Editing is active.\n"
-                     "Stop Visual Editing first.");
-        } else if (has_unsaved_changes_in_editor) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot import a template while the template has unsaved changes.\n"
-                     "Save or revert your changes first.");
-        } else {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Import a template from a .zip file.\n"
-                     "Import a full template package, including the main file and all language files.\n"
-                     "You can then configure the version, category and flag before performing the import.\n"
-                     "For legacy versions a template file cannot end in _snapshot.");
-        }
-        ImGui::SetTooltip("%s", tooltip_buffer);
-    }
-    ImGui::SameLine();
 
-    // Export Template Button
-    ImGui::BeginDisabled(selected_template_index == -1);
-    if (ImGui::Button("Export Template")) {
-        if (selected_template_index != -1) {
-            show_export_options_popup = true;
-        }
+    if (request_export && selected_template_index != -1) {
+        show_export_options_popup = true;
     }
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[256];
-        if (visual_editing_active) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot export a template while Visual Editing is active.\n"
-                     "Stop Visual Editing first.");
-        } else if (has_unsaved_changes_in_editor) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cannot export a template while the template has unsaved changes.\n"
-                     "Save or revert your changes first.");
-        } else if (selected_template_index == -1) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
-        } else {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Export the selected template as a .zip file, including its main file and all language files.\n\n"
-                     "Feel free to share them on the Official Advancely Discord (discord.gg/TyNgXDz)!");
-        }
-        ImGui::SetTooltip("%s", tooltip_buffer);
-    }
-    ImGui::EndDisabled(); // template_switching_disabled (action buttons)
 
     if (show_export_options_popup)
         ImGui::OpenPopup("Export Template");
@@ -5151,8 +5249,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // --- Language Management UI (appears when a template is selected) ---
-    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view && !
-        show_import_confirmation_view) {
+    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view &&
+        !show_rename_view && !show_import_confirmation_view) {
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         ImGui::Text("Languages for '%s%s'", selected.category, selected.optional_flag);
 
@@ -5348,8 +5446,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // --- Layout Management UI (mirrors the Language Management UI; appears when a template is selected) ---
-    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view && !
-        show_import_confirmation_view) {
+    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view &&
+        !show_rename_view && !show_import_confirmation_view) {
         ImGui::Separator();
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         ImGui::Text("Layouts for '%s%s'", selected.category, selected.optional_flag);
@@ -6113,14 +6211,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     reselect_after_revert(prev_adv, prev_stat, prev_ms);
                 }
             }
-        }
 
-        if (ImGui::IsItemHovered()) {
-            char revert_changes_tooltip_buffer[1024];
-            snprintf(revert_changes_tooltip_buffer, sizeof(revert_changes_tooltip_buffer),
-                     "Discard all unsaved changes and reload from the last saved state.\n"
-                     "(Ctrl+Z / Cmd+Z)");
-            ImGui::SetTooltip("%s", revert_changes_tooltip_buffer);
+            // Revert button tooltip (kept inside this block so it only applies to the Revert
+            // button; otherwise IsItemHovered would fall through to the Save button when the
+            // Revert button isn't rendered, showing the Revert tooltip on Save).
+            if (ImGui::IsItemHovered()) {
+                char revert_changes_tooltip_buffer[1024];
+                snprintf(revert_changes_tooltip_buffer, sizeof(revert_changes_tooltip_buffer),
+                         "Discard all unsaved changes and reload from the last saved state.\n"
+                         "(Ctrl+Z / Cmd+Z)");
+                ImGui::SetTooltip("%s", revert_changes_tooltip_buffer);
+            }
         }
 
         // Render the success or error message next to the button
@@ -17760,6 +17861,121 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(confirm_copy_tooltip_buffer, sizeof(confirm_copy_tooltip_buffer),
                      "Create a copy of the selected template with the new name.\nYou can also press ENTER.");
             ImGui::SetTooltip("%s", confirm_copy_tooltip_buffer);
+        }
+        // Display status/error message
+        if (status_message[0] != '\0') {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
+        }
+    }
+
+    // "Rename Template" Form
+    else if (show_rename_view) {
+        ImGui::Text("Rename Template");
+
+        ImGui::Spacing();
+
+        if (selected_template_index != -1) {
+            const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+            ImGui::Text("Renaming: %s%s  (%s)", selected.category, selected.optional_flag, creator_version_str);
+        }
+
+        // Unlike Copy, a rename moves ALL associated files (language, layout, notes and, on legacy
+        // versions, the global-stats snapshot) so nothing is left behind.
+        if (creator_selected_version <= MC_VERSION_1_6_4) {
+            ImGui::TextDisabled("Keeps your language, layout, notes and global-stats snapshot files.");
+        } else {
+            ImGui::TextDisabled("Keeps your language, layout and notes files.");
+        }
+        ImGui::Spacing();
+
+        ImGui::Combo("New Template Version", &rename_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the template.\n"
+                     "This version influences certain functionality of the template\n"
+                     "and how the tracker reads the game files.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::InputText("New Category Name", rename_template_category, sizeof(rename_template_category));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The main classification for the template.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::InputText("New Optional Flag", rename_template_flag, sizeof(rename_template_flag));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the category (e.g., '_optimized').\n"
+                     "The optional flag immediately follows the category name\n"
+                     "so it best practice to start with an underscore.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        // Allow enter key to confirm rename WHEN the window is focused
+        if (ImGui::Button("Confirm Rename") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
+                                                    ImGuiFocusedFlags_RootAndChildWindows))) {
+            if (selected_template_index != -1 && rename_template_version_idx >= 0) {
+                const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+                const char *dest_version = VERSION_STRINGS[rename_template_version_idx];
+                char error_msg[256] = "";
+
+                // Capture whether this is the in-use template BEFORE the files move.
+                bool was_current = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                    strcmp(selected.category, app_settings->category) == 0 &&
+                                    strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+
+                if (rename_template_files(creator_version_str, selected.category, selected.optional_flag,
+                                          dest_version, rename_template_category, rename_template_flag,
+                                          error_msg, sizeof(error_msg))) {
+                    status_message[0] = '\0';
+                    show_rename_view = false;
+
+                    // If the tracker was using this template, follow the rename so it doesn't point at
+                    // files that no longer exist. The language and layout flags are preserved by the rename.
+                    if (was_current && app_settings && t) {
+                        strncpy(app_settings->version_str, dest_version, sizeof(app_settings->version_str) - 1);
+                        app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
+                        strncpy(app_settings->category, rename_template_category, sizeof(app_settings->category) - 1);
+                        app_settings->category[sizeof(app_settings->category) - 1] = '\0';
+                        strncpy(app_settings->optional_flag, rename_template_flag,
+                                sizeof(app_settings->optional_flag) - 1);
+                        app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
+                        recompute_display_category(app_settings);
+                        settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                        SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the renamed template
+                        SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved change
+                    }
+
+                    // Switch the creator UI to the destination version so the renamed template is visible.
+                    strncpy(creator_version_str, dest_version, sizeof(creator_version_str) - 1);
+                    creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                    creator_version_idx = rename_template_version_idx;
+                    selected_template_index = -1; // The old selection no longer exists
+                    SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
+                    last_scanned_version[0] = '\0'; // Force rescan
+                } else {
+                    strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                    status_message[sizeof(status_message) - 1] = '\0';
+                }
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char confirm_rename_tooltip_buffer[512];
+            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                snprintf(confirm_rename_tooltip_buffer, sizeof(confirm_rename_tooltip_buffer),
+                         "Rename the selected template to the new name.\n"
+                         "Moves the main template file and all of its language, layout, notes\n"
+                         "and global-stats snapshot files. You can also press ENTER.");
+            } else {
+                snprintf(confirm_rename_tooltip_buffer, sizeof(confirm_rename_tooltip_buffer),
+                         "Rename the selected template to the new name.\n"
+                         "Moves the main template file and all of its language, layout\n"
+                         "and notes files. You can also press ENTER.");
+            }
+            ImGui::SetTooltip("%s", confirm_rename_tooltip_buffer);
         }
         // Display status/error message
         if (status_message[0] != '\0') {

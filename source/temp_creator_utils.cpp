@@ -851,6 +851,213 @@ bool delete_template_files(const char *version, const char *category, const char
     return all_success;
 }
 
+bool rename_template_files(const char *src_version, const char *src_category, const char *src_flag,
+                           const char *dest_version, const char *dest_category, const char *dest_flag,
+                           char *error_message, size_t error_msg_size) {
+    // 1. Validate Destination Inputs (mirrors copy_template_files)
+    if (!dest_category || dest_category[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: New category name cannot be empty.");
+        return false;
+    }
+    if (!is_valid_filename_part(dest_category)) {
+        snprintf(error_message, error_msg_size, "Error: New category contains invalid characters.");
+        return false;
+    }
+    if (!is_valid_filename_part(dest_flag)) {
+        snprintf(error_message, error_msg_size, "Error: New flag contains invalid characters.");
+        return false;
+    }
+    // Prevent the category+flag combination from colliding with the reserved metadata file name
+    {
+        char reserved_check[MAX_PATH_LENGTH];
+        snprintf(reserved_check, sizeof(reserved_check), "%s%s", dest_category, dest_flag ? dest_flag : "");
+        if (strcasecmp(reserved_check, "advancely_template") == 0) {
+            snprintf(error_message, error_msg_size,
+                     "Error: 'advancely_template' is a reserved name and cannot be used.");
+            return false;
+        }
+    }
+    if (name_uses_reserved_suffix_token(dest_category, dest_flag, error_message, error_msg_size)) {
+        return false;
+    }
+    // The new identity must differ from the original.
+    if (strcmp(src_version, dest_version) == 0 && strcmp(src_category, dest_category) == 0 &&
+        strcmp(src_flag, dest_flag) == 0) {
+        snprintf(error_message, error_msg_size, "Error: New name must be different from the original.");
+        return false;
+    }
+    // Prevent renaming to a reserved "_snapshot" suffix for legacy versions
+    MC_Version dest_version_enum = settings_get_version_from_string(dest_version);
+    if (dest_version_enum <= MC_VERSION_1_6_4) {
+        char combined_name[MAX_PATH_LENGTH];
+        snprintf(combined_name, sizeof(combined_name), "%s%s", dest_category, dest_flag);
+        if (ends_with(combined_name, "_snapshot")) {
+            snprintf(error_message, error_msg_size,
+                     "Error: Template name cannot end with '_snapshot' for legacy versions.");
+            return false;
+        }
+    }
+
+    // 2. Check for Name Collisions at Destination based on final filename (mirrors copy_template_files)
+    char dest_version_filename[64];
+    version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
+    char new_filename_part[MAX_PATH_LENGTH];
+    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
+
+    DiscoveredTemplate *existing_templates = nullptr;
+    int existing_count = 0;
+    scan_for_templates(dest_version, &existing_templates, &existing_count);
+
+    if (existing_templates) {
+        for (int i = 0; i < existing_count; ++i) {
+            char existing_version_filename[64];
+            version_to_filename_format(dest_version, existing_version_filename, sizeof(existing_version_filename));
+            char existing_filename_part[MAX_PATH_LENGTH];
+            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
+                     existing_version_filename, existing_templates[i].category, existing_templates[i].optional_flag);
+
+            if (strcmp(new_filename_part, existing_filename_part) == 0) {
+                snprintf(error_message, error_msg_size,
+                         "Error: Name collision. This combination results in an existing filename.");
+                free_discovered_templates(&existing_templates, &existing_count);
+                return false;
+            }
+        }
+        free_discovered_templates(&existing_templates, &existing_count);
+    }
+
+    // 3. Construct Source Paths and verify the main template file exists and is valid
+    char src_version_filename[64];
+    strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
+    src_version_filename[sizeof(src_version_filename) - 1] = '\0';
+    for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char src_category_path[MAX_PATH_LENGTH];
+    snprintf(src_category_path, sizeof(src_category_path), "%s/templates/%s/%s", get_resources_path(), src_version,
+             src_category);
+
+    char src_base_filename[MAX_PATH_LENGTH];
+    snprintf(src_base_filename, sizeof(src_base_filename), "%s_%s%s", src_version_filename, src_category, src_flag);
+
+    char src_template_path[MAX_PATH_LENGTH];
+    snprintf(src_template_path, sizeof(src_template_path), "%s/%s.json", src_category_path, src_base_filename);
+
+    cJSON *src_template_json = cJSON_from_file(src_template_path);
+    if (src_template_json == nullptr || src_template_json->child == nullptr) {
+        snprintf(error_message, error_msg_size,
+                 "Error: Source template file is empty or invalid and cannot be renamed.");
+        cJSON_Delete(src_template_json);
+        return false;
+    }
+    cJSON_Delete(src_template_json);
+
+    // 4. Construct Destination Paths and ensure the destination directory exists
+    char dest_category_path[MAX_PATH_LENGTH];
+    snprintf(dest_category_path, sizeof(dest_category_path), "%s/templates/%s/%s", get_resources_path(), dest_version,
+             dest_category);
+    fs_ensure_directory_exists(dest_category_path);
+
+    char dest_base_filename[MAX_PATH_LENGTH];
+    snprintf(dest_base_filename, sizeof(dest_base_filename), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
+
+    // 5. Collect the suffixes of all associated source files first, then move them. Collecting up front
+    // avoids enumerating files we create mid-scan when the destination shares the source directory.
+    // The suffix whitelist mirrors delete_template_files so we move exactly the template's own files.
+    std::vector<std::string> suffixes_to_move;
+    size_t base_len = strlen(src_base_filename);
+
+#ifdef _WIN32
+    char search_path[MAX_PATH_LENGTH];
+    snprintf(search_path, sizeof(search_path), "%s\\*", src_category_path);
+    WIN32_FIND_DATAA find_data;
+    HANDLE h_find = FindFirstFileA(search_path, &find_data);
+    if (h_find != INVALID_HANDLE_VALUE) {
+        do {
+            const char *filename = find_data.cFileName;
+            if (strncmp(filename, src_base_filename, base_len) == 0) {
+                const char *suffix = filename + base_len;
+                if (strcmp(suffix, ".json") == 0 ||
+                    strcmp(suffix, "_snapshot.json") == 0 ||
+                    strcmp(suffix, "_notes.txt") == 0 ||
+                    strncmp(suffix, "_lang", 5) == 0 ||
+                    strncmp(suffix, "_layout", 7) == 0) {
+                    suffixes_to_move.push_back(suffix);
+                }
+            }
+        } while (FindNextFileA(h_find, &find_data) != 0);
+        FindClose(h_find);
+    }
+#else // POSIX
+    DIR *dir = opendir(src_category_path);
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            const char *filename = entry->d_name;
+            if (strncmp(filename, src_base_filename, base_len) == 0) {
+                const char *suffix = filename + base_len;
+                if (strcmp(suffix, ".json") == 0 ||
+                    strcmp(suffix, "_snapshot.json") == 0 ||
+                    strcmp(suffix, "_notes.txt") == 0 ||
+                    strncmp(suffix, "_lang", 5) == 0 ||
+                    strncmp(suffix, "_layout", 7) == 0) {
+                    suffixes_to_move.push_back(suffix);
+                }
+            }
+        }
+        closedir(dir);
+    }
+#endif
+
+    if (suffixes_to_move.empty()) {
+        snprintf(error_message, error_msg_size, "Error: No template files were found to rename.");
+        return false;
+    }
+
+    bool all_success = true;
+    for (const std::string &suffix: suffixes_to_move) {
+        char from_path[MAX_PATH_LENGTH];
+        snprintf(from_path, sizeof(from_path), "%s/%s%s", src_category_path, src_base_filename, suffix.c_str());
+        char to_path[MAX_PATH_LENGTH];
+        snprintf(to_path, sizeof(to_path), "%s/%s%s", dest_category_path, dest_base_filename, suffix.c_str());
+        if (rename(from_path, to_path) != 0) {
+            log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to move file: %s -> %s\n", from_path, to_path);
+            all_success = false;
+        } else {
+            log_message(LOG_INFO, "[TEMP CREATE UTILS] Moved file: %s -> %s\n", from_path, to_path);
+        }
+    }
+
+    // 6. After moving the files, remove the now-empty source directories (mirrors delete_template_files)
+    if (all_success && is_directory_empty(src_category_path)) {
+#ifdef _WIN32
+        if (RemoveDirectoryA(src_category_path)) {
+#else
+            if (rmdir(src_category_path) == 0) {
+#endif
+            log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty category directory: %s\n", src_category_path);
+
+            char src_version_path[MAX_PATH_LENGTH];
+            snprintf(src_version_path, sizeof(src_version_path), "%s/templates/%s", get_resources_path(), src_version);
+            if (is_directory_empty(src_version_path)) {
+#ifdef _WIN32
+                if (RemoveDirectoryA(src_version_path)) {
+#else
+                    if (rmdir(src_version_path) == 0) {
+#endif
+                    log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty version directory: %s\n",
+                                src_version_path);
+                }
+            }
+        }
+    }
+
+    if (!all_success) {
+        snprintf(error_message, error_msg_size,
+                 "Error: Some template files could not be moved. Check the log for details.");
+    }
+    return all_success;
+}
+
 // Helper to construct the base path for a template's files, reducing code duplication.
 static void construct_template_base_path(const char *version, const char *category, const char *flag, char *out_path,
                                          size_t max_len) {

@@ -536,7 +536,7 @@ The best approach is to create a complete **copy of the template**. This makes y
 protects it from being overwritten.
 
 1. Open the **Template Editor** and select the official template you want to use as a base.
-2. Click the **Copy Template** button.
+2. Open the **`Template...`** dropdown and click **Copy Template**.
 3. Give your new version a unique name, typically by adding an **Optional Flag** (e.g., `_custom`).
 4. You can now safely edit your new, independent template in any way you wish.
 
@@ -837,12 +837,19 @@ the `Open Template Editor` button.
 
 ### Template Management
 
-From the main editor view, you can manage entire template packages:
+From the main editor view, you can manage entire template packages. **Create New Template** and **Edit Template** are
+their own buttons, while the copy, rename, delete, import and export actions are grouped under the **`Template...`**
+dropdown to keep the button row tidy:
 
 * **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique
   `Category Name` and an `Optional Flag`.
 * **Copy Template**: Duplicates an existing template, including all its language **and layout files**. This is the
-  perfect starting point for creating a variation of a complex template.
+  perfect starting point for creating a variation of a complex template. Note that a copy does **not** carry over your
+  `notes` (or the global-stats `snapshot` on legacy versions); use **Rename Template** if you want to keep those.
+* **Rename Template**: Changes a template's `version`, `category` and/or `Optional Flag` in place. Unlike a copy, this
+  **moves** the template and **all** of its associated files, so your language, layout, `notes` **and** (on legacy
+  versions) the global-stats `snapshot` files are kept intact. If you rename the template that is currently in use, the
+  tracker automatically follows the rename.
 * **Delete Template**: Permanently removes a template and all of its associated language, layout, **and notes files**.
   A template that is currently in use can also be deleted; the tracker simply falls back to the default template.
 * **Import Template**: Imports a full template package from a `.zip` file. Exported zips embed their exact version,
