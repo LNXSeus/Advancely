@@ -60,6 +60,9 @@ struct VisualLayoutItem {
     ManualPos *pos; // Pointer to the ManualPos being controlled
     CounterLinkedGoal link{}; // Identity of the goal this item belongs to (valid only if linkable)
     bool linkable = false; // True for goals that can be used as a linked-goal target
+    std::string key; // Stable identity (goal_type/parent/root/element) so a selection can survive a
+    // template reload, whose freed-and-reallocated ManualPos pointers would otherwise dangle. Empty
+    // for duplicate hit-test-only entries that reuse a pointer already keyed elsewhere this frame.
 };
 
 static std::vector<VisualLayoutItem> s_visual_layout_items;
@@ -90,6 +93,29 @@ static bool visual_pos_has_selected_ancestor(ManualPos *pos) {
 // template editor so it can append them as linked goals. Rebuilt every frame while editing.
 static std::vector<CounterLinkedGoal> s_visual_selected_goals;
 static bool s_visual_clear_selection_requested = false;
+
+// A template reload (e.g. after the editor's Save) frees and reallocates every ManualPos, leaving the
+// raw pointers in s_visual_selected_items dangling and apt to collide with newly-allocated goals,
+// which surfaces as random items appearing selected. To keep the selection intact, the selected
+// items' stable keys are captured just before the reload, then matched back to fresh pointers on the
+// first frame after it.
+static std::unordered_set<std::string> s_visual_selected_keys_pending;
+static bool s_visual_remap_after_reload = false;
+
+// Captures the stable keys of the currently selected items so the selection can be restored after a
+// template reload reallocates the underlying ManualPos objects. Must run BEFORE the old template data
+// is freed; only reads pointer values (no dereference), so the soon-to-be-freed pointers are safe.
+static void tracker_capture_visual_selection_for_reload(void) {
+    s_visual_selected_keys_pending.clear();
+    s_visual_remap_after_reload = false;
+    if (s_visual_selected_items.empty()) return;
+    for (const auto &item: s_visual_layout_items) {
+        if (!item.key.empty() && s_visual_selected_items.count(item.pos) > 0) {
+            s_visual_selected_keys_pending.insert(item.key);
+        }
+    }
+    s_visual_remap_after_reload = !s_visual_selected_keys_pending.empty();
+}
 
 int tracker_get_visual_selected_goal_count(void) {
     return (int) s_visual_selected_goals.size();
@@ -6190,8 +6216,19 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         linkable = false;
     }
 
+    // Stable identity for this draggable element, used to restore the selection across a template
+    // reload. The four parts uniquely identify each handle (e.g. an advancement's Icon vs Text, or a
+    // decoration's Endpoint 1 vs Bend 2). \x1f is a non-printable separator that can't appear in names.
+    char visual_item_key[512];
+    snprintf(visual_item_key, sizeof(visual_item_key), "%s\x1f%s\x1f%s\x1f%s",
+             goal_type ? goal_type : "",
+             parent_root_name ? parent_root_name : "",
+             root_name ? root_name : "",
+             element_type ? element_type : "");
+
     // Register this item for selection rectangle hit-testing
-    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable});
+    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable,
+                                     visual_item_key});
 
     // Record this element's hierarchical parent so multi-drag can leave automatic children alone.
     s_visual_parent_map[&target_pos] = hierarchy_parent_pos;
@@ -11115,6 +11152,21 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             s_visual_clear_selection_requested = false;
         }
 
+        // After a template reload reallocated every ManualPos, rebuild the selection from the keys
+        // captured before the reload, matching them to this frame's fresh pointers. Items whose goal
+        // no longer exists are simply dropped (instead of leaving a stale pointer that could collide
+        // with an unrelated goal). s_visual_layout_items is fully built by this point in the frame.
+        if (s_visual_remap_after_reload) {
+            s_visual_selected_items.clear();
+            for (const auto &item: s_visual_layout_items) {
+                if (!item.key.empty() && s_visual_selected_keys_pending.count(item.key) > 0) {
+                    s_visual_selected_items.insert(item.pos);
+                }
+            }
+            s_visual_selected_keys_pending.clear();
+            s_visual_remap_after_reload = false;
+        }
+
         // Draw highlight around selected items
         for (const auto &item: s_visual_layout_items) {
             if (s_visual_selected_items.count(item.pos) > 0) {
@@ -12167,6 +12219,11 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     if (!t) return;
 
     log_message(LOG_INFO, "[TRACKER] Re-initializing template...\n");
+
+    // Preserve any active visual-layout selection across the reallocation below: capture the selected
+    // items' stable keys now (while the old pointers are still valid) so they can be re-matched to the
+    // freshly parsed ManualPos objects on the next frame.
+    tracker_capture_visual_selection_for_reload();
 
     // Invalidate coop snapshot cache: serialized buffers are tied to the OLD
     // template layout (goal counts / order). Applying them after a template
