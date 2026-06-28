@@ -60,7 +60,7 @@ struct VisualLayoutItem {
     ManualPos *pos; // Pointer to the ManualPos being controlled
     CounterLinkedGoal link{}; // Identity of the goal this item belongs to (valid only if linkable)
     bool linkable = false; // True for goals that can be used as a linked-goal target
-    std::string key; // Stable identity (goal_type/parent/root/element) so a selection can survive a
+    std::string key{}; // Stable identity (goal_type/parent/root/element) so a selection can survive a
     // template reload, whose freed-and-reallocated ManualPos pointers would otherwise dangle. Empty
     // for duplicate hit-test-only entries that reuse a pointer already keyed elsewhere this frame.
 };
@@ -11144,7 +11144,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // --- Visual Layout Multi-Select ---
     if (t->is_visual_layout_editing && settings->use_manual_layout) {
-        ImDrawList *fg_draw_list = ImGui::GetForegroundDrawList();
+        // Draw selection visuals on the TrackerMap window's draw list (not the foreground one) so they
+        // sit at the same depth as the goals themselves. TrackerMap uses NoBringToFrontOnFocus and
+        // stays at the back, so the outlines render behind the editor/settings windows instead of
+        // piercing through them.
+        ImDrawList *sel_draw_list = ImGui::GetWindowDrawList();
 
         // Honor a clear request from the template editor (after appending linked goals).
         if (s_visual_clear_selection_requested) {
@@ -11172,10 +11176,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (s_visual_selected_items.count(item.pos) > 0) {
                 ImVec2 p_min = item.screen_pos;
                 ImVec2 p_max = ImVec2(p_min.x + item.size.x, p_min.y + item.size.y);
-                fg_draw_list->AddRect(p_min, p_max,
-                                      IM_COL32(settings->text_color.r, settings->text_color.g,
-                                               settings->text_color.b, 180),
-                                      2.0f, 0, 2.0f);
+                sel_draw_list->AddRect(p_min, p_max,
+                                       IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                settings->text_color.b, 180),
+                                       2.0f, 0, 2.0f);
             }
         }
 
@@ -11228,13 +11232,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                          fmaxf(t->visual_select_rect_start.y, mouse_pos.y));
 
                 // Draw the selection rectangle
-                fg_draw_list->AddRectFilled(rect_min, rect_max,
-                                            IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                     settings->text_color.b, 40));
-                fg_draw_list->AddRect(rect_min, rect_max,
-                                      IM_COL32(settings->text_color.r, settings->text_color.g,
-                                               settings->text_color.b, 150),
-                                      0.0f, 0, 1.5f);
+                sel_draw_list->AddRectFilled(rect_min, rect_max,
+                                             IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                      settings->text_color.b, 40));
+                sel_draw_list->AddRect(rect_min, rect_max,
+                                       IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                settings->text_color.b, 150),
+                                       0.0f, 0, 1.5f);
 
                 // Live-update selection as rectangle is drawn
                 // Start from the pre-rect snapshot (preserves Ctrl+Drag additive selection)
