@@ -115,30 +115,83 @@ static bool visual_link_same(const CounterLinkedGoal &a, const CounterLinkedGoal
 static std::unordered_set<std::string> s_linked_top; // Top-level items (root_name, no parent_root)
 static std::unordered_set<std::string> s_linked_sub; // Sub-items: composite key "parent_root\troot_name"
 
-// Search helpers: match display_name, root_name, and icon_path against the search buffer
-static bool item_matches_search(const TrackableItem *item, const char *search) {
-    return str_contains_insensitive(item->display_name, search)
-           || str_contains_insensitive(item->root_name, search)
-           || str_contains_insensitive(item->icon_path, search)
-           || str_contains_insensitive(item->group, search);
+// Mirrors the colored status tags shown in the template editor (Hidden, Row 1/2/3, recipe,
+// manual position). The search term must exactly equal a recognized keyword for the matching
+// flag to count, so typing e.g. "hidden" or "pos" filters the list down to flagged goals
+// without polluting ordinary name/root searches. effective_row is the overlay row the goal
+// actually lands on (1, 2 or 3), so "r2"/"r3" reveal goals that sit there by default, not just
+// the ones forced there; pass 0 to disable row matching. Pass false for flags a goal type lacks.
+static bool indicator_matches_search(const char *search, bool is_hidden, int effective_row,
+                                     bool is_recipe, bool manual_pos_set) {
+    if (!search || search[0] == '\0') return false;
+    if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
+    if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
+    if (effective_row == 2 && (strcasecmp(search, "row2") == 0 || strcasecmp(search, "r2") == 0)) return true;
+    if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
+    if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
+    if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
+                           || strcasecmp(search, "manual") == 0)) return true;
+    return false;
 }
 
-static bool category_matches_search(const TrackableCategory *cat, const char *search) {
+// Effective overlay row of a top-level category: advancements/achievements/recipes default to
+// Row 2 (forced to Row 3 via in_3rd_row); stats default to Row 3 (forced to Row 2 via in_2nd_row).
+static int category_effective_row(const TrackableCategory *cat, bool is_stat_section) {
+    if (is_stat_section) return cat->in_2nd_row ? 2 : 3;
+    return cat->in_3rd_row ? 3 : 2;
+}
+
+// Text-only category match (no indicator keywords). Used to decide whether a parent's whole
+// child list should be revealed: only a genuine name/id/icon match expands all children, while
+// an indicator match (e.g. "r2") keeps the category atomic so its Row 1 criteria stay hidden.
+static bool category_text_matches_search(const TrackableCategory *cat, const char *search) {
     return str_contains_insensitive(cat->display_name, search)
            || str_contains_insensitive(cat->root_name, search)
            || str_contains_insensitive(cat->icon_path, search);
 }
 
-static bool counter_matches_search(const CounterGoal *goal, const char *search) {
+// Search helpers: match display_name, root_name, and icon_path against the search buffer.
+// effective_row is the overlay row this item lands on (criteria/sub-stats are always Row 1).
+static bool item_matches_search(const TrackableItem *item, const char *search, int effective_row) {
+    return str_contains_insensitive(item->display_name, search)
+           || str_contains_insensitive(item->root_name, search)
+           || str_contains_insensitive(item->icon_path, search)
+           || str_contains_insensitive(item->group, search)
+           || indicator_matches_search(search, item->is_hidden, effective_row, false,
+                                       item->icon_pos.is_set || item->text_pos.is_set ||
+                                       item->progress_pos.is_set);
+}
+
+static bool category_matches_search(const TrackableCategory *cat, const char *search, bool is_stat_section) {
+    return category_text_matches_search(cat, search)
+           || indicator_matches_search(search, cat->is_hidden, category_effective_row(cat, is_stat_section),
+                                       cat->is_recipe,
+                                       cat->icon_pos.is_set || cat->text_pos.is_set ||
+                                       cat->progress_pos.is_set);
+}
+
+// Text-only counter match (no indicator keywords). Used for link expansion so that an indicator
+// search like "r3" reveals the matching counter itself without dragging in its linked goals.
+static bool counter_text_matches_search(const CounterGoal *goal, const char *search) {
     return str_contains_insensitive(goal->display_name, search)
            || str_contains_insensitive(goal->root_name, search)
            || str_contains_insensitive(goal->icon_path, search);
 }
 
+static bool counter_matches_search(const CounterGoal *goal, const char *search) {
+    return counter_text_matches_search(goal, search)
+           || indicator_matches_search(search, goal->is_hidden, goal->in_2nd_row ? 2 : 3, false,
+                                       goal->icon_pos.is_set || goal->text_pos.is_set ||
+                                       goal->progress_pos.is_set);
+}
+
 static bool ms_goal_matches_search(const MultiStageGoal *goal, const char *search) {
     return str_contains_insensitive(goal->display_name, search)
            || str_contains_insensitive(goal->root_name, search)
-           || str_contains_insensitive(goal->icon_path, search);
+           || str_contains_insensitive(goal->icon_path, search)
+           || indicator_matches_search(search, goal->is_hidden, goal->in_2nd_row ? 2 : 3, false,
+                                       goal->icon_pos.is_set || goal->text_pos.is_set ||
+                                       goal->progress_pos.is_set);
 }
 
 // For multi-stage goals: match the active stage's display_text, stage_id, and icon_path (only if stage icons are in use)
@@ -327,10 +380,10 @@ static void build_search_linked_sets(const Tracker *t) {
         }
     };
 
-    // Counters: if counter matches search, add its linked goals
+    // Counters: if counter matches search (by text, not an indicator keyword), add its linked goals
     for (int i = 0; i < td->counter_goal_count; i++) {
         CounterGoal *counter = td->counter_goals[i];
-        if (counter_matches_search(counter, t->search_buffer)) {
+        if (counter_text_matches_search(counter, t->search_buffer)) {
             add_linked(counter->linked_goals, counter->linked_goal_count);
         }
     }
@@ -6622,7 +6675,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (should_hide_parent_based_on_mode) continue;
 
         // Apply Search Filter for counting
-        bool parent_matches_search = category_matches_search(cat, t->search_buffer);
+        bool parent_text_matches_search = category_text_matches_search(cat, t->search_buffer);
+        bool parent_matches_search = category_matches_search(cat, t->search_buffer, is_stat_section);
         bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
         bool any_visible_child_matches_search = false;
         bool any_child_is_linked = false;
@@ -6645,15 +6699,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 bool child_linked = s_linked_sub.count(link_key) > 0;
                 if (child_linked) any_child_is_linked = true;
 
-                // Now check search filter for this visible child
-                if (item_matches_search(crit, t->search_buffer)) {
+                // Now check search filter for this visible child (criteria/sub-stats are Row 1)
+                if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
                     any_visible_child_matches_search = true;
                     // Count this child towards sub-totals if it matches search
                     total_visible_sub_count++;
                     if (crit->done) {
                         completed_sub_count++;
                     }
-                } else if (parent_matches_search) {
+                } else if (parent_text_matches_search) {
                     // If parent matches, still count this visible (but non-matching) child towards sub-totals
                     total_visible_sub_count++;
                     if (crit->done) {
@@ -6706,7 +6760,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (should_hide_parent_render) continue; // Skip if parent hidden based on mode
 
         // Check search filter
-        bool parent_matches = category_matches_search(cat, t->search_buffer);
+        bool parent_matches = category_matches_search(cat, t->search_buffer, is_stat_section);
         bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
         bool child_matches_render = false;
         bool child_is_linked_render = false;
@@ -6720,7 +6774,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 if (should_hide_crit_render) continue;
 
-                if (item_matches_search(crit, t->search_buffer)) {
+                if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
                     child_matches_render = true;
                     break;
                 }
@@ -6811,7 +6865,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (parent_should_hide_render) continue;
 
             // Search Filter (for rendering visibility)
-            bool parent_matches = category_matches_search(cat, t->search_buffer);
+            bool parent_text_matches = category_text_matches_search(cat, t->search_buffer);
+            bool parent_matches = category_matches_search(cat, t->search_buffer, is_stat_section);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             bool child_matches_render = false;
             bool child_is_linked_width = false;
@@ -6826,8 +6881,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     if (crit_should_hide_render) continue;
 
-                    // Now, check both hiding status AND the search term
-                    if (item_matches_search(crit, t->search_buffer)) {
+                    // Now, check both hiding status AND the search term (criteria are Row 1)
+                    if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
                         child_matches_render = true;
                         break;
                     }
@@ -6890,8 +6945,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
-                    bool crit_matches_search = parent_matches
-                                               || (child_matches_render && item_matches_search(crit, t->search_buffer))
+                    bool crit_matches_search = parent_text_matches
+                                               || (child_matches_render && item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1))
                                                || s_linked_sub.count(crit_link_key);
 
                     if (crit && !crit_should_hide_width && crit_matches_search) {
@@ -6991,12 +7046,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (should_hide_parent_render) continue;
 
             // --- Search Filtering (for rendering) ---
-            bool parent_matches = category_matches_search(cat, t->search_buffer);
+            // A genuine text match on the parent reveals ALL its children; an indicator match
+            // (e.g. "r2"/"r3") keeps the category atomic, so its Row 1 criteria stay hidden.
+            bool parent_text_matches = category_text_matches_search(cat, t->search_buffer);
+            bool parent_matches = category_matches_search(cat, t->search_buffer, is_stat_section);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             std::vector<TrackableItem *> matching_children; // Children that match search or are linked
             bool child_matches_search = false; // Flag if any child matches search
             bool any_child_linked = false;
-            if (!parent_matches) {
+            if (!parent_text_matches) {
                 for (int j = 0; j < cat->criteria_count; j++) {
                     TrackableItem *crit = cat->criteria[j];
                     if (!crit) continue;
@@ -7006,7 +7064,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     if (should_hide_crit_render) continue;
 
-                    bool crit_search = item_matches_search(crit, t->search_buffer);
+                    bool crit_search = item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1);
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_linked = s_linked_sub.count(crit_link_key) > 0;
 
@@ -7022,7 +7080,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // --- PREPARE CHILDREN LIST ---
             std::vector<TrackableItem *> children_to_render;
-            if (parent_matches) {
+            if (parent_text_matches) {
                 // Text search matches parent → show ALL visible children (existing behavior)
                 for (int j = 0; j < cat->criteria_count; ++j) {
                     TrackableItem *crit = cat->criteria[j];
@@ -8360,8 +8418,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         bool should_hide_based_on_mode = false;
         should_hide_based_on_mode = tracker_should_hide_by_mode(settings, item->is_hidden, is_item_considered_complete);
 
-        // Apply Search Filter for counting
-        bool matches_search = item_matches_search(item, t->search_buffer)
+        // Apply Search Filter for counting (unlocks default to Row 2, forced to Row 3 via in_3rd_row)
+        bool matches_search = item_matches_search(item, t->search_buffer, item->in_3rd_row ? 3 : 2)
                               || s_linked_top.count(item->root_name);
 
         // Count items only if they are not hidden by mode AND match the search
@@ -8387,7 +8445,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Combine hiding and search filter
-        if (!should_hide_render && (item_matches_search(item, t->search_buffer)
+        if (!should_hide_render && (item_matches_search(item, t->search_buffer, item->in_3rd_row ? 3 : 2)
                                     || s_linked_top.count(item->root_name))) {
             section_has_renderable_content = true;
             break; // Found at least one item to render
@@ -8440,7 +8498,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             should_hide_width = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
             // Apply search filter
-            bool matches_search_width = item_matches_search(item, t->search_buffer)
+            bool matches_search_width = item_matches_search(item, t->search_buffer, item->in_3rd_row ? 3 : 2)
                                         || s_linked_top.count(item->root_name);
 
             // Only consider items that will actually be rendered for width calculation
@@ -8483,7 +8541,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Apply search filter
-        bool matches_search_render = item_matches_search(item, t->search_buffer)
+        bool matches_search_render = item_matches_search(item, t->search_buffer, item->in_3rd_row ? 3 : 2)
                                      || s_linked_top.count(item->root_name);
 
         // Skip rendering if hidden or doesn't match search
@@ -8770,8 +8828,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         bool should_hide_based_on_mode = false;
         should_hide_based_on_mode = tracker_should_hide_by_mode(settings, item->is_hidden, is_item_considered_complete);
 
-        // Apply Search Filter for counting
-        bool matches_search = item_matches_search(item, t->search_buffer)
+        // Apply Search Filter for counting (custom goals default to Row 3, forced to Row 2 via in_2nd_row)
+        bool matches_search = item_matches_search(item, t->search_buffer, item->in_2nd_row ? 2 : 3)
                               || s_linked_top.count(item->root_name);
 
         // Count items only if they are not hidden by mode AND match the search
@@ -8797,7 +8855,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Combine hiding and search filter
-        if (!should_hide_render && (item_matches_search(item, t->search_buffer)
+        if (!should_hide_render && (item_matches_search(item, t->search_buffer, item->in_2nd_row ? 2 : 3)
                                     || s_linked_top.count(item->root_name))) {
             section_has_renderable_content = true;
             break; // Found at least one item to render
@@ -8857,7 +8915,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             should_hide_width = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
             // Apply search filter
-            bool matches_search_width = item_matches_search(item, t->search_buffer)
+            bool matches_search_width = item_matches_search(item, t->search_buffer, item->in_2nd_row ? 2 : 3)
                                         || s_linked_top.count(item->root_name);
 
             // Only consider items that will actually be rendered for width calculation
@@ -8919,7 +8977,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         should_hide_render = tracker_should_hide_by_mode(settings, item->is_hidden, item->done);
 
         // Apply search filter
-        bool matches_search_render = item_matches_search(item, t->search_buffer)
+        bool matches_search_render = item_matches_search(item, t->search_buffer, item->in_2nd_row ? 2 : 3)
                                      || s_linked_top.count(item->root_name);
 
         // Skip rendering if hidden or doesn't match search
@@ -11552,6 +11610,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             "criterion that shares that group under its parent advancement.\n"
             "You can also use Ctrl + F (or Cmd + F on macOS).\n"
             "Using the search filter also dynamically updates the completion counters in the section headers.");
+        ImGui::Separator();
+        ImGui::TextUnformatted("Indicator keywords (match the colored tags in the template editor):");
+        ImGui::BulletText("hidden        - goals flagged as Hidden");
+        ImGui::BulletText("row1 / r1     - criteria & sub-stats (always the 1st overlay row)");
+        ImGui::BulletText("row2 / r2     - every goal on the 2nd overlay row (default or forced)");
+        ImGui::BulletText("row3 / r3     - every goal on the 3rd overlay row (default or forced)");
+        ImGui::BulletText("recipe / rcp  - recipe advancements");
+        ImGui::BulletText("pos / manual  - goals with custom manual-layout coordinates");
+        ImGui::TextUnformatted("Row keywords match the overlay row a goal actually lands on, and show the\n"
+                               "goal itself only (an advancement matching \"r2\" is shown without its criteria).");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 

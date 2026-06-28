@@ -355,6 +355,31 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
     draw_editor_row_status_tags(tags, n);
 }
 
+// Matches the search term against a goal's status-indicator flags so the editor's search box
+// can filter by the colored row tags (Hidden, Row 1/2/3, recipe, manual position). The term must
+// exactly equal a recognized keyword for the matching flag to count, so it does not pollute
+// ordinary name/root searches. effective_row is the overlay row the goal actually lands on (1, 2
+// or 3), so "r2"/"r3" reveal goals that sit there by default, not just the ones forced there; pass
+// 0 to disable row matching. Pass false for flags a goal type does not support.
+static bool indicator_matches_search(const char *search, bool is_hidden, int effective_row,
+                                     bool is_recipe, bool manual_pos_set) {
+    if (!search || search[0] == '\0') return false;
+    if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
+    if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
+    if (effective_row == 2 && (strcasecmp(search, "row2") == 0 || strcasecmp(search, "r2") == 0)) return true;
+    if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
+    if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
+    if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
+                           || strcasecmp(search, "manual") == 0)) return true;
+    return false;
+}
+
+// Indicator match for a Row 1 sub-item (advancement criterion or sub-stat): hidden, r1/row1, pos.
+static bool subitem_indicator_matches_search(const EditorTrackableItem &c, const char *search) {
+    return indicator_matches_search(search, c.is_hidden, 1, false,
+                                    c.icon_pos.is_set || c.text_pos.is_set || c.progress_pos.is_set);
+}
+
 // Helper: propagate a rename through a vector of EditorCounterLinkedGoal
 // If new_name is empty, matching linked goals are removed instead of updated.
 static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal> &linked_goals,
@@ -1986,6 +2011,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     editor_data.unlocks.clear();
     editor_data.custom_goals.clear();
     editor_data.multi_stage_goals.clear();
+    editor_data.counter_goals.clear();
     editor_data.decorations.clear();
     editor_data.display_category[0] = '\0';
 
@@ -4126,10 +4152,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::InputTextWithHint("##TCSearch", "Search...", tc_search_buffer, sizeof(tc_search_buffer));
         if (ImGui::IsItemHovered()) {
+            // Only the Edit Template goal-type scopes support indicator keywords, and each scope
+            // exposes a different subset (e.g. only advancements have recipes; only criteria/sub-stats
+            // sit on Row 1). Build the keyword list to match the scope currently being searched.
+            bool ind_hidden = false, ind_row1 = false, ind_row23 = false, ind_recipe = false, ind_pos = false;
+            switch (current_search_scope) {
+                case SCOPE_ADVANCEMENTS:
+                    ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = true;
+                    break;
+                case SCOPE_STATS:
+                    ind_hidden = ind_row1 = ind_row23 = ind_pos = true;
+                    break;
+                case SCOPE_UNLOCKS:
+                case SCOPE_CUSTOM:
+                case SCOPE_MULTISTAGE:
+                case SCOPE_COUNTERS:
+                    ind_hidden = ind_row23 = ind_pos = true;
+                    break;
+                case SCOPE_ADVANCEMENT_DETAILS:
+                case SCOPE_STAT_DETAILS:
+                    ind_hidden = ind_row1 = ind_pos = true;
+                    break;
+                default:
+                    break;
+            }
+            bool any_indicator = ind_hidden || ind_row1 || ind_row23 || ind_recipe || ind_pos;
+
             char tooltip_buffer[1024];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Filter the list by name, ID, icon path, or target value.\n\n"
-                     "Press Ctrl+F (Cmd+F on macOS) to focus this field.");
+            int p = snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Filter the list by name, ID, icon path, or target value.");
+            if (any_indicator) {
+                p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                              "\n\nIndicator keywords (match the colored row tags):");
+                if (ind_hidden)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  hidden        - goals flagged as Hidden");
+                if (ind_row1)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  row1 / r1     - criteria & sub-stats (always the 1st overlay row)");
+                if (ind_row23)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  row2 / r2     - goals on the 2nd overlay row (default or forced)"
+                                  "\n  row3 / r3     - goals on the 3rd overlay row (default or forced)");
+                if (ind_recipe)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  recipe / rcp  - recipe advancements");
+                if (ind_pos)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  pos / manual  - goals with custom manual-layout coordinates");
+            }
+            snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                     "\n\nPress Ctrl+F (Cmd+F on macOS) to focus this field.");
 
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
@@ -6470,20 +6543,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (auto &advancement: current_template_data.advancements) {
                             bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
                                                 str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
-                                                str_contains_insensitive(advancement.icon_path, tc_search_buffer);
+                                                str_contains_insensitive(advancement.icon_path, tc_search_buffer) ||
+                                                indicator_matches_search(tc_search_buffer, advancement.is_hidden,
+                                                    advancement.in_3rd_row ? 3 : 2, advancement.is_recipe,
+                                                    advancement.icon_pos.is_set || advancement.text_pos.is_set ||
+                                                    advancement.progress_pos.is_set);
 
                             if (parent_match) {
                                 advancements_to_render.push_back(&advancement);
                                 continue; // Parent matches, no need to check children
                             }
 
-                            // If parent doesn't match, check its children (criteria)
+                            // If parent doesn't match, check its children (criteria are Row 1)
                             bool child_match = false;
                             for (const auto &criterion: advancement.criteria) {
                                 if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
-                                    str_contains_insensitive(criterion.group, tc_search_buffer)) {
+                                    str_contains_insensitive(criterion.group, tc_search_buffer) ||
+                                    indicator_matches_search(tc_search_buffer, criterion.is_hidden, 1, false,
+                                        criterion.icon_pos.is_set || criterion.text_pos.is_set ||
+                                        criterion.progress_pos.is_set)) {
                                     child_match = true;
                                     break;
                                 }
@@ -7766,7 +7846,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
                                         str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
                                         str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
-                                        str_contains_insensitive(criterion.group, tc_search_buffer)) {
+                                        str_contains_insensitive(criterion.group, tc_search_buffer) ||
+                                        subitem_indicator_matches_search(criterion, tc_search_buffer)) {
                                         visible_criteria_count++;
                                     }
                                 }
@@ -8439,7 +8520,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
                                     !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
                                     !str_contains_insensitive(criterion.icon_path, tc_search_buffer) &&
-                                    !str_contains_insensitive(criterion.group, tc_search_buffer)) {
+                                    !str_contains_insensitive(criterion.group, tc_search_buffer) &&
+                                    !subitem_indicator_matches_search(criterion, tc_search_buffer)) {
                                     continue;
                                 }
                             }
@@ -8624,7 +8706,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
                                                 !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
                                                 !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.group, tc_search_buffer)) {
+                                                !str_contains_insensitive(cc.group, tc_search_buffer) &&
+                                                !subitem_indicator_matches_search(cc, tc_search_buffer)) {
                                                 continue;
                                             }
                                         }
@@ -9158,7 +9241,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // This covers the display name for both simple and complex stats.
                             if (str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(stat_cat.icon_path, tc_search_buffer)) {
+                                str_contains_insensitive(stat_cat.icon_path, tc_search_buffer) ||
+                                indicator_matches_search(tc_search_buffer, stat_cat.is_hidden,
+                                    stat_cat.in_2nd_row ? 2 : 3, stat_cat.is_recipe,
+                                    stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
+                                    stat_cat.progress_pos.is_set)) {
                                 should_render = true;
                             }
 
@@ -9173,10 +9260,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           criterion.display_name, tc_search_buffer);
 
                                     // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
+                                    // Complex sub-stats are always Row 1; a simple stat has no real sub-stat to filter.
                                     if (name_match ||
                                         str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
                                         str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
-                                        (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                        (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                                        (!stat_cat.is_simple_stat &&
+                                         indicator_matches_search(tc_search_buffer, criterion.is_hidden, 1, false,
+                                            criterion.icon_pos.is_set || criterion.text_pos.is_set ||
+                                            criterion.progress_pos.is_set))) {
                                         should_render = true;
                                         break; // A matching child was found, no need to check others.
                                     }
@@ -10324,7 +10416,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
                                         str_contains_insensitive(crit.root_name, tc_search_buffer) ||
                                         str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
-                                        (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                        (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                                        subitem_indicator_matches_search(crit, tc_search_buffer)) {
                                         visible_criteria_count++;
                                     }
                                 }
@@ -10851,7 +10944,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     if (!str_contains_insensitive(crit.display_name, tc_search_buffer) &&
                                         !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
                                         !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
-                                        (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr)) {
+                                        (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr) &&
+                                        !subitem_indicator_matches_search(crit, tc_search_buffer)) {
                                         continue;
                                     }
                                 }
@@ -10978,7 +11072,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                     if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
                                                         !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
                                                         !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
-                                                        (cc.goal == 0 || strstr(gs, tc_search_buffer) == nullptr)) {
+                                                        (cc.goal == 0 || strstr(gs, tc_search_buffer) == nullptr) &&
+                                                        !subitem_indicator_matches_search(cc, tc_search_buffer)) {
                                                         continue;
                                                     }
                                                 }
@@ -11424,7 +11519,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &unlock: current_template_data.unlocks) {
                                 if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
+                                    str_contains_insensitive(unlock.icon_path, tc_search_buffer) ||
+                                    indicator_matches_search(tc_search_buffer, unlock.is_hidden,
+                                        unlock.in_3rd_row ? 3 : 2, false,
+                                        unlock.icon_pos.is_set || unlock.text_pos.is_set ||
+                                        unlock.progress_pos.is_set)) {
                                     count_top++;
                                 }
                             }
@@ -11829,7 +11928,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (is_unlock_search_active) {
                             if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
-                                !str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
+                                !str_contains_insensitive(unlock.icon_path, tc_search_buffer) &&
+                                !indicator_matches_search(tc_search_buffer, unlock.is_hidden,
+                                    unlock.in_3rd_row ? 3 : 2, false,
+                                    unlock.icon_pos.is_set || unlock.text_pos.is_set ||
+                                    unlock.progress_pos.is_set)) {
                                 continue;
                             }
                         }
@@ -12329,7 +12432,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (str_contains_insensitive(goal.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(goal.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
-                                (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                                indicator_matches_search(tc_search_buffer, goal.is_hidden,
+                                    goal.in_2nd_row ? 2 : 3, false,
+                                    goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                    goal.progress_pos.is_set)) {
                                 goals_to_render.push_back(&goal);
                             }
                         }
@@ -13363,7 +13470,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (auto &goal: current_template_data.multi_stage_goals) {
                             bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
                                                 str_contains_insensitive(goal.root_name, tc_search_buffer) ||
-                                                str_contains_insensitive(goal.icon_path, tc_search_buffer);
+                                                str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
+                                                indicator_matches_search(tc_search_buffer, goal.is_hidden,
+                                                    goal.in_2nd_row ? 2 : 3, false,
+                                                    goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                                    goal.progress_pos.is_set);
 
                             if (parent_match) {
                                 goals_to_render.push_back(&goal);
@@ -15692,7 +15803,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &c: current_template_data.counter_goals) {
                                 if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(c.display_name, tc_search_buffer) ||
-                                    str_contains_insensitive(c.icon_path, tc_search_buffer)) {
+                                    str_contains_insensitive(c.icon_path, tc_search_buffer) ||
+                                    indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
+                                        false, c.icon_pos.is_set || c.text_pos.is_set ||
+                                        c.progress_pos.is_set)) {
                                     count_top++;
                                 }
                             }
@@ -15717,7 +15831,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (auto &c: current_template_data.counter_goals) {
                             if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.display_name, tc_search_buffer) ||
-                                str_contains_insensitive(c.icon_path, tc_search_buffer)) {
+                                str_contains_insensitive(c.icon_path, tc_search_buffer) ||
+                                indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
+                                    false, c.icon_pos.is_set || c.text_pos.is_set ||
+                                    c.progress_pos.is_set)) {
                                 counters_to_render.push_back(&c);
                             }
                         }

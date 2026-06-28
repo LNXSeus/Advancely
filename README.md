@@ -602,6 +602,22 @@ box (here or anywhere in the template editor's search menus) automatically re-fo
   header. Like counters, this uses exact matching and is one layer deep so a linked counter will show up, but the
   counter's own linked goals will not.
 
+You can also filter by the status indicators shown as colored tags in the template editor by typing one of these
+keywords (the term must match exactly):
+
+* `hidden`: goals flagged as Hidden.
+* `row1`/`r1`: criteria and sub-stats, which always sit on the 1st overlay row.
+* `row2`/`r2`: every goal that lands on the 2nd overlay row, whether it sits there by default (advancements, unlocks)
+  or was forced there. When an advancement matches a row keyword it is shown on its own, without expanding its Row 1
+  criteria.
+* `row3`/`r3`: every goal on the 3rd overlay row, by default (stats, custom goals, multi-stage goals, counters) or
+  forced there.
+* `recipe`/`rcp`: recipe advancements.
+* `pos`/`manual`: goals with custom manual-layout coordinates.
+
+These keywords work in both the tracker search and the template editor's search. In the editor, the search box tooltip
+lists only the keywords that apply to the goal type currently selected in the scope dropdown.
+
 ### Section Completion Counters
 
 Each section header (the separator drawn above each section in the automatic layout, e.g., "Advancements",
