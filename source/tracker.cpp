@@ -7827,7 +7827,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 }
                             }
 
-                            ImU32 check_fill = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                            // No hover highlight while in the visual layout editor: the checkbox can't be ticked there.
+                            ImU32 check_fill = (is_hovered && !t->is_visual_layout_editing)
+                                                   ? checkbox_hover_color
+                                                   : checkbox_fill_color;
                             if (crit_cb_visible) {
                                 draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill,
                                                          3.0f * t->zoom_level);
@@ -8300,7 +8303,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         }
                     }
 
-                    ImU32 check_fill_parent = is_hovered_parent ? checkbox_hover_color : checkbox_fill_color;
+                    // No hover highlight while in the visual layout editor: the checkbox can't be ticked there.
+                    ImU32 check_fill_parent = (is_hovered_parent && !t->is_visual_layout_editing)
+                                                  ? checkbox_hover_color
+                                                  : checkbox_fill_color;
                     if (parent_cb_visible) {
                         draw_list->AddRectFilled(checkbox_rect_parent.Min, checkbox_rect_parent.Max, check_fill_parent,
                                                  3.0f * t->zoom_level);
@@ -9380,7 +9386,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     }
                 }
 
-                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                // No hover highlight while in the visual layout editor: the checkbox can't be ticked there.
+                ImU32 check_fill_color = (is_hovered && !t->is_visual_layout_editing)
+                                             ? checkbox_hover_color
+                                             : checkbox_fill_color;
                 if (cg_cb_visible) {
                     draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
                     draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
