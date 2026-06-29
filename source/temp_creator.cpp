@@ -3543,6 +3543,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Root name of goal to scroll to (set on click-to-select in visual layout)
     static char scroll_to_child_root_name[192] = "";
     // Root name of criterion/sub-stat to scroll to within the details pane (set on click-to-select)
+    static char scroll_to_stage_id[64] = "";
+    // Stage id of a multi-stage goal stage to scroll to within the details pane (set on add/copy)
+    // When true, the pending scroll aligns the target to the very top of the list (used when adding or
+    // copying an item) instead of the 0.3f bias used for click-to-select from the visual layout.
+    static bool scroll_to_align_top = false;
+
+    // Request that the list scroll to (and select) a top-level goal by root name on the next frame,
+    // aligning it to the very top of its list. Used right after adding or copying a goal.
+    auto request_scroll_to_new_goal = [&](const char *root_name) {
+        strncpy(scroll_to_goal_root_name, root_name, sizeof(scroll_to_goal_root_name) - 1);
+        scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
+        scroll_to_align_top = true;
+    };
+    // Same as above for a criterion / sub-stat within the open details pane.
+    auto request_scroll_to_new_child = [&](const char *root_name) {
+        strncpy(scroll_to_child_root_name, root_name, sizeof(scroll_to_child_root_name) - 1);
+        scroll_to_child_root_name[sizeof(scroll_to_child_root_name) - 1] = '\0';
+        scroll_to_align_top = true;
+    };
+    // Same as above for a multi-stage goal stage (keyed by stage id) within the open details pane.
+    auto request_scroll_to_new_stage = [&](const char *stage_id) {
+        strncpy(scroll_to_stage_id, stage_id, sizeof(scroll_to_stage_id) - 1);
+        scroll_to_stage_id[sizeof(scroll_to_stage_id) - 1] = '\0';
+        scroll_to_align_top = true;
+    };
 
     // Helper to dynamically calculate the next sort order per list
     auto get_next_sort_order = [](const auto &list) -> int {
@@ -6608,6 +6633,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
                         new_adv.icon_path[sizeof(new_adv.icon_path) - 1] = '\0';
                         current_template_data.advancements.push_back(new_adv);
+                        request_scroll_to_new_goal(new_adv.root_name);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -7494,9 +7520,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(advancement.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             selected_advancement = &advancement;
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         // DRAG AND DROP LOGIC
@@ -7687,6 +7714,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        request_scroll_to_new_goal(new_advancement.root_name);
                         s_adv_selection.clear();
                         s_adv_last_clicked = -1;
                         save_message_type = MSG_NONE;
@@ -8097,6 +8125,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
                                 new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                                 advancement.criteria.push_back(new_crit);
+                                request_scroll_to_new_child(new_crit.root_name);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -8677,6 +8706,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strcmp(criterion.root_name, scroll_to_child_root_name) == 0) {
                                 ImGui::SetScrollHereY(0.0f);
                                 scroll_to_child_root_name[0] = '\0';
+                                scroll_to_align_top = false;
                             }
 
                             // Per-criterion Group field row (visible only when groups are enabled).
@@ -9068,6 +9098,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
                             advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
                                                         new_criterion);
+                            request_scroll_to_new_child(new_criterion.root_name);
                             // Shift selection indices above the insertion point.
                             std::set<int> shifted;
                             for (int idx: s_crit_selection) shifted.insert(idx > criterion_to_copy ? idx + 1 : idx);
@@ -9297,6 +9328,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stat.criteria.push_back(new_crit);
 
                         current_template_data.stats.push_back(new_stat);
+                        request_scroll_to_new_goal(new_stat.root_name);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -9915,9 +9947,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(stat.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             selected_stat = &stat;
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
@@ -10096,6 +10129,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        request_scroll_to_new_goal(new_stat.root_name);
                         s_stat_selection.clear();
                         s_stat_last_clicked = -1;
                         save_message_type = MSG_NONE;
@@ -10675,6 +10709,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                                 new_crit.goal = 1; // Default to a completable goal
                                 stat_cat.criteria.push_back(new_crit);
+                                request_scroll_to_new_child(new_crit.root_name);
                                 save_message_type = MSG_NONE;
                             }
 
@@ -11094,6 +11129,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     strcmp(crit.root_name, scroll_to_child_root_name) == 0) {
                                     ImGui::SetScrollHereY(0.0f);
                                     scroll_to_child_root_name[0] = '\0';
+                                    scroll_to_align_top = false;
                                 }
 
                                 static char focused_sub_stat_root[192] = {};
@@ -11544,6 +11580,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(new_crit.root_name, new_name, sizeof(new_crit.root_name) - 1);
                                 new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                                 stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
+                                request_scroll_to_new_child(new_crit.root_name);
                                 std::set<int> shifted_cp;
                                 for (int idx: s_sub_selection) shifted_cp.insert(idx > crit_to_copy ? idx + 1 : idx);
                                 s_sub_selection = shifted_cp;
@@ -11682,6 +11719,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
                         new_unlock.icon_path[sizeof(new_unlock.icon_path) - 1] = '\0';
                         current_template_data.unlocks.push_back(new_unlock);
+                        request_scroll_to_new_goal(new_unlock.root_name);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -12087,8 +12125,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(unlock.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         static char focused_unlock_root[192] = {};
@@ -12390,6 +12429,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
                                                              new_item);
+                        request_scroll_to_new_goal(new_item.root_name);
                         std::set<int> shifted_cp;
                         for (int idx: s_unlocks_selection) shifted_cp.insert(idx > item_to_copy ? idx + 1 : idx);
                         s_unlocks_selection = shifted_cp;
@@ -12483,6 +12523,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
                         new_goal.goal = 1; // Default to a progress-based counter
                         current_template_data.custom_goals.push_back(new_goal);
+                        request_scroll_to_new_goal(new_goal.root_name);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -12908,8 +12949,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         static char focused_cg_root[192] = {};
@@ -13355,6 +13397,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.custom_goals.insert(
                             current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
+                        request_scroll_to_new_goal(new_item.root_name);
                         s_custom_selection.clear();
                         s_custom_last_clicked = -1;
                         save_message_type = MSG_NONE;
@@ -13523,6 +13566,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        request_scroll_to_new_goal(new_goal.root_name);
 
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
@@ -14157,9 +14201,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             selected_ms_goal = &goal;
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
@@ -14337,6 +14382,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
+                        request_scroll_to_new_goal(new_goal.root_name);
                         s_msg_selection.clear();
                         s_msg_last_clicked = -1;
                         ms_goal_data_changed = true;
@@ -14677,6 +14723,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 // Should not happen if new goals are created correctly, but as a fallback:
                                 goal.stages.push_back(new_stage);
                             }
+                            request_scroll_to_new_stage(new_stage.stage_id);
 
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
@@ -14987,6 +15034,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Group all stage controls to make them a single drag source
                             ImVec2 stage_item_start_cursor_pos = ImGui::GetCursorScreenPos();
                             ImGui::BeginGroup();
+
+                            // Scroll to this stage after it was just added or copied
+                            if (scroll_to_stage_id[0] != '\0' &&
+                                strcmp(stage.stage_id, scroll_to_stage_id) == 0) {
+                                ImGui::SetScrollHereY(0.0f);
+                                scroll_to_stage_id[0] = '\0';
+                                scroll_to_align_top = false;
+                            }
+
                             static char focused_stage_id[64] = {};
                             if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
                                 ms_goal_data_changed = true;
@@ -15801,6 +15857,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
                             new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                             goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
+                            request_scroll_to_new_stage(new_stage.stage_id);
                             std::set<int> shifted_cp;
                             for (int idx: s_stage_selection) shifted_cp.insert(idx > stage_to_copy ? idx + 1 : idx);
                             s_stage_selection = shifted_cp;
@@ -15919,6 +15976,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_counter.icon_path[sizeof(new_counter.icon_path) - 1] = '\0';
                         current_template_data.counter_goals.push_back(new_counter);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
+                        request_scroll_to_new_goal(new_counter.root_name);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -16417,9 +16475,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(counter.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             selected_counter_index = actual_idx;
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
@@ -16580,6 +16639,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy.progress_pos = {};
                         current_template_data.counter_goals.push_back(copy);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
+                        request_scroll_to_new_goal(copy.root_name);
                         s_ctr_selection.clear();
                         s_ctr_last_clicked = -1;
                         save_message_type = MSG_NONE;
@@ -16910,6 +16970,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         snprintf(new_elem.display_text, sizeof(new_elem.display_text), "Header %d", counter);
                         current_template_data.decorations.push_back(new_elem);
+                        request_scroll_to_new_goal(new_elem.id);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -16940,6 +17001,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             counter++;
                         }
                         current_template_data.decorations.push_back(new_elem);
+                        request_scroll_to_new_goal(new_elem.id);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -16973,6 +17035,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             counter++;
                         }
                         current_template_data.decorations.push_back(new_elem);
+                        request_scroll_to_new_goal(new_elem.id);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -17135,8 +17198,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(deco.id, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(0.3f);
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
                             scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
                         }
 
                         // Type display (read-only)
@@ -17759,6 +17823,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_elem.id[sizeof(new_elem.id) - 1] = '\0';
                         current_template_data.decorations.insert(
                             current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
+                        request_scroll_to_new_goal(new_elem.id);
                         std::set<int> shifted_cp;
                         for (int idx: s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
                         s_deco_selection = shifted_cp;
