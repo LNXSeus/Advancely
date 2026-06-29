@@ -13483,6 +13483,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
                         new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
 
+                        // Add a default first stage so the goal starts with an actual step (matching the
+                        // defaults used by the "Add New Stage" button), not just the hidden final stage.
+                        EditorSubGoal first_stage = {};
+                        strncpy(first_stage.stage_id, "new_stage_1", sizeof(first_stage.stage_id) - 1);
+                        first_stage.stage_id[sizeof(first_stage.stage_id) - 1] = '\0';
+                        strncpy(first_stage.display_text, "New Stage 1", sizeof(first_stage.display_text) - 1);
+                        first_stage.display_text[sizeof(first_stage.display_text) - 1] = '\0';
+                        first_stage.type = SUBGOAL_STAT; // Default to a common type
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            strncpy(first_stage.root_name, "0", sizeof(first_stage.root_name) - 1);
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            strncpy(first_stage.root_name, "stat.cool", sizeof(first_stage.root_name) - 1);
+                        } else {
+                            strncpy(first_stage.root_name, "minecraft:custom/minecraft:new_stat",
+                                    sizeof(first_stage.root_name) - 1);
+                        }
+                        first_stage.root_name[sizeof(first_stage.root_name) - 1] = '\0';
+                        first_stage.required_progress = 1;
+                        new_goal.stages.push_back(first_stage);
+
                         // Add a default "Final" stage, which is required for validation
                         EditorSubGoal final_stage = {};
                         strncpy(final_stage.stage_id, "final", sizeof(final_stage.stage_id) - 1);
