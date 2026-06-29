@@ -3422,6 +3422,11 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void) t;
 
+    // Tracks the open state across frames so we can detect the transition into "just opened". Declared
+    // before the early-return below so closing the window actually records the closed state (otherwise
+    // the return would skip the update and the editor would only ever detect the very first open).
+    static bool was_open_last_frame = false;
+
     // --- FORCE OPEN DURING VISUAL EDITING ---
     if (t && t->is_visual_layout_editing) {
         *p_open = true;
@@ -3435,6 +3440,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // remembered (the editing_template state below persists for the next open).
             t->template_editor_is_editing = false;
         }
+        was_open_last_frame = false;
         return;
     }
 
@@ -3463,7 +3469,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool import_layout_delete_after = false;
 
     // State for the creator's independent version selection
-    static bool was_open_last_frame = false;
     static int creator_version_idx = -1;
     static char creator_version_str[64] = "";
 
@@ -3916,6 +3921,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     was_open_last_frame = *p_open;
 
     if (just_opened) {
+        // If the template applied in Settings changed while the editor was closed, abandon any persisted
+        // edit session for the old template. Otherwise the per-frame Settings sync below would stitch the
+        // new Settings version onto the previously edited template's category/flag and point the tracker
+        // at a path that doesn't exist ("Template Not Found"). creator_version_str still holds the old
+        // edited version at this point, so the comparison must happen before it is overwritten.
+        if (editing_template &&
+            (strcmp(app_settings->version_str, creator_version_str) != 0 ||
+             strcmp(app_settings->category, selected_template_info.category) != 0 ||
+             strcmp(app_settings->optional_flag, selected_template_info.optional_flag) != 0)) {
+            editing_template = false;
+        }
+
         // On first open, synchronize with the main app settings
         strncpy(creator_version_str, app_settings->version_str, sizeof(creator_version_str) - 1);
         creator_version_str[sizeof(creator_version_str) - 1] = '\0';
@@ -4035,6 +4052,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             selected_template_index = -1; // Reset selection
             selected_lang_index = -1;
             selected_layout_mgmt_index = -1;
+        }
+
+        // On first open, jump straight to the template currently applied in Settings so the editor lands
+        // on what the user is actually tracking, regardless of what was selected in a previous session.
+        // The scan already ran for app_settings->version_str, so matching category + flag is enough.
+        // Skip this when reopening straight into a persisted edit session so we don't yank the user away.
+        if (just_opened && !editing_template) {
+            for (int i = 0; i < discovered_template_count; i++) {
+                if (strcmp(discovered_templates[i].category, app_settings->category) == 0 &&
+                    strcmp(discovered_templates[i].optional_flag, app_settings->optional_flag) == 0) {
+                    selected_template_index = i;
+                    selected_lang_index = -1;
+                    selected_layout_mgmt_index = -1;
+                    selected_lang_flag = ""; // default; Edit Template adopts the Settings lang/layout
+                    selected_layout_flag = "";
+                    break;
+                }
+            }
         }
         status_message[0] = '\0'; // Clear status message
     }
