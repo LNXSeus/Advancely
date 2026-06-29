@@ -114,10 +114,15 @@ void fs_create_empty_layout_file(const char *path);
 * @param flag The optional flag, e.g., "_pre1.9".
 * @param error_message A buffer to store any error message if the function fails.
 * @param error_msg_size The size of the error_message buffer.
+* @param overwrite_existing If true, a template whose name collides with the new one is deleted first
+*        (with all its associated files) so the new empty template replaces it instead of failing.
+* @param out_name_collision Optional. Set to true when the failure is specifically a name collision,
+*        so the UI can offer to replace the existing template instead of just showing an error.
 * @return true on success, false on failure.
 */
 bool validate_and_create_template(const char *version, const char *category, const char *flag, char *error_message,
-                                  size_t error_msg_size);
+                                  size_t error_msg_size, bool overwrite_existing = false,
+                                  bool *out_name_collision = nullptr);
 
 /**
 * @brief Copies an existing template and its language file to a new destination.

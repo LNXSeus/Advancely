@@ -3471,6 +3471,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_create_new_view = false;
     static char new_template_category[MAX_PATH_LENGTH] = "";
     static char new_template_flag[MAX_PATH_LENGTH] = "";
+    // Set when a create attempt hits an existing name, prompting a replace-confirmation popup.
+    static bool show_replace_template_popup = false;
 
     // State for the "Copy" view
     static bool show_copy_view = false;
@@ -4392,17 +4394,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Render the filtered list using the stored indices
     for (int i: templates_to_render_indices) {
-        char item_label[MAX_PATH_LENGTH * 2];
-        if (discovered_templates[i].optional_flag[0] != '\0') {
-            // With optional flag, display right after category
-            snprintf(item_label, sizeof(item_label), "%s%s", discovered_templates[i].category,
-                     discovered_templates[i].optional_flag);
-        } else {
-            // Without optional flag
-            snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
+        const DiscoveredTemplate &tpl = discovered_templates[i];
+
+        // Two templates can share the same concatenated name with a different category/flag split
+        // (e.g. category "all"/flag "_x" vs category "all_x"/flag ""). They are distinct templates in
+        // separate folders, so PushID(i) keeps their rows from colliding on the same ImGui ID, and the
+        // optional flag is drawn faded so the split is always visible.
+        ImGui::PushID(i);
+
+        // Full-width selectable with a hidden label; the two-tone text is painted on top via the draw
+        // list (no cursor juggling, which would otherwise trip ImGui's "SetCursorPos extends boundary"
+        // warning when the last row is followed directly by EndChild).
+        ImVec2 row_screen_pos = ImGui::GetCursorScreenPos();
+        bool clicked = ImGui::Selectable("##tpl_row", selected_template_index == i);
+
+        ImDrawList *row_draw_list = ImGui::GetWindowDrawList();
+        row_draw_list->AddText(row_screen_pos, ImGui::GetColorU32(ImGuiCol_Text), tpl.category);
+        if (tpl.optional_flag[0] != '\0') {
+            // Faded version of the regular text colour (not the separate "disabled" grey), so the flag
+            // reads as the same text, just dimmed.
+            ImVec4 flag_col = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            flag_col.w *= 0.55f;
+            float category_width = ImGui::CalcTextSize(tpl.category).x;
+            row_draw_list->AddText(ImVec2(row_screen_pos.x + category_width, row_screen_pos.y),
+                                   ImGui::GetColorU32(flag_col), tpl.optional_flag);
         }
 
-        if (ImGui::Selectable(item_label, selected_template_index == i)) {
+        if (clicked) {
             selected_template_index = i;
             selected_lang_index = -1; // Reset language selection
             selected_layout_mgmt_index = -1; // Reset layout selection
@@ -4434,6 +4452,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             show_rename_view = false;
             status_message[0] = '\0';
         }
+
+        ImGui::PopID();
     }
     ImGui::EndChild();
     ImGui::EndDisabled(); // template_switching_disabled (template list)
@@ -17764,14 +17784,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      ImGuiFocusedFlags_RootAndChildWindows))) {
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
+                bool name_collision = false;
 
                 if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
                                                  error_msg,
-                                                 sizeof(error_msg))) {
+                                                 sizeof(error_msg), false, &name_collision)) {
                     show_create_new_view = false;
                     // Force a rescan by clearing the last scanned version
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     last_scanned_version[0] = '\0';
+                } else if (name_collision) {
+                    // A template with this name already exists: offer to replace it instead of erroring.
+                    status_message[0] = '\0';
+                    show_replace_template_popup = true;
                 } else {
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
                     status_message[sizeof(status_message) - 1] = '\0';
@@ -18163,6 +18188,63 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (selected_template_index == -1) {
             ImGui::TextDisabled("Create a new template or select one from the list to begin.");
         }
+    }
+
+    // Replace-confirmation popup: shown when "Create Template" hits an existing name. Offers to
+    // overwrite the existing template (deleting all its associated files) instead of failing.
+    if (show_replace_template_popup) ImGui::OpenPopup("Replace Existing Template?");
+    if (ImGui::BeginPopupModal("Replace Existing Template?", &show_replace_template_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
+                    new_template_category, new_template_flag, creator_version_str);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                           "Replacing it permanently deletes the existing template and ALL of its\n"
+                           "associated files (language, layout, notes and snapshot). This cannot be undone.");
+        ImGui::Separator();
+
+        if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            char error_msg[256] = "";
+            if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
+                                             error_msg, sizeof(error_msg), true, nullptr)) {
+                show_create_new_view = false;
+                status_message[0] = '\0';
+                SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
+                last_scanned_version[0] = '\0'; // Force rescan
+
+                // If we just replaced the template the tracker is currently using, reload it so it
+                // reflects the new (empty) template instead of showing the old cached data.
+                if (app_settings &&
+                    strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                    strcmp(new_template_category, app_settings->category) == 0 &&
+                    strcmp(new_template_flag, app_settings->optional_flag) == 0) {
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                }
+            } else {
+                strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                status_message[sizeof(status_message) - 1] = '\0';
+            }
+            show_replace_template_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char replace_tooltip_buffer[256];
+            snprintf(replace_tooltip_buffer, sizeof(replace_tooltip_buffer),
+                     "You can also press ENTER.\nOverwrites the existing template with a new empty one.");
+            ImGui::SetTooltip("%s", replace_tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_replace_template_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char cancel_tooltip_buffer[256];
+            snprintf(cancel_tooltip_buffer, sizeof(cancel_tooltip_buffer),
+                     "You can also press ESCAPE.\nKeeps the existing template.");
+            ImGui::SetTooltip("%s", cancel_tooltip_buffer);
+        }
+        ImGui::EndPopup();
     }
 
     if (show_create_lang_popup) ImGui::OpenPopup("Create New Language");

@@ -841,8 +841,17 @@ From the main editor view, you can manage entire template packages. **Create New
 their own buttons, while the copy, rename, delete, import and export actions are grouped under the **`Template...`**
 dropdown to keep the button row tidy:
 
-* **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique
-  `Category Name` and an `Optional Flag`.
+* **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a
+  `Category Name` and an `Optional Flag`. A template's identity is the `Category Name` **and** `Optional Flag`
+  **individually**, not the two strung together: each template lives in its own `Category Name` folder, so
+  (`category: all_advancements`, `flag: _x`) and (`category: all_advancements_x`, `flag:` *empty*) are **two different
+  templates** that happily coexist even though their names read the same. In the **Existing Templates** list the
+  `Optional Flag` is shown in a dimmed colour so you can always tell which is which. A template is only treated as
+  already existing when its `Category Name` **and** `Optional Flag` both match. In that case, instead of a hard error, a
+  **`Replace Existing Template?`** confirmation appears, warning you that continuing permanently deletes the existing
+  template and **all** of its associated files (language, layout, `notes` and global-stats `snapshot`). Choose
+  **`Replace`** to overwrite it with the new empty template, or **`Cancel`** to keep the existing one and pick a
+  different name. Replacing the template that is currently in use reloads the tracker onto the new empty template.
 * **Copy Template**: Duplicates an existing template, including all its language **and layout files**. This is the
   perfect starting point for creating a variation of a complex template. Note that a copy does **not** carry over your
   `notes` (or the global-stats `snapshot` on legacy versions); use **Rename Template** if you want to keep those.

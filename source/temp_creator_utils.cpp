@@ -413,7 +413,8 @@ void fs_create_empty_layout_file(const char *path) {
 }
 
 bool validate_and_create_template(const char *version, const char *category, const char *flag, char *error_message,
-                                  size_t error_msg_size) {
+                                  size_t error_msg_size, bool overwrite_existing, bool *out_name_collision) {
+    if (out_name_collision) *out_name_collision = false;
     // 1. Validate Inputs
     if (!category || category[0] == '\0') {
         snprintf(error_message, error_msg_size, "Error: Category name cannot be empty.");
@@ -457,26 +458,31 @@ bool validate_and_create_template(const char *version, const char *category, con
         }
     }
 
-    // 2. Check for Name Collisions by scanning all templates for the version
-    char new_combo[MAX_PATH_LENGTH];
-    snprintf(new_combo, sizeof(new_combo), "%s%s", category, flag);
-
+    // 2. Check for an existing template with the SAME identity. A template's on-disk identity is its
+    // (category, flag) pair, not the concatenation of the two: it lives in templates/<version>/<category>/,
+    // so e.g. (category "all_x", flag "") and (category "all", flag "_x") are DIFFERENT templates that
+    // coexist in separate folders even though their names concatenate to the same string. Only an exact
+    // category AND flag match is a real collision.
     DiscoveredTemplate *existing_templates = nullptr;
     int existing_count = 0;
     scan_for_templates(version, &existing_templates, &existing_count);
 
     if (existing_templates) {
         for (int i = 0; i < existing_count; ++i) {
-            char existing_combo[MAX_PATH_LENGTH];
-            snprintf(existing_combo, sizeof(existing_combo), "%s%s",
-                     existing_templates[i].category, existing_templates[i].optional_flag);
-
-            if (strcmp(new_combo, existing_combo) == 0) {
-                snprintf(error_message, error_msg_size,
-                         "Error: Name collision. The name '%s' is already produced by template (category: '%s', flag: '%s').",
-                         new_combo, existing_templates[i].category, existing_templates[i].optional_flag);
-                free_discovered_templates(&existing_templates, &existing_count);
-                return false;
+            if (strcmp(category, existing_templates[i].category) == 0 &&
+                strcmp(flag ? flag : "", existing_templates[i].optional_flag) == 0) {
+                if (out_name_collision) *out_name_collision = true;
+                if (!overwrite_existing) {
+                    snprintf(error_message, error_msg_size,
+                             "Error: A template with category '%s' and flag '%s' already exists for this version.",
+                             category, flag ? flag : "");
+                    free_discovered_templates(&existing_templates, &existing_count);
+                    return false;
+                }
+                // Overwrite requested: delete the existing template (and all its associated files)
+                // before recreating an empty one in its place.
+                delete_template_files(version, category, flag);
+                break;
             }
         }
         free_discovered_templates(&existing_templates, &existing_count);
@@ -558,11 +564,11 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         }
     }
 
-    // 2. Check for Name Collisions at Destination based on final filename
+    // 2. Check for an existing template with the same identity at the destination. Identity is the
+    // (category, flag) pair, not the concatenated filename: differently-split names that concatenate to
+    // the same string live in separate category directories and are distinct, coexisting templates.
     char dest_version_filename[64];
     version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
-    char new_filename_part[MAX_PATH_LENGTH];
-    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
 
     DiscoveredTemplate *existing_templates = nullptr;
     int existing_count = 0;
@@ -570,15 +576,11 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 
     if (existing_templates) {
         for (int i = 0; i < existing_count; ++i) {
-            char existing_version_filename[64];
-            version_to_filename_format(dest_version, existing_version_filename, sizeof(existing_version_filename));
-            char existing_filename_part[MAX_PATH_LENGTH];
-            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
-                     existing_version_filename, existing_templates[i].category, existing_templates[i].optional_flag);
-
-            if (strcmp(new_filename_part, existing_filename_part) == 0) {
+            if (strcmp(dest_category, existing_templates[i].category) == 0 &&
+                strcmp(dest_flag ? dest_flag : "", existing_templates[i].optional_flag) == 0) {
                 snprintf(error_message, error_msg_size,
-                         "Error: Name collision. This combination results in an existing filename.");
+                         "Error: A template with category '%s' and flag '%s' already exists for this version.",
+                         dest_category, dest_flag ? dest_flag : "");
                 free_discovered_templates(&existing_templates, &existing_count);
                 return false;
             }
@@ -898,11 +900,12 @@ bool rename_template_files(const char *src_version, const char *src_category, co
         }
     }
 
-    // 2. Check for Name Collisions at Destination based on final filename (mirrors copy_template_files)
+    // 2. Check for an existing template with the same identity at the destination (mirrors
+    // copy_template_files). Identity is the (category, flag) pair, not the concatenated filename:
+    // differently-split names that concatenate to the same string live in separate category
+    // directories and are distinct, coexisting templates.
     char dest_version_filename[64];
     version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
-    char new_filename_part[MAX_PATH_LENGTH];
-    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
 
     DiscoveredTemplate *existing_templates = nullptr;
     int existing_count = 0;
@@ -910,15 +913,11 @@ bool rename_template_files(const char *src_version, const char *src_category, co
 
     if (existing_templates) {
         for (int i = 0; i < existing_count; ++i) {
-            char existing_version_filename[64];
-            version_to_filename_format(dest_version, existing_version_filename, sizeof(existing_version_filename));
-            char existing_filename_part[MAX_PATH_LENGTH];
-            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
-                     existing_version_filename, existing_templates[i].category, existing_templates[i].optional_flag);
-
-            if (strcmp(new_filename_part, existing_filename_part) == 0) {
+            if (strcmp(dest_category, existing_templates[i].category) == 0 &&
+                strcmp(dest_flag ? dest_flag : "", existing_templates[i].optional_flag) == 0) {
                 snprintf(error_message, error_msg_size,
-                         "Error: Name collision. This combination results in an existing filename.");
+                         "Error: A template with category '%s' and flag '%s' already exists for this version.",
+                         dest_category, dest_flag ? dest_flag : "");
                 free_discovered_templates(&existing_templates, &existing_count);
                 return false;
             }
@@ -1715,11 +1714,12 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
 bool execute_import_from_zip(const char *zip_path, const char *version, const char *category,
                              const char *flag, bool import_icons,
                              char *error_message, size_t msg_size) {
-    // Final validation before extracting
+    // Final validation before extracting. A template's identity is its (category, flag) pair, not the
+    // concatenated filename: differently-split names that concatenate to the same string live in
+    // separate category directories and are distinct, coexisting templates, so only an exact
+    // category AND flag match counts as already existing.
     char version_filename[64];
     version_to_filename_format(version, version_filename, sizeof(version_filename));
-    char new_filename_part[MAX_PATH_LENGTH];
-    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", version_filename, category, flag);
 
     DiscoveredTemplate *templates = nullptr;
     int count = 0;
@@ -1727,12 +1727,8 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     bool exists = false;
     if (templates) {
         for (int i = 0; i < count; i++) {
-            char existing_version_filename[64];
-            version_to_filename_format(version, existing_version_filename, sizeof(existing_version_filename));
-            char existing_filename_part[MAX_PATH_LENGTH];
-            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
-                     existing_version_filename, templates[i].category, templates[i].optional_flag);
-            if (strcmp(new_filename_part, existing_filename_part) == 0) {
+            if (strcmp(category, templates[i].category) == 0 &&
+                strcmp(flag ? flag : "", templates[i].optional_flag) == 0) {
                 exists = true;
                 break;
             }
@@ -1741,7 +1737,9 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     }
 
     if (exists) {
-        snprintf(error_message, msg_size, "Error: A template with this name already exists for version %s.", version);
+        snprintf(error_message, msg_size,
+                 "Error: A template with category '%s' and flag '%s' already exists for version %s.",
+                 category, flag ? flag : "", version);
         return false;
     }
 
