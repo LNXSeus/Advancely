@@ -995,7 +995,8 @@ overlay.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a custom goal to appear in the middle row of the overlay.
 * **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of
   `Stages`. You can toggle **Per-Stage Icons** to assign a specific image to every individual step. Each stage is a
-  smaller goal that must be completed in order. A stage's `Type` determines its trigger:
+  smaller goal that must be completed in order. A newly created goal already comes with one editable stage plus the
+  mandatory `Final` stage, so you can start filling it in right away. A stage's `Type` determines its trigger:
     * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
       `stats` folder).
     * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
