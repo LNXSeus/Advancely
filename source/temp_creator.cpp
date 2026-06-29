@@ -21946,6 +21946,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
         };
+        // Display name for entry i, sourced from the currently selected Language dropdown (the import
+        // data is reparsed against that lang file). Used so the search box can match goal names too.
+        auto display_at = [&](int i, char *out, size_t out_size) {
+            out[0] = '\0';
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS:
+                    snprintf(out, out_size, "%s", s_template_import_data.advancements[i].display_name);
+                    break;
+                case IFTS_STATS:
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[i].display_name);
+                    break;
+                case IFTS_UNLOCKS:
+                    snprintf(out, out_size, "%s", s_template_import_data.unlocks[i].display_name);
+                    break;
+                case IFTS_CUSTOM_GOALS:
+                    snprintf(out, out_size, "%s", s_template_import_data.custom_goals[i].display_name);
+                    break;
+                case IFTS_COUNTERS:
+                    snprintf(out, out_size, "%s", s_template_import_data.counter_goals[i].display_name);
+                    break;
+                case IFTS_MS_GOALS:
+                    snprintf(out, out_size, "%s", s_template_import_data.multi_stage_goals[i].display_name);
+                    break;
+                case IFTS_DECORATIONS:
+                    snprintf(out, out_size, "%s", s_template_import_data.decorations[i].display_text);
+                    break;
+                case IFTS_TEMPLATE_CRITERIA: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.advancements.size()) break;
+                    snprintf(out, out_size, "%s",
+                             s_template_import_data.advancements[p].criteria[i].display_name);
+                    break;
+                }
+                case IFTS_TEMPLATE_SUB_STATS: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.stats.size()) break;
+                    snprintf(out, out_size, "%s", s_template_import_data.stats[p].criteria[i].display_name);
+                    break;
+                }
+                case IFTS_TEMPLATE_STAGES: {
+                    int p = s_template_import_parent_index;
+                    if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) break;
+                    snprintf(out, out_size, "%s",
+                             s_template_import_data.multi_stage_goals[p].stages[i].display_text);
+                    break;
+                }
+            }
+        };
         auto parent_label_at = [&](int i, char *out, size_t out_size) {
             switch (s_template_import_scope) {
                 case IFTS_TEMPLATE_CRITERIA:
@@ -22297,7 +22345,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (s_template_import_search[0] == '\0') return true;
                 char row_label[384];
                 label_at(i, row_label, sizeof(row_label));
-                return str_contains_insensitive(row_label, s_template_import_search);
+                if (str_contains_insensitive(row_label, s_template_import_search)) return true;
+                // Also match the display name from the selected Language file so goals are findable by name.
+                char disp_label[384];
+                display_at(i, disp_label, sizeof(disp_label));
+                return disp_label[0] != '\0' && str_contains_insensitive(disp_label, s_template_import_search);
             };
 
             if (ImGui::Button("Select all##template_import")) {
@@ -22356,11 +22408,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetKeyboardFocusHere();
                 s_template_import_focus_search = false;
             }
-            ImGui::InputTextWithHint("##template_import_search", "Search...",
+            ImGui::InputTextWithHint("##template_import_search", "Search by id or name...",
                                      s_template_import_search, sizeof(s_template_import_search));
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s",
-                                  "Filter the list by root name or id (case-insensitive).\n\n"
+                                  "Filter the list by root name/id or display name (case-insensitive).\n"
+                                  "Display names come from the Language file selected above.\n\n"
                                   "Press Ctrl+F or Cmd+F to focus.");
             }
             ImGui::Separator();

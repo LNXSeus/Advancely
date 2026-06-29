@@ -1115,7 +1115,9 @@ options:
   (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
   are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /
   `Cmd+F` to focus the search, Shift+Click to toggle a checkbox range, and shows a clear message when the
-  source template has nothing of that type.
+  source template has nothing of that type. The search matches both the root name/id and the display name,
+  where the display name comes from the `Language` file selected above (so a name search only finds what that
+  language actually provides).
   A `Layout positions` checkbox decides whether the source's manual layout positions (icon / text / progress
   for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
   auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
