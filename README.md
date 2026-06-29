@@ -1118,13 +1118,15 @@ options:
   A `Layout positions` checkbox decides whether the source's manual layout positions (icon / text / progress
   for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
   auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
-  greyed out with a tooltip so they can't accidentally pollute the destination. The format check requires
+  flagged as a warning: they stay selectable (and are highlighted with a tooltip explaining the mismatch)
+  so you can still import them on purpose, but the highlight makes it clear the data may not resolve on
+  the template's version. The format check requires
   `:` on `1.13+`, forbids `:` on `1.7-1.11`, and accepts only numeric IDs on `1.6.4` and below. `1.12 - 1.12.2`
   is hybrid: advancement / criteria root names need `:`, but stat (and stat-typed stage) root names must not
   contain `:` because that range still uses the mid-era flat stats format. In every mid-era stat case
   (`1.7 - 1.12.2`) sub-stat root names must also start with `stat.` so legacy `achievement.` strings can't be
   smuggled in as stats. Stat category keys themselves are not format-checked; only their sub-stats are. Container
-  entries (complex stat categories with sub-stats and entire multi-stage goals) are also greyed out when
+  entries (complex stat categories with sub-stats and entire multi-stage goals) are flagged the same way when
   any of their children would themselves fail the check, including stages with a type not supported in
   this version.
 
@@ -1140,7 +1142,8 @@ sense at a finer grain:
   The Combo picks the source multi-stage goal; ticked stages are inserted just before this goal's final
   stage. Final stages from the source are hidden in the list entirely, and any stage whose type is not
   valid for the current Minecraft version (for example a `Criterion` stage on a legacy template, or an
-  `Unlock` stage outside the `25w14craftmine` snapshot) is greyed out with an explanation. Stage icons
+  `Unlock` stage outside the `25w14craftmine` snapshot) is flagged with a warning highlight and tooltip,
+  while staying selectable so you can still import it on purpose. Stage icons
   are extracted automatically too.
 
 #### Template update helpers (advancement and achievement import)

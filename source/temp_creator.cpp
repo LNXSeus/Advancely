@@ -21886,21 +21886,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             return true;
         };
-        auto entry_invalid_reason = [&](int i) -> const char * {
+        // Structural guards that genuinely prevent an entry from being imported (out-of-range / missing
+        // parent). These always block selection; they protect the import loops from indexing past the end.
+        auto entry_blocking_reason = [&](int i) -> const char * {
             switch (s_template_import_scope) {
                 case IFTS_ADVANCEMENTS: {
                     if (i < 0 || i >= (int) s_template_import_data.advancements.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.advancements[i].root_name, false))
-                        return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
                 case IFTS_STATS: {
                     if (i < 0 || i >= (int) s_template_import_data.stats.size()) return "Out of range.";
-                    const auto &cat = s_template_import_data.stats[i];
-                    for (const auto &c: cat.criteria) {
-                        if (!root_name_valid_for_version(c.root_name, true))
-                            return "Contains a sub-stat whose root name format does not match this Minecraft version.";
-                    }
                     return nullptr;
                 }
                 case IFTS_TEMPLATE_CRITERIA: {
@@ -21908,17 +21903,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return "Invalid parent.";
                     if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return
                             "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name,
-                                                     false))
-                        return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
                 case IFTS_TEMPLATE_SUB_STATS: {
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.stats.size()) return "Invalid parent.";
                     if (i < 0 || i >= (int) s_template_import_data.stats[p].criteria.size()) return "Out of range.";
-                    if (!root_name_valid_for_version(s_template_import_data.stats[p].criteria[i].root_name, true))
-                        return "Root name format does not match this Minecraft version.";
                     return nullptr;
                 }
                 case IFTS_TEMPLATE_STAGES: {
@@ -21926,23 +21916,65 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return "Invalid parent.";
                     if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return
                             "Out of range.";
-                    const auto &st = s_template_import_data.multi_stage_goals[p].stages[i];
-                    if (!stage_type_valid_for_version(st.type))
-                        return "Stage type is not supported in this Minecraft version.";
-                    if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name, st.type == SUBGOAL_STAT))
-                        return "Stage root name format does not match this Minecraft version.";
                     return nullptr;
                 }
                 case IFTS_MS_GOALS: {
                     if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals.size()) return "Out of range.";
+                    return nullptr;
+                }
+                default: return nullptr;
+            }
+        };
+        // Version-compatibility issues (root name format / unsupported stage type). These do NOT block the
+        // import: the entry stays selectable and is flagged with a warning so the user can decide. The data
+        // may simply not resolve on the template's Minecraft version.
+        auto entry_warning_reason = [&](int i) -> const char * {
+            if (entry_blocking_reason(i)) return nullptr; // out-of-range guards take precedence
+            switch (s_template_import_scope) {
+                case IFTS_ADVANCEMENTS: {
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[i].root_name, false))
+                        return "Warning: Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_STATS: {
+                    const auto &cat = s_template_import_data.stats[i];
+                    for (const auto &c: cat.criteria) {
+                        if (!root_name_valid_for_version(c.root_name, true))
+                            return "Warning: Contains a sub-stat whose root name format does not match this Minecraft version.";
+                    }
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_CRITERIA: {
+                    int p = s_template_import_parent_index;
+                    if (!root_name_valid_for_version(s_template_import_data.advancements[p].criteria[i].root_name,
+                                                     false))
+                        return "Warning: Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_SUB_STATS: {
+                    int p = s_template_import_parent_index;
+                    if (!root_name_valid_for_version(s_template_import_data.stats[p].criteria[i].root_name, true))
+                        return "Warning: Root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_TEMPLATE_STAGES: {
+                    int p = s_template_import_parent_index;
+                    const auto &st = s_template_import_data.multi_stage_goals[p].stages[i];
+                    if (!stage_type_valid_for_version(st.type))
+                        return "Warning: Stage type is not supported in this Minecraft version.";
+                    if (st.root_name[0] != '\0' && !root_name_valid_for_version(st.root_name, st.type == SUBGOAL_STAT))
+                        return "Warning: Stage root name format does not match this Minecraft version.";
+                    return nullptr;
+                }
+                case IFTS_MS_GOALS: {
                     const auto &goal = s_template_import_data.multi_stage_goals[i];
                     for (const auto &st: goal.stages) {
                         if (st.type == SUBGOAL_MANUAL) continue;
                         if (!stage_type_valid_for_version(st.type))
-                            return "Contains a stage whose type is not supported in this Minecraft version.";
+                            return "Warning: Contains a stage whose type is not supported in this Minecraft version.";
                         if (st.root_name[0] != '\0' && !root_name_valid_for_version(
                                 st.root_name, st.type == SUBGOAL_STAT))
-                            return "Contains a stage whose root name format does not match this Minecraft version.";
+                            return "Warning: Contains a stage whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
                 }
@@ -22151,15 +22183,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button("Select all##template_import")) {
                 for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
                     if (!template_import_visible(i)) continue;
-                    if (entry_invalid_reason(i)) continue;
+                    if (entry_blocking_reason(i)) continue;
                     s_template_import_selected[i] = true;
                 }
                 s_template_import_last_clicked = -1;
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s",
-                                  "Tick every importable entry. Greyed-out rows (invalid format or\n"
-                                  "unsupported stage type) are skipped.\n"
+                                  "Tick every importable entry. Rows flagged with a warning (data that\n"
+                                  "may not match this Minecraft version) are still included.\n"
                                   "You can also Shift+Click checkboxes to toggle a range at once.");
             }
             ImGui::SameLine();
@@ -22218,11 +22250,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (!template_import_visible(i)) continue;
                 char row_label[384];
                 label_at(i, row_label, sizeof(row_label));
-                const char *invalid_reason = entry_invalid_reason(i);
-                if (invalid_reason) s_template_import_selected[i] = false;
+                const char *blocking_reason = entry_blocking_reason(i);
+                const char *warning_reason = blocking_reason ? nullptr : entry_warning_reason(i);
+                if (blocking_reason) s_template_import_selected[i] = false;
                 bool sel = s_template_import_selected[i];
                 ImGui::PushID(i);
-                if (invalid_reason) ImGui::BeginDisabled();
+                if (blocking_reason) ImGui::BeginDisabled();
+                if (warning_reason) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.3f, 1.0f));
                 if (ImGui::Checkbox(row_label, &sel)) {
                     bool shift = ImGui::GetIO().KeyShift;
                     if (shift && s_template_import_last_clicked >= 0 &&
@@ -22232,7 +22266,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int hi = std::max(s_template_import_last_clicked, i);
                         for (int k = lo; k <= hi; k++) {
                             if (!template_import_visible(k)) continue;
-                            if (entry_invalid_reason(k)) continue;
+                            if (entry_blocking_reason(k)) continue;
                             s_template_import_selected[k] = sel;
                         }
                     } else {
@@ -22240,11 +22274,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     s_template_import_last_clicked = i;
                 }
-                if (invalid_reason) {
+                if (warning_reason) ImGui::PopStyleColor();
+                if (blocking_reason) {
                     ImGui::EndDisabled();
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        ImGui::SetTooltip("%s", invalid_reason);
+                        ImGui::SetTooltip("%s", blocking_reason);
                     }
+                } else if (warning_reason && ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", warning_reason);
                 }
                 ImGui::PopID();
             }
@@ -22455,7 +22492,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &a: current_template_data.advancements) existing.insert(a.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
-                                if (entry_invalid_reason(i)) continue;
+                                if (entry_blocking_reason(i)) continue;
                                 const auto &src = s_template_import_data.advancements[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -22467,7 +22504,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    if (entry_invalid_reason(i)) continue;
+                                    if (entry_blocking_reason(i)) continue;
                                     auto item = s_template_import_data.advancements[i];
                                     if (!s_template_import_keep_positions) {
                                         item.icon_pos = ManualPos{};
@@ -22492,7 +22529,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &a: current_template_data.stats) existing.insert(a.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
-                                if (entry_invalid_reason(i)) continue;
+                                if (entry_blocking_reason(i)) continue;
                                 const auto &src = s_template_import_data.stats[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -22503,7 +22540,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    if (entry_invalid_reason(i)) continue;
+                                    if (entry_blocking_reason(i)) continue;
                                     auto item = s_template_import_data.stats[i];
                                     if (!s_template_import_keep_positions) {
                                         item.icon_pos = ManualPos{};
@@ -22674,7 +22711,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &c: s_template_import_target_adv->criteria) existing.insert(c.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
-                                if (entry_invalid_reason(i)) continue;
+                                if (entry_blocking_reason(i)) continue;
                                 const auto &src = src_adv.criteria[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -22686,7 +22723,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    if (entry_invalid_reason(i)) continue;
+                                    if (entry_blocking_reason(i)) continue;
                                     auto item = src_adv.criteria[i];
                                     if (!s_template_import_keep_positions) {
                                         item.icon_pos = ManualPos{};
@@ -22712,7 +22749,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &c: s_template_import_target_stat->criteria) existing.insert(c.root_name);
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
-                                if (entry_invalid_reason(i)) continue;
+                                if (entry_blocking_reason(i)) continue;
                                 const auto &src = src_stat.criteria[i];
                                 if (existing.count(src.root_name)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -22723,7 +22760,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ok) {
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
-                                    if (entry_invalid_reason(i)) continue;
+                                    if (entry_blocking_reason(i)) continue;
                                     auto item = src_stat.criteria[i];
                                     if (!s_template_import_keep_positions) {
                                         item.icon_pos = ManualPos{};
@@ -22750,7 +22787,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int i = 0; ok && i < item_count; i++) {
                                 if (!s_template_import_selected[i]) continue;
                                 if (entry_is_final_stage(i)) continue;
-                                if (entry_invalid_reason(i)) continue;
+                                if (entry_blocking_reason(i)) continue;
                                 const auto &src = src_goal.stages[i];
                                 if (existing.count(src.stage_id)) {
                                     snprintf(s_template_import_error, sizeof(s_template_import_error),
@@ -22767,7 +22804,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int i = 0; i < item_count; i++) {
                                     if (!s_template_import_selected[i]) continue;
                                     if (entry_is_final_stage(i)) continue;
-                                    if (entry_invalid_reason(i)) continue;
+                                    if (entry_blocking_reason(i)) continue;
                                     const auto &src = src_goal.stages[i];
                                     insert_pos = dst_stages.insert(insert_pos, src) + 1;
                                     if (src.icon_path[0]) icons_to_pull.emplace_back(src.icon_path);
