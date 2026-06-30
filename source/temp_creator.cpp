@@ -5935,10 +5935,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
 
             if (t->visual_layout_just_clicked) {
-                // Scroll to the clicked goal in the editor list.
+                // Scroll to the clicked goal in the editor list, aligning it to the very top of the list
+                // (ImGui clamps when the bottom is reached).
                 // Always use the parent root name — criteria/sub-stats are not top-level list items.
                 strncpy(scroll_to_goal_root_name, t->visual_drag_root_name, sizeof(scroll_to_goal_root_name) - 1);
                 scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
+                scroll_to_align_top = true;
                 // If a criterion/sub-stat was clicked, also scroll to it within the details pane.
                 strncpy(scroll_to_child_root_name, t->visual_drag_child_root_name,
                         sizeof(scroll_to_child_root_name) - 1);
