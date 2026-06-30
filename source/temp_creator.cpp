@@ -7661,6 +7661,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               return &adv == target_item_ptr;
                                                           });
                             current_template_data.advancements.insert(target_it, item_to_move);
+                            // Keep the dragged item selected at its new position (erase/insert
+                            // invalidates the old pointer, so re-find it by root name).
+                            selected_advancement = nullptr;
+                            for (auto &adv: current_template_data.advancements) {
+                                if (strcmp(adv.root_name, item_to_move.root_name) == 0) {
+                                    selected_advancement = &adv;
+                                    break;
+                                }
+                            }
                             s_adv_selection.clear();
                             s_adv_last_clicked = -1;
                         }
@@ -10085,6 +10094,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               return &s == target_item_ptr;
                                                           });
                             current_template_data.stats.insert(target_it, item_to_move);
+                            // Keep the dragged item selected at its new position (erase/insert
+                            // invalidates the old pointer, so re-find it by root name).
+                            selected_stat = nullptr;
+                            for (auto &st: current_template_data.stats) {
+                                if (strcmp(st.root_name, item_to_move.root_name) == 0) {
+                                    selected_stat = &st;
+                                    break;
+                                }
+                            }
                             s_stat_selection.clear();
                             s_stat_last_clicked = -1;
                         }
@@ -14338,6 +14356,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               return &g == target_item_ptr;
                                                           });
                             current_template_data.multi_stage_goals.insert(target_it, item_to_move);
+                            // Keep the dragged item selected at its new position (erase/insert
+                            // invalidates the old pointer, so re-find it by root name).
+                            selected_ms_goal = nullptr;
+                            for (auto &g: current_template_data.multi_stage_goals) {
+                                if (strcmp(g.root_name, item_to_move.root_name) == 0) {
+                                    selected_ms_goal = &g;
+                                    break;
+                                }
+                            }
                             s_msg_selection.clear();
                             s_msg_last_clicked = -1;
                         }
