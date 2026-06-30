@@ -13,7 +13,7 @@
 		"fps":	60,
 		"overlay_fps":	60,
 		"always_on_top":	false,
-		"goal_hiding_mode":	0,
+		"goal_hiding_mode":	1,
 		"invert_hiding_mode":	false,
 		"print_debug_status":	false,
 		"enable_overlay":	false,

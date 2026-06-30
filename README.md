@@ -576,7 +576,7 @@ You can manipulate the view using several intuitive controls:
   their default positions.
 * **Goal Visibility Dropdown**: A dropdown in the bottom controls (next to `Manual Layout`) lets you switch the goal
   visibility mode on the fly. It exposes all six combinations of the three modes and the invert flag in one list:
-  `Hide All Completed`, `Hide All Incomplete (Inverted)`, `Hide Template-Hidden Only`,
+  `Hide All Completed`, `Hide All Incomplete (Inverted)`, `Hide Template-Hidden Only` (the default),
   `Hide Template-Hidden (Inverted)`, `Show All`, and `Show All (Inverted)`. Changing it saves immediately and applies
   instantly **without restarting the overlay**. See [The Tracker Window](#the-tracker-window) - open the **Controls & Features** dropdown and scroll
   to **Section Completion Counters** for exactly how each mode affects what is shown and counted.
@@ -1579,7 +1579,7 @@ The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these fa
 the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
 are individually configurable per user. They're local visual preferences, not pushed to other lobby members.
 
-Note that the goal visibility mode still applies on top of this. In `Hide All Completed` mode (the default),
+Note that the goal visibility mode still applies on top of this. In `Hide All Completed` mode,
 goals that have been finished are hidden from the tracker entirely, so their faces disappear with them. This is most
 visible for completed simple advancements and for goals whose only remaining state is a ticked manual checkbox. Use the
 **Goal Visibility Dropdown** in the bottom controls to switch to one of the other modes if you want completed goals

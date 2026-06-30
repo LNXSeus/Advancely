@@ -953,7 +953,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             if (remove_completed && cJSON_IsBool(remove_completed)) {
                 settings->goal_hiding_mode = cJSON_IsTrue(remove_completed) ? HIDE_ALL_COMPLETED : SHOW_ALL;
             } else {
-                settings->goal_hiding_mode = HIDE_ALL_COMPLETED; // Default value
+                settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE; // Default value
             }
             defaults_were_used = true;
         }
