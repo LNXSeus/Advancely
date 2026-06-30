@@ -92,6 +92,8 @@ struct Tracker {
 
     // --- UI State Flags ---
     bool is_hovering_scrollable_list; // Prevents main map zoom when scrolling a list
+    bool map_interactions_blocked; // True when another window (settings, editor, welcome, updater, ...) covers the
+    // map under the cursor; blocks checkbox toggles and list scrolling so clicks don't pass through.
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused; // Flag to track if the template creator window has focus.

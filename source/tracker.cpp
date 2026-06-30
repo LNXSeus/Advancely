@@ -7601,7 +7601,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         list_max_screen = ImVec2(screen_pos.x + (uniform_item_width * t->zoom_level),
                                                  list_min_screen.y + (criteria_list_height * t->zoom_level));
 
-                        if (ImGui::IsMouseHoveringRect(list_min_screen, list_max_screen) && max_scroll_logical > 0) {
+                        if (!t->map_interactions_blocked &&
+                            ImGui::IsMouseHoveringRect(list_min_screen, list_max_screen) && max_scroll_logical > 0) {
                             t->is_hovering_scrollable_list = true;
                             if (io.MouseWheel != 0.0f)
                                 cat->scroll_y -= io.MouseWheel * settings->tracker_list_scroll_speed;
@@ -7873,7 +7874,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             // Deactivating left click when in visual editing mode
                             // Co-op: Receivers respect stat checkbox permission
-                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
+                            if (!t->map_interactions_blocked && is_hovered &&
+                                ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                                 is_visual_layout_editing && view_editable_self) {
                                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                                      g_coop_ctx && coop_net_get_state(g_coop_ctx) ==
@@ -8352,7 +8354,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Deactivating left click when in visual editing mode
                     // Co-op: Receivers respect stat checkbox permission
-                    if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
+                    if (!t->map_interactions_blocked && is_hovered_parent &&
+                        ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                         is_visual_layout_editing && view_editable_self_p) {
                         bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                              g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
@@ -9436,8 +9439,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
 
-                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing &&
-                    view_editable_self_cg) {
+                if (!t->map_interactions_blocked && is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                    !t->is_visual_layout_editing && view_editable_self_cg) {
                     bool rcv_can_send_cg = rcv_in_lobby &&
                                            (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER ||
                                             viewing_own_uuid_cg);
@@ -11071,6 +11074,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // Reset the hover flag at the START of the frame, used for scrollable lists
     t->is_hovering_scrollable_list = false;
+
+    // Block map interactions (checkbox toggles, list scrolling) when another window is in front of the
+    // cursor. TrackerMap is a full-screen NoBringToFrontOnFocus window pinned at the back, so it is only
+    // the hovered window when nothing (settings/editor/welcome/updater/info/controls/notes) sits over it.
+    t->map_interactions_blocked = !ImGui::IsWindowHovered();
 
     // Snapshot the previous frame's item list (complete) for lookups during multi-drag,
     // then clear the current list so it can be rebuilt as items render this frame.
