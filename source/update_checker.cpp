@@ -388,6 +388,23 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script,
             "rsync -av \"${SOURCE_DIR}/resources/templates/\" ./resources/templates/ 2>/dev/null || true\n");
 
+#if defined(__APPLE__)
+    // macOS reads/writes user data from ~/Library/Application Support/Advancely, not the bundle.
+    // Refresh the OFFICIAL default templates and cert bundle there so updates actually reach the
+    // running app. rsync without --delete overwrites shipped files (the user is warned that default
+    // templates change on update) while leaving custom templates, settings and notes untouched. The
+    // directory only exists after the app has run once under the new scheme; otherwise the next
+    // launch seeds it from the freshly updated bundle, so skipping here is safe.
+    fprintf(updater_script, "SUPPORT_DIR=\"$HOME/Library/Application Support/Advancely\"\n");
+    fprintf(updater_script, "if [ -d \"$SUPPORT_DIR\" ]; then\n");
+    fprintf(updater_script, "    mkdir -p \"$SUPPORT_DIR/templates\" \"$SUPPORT_DIR/ca_certificates\"\n");
+    fprintf(updater_script,
+            "    rsync -av \"${SOURCE_DIR}/resources/templates/\" \"$SUPPORT_DIR/templates/\" 2>/dev/null || true\n");
+    fprintf(updater_script,
+            "    rsync -av \"${SOURCE_DIR}/resources/ca_certificates/\" \"$SUPPORT_DIR/ca_certificates/\" 2>/dev/null || true\n");
+    fprintf(updater_script, "fi\n");
+#endif
+
     fprintf(updater_script, "echo \"Cleaning up temporary files...\"\n");
     fprintf(updater_script, "rm -rf \"./%s\"\n", temp_dir);
 

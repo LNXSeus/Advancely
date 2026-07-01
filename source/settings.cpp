@@ -770,10 +770,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char preset_help_buffer[768];
             snprintf(preset_help_buffer, sizeof(preset_help_buffer),
                      "Save and switch between full snapshots of your settings.\n"
-                     "Presets are stored as .json files in resources/config/, right next to\n"
+                     "Presets are stored as .json files in %s/, right next to\n"
                      "settings.json. Advancely always reads only settings.json itself, so\n"
                      "loading a preset just fills this window with its values - click\n"
-                     "'Apply Settings' afterwards to actually use them.");
+                     "'Apply Settings' afterwards to actually use them.",
+                     get_config_display_path());
             ImGui::SetTooltip("%s", preset_help_buffer);
         }
 
@@ -859,8 +860,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "settings.json file, then create the preset.");
             } else {
                 snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
-                         "Save the current settings as a new preset file in resources/config/.\n"
-                         "The name cannot be 'settings' or match an existing preset.");
+                         "Save the current settings as a new preset file in %s/.\n"
+                         "The name cannot be 'settings' or match an existing preset.",
+                         get_config_display_path());
             }
             ImGui::SetTooltip("%s", create_tooltip_buffer);
         }
@@ -877,8 +879,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             char open_config_tooltip_buffer[256];
             snprintf(open_config_tooltip_buffer, sizeof(open_config_tooltip_buffer),
-                     "Opens the 'resources/config' folder in your file explorer,\n"
-                     "where settings.json and your preset files are stored.");
+                     "Opens the '%s' folder in your file explorer,\n"
+                     "where settings.json and your preset files are stored.",
+                     get_config_display_path());
             ImGui::SetTooltip("%s", open_config_tooltip_buffer);
         }
 
@@ -937,8 +940,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char remove_tooltip_buffer[512];
                 snprintf(remove_tooltip_buffer, sizeof(remove_tooltip_buffer),
-                         "Permanently delete the selected preset file from resources/config/.\n"
-                         "This does not affect your current settings.");
+                         "Permanently delete the selected preset file from %s/.\n"
+                         "This does not affect your current settings.",
+                         get_config_display_path());
                 ImGui::SetTooltip("%s", remove_tooltip_buffer);
             }
             if (!have_selection) ImGui::EndDisabled();
@@ -1202,11 +1206,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(template_settings_tooltip_buffer, sizeof(template_settings_tooltip_buffer),
                          "Select the Version, Category, Optional Flag, and Language to use for the tracker.\n\n"
                          "These settings construct the path to your template files, which looks like:\n"
-                         "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
+                         "%s/Version/Category/Version_CategoryOptionalFlag.json\n\n"
                          "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
                          "that store all the display names shown in the UI.\n\n"
                          "Use the 'Open Template Editor' button to build new templates,\n"
-                         "edit existing ones, and manage their language files.");
+                         "edit existing ones, and manage their language files.",
+                         get_templates_display_path());
                 ImGui::SetTooltip(
                     "%s", template_settings_tooltip_buffer);
             }
@@ -1965,7 +1970,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char open_templates_folder_tooltip_buffer[1024];
                 snprintf(open_templates_folder_tooltip_buffer, sizeof(open_templates_folder_tooltip_buffer),
-                         "Opens the 'resources/templates' folder in your file explorer.");
+                         "Opens the '%s' folder in your file explorer.",
+                         get_templates_display_path());
                 ImGui::SetTooltip("%s", open_templates_folder_tooltip_buffer);
             }
 

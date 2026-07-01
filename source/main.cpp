@@ -90,6 +90,8 @@ extern "C" {
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <libgen.h>
+#include <sys/stat.h> // For mkdir/stat when seeding the writable Application Support directory
+#include <dirent.h>   // For opendir/readdir when seeding the writable Application Support directory
 #endif
 
 SDL_AtomicInt g_needs_update;
@@ -968,6 +970,22 @@ const char *get_resources_path() {
         }
         return path;
     }
+#elif defined(__APPLE__)
+    // macOS denies write access to anything shipped alongside the .app bundle (read-only DMGs,
+    // App Translocation, restrictive extract permissions), so all user-writable data lives in
+    // ~/Library/Application Support/Advancely. Read-only assets (fonts, icons, gui, reference_files)
+    // keep loading from the bundle via get_application_dir(); seed_macos_support_dir() populates this
+    // location on first run.
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        const char *homedir = getenv("HOME");
+        if (homedir == NULL || homedir[0] == '\0') {
+            // Without HOME we cannot resolve Application Support; fall back to the bundle directory.
+            return get_application_dir();
+        }
+        snprintf(path, sizeof(path), "%s/Library/Application Support/Advancely", homedir);
+    }
+    return path;
 #endif
 
     return get_application_dir();
@@ -1020,6 +1038,105 @@ const char *get_notes_manifest_path() {
     }
     return path;
 }
+
+// Friendly base directory shown to users for the writable data folders. This is the display
+// counterpart to get_resources_path() (which returns the real absolute path): it uses the short
+// "~"-style form and reflects the Linux --use-home-dir choice at runtime. Safe to cache because the
+// flag is parsed at startup, long before any tooltip renders.
+static const char *get_data_dir_display_base() {
+#if defined(__APPLE__)
+    return "~/Library/Application Support/Advancely";
+#elif defined(__linux__)
+    return g_use_home_dir ? "~/.local/share/advancely" : "resources";
+#else
+    return "resources";
+#endif
+}
+
+const char *get_config_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/config", get_data_dir_display_base());
+    }
+    return path;
+}
+
+const char *get_templates_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/templates", get_data_dir_display_base());
+    }
+    return path;
+}
+
+#if defined(__APPLE__)
+// Recursively copies src into dst, copying only files that are MISSING at the destination so the
+// user's settings, custom templates and edits are never overwritten. Updated default templates are
+// delivered by the auto-updater (see apply_update), not by re-seeding.
+static void seed_macos_support_dir_recursive(const char *src, const char *dst) {
+    struct stat st;
+    if (stat(src, &st) != 0) return;
+
+    if (S_ISDIR(st.st_mode)) {
+        mkdir(dst, 0755); // No-op if the directory already exists.
+        DIR *dir = opendir(src);
+        if (!dir) return;
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+            char src_child[MAX_PATH_LENGTH];
+            char dst_child[MAX_PATH_LENGTH];
+            snprintf(src_child, sizeof(src_child), "%s/%s", src, entry->d_name);
+            snprintf(dst_child, sizeof(dst_child), "%s/%s", dst, entry->d_name);
+            seed_macos_support_dir_recursive(src_child, dst_child);
+        }
+        closedir(dir);
+        return;
+    }
+
+    // Regular file: copy only when the destination does not already exist (no-clobber).
+    if (path_exists(dst)) return;
+
+    FILE *in = fopen(src, "rb");
+    if (!in) return;
+    FILE *out = fopen(dst, "wb");
+    if (!out) {
+        fclose(in);
+        return;
+    }
+    char buffer[8192];
+    size_t bytes;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), in)) > 0) {
+        if (fwrite(buffer, 1, bytes, out) != bytes) break;
+    }
+    fclose(in);
+    fclose(out);
+}
+
+// Seeds the writable Application Support directory (get_resources_path on macOS) from the bundled
+// read-only resources (get_application_dir). Only the user-writable subtrees are copied; read-only
+// assets stay in the bundle. Safe to call every launch: existing files are left untouched.
+static void seed_macos_support_dir(void) {
+    const char *bundle = get_application_dir();  // Read-only source (next to/inside the .app).
+    const char *support = get_resources_path();  // Writable destination in Application Support.
+
+    // If the destination resolved back to the bundle (e.g. HOME unavailable) there is nothing to do.
+    if (strcmp(bundle, support) == 0) return;
+
+    mkdir(support, 0755); // Parent "Application Support" always exists on macOS.
+
+    const char *subdirs[] = {"templates", "config", "notes", "ca_certificates"};
+    for (size_t i = 0; i < sizeof(subdirs) / sizeof(subdirs[0]); i++) {
+        char src[MAX_PATH_LENGTH];
+        char dst[MAX_PATH_LENGTH];
+        snprintf(src, sizeof(src), "%s/%s", bundle, subdirs[i]);
+        snprintf(dst, sizeof(dst), "%s/%s", support, subdirs[i]);
+        seed_macos_support_dir_recursive(src, dst);
+    }
+
+    log_message(LOG_INFO, "[MAIN] macOS user data directory ready: %s\n", support);
+}
+#endif
 
 // ============================ AUTO-UPDATE FLOW ============================
 // The update runs on a worker thread so the main thread can render a live progress
@@ -1526,6 +1643,13 @@ int main(int argc, char *argv[]) {
     // Initialize the logger at the very beginning
     log_init(false); // Just the main log file
 
+#if defined(__APPLE__)
+    // On macOS all user-writable data lives in ~/Library/Application Support/Advancely because the
+    // bundle location is frequently read-only. Seed it from the bundled resources before anything
+    // reads or writes settings, templates or the single-instance lock. Only the main process seeds;
+    // the overlay child is spawned later and inherits the populated directory.
+    seed_macos_support_dir();
+#endif
 
     // Check for write permissions in the current directory before doing anything else
     FILE *write_test = fopen(".advancely-write-test", "w");
@@ -3799,9 +3923,16 @@ int main(int argc, char *argv[]) {
 
                             ImGui::SeparatorText("What the Update Changes");
                             ImGui::TextUnformatted("KEEPS your settings.json and _notes.txt files.");
+#if defined(__APPLE__)
+                            ImGui::TextUnformatted(
+                                "REPLACES the app bundle, libraries (.dylib), and official files: fonts, icons and "
+                                "reference_files next to the app, plus the default templates in your "
+                                "'~/Library/Application Support/Advancely' folder.");
+#else
                             ImGui::TextUnformatted(
                                 "REPLACES the main executable, libraries (.dll, .dylib, .so), and official files in "
                                 "the 'resources' folder (fonts, icons, templates, reference_files, etc.).");
+#endif
                             ImGui::Spacing();
 
                             ImGui::SeparatorText("Options");

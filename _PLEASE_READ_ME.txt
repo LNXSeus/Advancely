@@ -15,8 +15,17 @@ Your download contains the `Advancely.app` application and a `resources` folder.
 Due to macOS security (Gatekeeper), you must authorize the app before running it.
 
 ⚠️ **CRITICAL: DO NOT RUN FROM DOWNLOADS FOLDER**
-If you run the app directly from Downloads, macOS will block it from saving settings (App Translocation).
+If you run the app directly from Downloads, macOS will isolate it in a read-only temporary location (App Translocation),
+where it cannot find its `resources` folder.
 **YOU MUST MOVE THE APP** to your **Applications** folder or **Desktop** before running it.
+
+ℹ️ **FILE LOCATIONS (IMPORTANT):**
+Your editable data (settings, templates and notes) is stored in your user Library, NOT next to the app:
+- **User Data (Editable):** `~/Library/Application Support/Advancely/`
+  (This is where `settings.json`, `templates/` and `notes/` live)
+- **System Files (Read-Only):** the `resources` folder kept next to `Advancely.app`
+This is created automatically on first launch, so the app saves correctly even if the app folder itself is read-only.
+Updating the app refreshes the default templates here (your custom templates and settings are kept).
 
 ✔️ **Method 1: Terminal Authorization (Best Option)**
 
@@ -84,6 +93,6 @@ TL;DR (Summary)
 ==================================================
 
 - **For ALL Users:** Ensure paths contain only English characters.
-- **On macOS:** Keep `.app` and `resources` together. Move out of Downloads.
+- **On macOS:** Keep `.app` and `resources` together. Move out of Downloads. Edit settings/templates in `~/Library/Application Support/Advancely/`.
 - **On Windows:** Don't move the executable out of its folder. Create a shortcut instead.
 - **On Linux:** Install the package. Edit settings/templates in `~/.local/share/advancely/`.

@@ -59,6 +59,12 @@ const char *get_notes_dir_path();
 
 const char *get_notes_manifest_path();
 
+// Friendly, user-facing locations of the writable config/templates folders for tooltips and
+// messages. Resolved at runtime so they stay accurate per platform (and per Linux --use-home-dir).
+const char *get_config_display_path();
+
+const char *get_templates_display_path();
+
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO
 

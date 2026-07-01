@@ -417,6 +417,17 @@ Due to macOS security (Gatekeeper), you cannot run the app directly from the Dow
 > 1. Drag `Advancely.app` AND the `resources` folder from Downloads to your **Applications** folder or **Desktop**.
 > 2. Run it from the new location.
 
+> **ℹ️ Where your data is stored**
+>
+> Your editable data is kept in your user Library, so the app saves correctly even when the app folder itself is
+> read-only:
+> - **User Data (Editable):** `~/Library/Application Support/Advancely/` (holds `settings.json`, `templates/` and
+>   `notes/`)
+> - **System Files (Read-Only):** the `resources` folder next to `Advancely.app`
+>
+> This is created automatically on first launch. Updating the app refreshes the default templates there, while keeping
+> your custom templates and settings.
+
 **Authorizing the App (First Run):**
 
 ✔️ **Method 1: Terminal Authorization**
