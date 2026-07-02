@@ -175,6 +175,12 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
         a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
         a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
+        a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
+        a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
+        a->overlay_row2_custom_scroll_speed_enabled != b->overlay_row2_custom_scroll_speed_enabled ||
+        a->overlay_row2_scroll_speed != b->overlay_row2_scroll_speed ||
+        a->overlay_row3_custom_scroll_speed_enabled != b->overlay_row3_custom_scroll_speed_enabled ||
+        a->overlay_row3_scroll_speed != b->overlay_row3_scroll_speed ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
@@ -2984,6 +2990,94 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
                 }
 
+                // --- Custom Row 1 Scroll Speed ---
+                ImGui::Checkbox("Custom Row 1 Scroll Speed", &temp_settings.overlay_row1_custom_scroll_speed_enabled);
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Check this to give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
+                             "ignoring the global Overlay Scroll Speed above.");
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+                if (temp_settings.overlay_row1_custom_scroll_speed_enabled) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(150.0f);
+                    if (ImGui::DragFloat("Row 1 Scroll Speed", &temp_settings.overlay_row1_scroll_speed, 0.001f,
+                                         -25.00f, 25.00f, "%.3f")) {
+                        if (temp_settings.overlay_row1_scroll_speed < -25.0f)
+                            temp_settings.overlay_row1_scroll_speed = -25.0f;
+                        if (temp_settings.overlay_row1_scroll_speed > 25.0f)
+                            temp_settings.overlay_row1_scroll_speed = 25.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Scroll speed for Row 1 only.\n"
+                                 "A negative value scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: %.2f.", DEFAULT_OVERLAY_SCROLL_SPEED);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                }
+
+                // --- Custom Row 2 Scroll Speed ---
+                ImGui::Checkbox("Custom Row 2 Scroll Speed", &temp_settings.overlay_row2_custom_scroll_speed_enabled);
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Check this to give Row 2 (%s, Unlocks, and items forced to Row 2)\n"
+                             "its own scroll speed, ignoring the global Overlay Scroll Speed above.",
+                             advancements_label_plural_uppercase);
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+                if (temp_settings.overlay_row2_custom_scroll_speed_enabled) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(150.0f);
+                    if (ImGui::DragFloat("Row 2 Scroll Speed", &temp_settings.overlay_row2_scroll_speed, 0.001f,
+                                         -25.00f, 25.00f, "%.3f")) {
+                        if (temp_settings.overlay_row2_scroll_speed < -25.0f)
+                            temp_settings.overlay_row2_scroll_speed = -25.0f;
+                        if (temp_settings.overlay_row2_scroll_speed > 25.0f)
+                            temp_settings.overlay_row2_scroll_speed = 25.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Scroll speed for Row 2 only.\n"
+                                 "A negative value scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: %.2f.", DEFAULT_OVERLAY_SCROLL_SPEED);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                }
+
+                // --- Custom Row 3 Scroll Speed ---
+                ImGui::Checkbox("Custom Row 3 Scroll Speed", &temp_settings.overlay_row3_custom_scroll_speed_enabled);
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Check this to give Row 3 (Stats, Goals, and items forced to Row 3)\n"
+                             "its own scroll speed, ignoring the global Overlay Scroll Speed above.");
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+                if (temp_settings.overlay_row3_custom_scroll_speed_enabled) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(150.0f);
+                    if (ImGui::DragFloat("Row 3 Scroll Speed", &temp_settings.overlay_row3_scroll_speed, 0.001f,
+                                         -25.00f, 25.00f, "%.3f")) {
+                        if (temp_settings.overlay_row3_scroll_speed < -25.0f)
+                            temp_settings.overlay_row3_scroll_speed = -25.0f;
+                        if (temp_settings.overlay_row3_scroll_speed > 25.0f)
+                            temp_settings.overlay_row3_scroll_speed = 25.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Scroll speed for Row 3 only.\n"
+                                 "A negative value scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: %.2f.", DEFAULT_OVERLAY_SCROLL_SPEED);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                }
+
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Layout & Spacing");
@@ -5525,6 +5619,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Timer Formatting: Both Disabled\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
+                 "  - Per-Row Custom Scroll Speed: Off (all rows use the global speed)\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
                  "  - Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
                  "  - Overlay Font: %s (Top Text: %.0f pt, Row Text: %.0f pt)\n"

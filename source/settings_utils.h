@@ -109,6 +109,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP false
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
+#define DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED false // Per-row custom scroll speed off by default
 #define DEFAULT_GOAL_HIDING_MODE HIDE_ONLY_TEMPLATE_HIDDEN
 #define DEFAULT_INVERT_HIDING_MODE false
 #define DEFAULT_PRINT_DEBUG_STATUS false
@@ -324,7 +325,13 @@ struct AppSettings {
     // If false only error messages are printed to console and log file
     // Logic is used in logger.cpp in log_message() function
     bool print_debug_status;
-    float overlay_scroll_speed; // The speed and direction of the scrolling animation in the overlay.
+    float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
+    bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
+    float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.
+    bool overlay_row2_custom_scroll_speed_enabled; // If true, row 2 ignores the global speed and uses its own.
+    float overlay_row2_scroll_speed; // Custom scroll speed and direction for row 2.
+    bool overlay_row3_custom_scroll_speed_enabled; // If true, row 3 ignores the global speed and uses its own.
+    float overlay_row3_scroll_speed; // Custom scroll speed and direction for row 3.
     GoalHidingMode goal_hiding_mode; // 3 Stages of hiding goals
     bool invert_hiding_mode; // Inverts each hiding mode: hide/fade incomplete instead of completed
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.

@@ -173,6 +173,12 @@ static inline float snap_px(float v) {
     return roundf(v);
 }
 
+// A row scrolls at its own speed when the per-row custom speed is enabled,
+// otherwise it falls back to the global overlay scroll speed.
+static inline float effective_scroll_speed(bool custom_enabled, float custom_speed, float global_speed) {
+    return custom_enabled ? custom_speed : global_speed;
+}
+
 // --- Scrolling conveyor belt ---------------------------------------------
 // A row of fixed-width tiles that scrolls horizontally. Each tile holds a
 // stable item index (into the row's ordered item list) or -1 for a gap. When
@@ -840,10 +846,21 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     }
 
     // --- Update Animation State ---
+    // Each row uses the global scroll speed unless it has a custom speed enabled.
     const float base_scroll_speed = 60.0f;
-    float speed_multiplier = settings->overlay_scroll_speed;
+    float row1_speed = settings->overlay_row1_custom_scroll_speed_enabled
+                           ? settings->overlay_row1_scroll_speed
+                           : settings->overlay_scroll_speed;
+    float row2_speed = settings->overlay_row2_custom_scroll_speed_enabled
+                           ? settings->overlay_row2_scroll_speed
+                           : settings->overlay_scroll_speed;
+    float row3_speed = settings->overlay_row3_custom_scroll_speed_enabled
+                           ? settings->overlay_row3_scroll_speed
+                           : settings->overlay_scroll_speed;
     // Speedup from holding SPACE is handled in overlay_events directly, mutliplying by deltatime
-    float scroll_delta = -(base_scroll_speed * speed_multiplier * (*deltaTime));
+    float row1_scroll_delta = -(base_scroll_speed * row1_speed * (*deltaTime));
+    float row2_scroll_delta = -(base_scroll_speed * row2_speed * (*deltaTime));
+    float row3_scroll_delta = -(base_scroll_speed * row3_speed * (*deltaTime));
 
 
     // --- Row 1 Update Logic (Dynamic Width) ---
@@ -852,7 +869,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         // increasingly negative, which moves items from Right to Left.
         // Do NOT reset the offset to 0. Let it accumulate.
         // The render function handles the wrapping via fmod().
-        o->scroll_offset_row1 -= scroll_delta;
+        o->scroll_offset_row1 -= row1_scroll_delta;
     } else {
         o->scroll_offset_row1 = 0;
     }
@@ -862,13 +879,13 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         // Unified Logic: Just accumulate the scroll delta.
         // We no longer need to calculate widths or swap indices here.
         // The Block-Based renderer handles the wrapping automatically.
-        o->scroll_offset_row2 -= scroll_delta;
+        o->scroll_offset_row2 -= row2_scroll_delta;
     } else {
         o->scroll_offset_row2 = 0;
     }
 
     // Row 3 doesn't disappear by default (only with setting)
-    o->scroll_offset_row3 -= scroll_delta;
+    o->scroll_offset_row3 -= row3_scroll_delta;
 
     // The timing logic for complex stat categories lives in overlay_render().
 
@@ -1073,7 +1090,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
                         -item_full_width, (float) window_w + item_full_width,
                         F, removed, fabsf(settings->overlay_clear_animation),
-                        settings->overlay_scroll_speed > 0, signature, tiles);
+                        effective_scroll_speed(settings->overlay_row1_custom_scroll_speed_enabled,
+                                               settings->overlay_row1_scroll_speed,
+                                               settings->overlay_scroll_speed) > 0, signature, tiles);
 
             for (const auto &tile: tiles) {
                 if (tile.idx < 0) continue; // gap
@@ -1504,7 +1523,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
                             -coverage, (float) window_w + coverage,
                             F, removed, fabsf(settings->overlay_clear_animation),
-                            settings->overlay_scroll_speed > 0, signature, tiles);
+                            effective_scroll_speed(settings->overlay_row2_custom_scroll_speed_enabled,
+                                                   settings->overlay_row2_scroll_speed,
+                                                   settings->overlay_scroll_speed) > 0, signature, tiles);
 
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap left by a cleared item
@@ -1981,7 +2002,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
                         -coverage, (float) window_w + coverage,
                         F, removed, fabsf(settings->overlay_clear_animation),
-                        settings->overlay_scroll_speed > 0, signature, tiles);
+                        effective_scroll_speed(settings->overlay_row3_custom_scroll_speed_enabled,
+                                               settings->overlay_row3_scroll_speed,
+                                               settings->overlay_scroll_speed) > 0, signature, tiles);
 
             for (size_t ti = 0; ti < tiles.size(); ++ti) {
                 if (tiles[ti].idx < 0) continue; // gap left by a cleared item

@@ -483,6 +483,12 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_fps = DEFAULT_OVERLAY_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+    settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+    settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+    settings->overlay_row2_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+    settings->overlay_row2_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+    settings->overlay_row3_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+    settings->overlay_row3_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
     settings->invert_hiding_mode = DEFAULT_INVERT_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
@@ -1306,6 +1312,58 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        // --- Load Per-Row Custom Scroll Speed ---
+        const cJSON *row1_custom_speed_enabled = cJSON_GetObjectItem(
+            visual_settings, "overlay_row1_custom_scroll_speed_enabled");
+        if (row1_custom_speed_enabled && cJSON_IsBool(row1_custom_speed_enabled))
+            settings->overlay_row1_custom_scroll_speed_enabled = cJSON_IsTrue(row1_custom_speed_enabled);
+        else {
+            settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row1_scroll_speed = cJSON_GetObjectItem(visual_settings, "overlay_row1_scroll_speed");
+        if (row1_scroll_speed && cJSON_IsNumber(row1_scroll_speed)) // Speed CAN be negative (right to left)
+            settings->overlay_row1_scroll_speed = (float) row1_scroll_speed->valuedouble;
+        else {
+            settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row2_custom_speed_enabled = cJSON_GetObjectItem(
+            visual_settings, "overlay_row2_custom_scroll_speed_enabled");
+        if (row2_custom_speed_enabled && cJSON_IsBool(row2_custom_speed_enabled))
+            settings->overlay_row2_custom_scroll_speed_enabled = cJSON_IsTrue(row2_custom_speed_enabled);
+        else {
+            settings->overlay_row2_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row2_scroll_speed = cJSON_GetObjectItem(visual_settings, "overlay_row2_scroll_speed");
+        if (row2_scroll_speed && cJSON_IsNumber(row2_scroll_speed)) // Speed CAN be negative (right to left)
+            settings->overlay_row2_scroll_speed = (float) row2_scroll_speed->valuedouble;
+        else {
+            settings->overlay_row2_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row3_custom_speed_enabled = cJSON_GetObjectItem(
+            visual_settings, "overlay_row3_custom_scroll_speed_enabled");
+        if (row3_custom_speed_enabled && cJSON_IsBool(row3_custom_speed_enabled))
+            settings->overlay_row3_custom_scroll_speed_enabled = cJSON_IsTrue(row3_custom_speed_enabled);
+        else {
+            settings->overlay_row3_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row3_scroll_speed = cJSON_GetObjectItem(visual_settings, "overlay_row3_scroll_speed");
+        if (row3_scroll_speed && cJSON_IsNumber(row3_scroll_speed)) // Speed CAN be negative (right to left)
+            settings->overlay_row3_scroll_speed = (float) row3_scroll_speed->valuedouble;
+        else {
+            settings->overlay_row3_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+            defaults_were_used = true;
+        }
+
 
         // --- Load Custom Tracker Spacing ---
         const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(
@@ -1452,6 +1510,12 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
         settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
+        settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+        settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+        settings->overlay_row2_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+        settings->overlay_row2_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+        settings->overlay_row3_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
+        settings->overlay_row3_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
 
         settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
 
@@ -2151,6 +2215,27 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing",
                               cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_custom_scroll_speed_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_custom_scroll_speed_enabled",
+                              cJSON_CreateBool(settings->overlay_row1_custom_scroll_speed_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_scroll_speed");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_scroll_speed",
+                              cJSON_CreateNumber(settings->overlay_row1_scroll_speed));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_scroll_speed_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_scroll_speed_enabled",
+                              cJSON_CreateBool(settings->overlay_row2_custom_scroll_speed_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_scroll_speed");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_scroll_speed",
+                              cJSON_CreateNumber(settings->overlay_row2_scroll_speed));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_scroll_speed_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_scroll_speed_enabled",
+                              cJSON_CreateBool(settings->overlay_row3_custom_scroll_speed_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_scroll_speed");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_scroll_speed",
+                              cJSON_CreateNumber(settings->overlay_row3_scroll_speed));
 
         // --- Save Custom Tracker Spacing ---
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_section_custom_width_enabled");
