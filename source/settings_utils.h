@@ -184,7 +184,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_ADV_BG_HALF_DONE_PATH "advancement_background_half_done.png"
 #define DEFAULT_ADV_BG_DONE_PATH "advancement_background_done.png"
 
-#define DEFAULT_OVERLAY_FONT_SIZE 24.0f // This is fixed currently
+#define DEFAULT_OVERLAY_FONT_SIZE 24.0f // Default point size for both overlay text sizes (top bar and rows)
+#define OVERLAY_FONT_SIZE_MIN 8.0f
+#define OVERLAY_FONT_SIZE_MAX 96.0f
 
 // LOD Defaults
 #define DEFAULT_LOD_TEXT_SUB_THRESHOLD 0.25f
@@ -363,7 +365,8 @@ struct AppSettings {
     char ui_font_name[256]; // Filename of the font for ImGui UI (settings, etc.).
     float ui_font_size; // Size for the UI font, may cause non-destructive overlap of buttons.
     char overlay_font_name[256]; // Filename of the font for the overlay.
-    float overlay_font_size; // EXPERIMENTAL: Only changeable in settings.json directly
+    float overlay_progress_font_size; // Point size for the top info bar text (version, progress, IGT, socials).
+    float overlay_row_font_size; // Point size for the row 2 & 3 item text (name + progress).
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.

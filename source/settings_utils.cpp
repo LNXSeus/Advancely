@@ -535,6 +535,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->ui_font_size = DEFAULT_UI_FONT_SIZE;
     strncpy(settings->overlay_font_name, DEFAULT_OVERLAY_FONT, sizeof(settings->overlay_font_name) - 1);
     settings->overlay_font_name[sizeof(settings->overlay_font_name) - 1] = '\0';
+    settings->overlay_progress_font_size = DEFAULT_OVERLAY_FONT_SIZE;
+    settings->overlay_row_font_size = DEFAULT_OVERLAY_FONT_SIZE;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -1153,6 +1155,30 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->overlay_font_name[sizeof(settings->overlay_font_name) - 1] = '\0';
             defaults_were_used = true;
         }
+
+        const cJSON *overlay_progress_font_size = cJSON_GetObjectItem(general_settings, "overlay_progress_font_size");
+        if (overlay_progress_font_size && cJSON_IsNumber(overlay_progress_font_size)) {
+            settings->overlay_progress_font_size = (float) overlay_progress_font_size->valuedouble;
+        } else {
+            settings->overlay_progress_font_size = DEFAULT_OVERLAY_FONT_SIZE;
+            defaults_were_used = true;
+        }
+        if (settings->overlay_progress_font_size < OVERLAY_FONT_SIZE_MIN)
+            settings->overlay_progress_font_size = OVERLAY_FONT_SIZE_MIN;
+        if (settings->overlay_progress_font_size > OVERLAY_FONT_SIZE_MAX)
+            settings->overlay_progress_font_size = OVERLAY_FONT_SIZE_MAX;
+
+        const cJSON *overlay_row_font_size = cJSON_GetObjectItem(general_settings, "overlay_row_font_size");
+        if (overlay_row_font_size && cJSON_IsNumber(overlay_row_font_size)) {
+            settings->overlay_row_font_size = (float) overlay_row_font_size->valuedouble;
+        } else {
+            settings->overlay_row_font_size = DEFAULT_OVERLAY_FONT_SIZE;
+            defaults_were_used = true;
+        }
+        if (settings->overlay_row_font_size < OVERLAY_FONT_SIZE_MIN)
+            settings->overlay_row_font_size = OVERLAY_FONT_SIZE_MIN;
+        if (settings->overlay_row_font_size > OVERLAY_FONT_SIZE_MAX)
+            settings->overlay_row_font_size = OVERLAY_FONT_SIZE_MAX;
 
         const cJSON *ui_font = cJSON_GetObjectItem(general_settings, "ui_font_name");
         if (ui_font && cJSON_IsString(ui_font)) {
@@ -1889,6 +1915,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "tracker_ui_font_size", cJSON_CreateNumber(settings->tracker_ui_font_size));
         cJSON_DeleteItemFromObject(general_obj, "overlay_font_name");
         cJSON_AddItemToObject(general_obj, "overlay_font_name", cJSON_CreateString(settings->overlay_font_name));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_progress_font_size");
+        cJSON_AddItemToObject(general_obj, "overlay_progress_font_size",
+                              cJSON_CreateNumber(settings->overlay_progress_font_size));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_row_font_size");
+        cJSON_AddItemToObject(general_obj, "overlay_row_font_size",
+                              cJSON_CreateNumber(settings->overlay_row_font_size));
         cJSON_DeleteItemFromObject(general_obj, "ui_font_name");
         cJSON_AddItemToObject(general_obj, "ui_font_name", cJSON_CreateString(settings->ui_font_name));
         cJSON_DeleteItemFromObject(general_obj, "ui_font_size");

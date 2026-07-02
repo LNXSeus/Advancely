@@ -5,6 +5,8 @@
 		"tracker_sub_font_size":	14,
 		"tracker_ui_font_size":	16,
 		"overlay_font_name":	"Minecraft.ttf",
+		"overlay_progress_font_size":	24,
+		"overlay_row_font_size":	24,
 		"ui_font_name":	"Roboto-Regular.ttf",
 		"ui_font_size":	16,
 		"section_order":	[0, 1, 2, 3, 4, 5, 6],

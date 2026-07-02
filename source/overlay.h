@@ -31,6 +31,7 @@ struct OverlayDisplayItem {
 typedef struct {
     char text[256]; // The text string that was rendered
     SDL_Color color; // The color it was rendered with
+    TTF_Font *font; // The font it was rendered with (top bar and rows can differ)
     SDL_Texture *texture;
 } TextCacheEntry;
 
@@ -49,7 +50,8 @@ struct Overlay {
     SharedData *p_shared_data; // Pointer to the mapped shared memory
 
     TTF_TextEngine *text_engine;
-    TTF_Font *font; // For text on overlay window (sdl ttf)
+    TTF_Font *font; // Rows 2 & 3 text (sdl ttf), sized by overlay_row_font_size
+    TTF_Font *font_top; // Top progress/info bar text, sized by overlay_progress_font_size
 
     SDL_Texture *adv_bg;
     SDL_Texture *adv_bg_half_done;

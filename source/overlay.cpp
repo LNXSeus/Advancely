@@ -116,11 +116,12 @@ typedef struct {
 /**
  * @brief Helper function for text caching to improve performance.
  * @param o The Overlay instance
+ * @param font The font to render with (top bar and rows may use different sizes)
  * @param text The text to cache
  * @param color The color of the text
  * @return The SDL_Texture of the cached text
  */
-static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SDL_Color color) {
+static SDL_Texture *get_text_texture_from_cache(Overlay *o, TTF_Font *font, const char *text, SDL_Color color) {
     if (!text || text[0] == '\0') {
         return nullptr;
     }
@@ -128,7 +129,7 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SD
     // 1. Check if the texture is already in the cache
     for (int i = 0; i < o->text_cache_count; i++) {
         TextCacheEntry *entry = &o->text_cache[i];
-        if (strcmp(entry->text, text) == 0 &&
+        if (entry->font == font && strcmp(entry->text, text) == 0 &&
             entry->color.r == color.r && entry->color.g == color.g &&
             entry->color.b == color.b && entry->color.a == color.a) {
             return entry->texture;
@@ -136,7 +137,7 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SD
     }
 
     // 2. If not in cache, create it and add it
-    SDL_Surface *text_surface = TTF_RenderText_Blended(o->font, text, 0, color);
+    SDL_Surface *text_surface = TTF_RenderText_Blended(font, text, 0, color);
     if (!text_surface) {
         return nullptr;
     }
@@ -466,17 +467,24 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
 }
 
 
-// Compute the vertical layout (row anchors + window height) from the loaded font.
+// Compute the vertical layout (row anchors + window height) from the loaded fonts.
 //
-// The base numbers (48 / 108 / 260 / 420) were tuned for the default Minecraft
-// font at DEFAULT_OVERLAY_FONT_SIZE. Taller fonts need more vertical room for the
-// stacked text lines, so every anchor is offset by n * delta, where delta is the
-// difference between the current font's line height and the reference (default)
-// line height, and n is the number of text lines that sit above that anchor
-// (top bar = 1 line, each of rows 2/3 = 2 lines). At delta == 0 the anchors equal
-// the original tuned values, preserving the default spacing exactly.
+// The base numbers (47 / 108 / 260 / 420) were tuned for the default Minecraft
+// font at DEFAULT_OVERLAY_FONT_SIZE. Taller text needs more vertical room, so every
+// anchor is offset by the extra line height it must accommodate. The top info bar
+// and the row 2/3 text can use different sizes, so we track two deltas against the
+// reference (default) line height:
+//   dt = top bar line height  - reference   (the top bar sits above everything)
+//   dr = row 2/3 line height  - reference   (rows 2/3 each stack 2 text lines)
+// The coefficient on each delta is how many lines of that kind sit above the anchor:
+//   row1_y : 1 top line
+//   row2_y : 1 top line
+//   row3_y : 1 top line + row 2's 2 lines
+//   height : 1 top line + rows 2 and 3's 2 lines each
+// At dt == dr == 0 the anchors equal the original tuned values, preserving the
+// default spacing exactly.
 //
-// This is called once, after the font is loaded in overlay_new. The overlay
+// This is called once, after the fonts are loaded in overlay_new. The overlay
 // process is fully restarted whenever settings change, so the layout never needs
 // to be recomputed at runtime and the window never resizes without a settings change.
 static void overlay_compute_layout(Overlay *o) {
@@ -485,11 +493,12 @@ static void overlay_compute_layout(Overlay *o) {
     const float BASE_ROW3_Y = 260.0f;
     const float BASE_HEIGHT = (float) OVERLAY_FIXED_HEIGHT; // 420
 
-    float line_height = (float) TTF_GetFontHeight(o->font);
+    float top_line_height = (float) TTF_GetFontHeight(o->font_top);
+    float row_line_height = (float) TTF_GetFontHeight(o->font);
 
     // Self-calibrate the reference against the bundled default font at the same
     // base size, so the anchoring stays correct even if the default font changes.
-    float ref_line_height = line_height;
+    float ref_line_height = row_line_height;
     char ref_font_path[1024];
     snprintf(ref_font_path, sizeof(ref_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_OVERLAY_FONT);
     TTF_Font *ref_font = TTF_OpenFont(ref_font_path, DEFAULT_OVERLAY_FONT_SIZE);
@@ -501,12 +510,13 @@ static void overlay_compute_layout(Overlay *o) {
                     ref_font_path, SDL_GetError());
     }
 
-    float delta = line_height - ref_line_height;
+    float dt = top_line_height - ref_line_height;
+    float dr = row_line_height - ref_line_height;
 
-    o->layout_row1_y = snap_px(BASE_ROW1_Y + delta);
-    o->layout_row2_y = snap_px(BASE_ROW2_Y + delta);
-    o->layout_row3_y = snap_px(BASE_ROW3_Y + 3.0f * delta);
-    o->layout_height = (int) snap_px(BASE_HEIGHT + 5.0f * delta);
+    o->layout_row1_y = snap_px(BASE_ROW1_Y + dt);
+    o->layout_row2_y = snap_px(BASE_ROW2_Y + dt);
+    o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr);
+    o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr);
 }
 
 
@@ -583,9 +593,9 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false; // Critical failure if defaults also fail
     }
 
-    // Make font HiDPI aware by loading it at a base point size (e.g., 24).
-    // SDL_ttf will automatically scale it correctly on any monitor at render time.
-    const float base_font_size = DEFAULT_OVERLAY_FONT_SIZE;
+    // The overlay uses one font face at two point sizes: one for the top info bar
+    // and one for the row 2 & 3 text. Fonts are HiDPI aware; SDL_ttf scales them
+    // correctly on any monitor at render time.
     char overlay_font_path[1024];
     snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_application_dir(),
              settings->overlay_font_name);
@@ -597,8 +607,9 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
     }
 
-    o->font = TTF_OpenFont(overlay_font_path, base_font_size);
-    if (!o->font) {
+    o->font = TTF_OpenFont(overlay_font_path, settings->overlay_row_font_size);
+    o->font_top = TTF_OpenFont(overlay_font_path, settings->overlay_progress_font_size);
+    if (!o->font || !o->font_top) {
         log_message(LOG_ERROR, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
         return false;
@@ -993,7 +1004,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         };
 
         // Use text cache for top info bar
-        SDL_Texture *text_texture = get_text_texture_from_cache(o, final_buffer, text_color);
+        SDL_Texture *text_texture = get_text_texture_from_cache(o, o->font_top, final_buffer, text_color);
         if (text_texture) {
             float w, h;
             SDL_GetTextureSize(text_texture, &w, &h);
@@ -1245,7 +1256,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
 
                     // Render name
-                    SDL_Texture *name_tex = get_text_texture_from_cache(o, render_info.supporter->name, text_color);
+                    SDL_Texture *name_tex = get_text_texture_from_cache(o, o->font, render_info.supporter->name,
+                                                                        text_color);
                     if (name_tex) {
                         float w, h;
                         SDL_GetTextureSize(name_tex, &w, &h);
@@ -1256,7 +1268,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         // Render amount
                         char amount_buf[64];
                         snprintf(amount_buf, sizeof(amount_buf), "$%.2f", render_info.supporter->amount);
-                        SDL_Texture *amount_tex = get_text_texture_from_cache(o, amount_buf, text_color);
+                        SDL_Texture *amount_tex = get_text_texture_from_cache(o, o->font, amount_buf, text_color);
                         if (amount_tex) {
                             float pw, ph;
                             SDL_GetTextureSize(amount_tex, &pw, &ph);
@@ -1706,7 +1718,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
 
-                        SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                        SDL_Texture *name_texture = get_text_texture_from_cache(o, o->font, name_buf, text_color);
                         if (name_texture) {
                             float w, h;
                             SDL_GetTextureSize(name_texture, &w, &h);
@@ -1716,7 +1728,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                             if (progress_buf[0] != '\0') {
                                 SDL_Texture *progress_texture =
-                                        get_text_texture_from_cache(o, progress_buf, text_color);
+                                        get_text_texture_from_cache(o, o->font, progress_buf, text_color);
                                 if (progress_texture) {
                                     float pw, ph;
                                     SDL_GetTextureSize(progress_texture, &pw, &ph);
@@ -2198,7 +2210,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
 
                     // Text rendering uses cell_width_row3 for centering
-                    SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                    SDL_Texture *name_texture = get_text_texture_from_cache(o, o->font, name_buf, text_color);
                     // Use name_buf calculated earlier
                     if (name_texture) {
                         float w, h;
@@ -2209,7 +2221,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                         if (progress_buf[0] != '\0') {
                             // Use progress_buf which holds current text
-                            SDL_Texture *progress_texture = get_text_texture_from_cache(o, progress_buf, text_color);
+                            SDL_Texture *progress_texture = get_text_texture_from_cache(o, o->font, progress_buf, text_color);
                             if (progress_texture) {
                                 float pw, ph;
                                 SDL_GetTextureSize(progress_texture, &pw, &ph);
@@ -2251,7 +2263,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         // Render the text using the cache
         SDL_Color text_color = {255, 0, 255, 255}; // Purple for visibility
-        SDL_Texture *text_texture = get_text_texture_from_cache(o, debug_buffer, text_color);
+        SDL_Texture *text_texture = get_text_texture_from_cache(o, o->font_top, debug_buffer, text_color);
         if (text_texture) {
             float w, h;
             SDL_GetTextureSize(text_texture, &w, &h);
@@ -2310,6 +2322,11 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
         if (o->font) {
             TTF_CloseFont(o->font);
             o->font = nullptr;
+        }
+
+        if (o->font_top) {
+            TTF_CloseFont(o->font_top);
+            o->font_top = nullptr;
         }
 
         if (o->renderer) {

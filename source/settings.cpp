@@ -208,8 +208,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->tracker_sub_font_size != b->tracker_sub_font_size ||
         a->tracker_ui_font_size != b->tracker_ui_font_size ||
         strcmp(a->ui_font_name, b->ui_font_name) != 0 ||
-        a->ui_font_size != a->ui_font_size ||
+        a->ui_font_size != b->ui_font_size ||
         strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
+        a->overlay_progress_font_size != b->overlay_progress_font_size ||
+        a->overlay_row_font_size != b->overlay_row_font_size ||
 
         memcmp(&a->tracker_bg_color, &b->tracker_bg_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
@@ -3144,7 +3146,40 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char tooltip_buffer[1024];
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Select the font for the text in the separate stream overlay window.\n"
-                             "Only choose fonts within the resources/fonts directory.");
+                             "Only choose fonts within the resources/fonts directory.\n"
+                             "Changing the font may change the overlay window height.");
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+
+                if (ImGui::DragFloat("Top Text Size", &temp_settings.overlay_progress_font_size, 0.5f,
+                                     OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                    if (temp_settings.overlay_progress_font_size < OVERLAY_FONT_SIZE_MIN)
+                        temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MIN;
+                    if (temp_settings.overlay_progress_font_size > OVERLAY_FONT_SIZE_MAX)
+                        temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MAX;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Font size for the top info bar (version, progress, IGT and socials).\n"
+                             "A larger size increases the overlay window height to fit the taller text.\n"
+                             "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+
+                if (ImGui::DragFloat("Row Text Size", &temp_settings.overlay_row_font_size, 0.5f,
+                                     OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                    if (temp_settings.overlay_row_font_size < OVERLAY_FONT_SIZE_MIN)
+                        temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MIN;
+                    if (temp_settings.overlay_row_font_size > OVERLAY_FONT_SIZE_MAX)
+                        temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MAX;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Font size for the item text under rows 2 and 3 (name and progress).\n"
+                             "A larger size increases the overlay window height to fit the taller text.\n"
+                             "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
 
@@ -5492,7 +5527,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
                  "  - Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
-                 "  - Overlay Font: %s\n"
+                 "  - Overlay Font: %s (Top Text: %.0f pt, Row Text: %.0f pt)\n"
                  "  - Colors: Default Dark Theme\n"
                  "[System & Debug]\n"
                  "  - Check For Updates: %s\n"
@@ -5530,7 +5565,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
                  DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
-                 DEFAULT_OVERLAY_FONT,
+                 DEFAULT_OVERLAY_FONT, DEFAULT_OVERLAY_FONT_SIZE, DEFAULT_OVERLAY_FONT_SIZE,
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
                  DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled",
