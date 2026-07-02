@@ -3478,6 +3478,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char new_template_flag[MAX_PATH_LENGTH] = "";
     // Set when a create attempt hits an existing name, prompting a replace-confirmation popup.
     static bool show_replace_template_popup = false;
+    // Set when a copy/rename attempt hits an existing destination name, each prompting its own
+    // replace-confirmation popup (mirrors the create flow above).
+    static bool show_replace_copy_popup = false;
+    static bool show_replace_rename_popup = false;
 
     // State for the "Copy" view
     static bool show_copy_view = false;
@@ -18011,11 +18015,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
                 char error_msg[256] = "";
+                bool name_collision = false;
 
                 // Properly copy the template selected in the template creator
                 if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
                                         dest_version, copy_template_category, copy_template_flag,
-                                        error_msg, sizeof(error_msg))) {
+                                        error_msg, sizeof(error_msg), false, &name_collision)) {
                     status_message[0] = '\0'; // Ensure status message is clear
                     show_copy_view = false;
                     // Switch UI to the version the copy was created in same as import
@@ -18024,6 +18029,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     creator_version_idx = copy_template_version_idx;
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     last_scanned_version[0] = '\0'; // Force rescan
+                } else if (name_collision) {
+                    // A template with this destination name already exists: offer to replace it.
+                    status_message[0] = '\0';
+                    show_replace_copy_popup = true;
                 } else {
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
                     status_message[sizeof(status_message) - 1] = '\0';
@@ -18095,6 +18104,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[rename_template_version_idx];
                 char error_msg[256] = "";
+                bool name_collision = false;
 
                 // Capture whether this is the in-use template BEFORE the files move.
                 bool was_current = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -18103,7 +18113,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (rename_template_files(creator_version_str, selected.category, selected.optional_flag,
                                           dest_version, rename_template_category, rename_template_flag,
-                                          error_msg, sizeof(error_msg))) {
+                                          error_msg, sizeof(error_msg), false, &name_collision)) {
                     status_message[0] = '\0';
                     show_rename_view = false;
 
@@ -18130,6 +18140,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     selected_template_index = -1; // The old selection no longer exists
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     last_scanned_version[0] = '\0'; // Force rescan
+                } else if (name_collision) {
+                    // A template with this destination name already exists: offer to replace it.
+                    status_message[0] = '\0';
+                    show_replace_rename_popup = true;
                 } else {
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
                     status_message[sizeof(status_message) - 1] = '\0';
@@ -18385,6 +18399,157 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_replace_template_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char cancel_tooltip_buffer[256];
+            snprintf(cancel_tooltip_buffer, sizeof(cancel_tooltip_buffer),
+                     "You can also press ESCAPE.\nKeeps the existing template.");
+            ImGui::SetTooltip("%s", cancel_tooltip_buffer);
+        }
+        ImGui::EndPopup();
+    }
+
+    // Replace-confirmation popup for "Confirm Copy": shown when the destination name collides with an
+    // existing template. Mirrors the create-template replace popup above.
+    if (show_replace_copy_popup) ImGui::OpenPopup("Replace Existing Template? (Copy)");
+    if (ImGui::BeginPopupModal("Replace Existing Template? (Copy)", &show_replace_copy_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        const char *dest_version = (copy_template_version_idx >= 0)
+                                       ? VERSION_STRINGS[copy_template_version_idx]
+                                       : creator_version_str;
+        ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
+                    copy_template_category, copy_template_flag, dest_version);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                           "Replacing it permanently deletes the existing template and ALL of its\n"
+                           "associated files (language, layout, notes and snapshot). This cannot be undone.");
+        ImGui::Separator();
+
+        if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            if (selected_template_index != -1 && copy_template_version_idx >= 0) {
+                const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+                char error_msg[256] = "";
+                if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
+                                        dest_version, copy_template_category, copy_template_flag,
+                                        error_msg, sizeof(error_msg), true, nullptr)) {
+                    status_message[0] = '\0';
+                    show_copy_view = false;
+                    strncpy(creator_version_str, dest_version, sizeof(creator_version_str) - 1);
+                    creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                    creator_version_idx = copy_template_version_idx;
+                    SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
+                    last_scanned_version[0] = '\0'; // Force rescan
+
+                    // If we just replaced the template the tracker is currently using, reload it so it
+                    // reflects the copied data instead of showing the old cached data.
+                    if (app_settings &&
+                        strcmp(dest_version, app_settings->version_str) == 0 &&
+                        strcmp(copy_template_category, app_settings->category) == 0 &&
+                        strcmp(copy_template_flag, app_settings->optional_flag) == 0) {
+                        SDL_SetAtomicInt(&g_settings_changed, 1);
+                    }
+                } else {
+                    strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                    status_message[sizeof(status_message) - 1] = '\0';
+                }
+            }
+            show_replace_copy_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char replace_tooltip_buffer[256];
+            snprintf(replace_tooltip_buffer, sizeof(replace_tooltip_buffer),
+                     "You can also press ENTER.\nOverwrites the existing template with the copy.");
+            ImGui::SetTooltip("%s", replace_tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_replace_copy_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char cancel_tooltip_buffer[256];
+            snprintf(cancel_tooltip_buffer, sizeof(cancel_tooltip_buffer),
+                     "You can also press ESCAPE.\nKeeps the existing template.");
+            ImGui::SetTooltip("%s", cancel_tooltip_buffer);
+        }
+        ImGui::EndPopup();
+    }
+
+    // Replace-confirmation popup for "Confirm Rename": shown when the destination name collides with an
+    // existing template. Mirrors the create-template replace popup above.
+    if (show_replace_rename_popup) ImGui::OpenPopup("Replace Existing Template? (Rename)");
+    if (ImGui::BeginPopupModal("Replace Existing Template? (Rename)", &show_replace_rename_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        const char *dest_version = (rename_template_version_idx >= 0)
+                                       ? VERSION_STRINGS[rename_template_version_idx]
+                                       : creator_version_str;
+        ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
+                    rename_template_category, rename_template_flag, dest_version);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                           "Replacing it permanently deletes the existing template and ALL of its\n"
+                           "associated files (language, layout, notes and snapshot). This cannot be undone.");
+        ImGui::Separator();
+
+        if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            if (selected_template_index != -1 && rename_template_version_idx >= 0) {
+                const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+                char error_msg[256] = "";
+
+                // Capture whether this is the in-use template BEFORE the files move.
+                bool was_current = (app_settings &&
+                                    strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                    strcmp(selected.category, app_settings->category) == 0 &&
+                                    strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+
+                if (rename_template_files(creator_version_str, selected.category, selected.optional_flag,
+                                          dest_version, rename_template_category, rename_template_flag,
+                                          error_msg, sizeof(error_msg), true, nullptr)) {
+                    status_message[0] = '\0';
+                    show_rename_view = false;
+
+                    // If the tracker was using this template, follow the rename so it doesn't point at
+                    // files that no longer exist. The language and layout flags are preserved by the rename.
+                    if (was_current && app_settings && t) {
+                        strncpy(app_settings->version_str, dest_version, sizeof(app_settings->version_str) - 1);
+                        app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
+                        strncpy(app_settings->category, rename_template_category, sizeof(app_settings->category) - 1);
+                        app_settings->category[sizeof(app_settings->category) - 1] = '\0';
+                        strncpy(app_settings->optional_flag, rename_template_flag,
+                                sizeof(app_settings->optional_flag) - 1);
+                        app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
+                        recompute_display_category(app_settings);
+                        settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                        SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the renamed template
+                        SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved change
+                    }
+
+                    // Switch the creator UI to the destination version so the renamed template is visible.
+                    strncpy(creator_version_str, dest_version, sizeof(creator_version_str) - 1);
+                    creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                    creator_version_idx = rename_template_version_idx;
+                    selected_template_index = -1; // The old selection no longer exists
+                    SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
+                    last_scanned_version[0] = '\0'; // Force rescan
+                } else {
+                    strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                    status_message[sizeof(status_message) - 1] = '\0';
+                }
+            }
+            show_replace_rename_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char replace_tooltip_buffer[256];
+            snprintf(replace_tooltip_buffer, sizeof(replace_tooltip_buffer),
+                     "You can also press ENTER.\nOverwrites the existing template with the renamed one.");
+            ImGui::SetTooltip("%s", replace_tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_replace_rename_popup = false;
             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsItemHovered()) {

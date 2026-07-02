@@ -134,11 +134,16 @@ bool validate_and_create_template(const char *version, const char *category, con
 * @param dest_flag The optional flag for the new template.
 * @param error_message A buffer to store any error message.
 * @param error_msg_size The size of the error_message buffer.
+* @param overwrite_existing If true, a template whose identity collides with the destination is deleted
+*        first (with all its associated files) so the copy replaces it instead of failing.
+* @param out_name_collision Optional. Set to true when the failure is specifically a name collision,
+*        so the UI can offer to replace the existing template instead of just showing an error.
 * @return true on success, false on failure.
 */
 bool copy_template_files(const char *src_version, const char *src_category, const char *src_flag,
                          const char *dest_version, const char *dest_category, const char *dest_flag,
-                         char *error_message, size_t error_msg_size);
+                         char *error_message, size_t error_msg_size, bool overwrite_existing = false,
+                         bool *out_name_collision = nullptr);
 
 /**
  * @brief Deletes a template and its corresponding language files.
@@ -165,11 +170,16 @@ bool delete_template_files(const char *version, const char *category, const char
  * @param dest_flag The destination optional flag.
  * @param error_message A buffer to store any error message.
  * @param error_msg_size The size of the error_message buffer.
+ * @param overwrite_existing If true, a template whose identity collides with the destination is deleted
+ *        first (with all its associated files) so the renamed template replaces it instead of failing.
+ * @param out_name_collision Optional. Set to true when the failure is specifically a name collision,
+ *        so the UI can offer to replace the existing template instead of just showing an error.
  * @return true on success, false on failure.
  */
 bool rename_template_files(const char *src_version, const char *src_category, const char *src_flag,
                            const char *dest_version, const char *dest_category, const char *dest_flag,
-                           char *error_message, size_t error_msg_size);
+                           char *error_message, size_t error_msg_size, bool overwrite_existing = false,
+                           bool *out_name_collision = nullptr);
 
 /**
  * @brief Enum to represent the result of a language file copy operation.

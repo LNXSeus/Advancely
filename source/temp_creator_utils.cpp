@@ -517,7 +517,9 @@ bool validate_and_create_template(const char *version, const char *category, con
 
 bool copy_template_files(const char *src_version, const char *src_category, const char *src_flag,
                          const char *dest_version, const char *dest_category, const char *dest_flag,
-                         char *error_message, size_t error_msg_size) {
+                         char *error_message, size_t error_msg_size, bool overwrite_existing,
+                         bool *out_name_collision) {
+    if (out_name_collision) *out_name_collision = false;
     // 1. Validate Destination Inputs
     if (!dest_category || dest_category[0] == '\0') {
         snprintf(error_message, error_msg_size, "Error: New category name cannot be empty.");
@@ -564,7 +566,30 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         }
     }
 
-    // 2. Check for an existing template with the same identity at the destination. Identity is the
+    // 2. Construct Source Paths and verify the source template exists and is valid. This is done BEFORE
+    // any destructive overwrite of the destination so a bad source can never delete a good destination.
+    char src_version_filename[64];
+    strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
+    src_version_filename[sizeof(src_version_filename) - 1] = '\0';
+    for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char src_base_path[MAX_PATH_LENGTH];
+    snprintf(src_base_path, sizeof(src_base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
+             src_version, src_category, src_version_filename, src_category, src_flag);
+
+    char src_template_path[MAX_PATH_LENGTH];
+    snprintf(src_template_path, sizeof(src_template_path), "%s.json", src_base_path);
+
+    cJSON *src_template_json = cJSON_from_file(src_template_path);
+    if (src_template_json == nullptr || src_template_json->child == nullptr) {
+        snprintf(error_message, error_msg_size,
+                 "Error: Source template file is empty or invalid and cannot be copied.");
+        cJSON_Delete(src_template_json); // Delete and return
+        return false;
+    }
+    cJSON_Delete(src_template_json); // We only needed to check it, now we free it.
+
+    // 3. Check for an existing template with the same identity at the destination. Identity is the
     // (category, flag) pair, not the concatenated filename: differently-split names that concatenate to
     // the same string live in separate category directories and are distinct, coexisting templates.
     char dest_version_filename[64];
@@ -578,40 +603,22 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         for (int i = 0; i < existing_count; ++i) {
             if (strcmp(dest_category, existing_templates[i].category) == 0 &&
                 strcmp(dest_flag ? dest_flag : "", existing_templates[i].optional_flag) == 0) {
-                snprintf(error_message, error_msg_size,
-                         "Error: A template with category '%s' and flag '%s' already exists for this version.",
-                         dest_category, dest_flag ? dest_flag : "");
-                free_discovered_templates(&existing_templates, &existing_count);
-                return false;
+                if (out_name_collision) *out_name_collision = true;
+                if (!overwrite_existing) {
+                    snprintf(error_message, error_msg_size,
+                             "Error: A template with category '%s' and flag '%s' already exists for this version.",
+                             dest_category, dest_flag ? dest_flag : "");
+                    free_discovered_templates(&existing_templates, &existing_count);
+                    return false;
+                }
+                // Overwrite requested: delete the existing destination template (and all its associated
+                // files: language, layout, notes and snapshot) before copying the source over it.
+                delete_template_files(dest_version, dest_category, dest_flag);
+                break;
             }
         }
         free_discovered_templates(&existing_templates, &existing_count);
     }
-
-
-    // 3. Construct Source Paths
-    char src_version_filename[64];
-    strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
-    src_version_filename[sizeof(src_version_filename) - 1] = '\0';
-    for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
-
-    char src_base_path[MAX_PATH_LENGTH];
-    snprintf(src_base_path, sizeof(src_base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
-             src_version, src_category, src_version_filename, src_category, src_flag);
-
-    char src_template_path[MAX_PATH_LENGTH];
-    snprintf(src_template_path, sizeof(src_template_path), "%s.json", src_base_path);
-
-    // 4. Check if source template is empty or invalid
-    cJSON *src_template_json = cJSON_from_file(src_template_path);
-    if (src_template_json == nullptr || src_template_json->child == nullptr) {
-        snprintf(error_message, error_msg_size,
-                 "Error: Source template file is empty or invalid and cannot be copied.");
-        cJSON_Delete(src_template_json); // Delete and return
-        return false;
-    }
-    cJSON_Delete(src_template_json); // We only needed to check it, now we free it.
-
 
     // 5. Construct Destination Paths
     char dest_base_path[MAX_PATH_LENGTH];
@@ -855,7 +862,9 @@ bool delete_template_files(const char *version, const char *category, const char
 
 bool rename_template_files(const char *src_version, const char *src_category, const char *src_flag,
                            const char *dest_version, const char *dest_category, const char *dest_flag,
-                           char *error_message, size_t error_msg_size) {
+                           char *error_message, size_t error_msg_size, bool overwrite_existing,
+                           bool *out_name_collision) {
+    if (out_name_collision) *out_name_collision = false;
     // 1. Validate Destination Inputs (mirrors copy_template_files)
     if (!dest_category || dest_category[0] == '\0') {
         snprintf(error_message, error_msg_size, "Error: New category name cannot be empty.");
@@ -900,32 +909,9 @@ bool rename_template_files(const char *src_version, const char *src_category, co
         }
     }
 
-    // 2. Check for an existing template with the same identity at the destination (mirrors
-    // copy_template_files). Identity is the (category, flag) pair, not the concatenated filename:
-    // differently-split names that concatenate to the same string live in separate category
-    // directories and are distinct, coexisting templates.
-    char dest_version_filename[64];
-    version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
-
-    DiscoveredTemplate *existing_templates = nullptr;
-    int existing_count = 0;
-    scan_for_templates(dest_version, &existing_templates, &existing_count);
-
-    if (existing_templates) {
-        for (int i = 0; i < existing_count; ++i) {
-            if (strcmp(dest_category, existing_templates[i].category) == 0 &&
-                strcmp(dest_flag ? dest_flag : "", existing_templates[i].optional_flag) == 0) {
-                snprintf(error_message, error_msg_size,
-                         "Error: A template with category '%s' and flag '%s' already exists for this version.",
-                         dest_category, dest_flag ? dest_flag : "");
-                free_discovered_templates(&existing_templates, &existing_count);
-                return false;
-            }
-        }
-        free_discovered_templates(&existing_templates, &existing_count);
-    }
-
-    // 3. Construct Source Paths and verify the main template file exists and is valid
+    // 2. Construct Source Paths and verify the main template file exists and is valid. This is done
+    // BEFORE any destructive overwrite of the destination so a bad source can never delete a good
+    // destination.
     char src_version_filename[64];
     strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
     src_version_filename[sizeof(src_version_filename) - 1] = '\0';
@@ -949,6 +935,38 @@ bool rename_template_files(const char *src_version, const char *src_category, co
         return false;
     }
     cJSON_Delete(src_template_json);
+
+    // 3. Check for an existing template with the same identity at the destination (mirrors
+    // copy_template_files). Identity is the (category, flag) pair, not the concatenated filename:
+    // differently-split names that concatenate to the same string live in separate category
+    // directories and are distinct, coexisting templates.
+    char dest_version_filename[64];
+    version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
+
+    DiscoveredTemplate *existing_templates = nullptr;
+    int existing_count = 0;
+    scan_for_templates(dest_version, &existing_templates, &existing_count);
+
+    if (existing_templates) {
+        for (int i = 0; i < existing_count; ++i) {
+            if (strcmp(dest_category, existing_templates[i].category) == 0 &&
+                strcmp(dest_flag ? dest_flag : "", existing_templates[i].optional_flag) == 0) {
+                if (out_name_collision) *out_name_collision = true;
+                if (!overwrite_existing) {
+                    snprintf(error_message, error_msg_size,
+                             "Error: A template with category '%s' and flag '%s' already exists for this version.",
+                             dest_category, dest_flag ? dest_flag : "");
+                    free_discovered_templates(&existing_templates, &existing_count);
+                    return false;
+                }
+                // Overwrite requested: delete the existing destination template (and all its associated
+                // files: language, layout, notes and snapshot) before moving the source over it.
+                delete_template_files(dest_version, dest_category, dest_flag);
+                break;
+            }
+        }
+        free_discovered_templates(&existing_templates, &existing_count);
+    }
 
     // 4. Construct Destination Paths and ensure the destination directory exists
     char dest_category_path[MAX_PATH_LENGTH];

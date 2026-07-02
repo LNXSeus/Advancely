@@ -870,6 +870,12 @@ dropdown to keep the button row tidy:
   **moves** the template and **all** of its associated files, so your language, layout, `notes` **and** (on legacy
   versions) the global-stats `snapshot` files are kept intact. If you rename the template that is currently in use, the
   tracker automatically follows the rename.
+
+  Both **Copy Template** and **Rename Template** use the same replace-instead-of-error behaviour as creating a new
+  template: if the destination `version`, `Category Name` **and** `Optional Flag` all match an existing template, the
+  same **`Replace Existing Template?`** confirmation appears. Choosing **`Replace`** permanently deletes the destination
+  template and **all** of its associated files (language, layout, `notes` and global-stats `snapshot`) before the copy or
+  rename overwrites it, and reloads the tracker if it was using that template.
 * **Delete Template**: Permanently removes a template and all of its associated language, layout, **and notes files**.
   A template that is currently in use can also be deleted; the tracker simply falls back to the default template.
 * **Import Template**: Imports a full template package from a `.zip` file. Exported zips embed their exact version,
@@ -1744,7 +1750,8 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares
   on the overlay within the first row or being invisible on the tracker). Checking the `advancely_log.txt` or
   `advancely_overlay_log.txt` file will tell you about incompatible images.
-  To fix this, re-save the images in a standard format or use ImageMagick (recursive):
+0,
+* To fix this, re-save the images in a standard format or use ImageMagick (recursive):
   `for /r %i in (*.png) do magick mogrify -define png:format=png32 -interlace none -strip -depth 8 "%i"`.
 * **Frame drops when no saves folder**: Whenever Advancely is set to track the active instance, 
 but no instance is open, it might hook onto a different java process and unsuccessfully try to locate a saves folder from it.
