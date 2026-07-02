@@ -298,6 +298,73 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     return false;
 }
 
+// Returns true if any setting the overlay process reads from its own settings copy
+// differs. The overlay only picks these up on a restart, so this decides whether an
+// Apply needs to bounce the overlay window. Anything NOT listed here (tracker visuals,
+// UI, hotkeys, path/coop config, live progress via IPC, etc.) leaves the overlay
+// untouched. Keep this in sync with the settings->... reads in overlay.cpp.
+static bool overlay_settings_different(const AppSettings *a, const AppSettings *b) {
+    return
+        // Whether the overlay process should exist / how fast it runs / its width.
+        a->enable_overlay != b->enable_overlay ||
+        a->overlay_fps != b->overlay_fps ||
+        a->overlay_window.w != b->overlay_window.w ||
+
+        // Config read from the overlay's own copy (mod flags).
+        // NOTE: version_str / display_version_str / category_display_name are intentionally
+        // NOT here: they're pushed live via the IPC header (fill_overlay_ipc_labels), so a
+        // template/version/category change updates the overlay without a restart.
+        a->using_hermes != b->using_hermes ||
+        a->print_debug_status != b->print_debug_status ||
+
+        // Top info bar content/formatting.
+        a->overlay_show_world != b->overlay_show_world ||
+        a->overlay_show_run_details != b->overlay_show_run_details ||
+        a->overlay_show_progress != b->overlay_show_progress ||
+        a->overlay_show_igt != b->overlay_show_igt ||
+        a->overlay_show_update_timer != b->overlay_show_update_timer ||
+        a->igt_unit_spacing != b->igt_unit_spacing ||
+        a->igt_always_show_ms != b->igt_always_show_ms ||
+        a->overlay_progress_text_align != b->overlay_progress_text_align ||
+        strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
+
+        // Scrolling / freeze behavior.
+        a->overlay_scroll_speed != b->overlay_scroll_speed ||
+        a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
+        a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
+        a->overlay_row2_custom_scroll_speed_enabled != b->overlay_row2_custom_scroll_speed_enabled ||
+        a->overlay_row2_scroll_speed != b->overlay_row2_scroll_speed ||
+        a->overlay_row3_custom_scroll_speed_enabled != b->overlay_row3_custom_scroll_speed_enabled ||
+        a->overlay_row3_scroll_speed != b->overlay_row3_scroll_speed ||
+        a->overlay_row1_freeze_enabled != b->overlay_row1_freeze_enabled ||
+        a->overlay_row1_freeze_align != b->overlay_row1_freeze_align ||
+        a->overlay_row2_freeze_enabled != b->overlay_row2_freeze_enabled ||
+        a->overlay_row2_freeze_align != b->overlay_row2_freeze_align ||
+        a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
+        a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
+        a->overlay_clear_animation != b->overlay_clear_animation ||
+        a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
+
+        // Row spacing / sizing.
+        a->overlay_row1_spacing != b->overlay_row1_spacing ||
+        a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+        a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
+        a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
+        a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
+        a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
+        a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+
+        // Fonts / colors / background textures loaded at overlay init.
+        strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
+        a->overlay_progress_font_size != b->overlay_progress_font_size ||
+        a->overlay_row_font_size != b->overlay_row_font_size ||
+        memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
+        strcmp(a->adv_bg_path, b->adv_bg_path) != 0 ||
+        strcmp(a->adv_bg_half_done_path, b->adv_bg_half_done_path) != 0 ||
+        strcmp(a->adv_bg_done_path, b->adv_bg_done_path) != 0;
+}
+
 // Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
 /**
  * @brief Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
@@ -2744,7 +2811,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "On Windows you MUST use GAME CAPTURE for the overlay (NOT window capture).\n"
-                             "Applying settings will restart the overlay window.\n"
+                             "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).",
                              advancements_label_plural_lowercase
                     );
@@ -2763,7 +2830,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
-                             "Applying settings will restart the overlay window.\n"
+                             "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
@@ -2782,7 +2849,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
-                             "Applying settings will restart the overlay window.\n"
+                             "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
@@ -2801,7 +2868,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
-                             "Applying settings will restart the overlay window.\n"
+                             "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
@@ -5508,6 +5575,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 memcpy(temp_settings.coop_adv_assignments, app_settings->coop_adv_assignments,
                        sizeof(app_settings->coop_adv_assignments));
 
+                // Decide whether the overlay must restart BEFORE app_settings is
+                // overwritten: only bounce it when a setting the overlay actually
+                // reads changed (app_settings still holds the pre-Apply values here).
+                const bool overlay_changed = overlay_settings_different(app_settings, &temp_settings);
+
                 // Copy temp settings to the real settings, save, and trigger a reload
                 memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                 memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
@@ -5525,7 +5597,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     pending_preset_progress_path[0] = '\0';
                 }
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
-                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                // Only restart the overlay when a setting it reads actually changed.
+                // Tracker/UI/hotkey/coop-only changes leave the overlay running.
+                if (overlay_changed) {
+                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                }
 
                 // Update template sync for connected receivers if hosting
                 if (app_settings->network_mode == NETWORK_HOST && g_coop_ctx) {

@@ -761,8 +761,9 @@ real-time display that you can easily add to your stream layout.
 6. **Adjust Settings**: For a clean, transparent background, it's recommended to set the **Similarity** to `1` and *
    *Smoothness** to around `210`.
 
-> **Important for Streamers:** Applying any changes in Advancely's settings will restart the overlay window. You may
-> need to re-select the window in your capture source properties afterward.
+> **Important for Streamers:** Applying a change to an overlay-related setting will restart the overlay window (other
+> changes, such as tracker visuals, hotkeys, or co-op, leave it running). If it does restart, you may need to re-select
+> the window in your capture source properties afterward.
 
 ### Overlay Layout Explained
 

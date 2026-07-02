@@ -131,7 +131,25 @@ static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 typedef struct {
     char world_name[MAX_PATH_LENGTH];
     float time_since_last_update;
+    // Top-bar labels the overlay used to read from its own settings copy (needed a
+    // restart to refresh). Sent live here so template/version/category changes update
+    // the overlay without restarting it. Sizes mirror the AppSettings fields.
+    char version_str[64];
+    char display_version_str[64];
+    char category_display_name[MAX_PATH_LENGTH];
 } OverlayIPCHeader;
+
+// Fill the version/category labels the overlay shows in its top bar. Sent live in the
+// IPC header (alongside world_name/time) so a template/version/category change updates
+// the overlay without restarting it. Call at every site that writes the header.
+static void fill_overlay_ipc_labels(OverlayIPCHeader *header, const AppSettings *settings) {
+    strncpy(header->version_str, settings->version_str, sizeof(header->version_str) - 1);
+    header->version_str[sizeof(header->version_str) - 1] = '\0';
+    strncpy(header->display_version_str, settings->display_version_str, sizeof(header->display_version_str) - 1);
+    header->display_version_str[sizeof(header->display_version_str) - 1] = '\0';
+    strncpy(header->category_display_name, settings->category_display_name, sizeof(header->category_display_name) - 1);
+    header->category_display_name[sizeof(header->category_display_name) - 1] = '\0';
+}
 
 
 // All builds now have the resources folder on the same level as the executable or .app bundle
@@ -1562,6 +1580,18 @@ int main(int argc, char *argv[]) {
                         proxy_tracker.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         proxy_tracker.time_since_last_update = header.time_since_last_update;
 
+                        // Refresh the top-bar labels live from the header so a template/
+                        // version/category change updates the overlay without a restart.
+                        // overlay_render reads these from settings->..., so update that copy.
+                        strncpy(settings.version_str, header.version_str, sizeof(settings.version_str) - 1);
+                        settings.version_str[sizeof(settings.version_str) - 1] = '\0';
+                        strncpy(settings.display_version_str, header.display_version_str,
+                                sizeof(settings.display_version_str) - 1);
+                        settings.display_version_str[sizeof(settings.display_version_str) - 1] = '\0';
+                        strncpy(settings.category_display_name, header.category_display_name,
+                                sizeof(settings.category_display_name) - 1);
+                        settings.category_display_name[sizeof(settings.category_display_name) - 1] = '\0';
+
                         // Only deserialize the heavy template data if it's actually there (size > header)
                         if (overlay->p_shared_data->data_size > sizeof(OverlayIPCHeader)) {
                             buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header.
@@ -2655,6 +2685,7 @@ int main(int argc, char *argv[]) {
                                 header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                             }
                             header.time_since_last_update = tracker->time_since_last_update;
+                            fill_overlay_ipc_labels(&header, &app_settings);
 
                             char *buffer_head = tracker->p_shared_data->buffer;
                             memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
@@ -3004,6 +3035,7 @@ int main(int argc, char *argv[]) {
                                 header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                             }
                             header.time_since_last_update = tracker->time_since_last_update;
+                            fill_overlay_ipc_labels(&header, &app_settings);
                             char *buffer_head = tracker->p_shared_data->buffer;
                             memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
                             buffer_head += sizeof(OverlayIPCHeader);
@@ -3517,6 +3549,7 @@ int main(int argc, char *argv[]) {
                             header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         }
                         header.time_since_last_update = tracker->time_since_last_update;
+                        fill_overlay_ipc_labels(&header, &app_settings);
 
                         // Get a pointer to the beginning of the shared buffer.
                         char *buffer_head = tracker->p_shared_data->buffer;
@@ -3621,6 +3654,7 @@ int main(int argc, char *argv[]) {
                             header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         }
                         header.time_since_last_update = tracker->time_since_last_update;
+                        fill_overlay_ipc_labels(&header, &app_settings);
                         char *buffer_head = tracker->p_shared_data->buffer;
                         memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
                         buffer_head += sizeof(OverlayIPCHeader);
@@ -3651,6 +3685,7 @@ int main(int argc, char *argv[]) {
                         header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                     }
                     header.time_since_last_update = tracker->time_since_last_update;
+                    fill_overlay_ipc_labels(&header, &app_settings);
 
                     // Write header at the start of buffer
                     memcpy(tracker->p_shared_data->buffer, &header, sizeof(OverlayIPCHeader));
