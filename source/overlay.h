@@ -83,6 +83,14 @@ struct Overlay {
 
     float calculated_row2_item_width; // Store calculated width for update func
     float calculated_row3_item_width; // Store calculated width for update func
+
+    // Dynamic vertical layout, computed once from the loaded font in overlay_init.
+    // Row anchors and window height grow with the font's line height so taller
+    // fonts keep the same inter-row spacing instead of overlapping.
+    float layout_row1_y; // Top of row 1 icons
+    float layout_row2_y; // Top of row 2 icons
+    float layout_row3_y; // Top of row 3 icons
+    int layout_height; // Total overlay window height
 };
 
 /**

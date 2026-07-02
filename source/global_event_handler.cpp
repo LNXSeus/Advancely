@@ -232,10 +232,10 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     int w, h;
                     SDL_GetWindowSize(o->window, &w, &h);
                     app_settings->overlay_window.w = w;
-                    app_settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
+                    app_settings->overlay_window.h = o->layout_height;
 
-                    if (event.type == SDL_EVENT_WINDOW_RESIZED && h != OVERLAY_FIXED_HEIGHT) {
-                        SDL_SetWindowSize(o->window, w, OVERLAY_FIXED_HEIGHT);
+                    if (event.type == SDL_EVENT_WINDOW_RESIZED && h != o->layout_height) {
+                        SDL_SetWindowSize(o->window, w, o->layout_height);
                     }
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);

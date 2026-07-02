@@ -466,6 +466,50 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
 }
 
 
+// Compute the vertical layout (row anchors + window height) from the loaded font.
+//
+// The base numbers (48 / 108 / 260 / 420) were tuned for the default Minecraft
+// font at DEFAULT_OVERLAY_FONT_SIZE. Taller fonts need more vertical room for the
+// stacked text lines, so every anchor is offset by n * delta, where delta is the
+// difference between the current font's line height and the reference (default)
+// line height, and n is the number of text lines that sit above that anchor
+// (top bar = 1 line, each of rows 2/3 = 2 lines). At delta == 0 the anchors equal
+// the original tuned values, preserving the default spacing exactly.
+//
+// This is called once, after the font is loaded in overlay_new. The overlay
+// process is fully restarted whenever settings change, so the layout never needs
+// to be recomputed at runtime and the window never resizes without a settings change.
+static void overlay_compute_layout(Overlay *o) {
+    const float BASE_ROW1_Y = 47.0f; // Centered between the top text and row 2 (13px above and below)
+    const float BASE_ROW2_Y = 108.0f;
+    const float BASE_ROW3_Y = 260.0f;
+    const float BASE_HEIGHT = (float) OVERLAY_FIXED_HEIGHT; // 420
+
+    float line_height = (float) TTF_GetFontHeight(o->font);
+
+    // Self-calibrate the reference against the bundled default font at the same
+    // base size, so the anchoring stays correct even if the default font changes.
+    float ref_line_height = line_height;
+    char ref_font_path[1024];
+    snprintf(ref_font_path, sizeof(ref_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_OVERLAY_FONT);
+    TTF_Font *ref_font = TTF_OpenFont(ref_font_path, DEFAULT_OVERLAY_FONT_SIZE);
+    if (ref_font) {
+        ref_line_height = (float) TTF_GetFontHeight(ref_font);
+        TTF_CloseFont(ref_font);
+    } else {
+        log_message(LOG_ERROR, "[OVERLAY] Failed to open reference font '%s' for layout calibration: %s\n",
+                    ref_font_path, SDL_GetError());
+    }
+
+    float delta = line_height - ref_line_height;
+
+    o->layout_row1_y = snap_px(BASE_ROW1_Y + delta);
+    o->layout_row2_y = snap_px(BASE_ROW2_Y + delta);
+    o->layout_row3_y = snap_px(BASE_ROW3_Y + 3.0f * delta);
+    o->layout_height = (int) snap_px(BASE_HEIGHT + 5.0f * delta);
+}
+
+
 bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // dereference once and use calloc
     *overlay = (Overlay *) calloc(1, sizeof(Overlay));
@@ -559,6 +603,14 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         overlay_free(overlay, settings);
         return false;
     }
+
+    // Size the window to the loaded font. The window was created with a placeholder
+    // height in overlay_init_sdl; resize it now that we know the font's line height.
+    overlay_compute_layout(o);
+    int current_w;
+    SDL_GetWindowSize(o->window, &current_w, nullptr);
+    SDL_SetWindowSize(o->window, current_w, o->layout_height);
+
     return true;
 }
 
@@ -585,10 +637,10 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             int w, h;
             SDL_GetWindowSize(o->window, &w, &h);
             settings->overlay_window.w = w;
-            settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
+            settings->overlay_window.h = o->layout_height;
 
-            if (event->type == SDL_EVENT_WINDOW_RESIZED && h != OVERLAY_FIXED_HEIGHT) {
-                SDL_SetWindowSize(o->window, w, OVERLAY_FIXED_HEIGHT);
+            if (event->type == SDL_EVENT_WINDOW_RESIZED && h != o->layout_height) {
+                SDL_SetWindowSize(o->window, w, o->layout_height);
             }
             break;
         }
@@ -970,7 +1022,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
-        const float ROW1_Y_POS = 48.0f;
+        const float ROW1_Y_POS = o->layout_row1_y;
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SHARED_ICON_SIZE = settings->overlay_row1_shared_icon_size; // Originally 30.0f
         const float item_full_width = snap_px(ROW1_ICON_SIZE + settings->overlay_row1_spacing);
@@ -1073,7 +1125,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     // --- ROW 2: Advancements & Unlocks (AND forced items) ---
     // ROW 2 ALSO SHOWS SUPPORTERS WHEN RUN IS COMPLETED
     {
-        const float ROW2_Y_POS = 108.0f;
+        const float ROW2_Y_POS = o->layout_row2_y;
         const float ITEM_WIDTH = 96.0f; // Minimum Width based on icon bg
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;
@@ -1690,7 +1742,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     // --- ROW 3: Stats & Goals ---
     // (excluding forced items with "in_2nd_row" flag)
     {
-        const float ROW3_Y_POS = 260.0f; // Configure height of row, more pushes down
+        const float ROW3_Y_POS = o->layout_row3_y; // Grows with font line height
         const float ITEM_WIDTH = 96.0f; // Minimum width based on icon bg
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;

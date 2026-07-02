@@ -1623,7 +1623,7 @@ int main(int argc, char *argv[]) {
             int w, h;
             SDL_GetWindowSize(overlay->window, &w, &h);
             settings.overlay_window.w = w;
-            settings.overlay_window.h = OVERLAY_FIXED_HEIGHT;
+            settings.overlay_window.h = overlay->layout_height;
             settings_save(&settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM);
         }
 
