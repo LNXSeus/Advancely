@@ -1127,7 +1127,17 @@ options:
   exactly like the player-file flow. A `Language` dropdown at the top picks which language file from the source
   template provides the display names for the items you import, and (for position/decoration scopes) a `Layout`
   dropdown next to it picks which of the source's `_layout` files supplies the manual positions and decoration
-  geometry; selections are kept when you change either one. Any
+  geometry; selections are kept when you change either one. When the template you are editing has more than one
+  language and the source template contains **all** of those same languages, the `Language` dropdown is replaced by
+  an `Import languages` checklist that is auto-ticked for every language your template already has. Confirming then
+  fills the Display Names for all ticked languages at once (e.g. import a goal and immediately get its `Default`,
+  `ger` and `zh_cn` names), so you don't have to re-import once per language. It never creates new language files:
+  the choices are strictly the languages your template already has. The language you're currently editing is always
+  included (its checkbox is locked on) and is written the moment you `Save` like any other edit; the other languages
+  are merged into their existing `_lang` files on that same `Save` (and discarded if you `Revert` first). Any
+  translation the source happens to be missing is simply left blank. If the languages don't line up (the source is
+  missing one of yours, or your template has just a single language), it falls back to the single `Language` dropdown
+  and imports into the language selected in the editor. Any
   `linked_goals` / arrow endpoints / multi-stage `parent_advancement` refs that won't resolve after the import
   (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
   are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /

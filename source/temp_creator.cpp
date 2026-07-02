@@ -25,6 +25,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <map> // For deferred multi-language import (ordered lang key merge)
 #include <unordered_set> // For checking duplicates
 #include <unordered_map>
 
@@ -2700,6 +2701,62 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     return true;
 }
 
+// Merge deferred multi-language import translations into the current template's OTHER language files.
+// `pending` maps a language flag ("" = default) to (lang_key -> display_name). Each target file is
+// read, the pending keys merged in (replacing any existing entry), and written back. It never creates
+// a language file that doesn't already exist, because the caller only ever populates flags the current
+// template already has. Best-effort: I/O failures are logged and skipped so one bad file can't abort a
+// save that already succeeded.
+static void write_pending_lang_imports(const char *version, const DiscoveredTemplate &template_info,
+                                       const std::map<std::string, std::map<std::string, std::string>> &pending) {
+    if (pending.empty()) return;
+
+    char version_filename[64];
+    strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char base_path_str[MAX_PATH_LENGTH];
+    snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
+             version, template_info.category, version_filename, template_info.category,
+             template_info.optional_flag);
+
+    for (const auto &lang_entry: pending) {
+        const std::string &flag = lang_entry.first;
+        if (lang_entry.second.empty()) continue;
+
+        char lang_path[MAX_PATH_LENGTH];
+        if (!flag.empty()) {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path_str, flag.c_str());
+        } else {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path_str);
+        }
+
+        // Merge into the existing file (preserving unrelated entries) rather than regenerating it.
+        cJSON *lang_json = cJSON_from_file(lang_path);
+        if (!lang_json) lang_json = cJSON_CreateObject();
+        for (const auto &kv: lang_entry.second) {
+            cJSON_DeleteItemFromObject(lang_json, kv.first.c_str()); // replace if already present
+            cJSON_AddStringToObject(lang_json, kv.first.c_str(), kv.second.c_str());
+        }
+
+        FILE *f = fopen(lang_path, "w");
+        if (f) {
+            char *s = cJSON_Print(lang_json);
+            if (s) {
+                fputs(s, f);
+                free(s);
+            }
+            fclose(f);
+            log_message(LOG_INFO, "[IMPORT FROM TEMPLATE] Merged %zu translation(s) into %s\n",
+                        lang_entry.second.size(), lang_path);
+        } else {
+            log_message(LOG_ERROR, "[IMPORT FROM TEMPLATE] Failed to write language file: %s\n", lang_path);
+        }
+        cJSON_Delete(lang_json);
+    }
+}
+
 enum SaveMessageType {
     MSG_NONE,
     MSG_SUCCESS,
@@ -2898,7 +2955,9 @@ static bool validate_and_save_template(const char *creator_version_str,
                                        const std::string &lang_flag, const std::string &layout_flag,
                                        EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
                                        SaveMessageType &save_message_type, char *status_message,
-                                       AppSettings *app_settings) {
+                                       AppSettings *app_settings,
+                                       std::map<std::string, std::map<std::string, std::string>> *pending_lang_imports
+                                       = nullptr) {
     // Reset message state on new save attempt
     save_message_type = MSG_NONE;
     status_message[0] = '\0';
@@ -3047,6 +3106,14 @@ static bool validate_and_save_template(const char *creator_version_str,
                                        strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                        strcmp(selected_template_info.optional_flag,
                                               app_settings->optional_flag) == 0);
+
+            // Flush any deferred multi-language import translations into the template's OTHER language
+            // files now that the active language and structure are safely on disk. Cleared afterwards so
+            // a subsequent Save doesn't rewrite them, and so Revert (which clears the map) discards them.
+            if (pending_lang_imports && !pending_lang_imports->empty()) {
+                write_pending_lang_imports(creator_version_str, selected_template_info, *pending_lang_imports);
+                pending_lang_imports->clear();
+            }
 
             if (is_active_template) {
                 // Signal the main loop to reload the tracker data
@@ -3679,6 +3746,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTemplate s_template_import_data;
     static std::vector<std::string> s_template_import_lang_flags;
     static int s_template_import_lang_index = 0;
+    // Multi-language import: when the current template's languages are all present in the source
+    // (subset), the user can import Display Names for several languages at once. Targets are strictly
+    // the current template's existing languages (never create new ones). The non-active languages'
+    // translations are held here until the next Save, then merged into their lang files on disk.
+    static std::vector<std::string> s_template_import_target_langs; // current template's languages
+    static std::vector<bool> s_template_import_lang_selected; // parallel to target_langs
+    static bool s_template_import_multi_available = false;
+    static std::map<std::string, std::map<std::string, std::string>> s_pending_lang_imports;
     static std::vector<std::string> s_template_import_layout_flags;
     static int s_template_import_layout_index = 0;
     static std::vector<bool> s_template_import_selected;
@@ -3772,6 +3847,43 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (!has_default) s_template_import_lang_flags.insert(s_template_import_lang_flags.begin(), std::string());
         s_template_import_lang_index = 0;
+
+        // Multi-language import is offered only when EVERY language the current template already has also
+        // exists in the source (subset). Then each target language "knows exactly where to go" and we
+        // never have to create a new language file. When it isn't a subset we fall back to the single
+        // source-language picker below (import into the active editor language only).
+        s_template_import_target_langs.clear();
+        s_template_import_multi_available = false;
+        if (editing_template && !selected_template_info.available_lang_flags.empty()) {
+            s_template_import_target_langs = selected_template_info.available_lang_flags;
+            bool all_present = true;
+            for (const auto &cur: s_template_import_target_langs) {
+                bool found = false;
+                for (const auto &src: s_template_import_lang_flags) if (src == cur) {
+                    found = true;
+                    break;
+                }
+                if (!found) {
+                    all_present = false;
+                    break;
+                }
+            }
+            // Only engage multi mode when there's more than one language to fan out to; with a single
+            // language the source-language picker below stays useful (choose which source names to pull).
+            s_template_import_multi_available = all_present && s_template_import_target_langs.size() > 1;
+        }
+        // Auto-select every target language (the whole point: fill default/ger/zh_cn in one import).
+        s_template_import_lang_selected.assign(s_template_import_target_langs.size(), true);
+        // In multi mode the in-memory display names must reflect the ACTIVE editor language, so the
+        // imported items look right in the editor; the other languages are written on Save from disk.
+        if (s_template_import_multi_available) {
+            for (int i = 0; i < (int) s_template_import_lang_flags.size(); i++) {
+                if (s_template_import_lang_flags[i] == selected_lang_flag) {
+                    s_template_import_lang_index = i;
+                    break;
+                }
+            }
+        }
 
         // Discover the source's layout files. Unlike languages, layouts are optional: if the source has
         // none we leave the list empty (the Layout picker stays hidden and decorations/positions fall back
@@ -4118,6 +4230,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         current_template_data = saved_template_data;
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
+        s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
 
         // Reloading template on revert changes -> matters for visual editor mode
         bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -4143,7 +4256,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::IsKeyPressed(ImGuiKey_S)) {
         validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
                                    selected_layout_flag, current_template_data, saved_template_data,
-                                   save_message_type, status_message, app_settings);
+                                   save_message_type, status_message, app_settings, &s_pending_lang_imports);
     }
 
     if (roboto_font) {
@@ -4498,6 +4611,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                               status_message)) {
                     // Also update the 'saved' snapshot to reflect the newly loaded state
                     saved_template_data = current_template_data;
+                    s_pending_lang_imports.clear(); // deferred imports belonged to the previous template
 
                     // Exit editor to prevent confusion
                     editing_template = false;
@@ -4594,6 +4708,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
                                           selected_layout_flag, current_template_data, status_message)) {
                 saved_template_data = current_template_data;
+                s_pending_lang_imports.clear(); // fresh editor session; no deferred imports carry over
             }
         }
     }
@@ -6249,7 +6364,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
             validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
                                        selected_layout_flag, current_template_data,
-                                       saved_template_data, save_message_type, status_message, app_settings);
+                                       saved_template_data, save_message_type, status_message, app_settings,
+                                       &s_pending_lang_imports);
         }
 
         // Save button tooltip
@@ -6279,6 +6395,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 current_template_data = saved_template_data;
                 save_message_type = MSG_NONE; // Clear any existing message
                 status_message[0] = '\0'; // Clear the message text
+                s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
 
                 // Reloading template on revert changes -> matters for visual editor mode
                 bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -6389,7 +6506,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         validate_and_save_template(creator_version_str, selected_template_info,
                                                    selected_lang_flag, selected_layout_flag, current_template_data,
                                                    saved_template_data, save_message_type,
-                                                   status_message, app_settings);
+                                                   status_message, app_settings, &s_pending_lang_imports);
                     }
 
                     // Remember the current hiding mode and manual layout setting before
@@ -22371,8 +22488,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // Source pickers (Language + Layout) share one line. Language sources the display names;
             // Layout sources the manual positions / decorations.
-            bool show_import_lang_combo = !s_template_import_lang_flags.empty();
+            // When the source has all of the current template's languages, offer the multi-language
+            // checklist instead of the single-source dropdown (see s_template_import_multi_available).
+            bool show_import_lang_multi = s_template_import_multi_available &&
+                                          !s_template_import_target_langs.empty();
+            bool show_import_lang_combo = !show_import_lang_multi && !s_template_import_lang_flags.empty();
             bool show_import_layout_combo = scope_has_positions() && !s_template_import_layout_flags.empty();
+
+            // Multi-language checklist: import Display Names for several languages at once. Only the
+            // current template's own languages are offered (all present in the source), so nothing new
+            // is created. The active editor language is always included; the rest are written to their
+            // lang files on the next Save.
+            if (show_import_lang_multi) {
+                // Keep the selection vector in lockstep with the target languages (defensive).
+                if (s_template_import_lang_selected.size() != s_template_import_target_langs.size()) {
+                    s_template_import_lang_selected.assign(s_template_import_target_langs.size(), true);
+                }
+                ImGui::TextUnformatted("Import languages:");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Import Display Names for every ticked language in one go. These are the\n"
+                                      "languages your current template already has (the source has them all too).\n"
+                                      "The language you're editing is always included and saved as usual; the\n"
+                                      "others are merged into their language files when you next Save. Any\n"
+                                      "translation the source is missing is left blank.");
+                }
+                for (size_t li = 0; li < s_template_import_target_langs.size(); li++) {
+                    const std::string &f = s_template_import_target_langs[li];
+                    bool is_active = (f == selected_lang_flag);
+                    ImGui::SameLine();
+                    ImGui::PushID((int) li);
+                    if (is_active) s_template_import_lang_selected[li] = true; // active is mandatory
+                    bool sel = s_template_import_lang_selected[li];
+                    if (is_active) ImGui::BeginDisabled();
+                    char lbl[96];
+                    snprintf(lbl, sizeof(lbl), "%s", f.empty() ? "Default" : f.c_str());
+                    if (ImGui::Checkbox(lbl, &sel)) {
+                        s_template_import_lang_selected[li] = sel;
+                    }
+                    if (is_active) {
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            ImGui::SetTooltip("%s",
+                                              "This is the language you're currently editing, so it's always imported.");
+                        }
+                    }
+                    ImGui::PopID();
+                }
+            }
 
             // Language file picker. Display names of imported items will be sourced from this lang file.
             if (show_import_lang_combo) {
@@ -22410,6 +22573,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Layout file picker on the SAME line as the Language picker. Provides the manual positions
             // (and, for the Decorations scope, the decorations) pulled from the source. Only shown for
             // position/decoration scopes when the source actually has layout files.
+            // Keep the layout picker on the language row only for the single-combo case; the multi
+            // checklist takes a full row of its own, so the layout picker drops to the next line.
             if (show_import_lang_combo && show_import_layout_combo) ImGui::SameLine();
             if (show_import_layout_combo) {
                 auto layout_label = [&](int i) -> const char * {
@@ -22443,7 +22608,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       "selections are kept.");
                 }
             }
-            if (show_import_lang_combo || show_import_layout_combo) ImGui::Separator();
+            if (show_import_lang_multi || show_import_lang_combo || show_import_layout_combo) ImGui::Separator();
 
             if (is_parented_scope()) {
                 int pcount = parent_count_in_scope();
@@ -23185,6 +23350,171 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         log_message(LOG_INFO,
                                     "[IMPORT FROM TEMPLATE] Imported %d item(s); extracted %d icon(s).\n",
                                     sel_count, extracted);
+
+                        // Deferred multi-language import: for every SELECTED non-active target language,
+                        // copy the source's translations for the just-imported items into the pending map,
+                        // to be merged into that language file on the next Save. The active editor language
+                        // is handled in-memory via each item's display_name, exactly as a single import.
+                        if (s_template_import_multi_available) {
+                            auto san_adv = [](const char *root) -> std::string {
+                                std::string s(root);
+                                for (char &c: s) if (c == ':' || c == '/') c = '.';
+                                return s;
+                            };
+                            // (source_key, target_key) pairs mirroring save_template_from_editor's lang keys.
+                            // They differ only for the parented scopes, where the source and destination
+                            // parents differ (criteria/sub-stats/stages move under a different owner).
+                            std::vector<std::pair<std::string, std::string>> key_pairs;
+                            switch (s_template_import_scope) {
+                                case IFTS_ADVANCEMENTS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
+                                        const auto &src = s_template_import_data.advancements[i];
+                                        std::string k = "advancement." + san_adv(src.root_name);
+                                        key_pairs.emplace_back(k, k);
+                                        for (const auto &c: src.criteria) {
+                                            std::string ck = k + ".criteria." + c.root_name;
+                                            key_pairs.emplace_back(ck, ck);
+                                        }
+                                    }
+                                    break;
+                                case IFTS_STATS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
+                                        const auto &src = s_template_import_data.stats[i];
+                                        std::string k = std::string("stat.") + src.root_name;
+                                        key_pairs.emplace_back(k, k);
+                                        if (!src.is_simple_stat) {
+                                            for (const auto &c: src.criteria) {
+                                                std::string ck = k + ".criteria." + c.root_name;
+                                                key_pairs.emplace_back(ck, ck);
+                                            }
+                                        }
+                                    }
+                                    break;
+                                case IFTS_UNLOCKS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i]) continue;
+                                        std::string k = std::string("unlock.") +
+                                                        s_template_import_data.unlocks[i].root_name;
+                                        key_pairs.emplace_back(k, k);
+                                    }
+                                    break;
+                                case IFTS_CUSTOM_GOALS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i]) continue;
+                                        std::string k = std::string("custom.") +
+                                                        s_template_import_data.custom_goals[i].root_name;
+                                        key_pairs.emplace_back(k, k);
+                                    }
+                                    break;
+                                case IFTS_COUNTERS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i]) continue;
+                                        std::string k = std::string("counter.") +
+                                                        s_template_import_data.counter_goals[i].root_name;
+                                        key_pairs.emplace_back(k, k);
+                                    }
+                                    break;
+                                case IFTS_MS_GOALS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i]) continue;
+                                        const auto &g = s_template_import_data.multi_stage_goals[i];
+                                        std::string base = std::string("multi_stage_goal.") + g.root_name;
+                                        key_pairs.emplace_back(base + ".display_name", base + ".display_name");
+                                        for (const auto &st: g.stages) {
+                                            std::string sk = base + ".stage." + st.stage_id;
+                                            key_pairs.emplace_back(sk, sk);
+                                        }
+                                    }
+                                    break;
+                                case IFTS_DECORATIONS:
+                                    for (int i = 0; i < item_count; i++) {
+                                        if (!s_template_import_selected[i]) continue;
+                                        const auto &d = s_template_import_data.decorations[i];
+                                        if (d.type == DECORATION_TEXT_HEADER) {
+                                            std::string k = std::string("decoration.") + d.id;
+                                            key_pairs.emplace_back(k, k);
+                                        }
+                                    }
+                                    break;
+                                case IFTS_TEMPLATE_CRITERIA: {
+                                    int p = s_template_import_parent_index;
+                                    if (s_template_import_target_adv && p >= 0 &&
+                                        p < (int) s_template_import_data.advancements.size()) {
+                                        const auto &src_adv = s_template_import_data.advancements[p];
+                                        std::string src_base = "advancement." + san_adv(src_adv.root_name);
+                                        std::string dst_base = "advancement." +
+                                                               san_adv(s_template_import_target_adv->root_name);
+                                        for (int i = 0; i < item_count; i++) {
+                                            if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
+                                            if (i >= (int) src_adv.criteria.size()) continue;
+                                            const char *cr = src_adv.criteria[i].root_name;
+                                            key_pairs.emplace_back(src_base + ".criteria." + cr,
+                                                                   dst_base + ".criteria." + cr);
+                                        }
+                                    }
+                                    break;
+                                }
+                                case IFTS_TEMPLATE_SUB_STATS: {
+                                    int p = s_template_import_parent_index;
+                                    if (s_template_import_target_stat && p >= 0 &&
+                                        p < (int) s_template_import_data.stats.size()) {
+                                        const auto &src_stat = s_template_import_data.stats[p];
+                                        std::string src_base = std::string("stat.") + src_stat.root_name;
+                                        std::string dst_base = std::string("stat.") +
+                                                               s_template_import_target_stat->root_name;
+                                        for (int i = 0; i < item_count; i++) {
+                                            if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
+                                            if (i >= (int) src_stat.criteria.size()) continue;
+                                            const char *cr = src_stat.criteria[i].root_name;
+                                            key_pairs.emplace_back(src_base + ".criteria." + cr,
+                                                                   dst_base + ".criteria." + cr);
+                                        }
+                                    }
+                                    break;
+                                }
+                                case IFTS_TEMPLATE_STAGES: {
+                                    int p = s_template_import_parent_index;
+                                    if (s_template_import_target_ms && p >= 0 &&
+                                        p < (int) s_template_import_data.multi_stage_goals.size()) {
+                                        const auto &src_goal = s_template_import_data.multi_stage_goals[p];
+                                        std::string src_base = std::string("multi_stage_goal.") + src_goal.root_name;
+                                        std::string dst_base = std::string("multi_stage_goal.") +
+                                                               s_template_import_target_ms->root_name;
+                                        for (int i = 0; i < item_count; i++) {
+                                            if (!s_template_import_selected[i] || entry_is_final_stage(i) ||
+                                                entry_blocking_reason(i)) continue;
+                                            if (i >= (int) src_goal.stages.size()) continue;
+                                            const char *sid = src_goal.stages[i].stage_id;
+                                            key_pairs.emplace_back(src_base + ".stage." + sid,
+                                                                   dst_base + ".stage." + sid);
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if (!key_pairs.empty()) {
+                                for (size_t li = 0; li < s_template_import_target_langs.size(); li++) {
+                                    if (!s_template_import_lang_selected[li]) continue;
+                                    const std::string &L = s_template_import_target_langs[li];
+                                    if (L == selected_lang_flag) continue; // active handled in-memory
+                                    cJSON *src_lang = read_lang_json_from_zip(s_template_import_zip_path,
+                                                                              L.empty() ? nullptr : L.c_str());
+                                    if (!src_lang) continue;
+                                    for (const auto &kp: key_pairs) {
+                                        cJSON *e = cJSON_GetObjectItem(src_lang, kp.first.c_str());
+                                        // Missing translations stay missing (skip rather than blanking).
+                                        if (cJSON_IsString(e) && e->valuestring && e->valuestring[0] != '\0') {
+                                            s_pending_lang_imports[L][kp.second] = e->valuestring;
+                                        }
+                                    }
+                                    cJSON_Delete(src_lang);
+                                }
+                            }
+                        }
+
                         s_template_import_error[0] = '\0';
                         ImGui::CloseCurrentPopup();
                     }
