@@ -420,15 +420,20 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
 
     // Total width of the visible items laid out edge to edge (no trailing gap).
     float content_width = (float) (visible - 1) * iw + cell;
-    if (content_width > (float) window_w) return false; // still too wide: keep scrolling
+    // Reserve the same small edge padding as the top info bar on both sides so a
+    // left- or right-aligned item never sits flush with (or gets clipped by) the
+    // window border. The fit test accounts for it too, so freezing only kicks in
+    // once the items fit *with* the padding.
+    const float edge_padding = 10.0f;
+    if (content_width > (float) window_w - 2.0f * edge_padding) return false; // too wide: keep scrolling
 
     float start_x;
     if (align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER)
         start_x = ((float) window_w - content_width) / 2.0f;
     else if (align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
-        start_x = (float) window_w - content_width;
+        start_x = (float) window_w - content_width - edge_padding;
     else
-        start_x = 0.0f;
+        start_x = edge_padding;
 
     out.clear();
     int slot = 0;
