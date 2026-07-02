@@ -401,6 +401,45 @@ static const char *overlay_item_root(const OverlayDisplayItem &di) {
     return "";
 }
 
+// When a row is set to freeze once its items fit, lay them out statically instead
+// of scrolling: each still-visible item is drawn once, in template order, aligned
+// within the window. `iw` is the per-item cell + spacing (matching the belt), and
+// `cell` is the item cell width (icon or text cell) used to size the content block.
+// Returns true and fills `out` when the row should be frozen (feature enabled and
+// all visible items fit); otherwise returns false and leaves `out` untouched so the
+// caller falls back to the scrolling belt.
+static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment align,
+                          int window_w, float iw, float cell,
+                          int F, const std::vector<char> &removed,
+                          std::vector<BeltTile> &out) {
+    if (!freeze_enabled) return false;
+
+    int visible = 0;
+    for (int i = 0; i < F; i++) if (!removed[i]) visible++;
+    if (visible <= 0) return false;
+
+    // Total width of the visible items laid out edge to edge (no trailing gap).
+    float content_width = (float) (visible - 1) * iw + cell;
+    if (content_width > (float) window_w) return false; // still too wide: keep scrolling
+
+    float start_x;
+    if (align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER)
+        start_x = ((float) window_w - content_width) / 2.0f;
+    else if (align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
+        start_x = (float) window_w - content_width;
+    else
+        start_x = 0.0f;
+
+    out.clear();
+    int slot = 0;
+    for (int i = 0; i < F; i++) {
+        if (removed[i]) continue;
+        out.push_back({i, snap_px(start_x + (float) slot * iw), 0.0f});
+        slot++;
+    }
+    return true;
+}
+
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
  * It also corrects the aspect ratio of the .png textures.
  *
@@ -1089,12 +1128,17 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (F > 0 && item_full_width > 0) {
             static ScrollBelt belt_row1;
             std::vector<BeltTile> tiles;
-            belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
-                        -item_full_width, (float) window_w + item_full_width,
-                        F, removed, fabsf(settings->overlay_clear_animation),
-                        effective_scroll_speed(settings->overlay_row1_custom_scroll_speed_enabled,
-                                               settings->overlay_row1_scroll_speed,
-                                               settings->overlay_scroll_speed) > 0, signature, tiles);
+            if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
+                              window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
+                belt_row1.init = false; // reset so scrolling re-initialises cleanly if it resumes
+            } else {
+                belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
+                            -item_full_width, (float) window_w + item_full_width,
+                            F, removed, fabsf(settings->overlay_clear_animation),
+                            effective_scroll_speed(settings->overlay_row1_custom_scroll_speed_enabled,
+                                                   settings->overlay_row1_scroll_speed,
+                                                   settings->overlay_scroll_speed) > 0, signature, tiles);
+            }
 
             for (const auto &tile: tiles) {
                 if (tile.idx < 0) continue; // gap
@@ -1522,12 +1566,17 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                               o->font);
                 static ScrollBelt belt_row2;
                 std::vector<BeltTile> tiles;
-                belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
-                            -coverage, (float) window_w + coverage,
-                            F, removed, fabsf(settings->overlay_clear_animation),
-                            effective_scroll_speed(settings->overlay_row2_custom_scroll_speed_enabled,
-                                                   settings->overlay_row2_scroll_speed,
-                                                   settings->overlay_scroll_speed) > 0, signature, tiles);
+                if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
+                                  window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
+                    belt_row2.init = false; // reset so scrolling re-initialises cleanly if it resumes
+                } else {
+                    belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
+                                -coverage, (float) window_w + coverage,
+                                F, removed, fabsf(settings->overlay_clear_animation),
+                                effective_scroll_speed(settings->overlay_row2_custom_scroll_speed_enabled,
+                                                       settings->overlay_row2_scroll_speed,
+                                                       settings->overlay_scroll_speed) > 0, signature, tiles);
+                }
 
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap left by a cleared item
@@ -2001,12 +2050,17 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                           o->font);
             static ScrollBelt belt_row3;
             std::vector<BeltTile> tiles;
-            belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
-                        -coverage, (float) window_w + coverage,
-                        F, removed, fabsf(settings->overlay_clear_animation),
-                        effective_scroll_speed(settings->overlay_row3_custom_scroll_speed_enabled,
-                                               settings->overlay_row3_scroll_speed,
-                                               settings->overlay_scroll_speed) > 0, signature, tiles);
+            if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
+                              window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
+                belt_row3.init = false; // reset so scrolling re-initialises cleanly if it resumes
+            } else {
+                belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
+                            -coverage, (float) window_w + coverage,
+                            F, removed, fabsf(settings->overlay_clear_animation),
+                            effective_scroll_speed(settings->overlay_row3_custom_scroll_speed_enabled,
+                                                   settings->overlay_row3_scroll_speed,
+                                                   settings->overlay_scroll_speed) > 0, signature, tiles);
+            }
 
             for (size_t ti = 0; ti < tiles.size(); ++ti) {
                 if (tiles[ti].idx < 0) continue; // gap left by a cleared item

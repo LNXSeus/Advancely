@@ -489,6 +489,12 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row2_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row3_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row3_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+    settings->overlay_row1_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+    settings->overlay_row1_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
+    settings->overlay_row2_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+    settings->overlay_row2_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
+    settings->overlay_row3_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+    settings->overlay_row3_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
     settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
     settings->invert_hiding_mode = DEFAULT_INVERT_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
@@ -1364,6 +1370,45 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        // --- Load Per-Row Freeze-When-Fits ---
+        struct {
+            const char *enabled_key;
+            const char *align_key;
+            bool *enabled;
+            OverlayProgressTextAlignment *align;
+        } freeze_fields[] = {
+            {
+                "overlay_row1_freeze_enabled", "overlay_row1_freeze_align",
+                &settings->overlay_row1_freeze_enabled, &settings->overlay_row1_freeze_align
+            },
+            {
+                "overlay_row2_freeze_enabled", "overlay_row2_freeze_align",
+                &settings->overlay_row2_freeze_enabled, &settings->overlay_row2_freeze_align
+            },
+            {
+                "overlay_row3_freeze_enabled", "overlay_row3_freeze_align",
+                &settings->overlay_row3_freeze_enabled, &settings->overlay_row3_freeze_align
+            },
+        };
+        for (auto &f: freeze_fields) {
+            const cJSON *enabled = cJSON_GetObjectItem(visual_settings, f.enabled_key);
+            if (enabled && cJSON_IsBool(enabled))
+                *f.enabled = cJSON_IsTrue(enabled);
+            else {
+                *f.enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+                defaults_were_used = true;
+            }
+
+            const cJSON *align = cJSON_GetObjectItem(visual_settings, f.align_key);
+            if (align && cJSON_IsNumber(align) && align->valueint >= OVERLAY_PROGRESS_TEXT_ALIGN_LEFT &&
+                align->valueint <= OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
+                *f.align = (OverlayProgressTextAlignment) align->valueint;
+            else {
+                *f.align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
+                defaults_were_used = true;
+            }
+        }
+
 
         // --- Load Custom Tracker Spacing ---
         const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(
@@ -1516,6 +1561,12 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row2_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
         settings->overlay_row3_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
         settings->overlay_row3_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+        settings->overlay_row1_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+        settings->overlay_row1_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
+        settings->overlay_row2_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+        settings->overlay_row2_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
+        settings->overlay_row3_freeze_enabled = DEFAULT_OVERLAY_ROW_FREEZE_ENABLED;
+        settings->overlay_row3_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
 
         settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
 
@@ -2236,6 +2287,27 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_scroll_speed");
         cJSON_AddItemToObject(visuals_obj, "overlay_row3_scroll_speed",
                               cJSON_CreateNumber(settings->overlay_row3_scroll_speed));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_freeze_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_freeze_enabled",
+                              cJSON_CreateBool(settings->overlay_row1_freeze_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_freeze_align");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_freeze_align",
+                              cJSON_CreateNumber(settings->overlay_row1_freeze_align));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_freeze_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_freeze_enabled",
+                              cJSON_CreateBool(settings->overlay_row2_freeze_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_freeze_align");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_freeze_align",
+                              cJSON_CreateNumber(settings->overlay_row2_freeze_align));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_freeze_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_freeze_enabled",
+                              cJSON_CreateBool(settings->overlay_row3_freeze_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_freeze_align");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_freeze_align",
+                              cJSON_CreateNumber(settings->overlay_row3_freeze_align));
 
         // --- Save Custom Tracker Spacing ---
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_section_custom_width_enabled");

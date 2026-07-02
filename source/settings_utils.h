@@ -110,6 +110,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP false
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED false // Per-row custom scroll speed off by default
+#define DEFAULT_OVERLAY_ROW_FREEZE_ENABLED true // Per-row freeze-when-items-fit on by default
+#define DEFAULT_OVERLAY_ROW_FREEZE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Frozen items left-aligned by default
 #define DEFAULT_GOAL_HIDING_MODE HIDE_ONLY_TEMPLATE_HIDDEN
 #define DEFAULT_INVERT_HIDING_MODE false
 #define DEFAULT_PRINT_DEBUG_STATUS false
@@ -332,6 +334,12 @@ struct AppSettings {
     float overlay_row2_scroll_speed; // Custom scroll speed and direction for row 2.
     bool overlay_row3_custom_scroll_speed_enabled; // If true, row 3 ignores the global speed and uses its own.
     float overlay_row3_scroll_speed; // Custom scroll speed and direction for row 3.
+    bool overlay_row1_freeze_enabled; // If true, row 1 stops scrolling once its visible items fit the window.
+    OverlayProgressTextAlignment overlay_row1_freeze_align; // Alignment for row 1's frozen (static) items.
+    bool overlay_row2_freeze_enabled; // If true, row 2 stops scrolling once its visible items fit the window.
+    OverlayProgressTextAlignment overlay_row2_freeze_align; // Alignment for row 2's frozen (static) items.
+    bool overlay_row3_freeze_enabled; // If true, row 3 stops scrolling once its visible items fit the window.
+    OverlayProgressTextAlignment overlay_row3_freeze_align; // Alignment for row 3's frozen (static) items.
     GoalHidingMode goal_hiding_mode; // 3 Stages of hiding goals
     bool invert_hiding_mode; // Inverts each hiding mode: hide/fade incomplete instead of completed
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
