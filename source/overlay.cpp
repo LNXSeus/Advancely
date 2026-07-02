@@ -875,7 +875,9 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     }
 
     // --- Row 2 Update Logic (Dynamic Width) ---
-    if (!row2_items.empty()) {
+    // Keep accumulating while the run is complete too: row 2 then hosts the
+    // supporter showcase, which scrolls at row 2's speed even with no row 2 items.
+    if (!row2_items.empty() || t->template_data->run_completed) {
         // Unified Logic: Just accumulate the scroll delta.
         // We no longer need to calculate widths or swap indices here.
         // The Block-Based renderer handles the wrapping automatically.
@@ -1228,7 +1230,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             const float item_full_width = cell_width + ITEM_SPACING;
 
             float total_row_width = NUM_SUPPORTERS * item_full_width;
-            float start_pos = snap_px(fmod(o->scroll_offset_row3, total_row_width)); // Sync with row 3's speed
+            float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width)); // Sync with row 2's speed
             int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
             for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
