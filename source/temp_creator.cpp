@@ -22737,6 +22737,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 return disp_label[0] != '\0' && str_contains_insensitive(disp_label, s_template_import_search);
             };
 
+            // True when the source sub-goal at row i is not already present in the target it will be
+            // imported into. Identity mirrors the apply loops: root_name for criteria/sub-stats, stage_id
+            // for stages. Only meaningful for the parented sub-goal scopes.
+            auto template_import_item_is_new = [&](int i) -> bool {
+                int p = s_template_import_parent_index;
+                switch (s_template_import_scope) {
+                    case IFTS_TEMPLATE_CRITERIA: {
+                        if (!s_template_import_target_adv) return false;
+                        if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return false;
+                        const auto &src_adv = s_template_import_data.advancements[p];
+                        if (i < 0 || i >= (int) src_adv.criteria.size()) return false;
+                        const char *rn = src_adv.criteria[i].root_name;
+                        for (const auto &c: s_template_import_target_adv->criteria)
+                            if (strcmp(c.root_name, rn) == 0) return false;
+                        return true;
+                    }
+                    case IFTS_TEMPLATE_SUB_STATS: {
+                        if (!s_template_import_target_stat) return false;
+                        if (p < 0 || p >= (int) s_template_import_data.stats.size()) return false;
+                        const auto &src_stat = s_template_import_data.stats[p];
+                        if (i < 0 || i >= (int) src_stat.criteria.size()) return false;
+                        const char *rn = src_stat.criteria[i].root_name;
+                        for (const auto &c: s_template_import_target_stat->criteria)
+                            if (strcmp(c.root_name, rn) == 0) return false;
+                        return true;
+                    }
+                    case IFTS_TEMPLATE_STAGES: {
+                        if (!s_template_import_target_ms) return false;
+                        if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return false;
+                        const auto &src_goal = s_template_import_data.multi_stage_goals[p];
+                        if (i < 0 || i >= (int) src_goal.stages.size()) return false;
+                        const char *sid = src_goal.stages[i].stage_id;
+                        for (const auto &s: s_template_import_target_ms->stages)
+                            if (strcmp(s.stage_id, sid) == 0) return false;
+                        return true;
+                    }
+                    default: return false;
+                }
+            };
+
             if (ImGui::Button("Select all##template_import")) {
                 for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
                     if (!template_import_visible(i)) continue;
@@ -22750,6 +22790,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                   "Tick every importable entry. Rows flagged with a warning (data that\n"
                                   "may not match this Minecraft version) are still included.\n"
                                   "You can also Shift+Click checkboxes to toggle a range at once.");
+            }
+            if (is_parented_scope()) {
+                ImGui::SameLine();
+                if (ImGui::Button("Select new##template_import")) {
+                    for (int i = 0; i < (int) s_template_import_selected.size(); i++) {
+                        if (!template_import_visible(i)) continue;
+                        if (entry_blocking_reason(i)) continue;
+                        if (!template_import_item_is_new(i)) continue;
+                        s_template_import_selected[i] = true;
+                    }
+                    s_template_import_last_clicked = -1;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char select_new_tip[320];
+                    snprintf(select_new_tip, sizeof(select_new_tip),
+                             "Tick only the %s from the source above that this target\n"
+                             "does not already have. Respects the current search filter.",
+                             scope_title_word());
+                    ImGui::SetTooltip("%s", select_new_tip);
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button("Clear all##template_import")) {
