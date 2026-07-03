@@ -21148,10 +21148,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_pending_renames.clear();
 
                 int crit_rows = 0;
+                char first_added_crit[192] = ""; // remembered for the scroll-to after commit
                 for (const auto &chg: s_pending_criteria_changes) {
                     for (auto &cat: current_template_data.advancements) {
                         if (strcmp(cat.root_name, chg.template_root.c_str()) != 0) continue;
                         for (const auto &add_name: chg.adds) {
+                            if (first_added_crit[0] == '\0') {
+                                strncpy(first_added_crit, add_name.c_str(), sizeof(first_added_crit) - 1);
+                                first_added_crit[sizeof(first_added_crit) - 1] = '\0';
+                            }
                             EditorTrackableItem item = {};
                             strncpy(item.root_name, add_name.c_str(), sizeof(item.root_name) - 1);
                             item.root_name[sizeof(item.root_name) - 1] = '\0';
@@ -21207,6 +21212,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     s_pending_advancement_removes.clear();
                 }
 
+                // Scroll to the first criterion added via staged "criteria differences".
+                if (first_added_crit[0] != '\0') {
+                    request_scroll_to_new_child(first_added_crit);
+                }
                 import_error_message[0] = '\0';
                 show_import_advancements_popup = false;
                 ImGui::CloseCurrentPopup();
@@ -21214,6 +21223,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Importing Advancement/Achievement Criteria
                 import_error_message[0] = '\0';
                 bool has_duplicates = false;
+                // Remember the criteria count so we can scroll to the top of the imported batch below.
+                size_t crit_count_before = selected_advancement->criteria.size();
 
                 std::unordered_set<std::string> existing_crit_names;
                 for (const auto &crit: selected_advancement->criteria) {
@@ -21290,6 +21301,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
                             selected_advancement->criteria.push_back(imported_crit);
                         }
+                    }
+                    // Scroll to the first newly-imported criterion (topmost of the appended batch).
+                    if (selected_advancement->criteria.size() > crit_count_before) {
+                        request_scroll_to_new_child(selected_advancement->criteria[crit_count_before].root_name);
                     }
                     show_import_advancements_popup = false; // Close on success
                     ImGui::CloseCurrentPopup();
@@ -21439,6 +21454,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // 2. If no duplicates, proceed with import
                 if (!has_duplicates) {
+                    // Remember the count so we can scroll to the top of the imported batch below.
+                    size_t adv_count_before = current_template_data.advancements.size();
                     for (const auto &new_adv: importable_advancements) {
                         if (new_adv.is_selected) {
                             EditorTrackableCategory imported_cat = {};
@@ -21478,6 +21495,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             current_template_data.advancements.push_back(imported_cat);
                         }
+                    }
+                    // Scroll to the first newly-imported advancement (topmost of the appended batch).
+                    if (current_template_data.advancements.size() > adv_count_before) {
+                        request_scroll_to_new_goal(current_template_data.advancements[adv_count_before].root_name);
                     }
                     show_import_advancements_popup = false;
                     ImGui::CloseCurrentPopup();
@@ -21694,6 +21715,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
             ImGui::SameLine();
+            if (ImGui::Button("Select New")) {
+                // Identities already in the destination: the target stat's sub-stats when importing as
+                // sub-stats, else the simple stats already in the template (matched on their tracked key).
+                std::unordered_set<std::string> existing;
+                if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                    if (selected_stat)
+                        for (const auto &c: selected_stat->criteria) existing.insert(c.root_name);
+                } else {
+                    for (const auto &s: current_template_data.stats)
+                        if (s.is_simple_stat && !s.criteria.empty()) existing.insert(s.criteria[0].root_name);
+                }
+                for (auto *stat_ptr: filtered_stats) {
+                    if (!existing.count(stat_ptr->root_name)) stat_ptr->is_selected = true;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Selects only the entries in the current search that this template does\n"
+                                  "not already have, so you can pull just the ones you are missing.");
+            }
+            ImGui::SameLine();
             if (ImGui::Button("Deselect All")) {
                 for (auto *stat_ptr: filtered_stats) {
                     stat_ptr->is_selected = false;
@@ -21828,6 +21870,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::CloseCurrentPopup();
             } else {
                 // BATCH_IMPORT
+                // Remember the destination count so we can scroll to the top of the imported batch below.
+                size_t stat_scroll_count_before = (current_stat_import_mode == IMPORT_AS_SUB_STAT)
+                                                      ? (selected_stat ? selected_stat->criteria.size() : 0)
+                                                      : current_template_data.stats.size();
                 if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
                     // --- Logic to import as SUB-STATS (CRITERIA) ---
                     if (selected_stat != nullptr) {
@@ -21893,6 +21939,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 // Close popup only if no error occurred during batch import
                 if (import_error_message[0] == '\0') {
+                    // Scroll to the first newly-imported stat/sub-stat (topmost of the appended batch).
+                    if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                        if (selected_stat && selected_stat->criteria.size() > stat_scroll_count_before) {
+                            request_scroll_to_new_child(selected_stat->criteria[stat_scroll_count_before].root_name);
+                        }
+                    } else if (current_template_data.stats.size() > stat_scroll_count_before) {
+                        request_scroll_to_new_goal(current_template_data.stats[stat_scroll_count_before].root_name);
+                    }
                     show_import_stats_popup = false;
                     ImGui::CloseCurrentPopup();
                 }
@@ -21999,6 +22053,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Selects all unlocks in the current search.\n\nYou can also Shift+Click to select a range.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Select New")) {
+                std::unordered_set<std::string> existing;
+                for (const auto &u: current_template_data.unlocks) existing.insert(u.root_name);
+                for (auto *unlock_ptr: filtered_unlocks) {
+                    if (!existing.count(unlock_ptr->root_name)) unlock_ptr->is_selected = true;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  "Selects only the unlocks in the current search that this template does\n"
+                                  "not already have, so you can pull just the ones you are missing.");
             }
             ImGui::SameLine();
             if (ImGui::Button("Deselect All")) {
@@ -22115,6 +22182,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     existing_names.insert(existing_unlock.root_name);
                 }
 
+                // Remember the count so we can scroll to the top of the imported batch below.
+                size_t unlock_count_before = current_template_data.unlocks.size();
                 for (const auto &new_unlock: importable_unlocks) {
                     if (new_unlock.is_selected) {
                         if (existing_names.count(new_unlock.root_name)) {
@@ -22136,6 +22205,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 if (import_error_message[0] == '\0') {
+                    // Scroll to the first newly-imported unlock (topmost of the appended batch).
+                    if (current_template_data.unlocks.size() > unlock_count_before) {
+                        request_scroll_to_new_goal(current_template_data.unlocks[unlock_count_before].root_name);
+                    }
                     show_import_unlocks_popup = false;
                     ImGui::CloseCurrentPopup();
                     import_search_buffer[0] = '\0';
@@ -23599,6 +23672,51 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     cJSON_Delete(src_lang);
                                 }
                             }
+                        }
+
+                        // Scroll the editor to the top of the freshly imported batch. Imported items are
+                        // appended to the bottom of their list, so jump to the first selected one (the
+                        // topmost of the new block), matching the scroll behaviour when adding/pasting.
+                        for (int i = 0; i < item_count; i++) {
+                            if (!s_template_import_selected[i]) continue;
+                            if (entry_blocking_reason(i)) continue;
+                            if (entry_is_final_stage(i)) continue;
+                            int p = s_template_import_parent_index;
+                            switch (s_template_import_scope) {
+                                case IFTS_ADVANCEMENTS:
+                                    request_scroll_to_new_goal(s_template_import_data.advancements[i].root_name);
+                                    break;
+                                case IFTS_STATS:
+                                    request_scroll_to_new_goal(s_template_import_data.stats[i].root_name);
+                                    break;
+                                case IFTS_UNLOCKS:
+                                    request_scroll_to_new_goal(s_template_import_data.unlocks[i].root_name);
+                                    break;
+                                case IFTS_CUSTOM_GOALS:
+                                    request_scroll_to_new_goal(s_template_import_data.custom_goals[i].root_name);
+                                    break;
+                                case IFTS_COUNTERS:
+                                    request_scroll_to_new_goal(s_template_import_data.counter_goals[i].root_name);
+                                    break;
+                                case IFTS_MS_GOALS:
+                                    request_scroll_to_new_goal(s_template_import_data.multi_stage_goals[i].root_name);
+                                    break;
+                                case IFTS_DECORATIONS:
+                                    request_scroll_to_new_goal(s_template_import_data.decorations[i].id);
+                                    break;
+                                case IFTS_TEMPLATE_CRITERIA:
+                                    request_scroll_to_new_child(
+                                        s_template_import_data.advancements[p].criteria[i].root_name);
+                                    break;
+                                case IFTS_TEMPLATE_SUB_STATS:
+                                    request_scroll_to_new_child(s_template_import_data.stats[p].criteria[i].root_name);
+                                    break;
+                                case IFTS_TEMPLATE_STAGES:
+                                    request_scroll_to_new_stage(
+                                        s_template_import_data.multi_stage_goals[p].stages[i].stage_id);
+                                    break;
+                            }
+                            break;
                         }
 
                         s_template_import_error[0] = '\0';
