@@ -1177,6 +1177,11 @@ sense at a finer grain:
   while staying selectable so you can still import it on purpose. Stage icons
   are extracted automatically too.
 
+In all three, the source Combo is **pre-selected** to the entry whose ID matches the goal you are editing (if the
+source template has one), so you don't have to hunt for it; it falls back to the first entry when there is no match.
+A `Select new` button (next to `Select all` / `Clear all`) ticks only the source children this target does not
+already have, so you can pull just the ones you are missing. It respects the current search filter.
+
 #### Template update helpers (advancement and achievement import)
 
 When upgrading a large template across Minecraft versions (or downgrading to an older one), the `Select...` dropdown
