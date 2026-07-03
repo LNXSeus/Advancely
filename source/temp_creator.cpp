@@ -3918,18 +3918,44 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_target_stat = nullptr;
         s_template_import_target_ms = nullptr;
         open_template_import(IFTS_TEMPLATE_CRITERIA);
+        // Pre-select the source advancement whose ID matches the goal we're importing into, so the
+        // user isn't left hunting through the dropdown. Leaves the fallback (first entry) if no match.
+        if (s_show_template_import_popup && target) {
+            for (int i = 0; i < (int) s_template_import_data.advancements.size(); i++) {
+                if (strcmp(s_template_import_data.advancements[i].root_name, target->root_name) == 0) {
+                    s_template_import_parent_index = i;
+                    break;
+                }
+            }
+        }
     };
     auto open_template_import_for_sub_stats = [&](EditorTrackableCategory *target) {
         s_template_import_target_adv = nullptr;
         s_template_import_target_stat = target;
         s_template_import_target_ms = nullptr;
         open_template_import(IFTS_TEMPLATE_SUB_STATS);
+        if (s_show_template_import_popup && target) {
+            for (int i = 0; i < (int) s_template_import_data.stats.size(); i++) {
+                if (strcmp(s_template_import_data.stats[i].root_name, target->root_name) == 0) {
+                    s_template_import_parent_index = i;
+                    break;
+                }
+            }
+        }
     };
     auto open_template_import_for_stages = [&](EditorMultiStageGoal *target) {
         s_template_import_target_adv = nullptr;
         s_template_import_target_stat = nullptr;
         s_template_import_target_ms = target;
         open_template_import(IFTS_TEMPLATE_STAGES);
+        if (s_show_template_import_popup && target) {
+            for (int i = 0; i < (int) s_template_import_data.multi_stage_goals.size(); i++) {
+                if (strcmp(s_template_import_data.multi_stage_goals[i].root_name, target->root_name) == 0) {
+                    s_template_import_parent_index = i;
+                    break;
+                }
+            }
+        }
     };
 
     // For multi-purpose import popups
