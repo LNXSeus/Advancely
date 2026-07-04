@@ -33,6 +33,7 @@ typedef struct {
     SDL_Color color; // The color it was rendered with
     TTF_Font *font; // The font it was rendered with (top bar and rows can differ)
     SDL_Texture *texture;
+    Uint32 last_used; // SDL tick of the last cache hit, for LRU eviction
 } TextCacheEntry;
 
 struct Overlay {

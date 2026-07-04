@@ -121,10 +121,17 @@ typedef struct {
  * @param color The color of the text
  * @return The SDL_Texture of the cached text
  */
+// Upper bound on cached text textures. Volatile strings (the IGT/timer in the top
+// info bar change every frame) would otherwise grow this without limit; once the cap
+// is hit the least-recently-used entry is evicted so memory stays bounded.
+#define MAX_TEXT_CACHE_ENTRIES 512
+
 static SDL_Texture *get_text_texture_from_cache(Overlay *o, TTF_Font *font, const char *text, SDL_Color color) {
     if (!text || text[0] == '\0') {
         return nullptr;
     }
+
+    Uint32 now = SDL_GetTicks();
 
     // 1. Check if the texture is already in the cache
     for (int i = 0; i < o->text_cache_count; i++) {
@@ -132,6 +139,7 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, TTF_Font *font, cons
         if (entry->font == font && strcmp(entry->text, text) == 0 &&
             entry->color.r == color.r && entry->color.g == color.g &&
             entry->color.b == color.b && entry->color.a == color.a) {
+            entry->last_used = now;
             return entry->texture;
         }
     }
@@ -148,25 +156,39 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, TTF_Font *font, cons
     }
     SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
 
-    // 3. Add to cache, resizing if necessary
-    if (o->text_cache_count >= o->text_cache_capacity) {
-        int new_capacity = o->text_cache_capacity == 0 ? 32 : o->text_cache_capacity * 2;
-        auto *new_cache = (TextCacheEntry *) realloc(o->text_cache, new_capacity * sizeof(TextCacheEntry));
-        if (!new_cache) {
-            SDL_DestroyTexture(text_texture);
-            return nullptr;
+    // 3. Pick a slot: reuse the least-recently-used one at the cap, else append
+    // (growing the array, but never past the cap).
+    TextCacheEntry *slot;
+    if (o->text_cache_count >= MAX_TEXT_CACHE_ENTRIES) {
+        int lru = 0;
+        for (int i = 1; i < o->text_cache_count; i++) {
+            if (o->text_cache[i].last_used < o->text_cache[lru].last_used) lru = i;
         }
-        o->text_cache = new_cache;
-        o->text_cache_capacity = new_capacity;
+        if (o->text_cache[lru].texture) SDL_DestroyTexture(o->text_cache[lru].texture);
+        slot = &o->text_cache[lru];
+    } else {
+        if (o->text_cache_count >= o->text_cache_capacity) {
+            int new_capacity = o->text_cache_capacity == 0 ? 32 : o->text_cache_capacity * 2;
+            if (new_capacity > MAX_TEXT_CACHE_ENTRIES) new_capacity = MAX_TEXT_CACHE_ENTRIES;
+            auto *new_cache = (TextCacheEntry *) realloc(o->text_cache, new_capacity * sizeof(TextCacheEntry));
+            if (!new_cache) {
+                SDL_DestroyTexture(text_texture);
+                return nullptr;
+            }
+            o->text_cache = new_cache;
+            o->text_cache_capacity = new_capacity;
+        }
+        slot = &o->text_cache[o->text_cache_count++];
     }
 
-    TextCacheEntry *new_entry = &o->text_cache[o->text_cache_count++];
-    strncpy(new_entry->text, text, sizeof(new_entry->text) - 1);
-    new_entry->text[sizeof(new_entry->text) - 1] = '\0';
-    new_entry->color = color;
-    new_entry->texture = text_texture;
+    strncpy(slot->text, text, sizeof(slot->text) - 1);
+    slot->text[sizeof(slot->text) - 1] = '\0';
+    slot->color = color;
+    slot->font = font; // Was previously never stored, so lookups always missed and leaked a texture per frame.
+    slot->texture = text_texture;
+    slot->last_used = now;
 
-    return new_entry->texture;
+    return slot->texture;
 }
 
 static inline float snap_px(float v) {
@@ -443,6 +465,174 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
         slot++;
     }
     return true;
+}
+
+// --- Page mode -----------------------------------------------------------
+// A static, centered slice of items that flips to the next slice like the pages
+// of a book (a sharp cut, no scrolling). A page holds as many items as fit the
+// window width; the still-visible items are laid out once, centered. Items that
+// clear while a page is showing crop away in place and leave a gap for the rest
+// of that page; the next page is recomputed fresh so the gap disappears. Shares
+// BeltTile with the belt so the same draw loop renders both modes. Kept separate
+// from ScrollBelt so more layout modes can be added the same way later.
+struct PageView {
+    unsigned long long signature = 0;
+    int page_offset = 0;   // start index into the not-removed item list for the current page
+    Uint32 last_page = 0;  // global page index (SDL ticks / interval) last snapped at
+    bool init = false;
+
+    std::vector<int> tiles; // item indices for the current page in template order (fixed slots; -1 handled at draw)
+
+    // Per-item clear (crop) timers, mirroring ScrollBelt so a completed item can
+    // shrink away in place before its slot becomes a gap.
+    std::vector<float> clear_elapsed;
+    std::vector<char> was_removed;
+    Uint32 anim_prev = 0;
+};
+
+// How many items fit on one page given the per-item stride `iw` and the widest
+// item cell `cell`. A page of n items spans (n-1)*iw + cell (no trailing spacing);
+// page_update then centers that, splitting whatever is left over into equal side
+// margins. So we fit against nearly the full window width and keep only a tiny edge
+// guard - reserving more here would drop a goal that actually fits and inflate the
+// side margins by up to a whole item's stride. Always >= 1.
+static int page_capacity(int window_w, float iw, float cell) {
+    if (iw <= 0.0f) return 1;
+    const float edge_guard = 2.0f; // keeps a full page a hair off the window edges
+    float avail = (float) window_w - 2.0f * edge_guard;
+    int n = 1 + (int) floorf((avail - cell) / iw);
+    if (n < 1) n = 1;
+    return n;
+}
+
+// Rebuild the current page's tile snapshot from the not-removed items in template
+// order. Without repeat the page is the slice [page_offset, page_offset + per_page)
+// and page_offset wraps back to the start once it runs past the end, so paging
+// cycles like a book (the last page may be partial). With repeat the page is always
+// exactly per_page tiles, cycling through the items so it is never partial.
+static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const std::vector<char> &removed) {
+    std::vector<int> active;
+    active.reserve((size_t) F);
+    for (int i = 0; i < F; i++) if (!removed[i]) active.push_back(i);
+
+    p.tiles.clear();
+    if (active.empty()) { p.page_offset = 0; return; }
+    int n = (int) active.size();
+
+    if (repeat) {
+        p.page_offset %= n;
+        if (p.page_offset < 0) p.page_offset = 0;
+        for (int k = 0; k < per_page; k++) {
+            p.tiles.push_back(active[(p.page_offset + k) % n]);
+        }
+    } else {
+        if (p.page_offset >= n) p.page_offset = 0;
+        for (int k = 0; k < per_page && p.page_offset + k < n; k++) {
+            p.tiles.push_back(active[p.page_offset + k]);
+        }
+    }
+}
+
+// Advances the page view one frame and fills `out` with the current page's tiles,
+// centered within the window. `interval` is the seconds a page is shown before a
+// sharp cut to the next one. A cleared item keeps its slot (cropping over
+// `duration` seconds) before turning into a gap; duration <= 0 clears instantly.
+static void page_update(PageView &p, float interval, OverlayProgressTextAlignment align, bool repeat,
+                        int window_w, float iw, float cell,
+                        int F, const std::vector<char> &removed, float duration,
+                        unsigned long long signature, std::vector<BeltTile> &out) {
+    out.clear();
+    if (F <= 0 || iw <= 0.0f) {
+        p.tiles.clear();
+        p.init = false;
+        return;
+    }
+
+    int per_page = page_capacity(window_w, iw, cell);
+    Uint32 now = SDL_GetTicks();
+
+    // Global page index shared by every row: derived purely from the wall clock and
+    // the interval, so all rows cross a page boundary on the exact same frame instead
+    // of drifting apart on independent per-row timers.
+    float iv = interval < 0.1f ? 0.1f : interval;
+    Uint32 interval_ms = (Uint32) (iv * 1000.0f);
+    if (interval_ms == 0) interval_ms = 1;
+    Uint32 global_page = now / interval_ms;
+
+    // Reset on first use, template change or item-count change.
+    if (!p.init || p.signature != signature || (int) p.clear_elapsed.size() != F) {
+        p.signature = signature;
+        p.page_offset = 0;
+        p.clear_elapsed.assign((size_t) F, 0.0f);
+        p.was_removed.assign((size_t) F, 0);
+        // Items already cleared start fully gone so they never animate on startup.
+        for (int i = 0; i < F; i++) {
+            if (removed[i]) { p.was_removed[i] = 1; p.clear_elapsed[i] = duration; }
+        }
+        p.anim_prev = now;
+        p.last_page = global_page;
+        page_snapshot(p, per_page, repeat, F, removed);
+        p.init = true;
+    }
+
+    // Advance the per-item clear timers (crop animation for items completed while shown).
+    float adt = (float) (now - p.anim_prev) / 1000.0f;
+    p.anim_prev = now;
+    if (adt < 0.0f) adt = 0.0f;
+    if (adt > 0.25f) adt = 0.25f; // ignore long stalls (window minimized, etc.)
+    for (int i = 0; i < F; i++) {
+        if (removed[i]) {
+            if (!p.was_removed[i]) p.clear_elapsed[i] = 0.0f; // just cleared
+            else p.clear_elapsed[i] += adt;
+        } else {
+            p.clear_elapsed[i] = 0.0f;
+        }
+        p.was_removed[i] = removed[i];
+    }
+
+    // Flip to the next page on a global boundary (sharp cut). Using the shared page
+    // index keeps every row switching simultaneously.
+    if (global_page != p.last_page) {
+        p.page_offset += per_page; // wraps inside page_snapshot
+        page_snapshot(p, per_page, repeat, F, removed);
+        p.last_page = global_page;
+    }
+
+    int slots = (int) p.tiles.size();
+    if (slots <= 0) return;
+
+    // The slot count is fixed for the page's lifetime, so a cleared item leaving a
+    // gap does not shift the remaining items. A not-full page is aligned relative to
+    // where a *full* page would sit, so the left padding stays consistent as the page
+    // empties (Left), the items stay centered (Center), or they push to a full page's
+    // right edge (Right). A full page makes all three coincide.
+    float content_width = (float) (slots - 1) * iw + cell;
+    float full_width = (float) (per_page - 1) * iw + cell;
+    float left_margin = ((float) window_w - full_width) / 2.0f;
+    float start_x;
+    if (align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER)
+        start_x = ((float) window_w - content_width) / 2.0f;
+    else if (align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
+        start_x = left_margin + (full_width - content_width);
+    else
+        start_x = left_margin;
+
+    out.reserve((size_t) slots);
+    for (int k = 0; k < slots; k++) {
+        int idx = p.tiles[k];
+        float x = snap_px(start_x + (float) k * iw);
+        float clear = 0.0f;
+        if (idx >= 0 && removed[idx]) {
+            if (duration > 0.0f) {
+                clear = p.clear_elapsed[idx] / duration;
+                if (clear < 0.0f) clear = 0.0f;
+                if (clear > 1.0f) clear = 1.0f;
+            }
+            // Once fully cropped (or instant clear) the slot becomes a gap.
+            if (duration <= 0.0f || p.clear_elapsed[idx] >= duration) idx = -1;
+        }
+        out.push_back({idx, x, clear});
+    }
 }
 
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
@@ -1132,8 +1322,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (F > 0 && item_full_width > 0) {
             static ScrollBelt belt_row1;
+            static PageView page_row1;
             std::vector<BeltTile> tiles;
-            if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
+            if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+                page_update(page_row1, settings->overlay_page_interval, settings->overlay_page_align,
+                            settings->overlay_page_repeat, window_w, item_full_width, ROW1_ICON_SIZE,
+                            F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
+            } else if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
                               window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
                 belt_row1.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {
@@ -1570,8 +1766,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 float clear_band_bottom = ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + 2.0f * (float) TTF_GetFontHeight(
                                               o->font);
                 static ScrollBelt belt_row2;
+                static PageView page_row2;
                 std::vector<BeltTile> tiles;
-                if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
+                if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+                    page_update(page_row2, settings->overlay_page_interval, settings->overlay_page_align,
+                                settings->overlay_page_repeat, window_w, item_full_width_row2, cell_width_row2,
+                                F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                    belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
+                } else if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
                                   window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
                     belt_row2.init = false; // reset so scrolling re-initialises cleanly if it resumes
                 } else {
@@ -2054,8 +2256,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             float clear_band_bottom = ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + 2.0f * (float) TTF_GetFontHeight(
                                           o->font);
             static ScrollBelt belt_row3;
+            static PageView page_row3;
             std::vector<BeltTile> tiles;
-            if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
+            if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+                page_update(page_row3, settings->overlay_page_interval, settings->overlay_page_align,
+                            settings->overlay_page_repeat, window_w, item_full_width_row3, cell_width_row3,
+                            F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
+            } else if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
                               window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
                 belt_row3.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {

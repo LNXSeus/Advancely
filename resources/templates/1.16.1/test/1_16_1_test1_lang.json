@@ -250,20 +250,5 @@
 	"multi_stage_goal.ms_goal:even_more_basics2.stage.2":	"Eat raw beefyyy",
 	"multi_stage_goal.ms_goal:even_more_basics2.stage.3":	"Mine 64 dirt",
 	"multi_stage_goal.ms_goal:even_more_basics2.stage.4":	"Get 'A Seedy Place' Advancement",
-	"multi_stage_goal.ms_goal:even_more_basics2.stage.final":	"Done!",
-	"counter.early_game":	"Early Game",
-	"counter.overworld":	"Overworld",
-	"counter.village":	"Village",
-	"counter.ocean":	"Ocean",
-	"counter.mushroom":	"Mushroom Is.",
-	"counter.swamp":	"Swamp",
-	"counter.jungle":	"Jungle",
-	"counter.bees":	"Birch For.",
-	"counter.taiga":	"Taiga",
-	"counter.snowy":	"Tundra",
-	"counter.llamas":	"Mt. + Sav.",
-	"counter.desert":	"Desert",
-	"counter.mesa":	"Mesa",
-	"counter.nether":	"Nether",
-	"counter.endgame":	"Endgame"
+	"multi_stage_goal.ms_goal:even_more_basics2.stage.final":	"Done!"
 }

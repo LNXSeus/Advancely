@@ -482,6 +482,10 @@ void settings_set_defaults(AppSettings *settings) {
     settings->fps = DEFAULT_FPS;
     settings->overlay_fps = DEFAULT_OVERLAY_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
+    settings->overlay_render_mode = DEFAULT_OVERLAY_RENDER_MODE;
+    settings->overlay_page_interval = DEFAULT_OVERLAY_PAGE_INTERVAL;
+    settings->overlay_page_align = DEFAULT_OVERLAY_PAGE_ALIGN;
+    settings->overlay_page_repeat = DEFAULT_OVERLAY_PAGE_REPEAT;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -947,6 +951,40 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         if (on_top && cJSON_IsBool(on_top)) settings->tracker_always_on_top = cJSON_IsTrue(on_top);
         else {
             settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
+            defaults_were_used = true;
+        }
+
+        const cJSON *render_mode = cJSON_GetObjectItem(general_settings, "overlay_render_mode");
+        if (render_mode && cJSON_IsNumber(render_mode) && render_mode->valueint >= OVERLAY_RENDER_MODE_BELT &&
+            render_mode->valueint <= OVERLAY_RENDER_MODE_PAGE) {
+            settings->overlay_render_mode = (OverlayRenderMode) render_mode->valueint;
+        } else {
+            settings->overlay_render_mode = DEFAULT_OVERLAY_RENDER_MODE;
+            defaults_were_used = true;
+        }
+
+        const cJSON *page_interval = cJSON_GetObjectItem(general_settings, "overlay_page_interval");
+        if (page_interval && cJSON_IsNumber(page_interval))
+            settings->overlay_page_interval = (float) page_interval->valuedouble;
+        else {
+            settings->overlay_page_interval = DEFAULT_OVERLAY_PAGE_INTERVAL;
+            defaults_were_used = true;
+        }
+
+        const cJSON *page_align = cJSON_GetObjectItem(general_settings, "overlay_page_align");
+        if (page_align && cJSON_IsNumber(page_align) && page_align->valueint >= OVERLAY_PROGRESS_TEXT_ALIGN_LEFT &&
+            page_align->valueint <= OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) {
+            settings->overlay_page_align = (OverlayProgressTextAlignment) page_align->valueint;
+        } else {
+            settings->overlay_page_align = DEFAULT_OVERLAY_PAGE_ALIGN;
+            defaults_were_used = true;
+        }
+
+        const cJSON *page_repeat = cJSON_GetObjectItem(general_settings, "overlay_page_repeat");
+        if (page_repeat && cJSON_IsBool(page_repeat))
+            settings->overlay_page_repeat = cJSON_IsTrue(page_repeat);
+        else {
+            settings->overlay_page_repeat = DEFAULT_OVERLAY_PAGE_REPEAT;
             defaults_were_used = true;
         }
 
@@ -2070,6 +2108,15 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         // Update Overlay/Notes Settings
         cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
         cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_render_mode");
+        cJSON_AddItemToObject(general_obj, "overlay_render_mode", cJSON_CreateNumber(settings->overlay_render_mode));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_page_interval");
+        cJSON_AddItemToObject(general_obj, "overlay_page_interval",
+                              cJSON_CreateNumber(settings->overlay_page_interval));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_page_align");
+        cJSON_AddItemToObject(general_obj, "overlay_page_align", cJSON_CreateNumber(settings->overlay_page_align));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_page_repeat");
+        cJSON_AddItemToObject(general_obj, "overlay_page_repeat", cJSON_CreateBool(settings->overlay_page_repeat));
         cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
         cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
         cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");

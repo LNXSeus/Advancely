@@ -109,6 +109,10 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP false
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
+#define DEFAULT_OVERLAY_RENDER_MODE OVERLAY_RENDER_MODE_BELT // Classic scrolling belt by default
+#define DEFAULT_OVERLAY_PAGE_INTERVAL 8.0f // Seconds each static page is shown before flipping (Page mode)
+#define DEFAULT_OVERLAY_PAGE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Partial (not-full) pages left-align by default
+#define DEFAULT_OVERLAY_PAGE_REPEAT false // Repeat items so every page is full, off by default
 #define DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED false // Per-row custom scroll speed off by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ENABLED true // Per-row freeze-when-items-fit on by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Frozen items left-aligned by default
@@ -257,6 +261,15 @@ enum OverlayProgressTextAlignment {
     OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT
 };
 
+// How the overlay lays out its item rows. New modes can be appended here; the
+// overlay render code and settings UI switch on this value. BELT is the classic
+// scrolling conveyor (with optional per-row auto-freeze); PAGE shows a static,
+// centered slice of items and flips between slices like the pages of a book.
+enum OverlayRenderMode {
+    OVERLAY_RENDER_MODE_BELT,
+    OVERLAY_RENDER_MODE_PAGE
+};
+
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
 extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
 extern const ColorRGBA DEFAULT_OVERLAY_BG_COLOR;
@@ -327,6 +340,10 @@ struct AppSettings {
     // If false only error messages are printed to console and log file
     // Logic is used in logger.cpp in log_message() function
     bool print_debug_status;
+    OverlayRenderMode overlay_render_mode; // How the overlay lays out item rows (scrolling belt vs static pages).
+    float overlay_page_interval; // Seconds each static page is shown before flipping (Page mode only).
+    OverlayProgressTextAlignment overlay_page_align; // How a not-full page is aligned within the window (Page mode).
+    bool overlay_page_repeat; // If true, items repeat so every page is full (Page mode); disables page alignment.
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.

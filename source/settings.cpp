@@ -167,6 +167,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->print_debug_status != b->print_debug_status ||
 
         // Overlay settings
+        a->overlay_render_mode != b->overlay_render_mode ||
+        a->overlay_page_interval != b->overlay_page_interval ||
+        a->overlay_page_align != b->overlay_page_align ||
+        a->overlay_page_repeat != b->overlay_page_repeat ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
@@ -329,6 +333,10 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
         // Scrolling / freeze behavior.
+        a->overlay_render_mode != b->overlay_render_mode ||
+        a->overlay_page_interval != b->overlay_page_interval ||
+        a->overlay_page_align != b->overlay_page_align ||
+        a->overlay_page_repeat != b->overlay_page_repeat ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
         a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
@@ -3048,6 +3056,92 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 ImGui::Separator();
                 ImGui::Spacing();
+                ImGui::Text("Mode");
+
+                // Overlay layout mode. Belt is the classic scrolling conveyor; Page shows a
+                // static, centered slice of items and flips between slices like a book.
+                int overlay_mode = (int) temp_settings.overlay_render_mode;
+                if (ImGui::RadioButton("Scrolling Belt", overlay_mode == OVERLAY_RENDER_MODE_BELT)) {
+                    overlay_mode = OVERLAY_RENDER_MODE_BELT;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char overlay_mode_belt_tooltip_buffer[512];
+                    snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
+                             "Items continuously scroll across the overlay as a conveyor belt.\n"
+                             "Enables the scroll speed, per-row custom speed and auto-freeze options below.");
+                    ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
+                }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Page", overlay_mode == OVERLAY_RENDER_MODE_PAGE)) {
+                    overlay_mode = OVERLAY_RENDER_MODE_PAGE;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char overlay_mode_page_tooltip_buffer[512];
+                    snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
+                             "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
+                             "After the interval below the overlay cuts to the next page of items (like a book)");
+                    ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
+                }
+                temp_settings.overlay_render_mode = (OverlayRenderMode) overlay_mode;
+
+                const bool overlay_page_mode = (temp_settings.overlay_render_mode == OVERLAY_RENDER_MODE_PAGE);
+
+                // Only relevant to Page mode; reveal the page-flip interval when it is selected.
+                if (overlay_page_mode) {
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Page Mode Settings");
+                    if (ImGui::DragFloat("Page Switch Interval (s)", &temp_settings.overlay_page_interval, 0.1f, 0.1f,
+                                         120.0f, "%.1f s")) {
+                        if (temp_settings.overlay_page_interval < 0.1f) temp_settings.overlay_page_interval = 0.1f;
+                        if (temp_settings.overlay_page_interval > 120.0f) temp_settings.overlay_page_interval = 120.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char page_interval_tooltip_buffer[512];
+                        snprintf(page_interval_tooltip_buffer, sizeof(page_interval_tooltip_buffer),
+                                 "How long each static page of items is shown before the overlay cuts\n"
+                                 "to the next page. A page holds as many items as fit the overlay width.");
+                        ImGui::SetTooltip("%s", page_interval_tooltip_buffer);
+                    }
+
+                    ImGui::Checkbox("Repeat To Fill Page", &temp_settings.overlay_page_repeat);
+                    if (ImGui::IsItemHovered()) {
+                        char page_repeat_tooltip_buffer[512];
+                        snprintf(page_repeat_tooltip_buffer, sizeof(page_repeat_tooltip_buffer),
+                                 "Repeat the remaining items so every page is completely full.\n"
+                                 "With this on there is never any empty space, so the page alignment\n"
+                                 "option below does not apply.");
+                        ImGui::SetTooltip("%s", page_repeat_tooltip_buffer);
+                    }
+
+                    // Alignment only matters when a page can be partially empty, which never
+                    // happens while Repeat To Fill is on, so disable (grey out) the dropdown then.
+                    ImGui::BeginDisabled(temp_settings.overlay_page_repeat);
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::Combo("Page Alignment", (int *) &temp_settings.overlay_page_align, "Left\0Center\0Right\0");
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char page_align_tooltip_buffer[640];
+                        if (temp_settings.overlay_page_repeat) {
+                            snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
+                                     "Unavailable while 'Repeat To Fill Page' is enabled:\n"
+                                     "a repeated page is always full, so there is nothing to align.");
+                        } else {
+                            snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
+                                     "How to align a page that is not full (fewer items than fit the width).\n"
+                                     "Left keeps the same left padding a full, centered page would have, so items\n"
+                                     "stay put as the page empties. Center centers the remaining items. Right\n"
+                                     "pushes them to where a full page's right edge would be.");
+                        }
+                        ImGui::SetTooltip("%s", page_align_tooltip_buffer);
+                    }
+                    ImGui::EndDisabled();
+                }
+
+                // The scroll speed, per-row custom speeds and auto-freeze toggles only affect the
+                // scrolling belt mode, so hide the whole Scrolling section while Page mode is active.
+                if (!overlay_page_mode) {
+                ImGui::Separator();
+                ImGui::Spacing();
                 ImGui::Text("Scrolling");
 
                 if (ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f,
@@ -3203,6 +3297,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                 }
+
+                } // End of belt-only scrolling / freeze options (hidden in Page mode)
 
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -5754,6 +5850,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Timer Formatting: Both Disabled\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
+                 "  - Overlay Mode: Scrolling Belt\n"
                  "  - Per-Row Custom Scroll Speed: Off (all rows use the global speed)\n"
                  "  - Row Auto-Freeze: On (all rows; alignment Left)\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
