@@ -1135,7 +1135,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                          "Linux: ~/.minecraft/saves\n"
                          "macOS: ~/Library/Application Support/minecraft/saves\n"
-                         "This is Path Mode: %d", PATH_MODE_AUTO);
+                         "This is Path Mode: %d\n"
+                         "Default: Auto-Track Active Instance", PATH_MODE_AUTO);
                 ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
             }
 
@@ -1152,7 +1153,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "active world.\n\n"
                          "WARNING:\n"
                          "Without Minecraft running the tracker may not work correctly.\n"
-                         "This is Path Mode: %d", PATH_MODE_INSTANCE);
+                         "This is Path Mode: %d\n"
+                         "Default: Auto-Track Active Instance (this mode)", PATH_MODE_INSTANCE);
                 ImGui::SetTooltip("%s", tooltip);
             }
 
@@ -1164,7 +1166,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Lock the tracker to one specific world folder.\n"
                          "Unlike other modes, the tracker stays on the chosen world\n"
                          "regardless of which world you open next in Minecraft.\n"
-                         "This is Path Mode: %d", PATH_MODE_FIXED_WORLD);
+                         "This is Path Mode: %d\n"
+                         "Default: Auto-Track Active Instance", PATH_MODE_FIXED_WORLD);
                 ImGui::SetTooltip("%s", tooltip);
             }
 
@@ -1202,7 +1205,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char tooltip[512];
                 snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
                          "Useful for custom launchers or non-standard installations.\n"
-                         "This is Path Mode: %d", PATH_MODE_MANUAL);
+                         "This is Path Mode: %d\n"
+                         "Default: Auto-Track Active Instance", PATH_MODE_MANUAL);
                 ImGui::SetTooltip("%s", tooltip);
             }
 
@@ -1382,7 +1386,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
                              "(E.g., Playing 1.21.6 (Template Version) all_advancements in 1.21.10 (Display Version).)\n"
                              "This way templates don't need to be copied for each subversion.\n"
-                             "Click on '(Version Support)' to see the version ranges that functionally equal.");
+                             "Click on '(Version Support)' to see the version ranges that functionally equal.\n"
+                             "Default: %s", DEFAULT_VERSION);
                 }
                 ImGui::SetTooltip("%s", version_tooltip_buffer);
             }
@@ -1412,7 +1417,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "(E.g., You select the 1.21.6 (Template Version) all_advancements template,\n"
                          "but play on 1.21.10 (Display Version) that has the same advancements.)\n"
                          "So no need to copy the same template for each subversion.\n"
-                         "By default, this matches the 'Template Version'.");
+                         "By default, this matches the 'Template Version'.\n"
+                         "Default: %s", DEFAULT_VERSION);
                 ImGui::SetTooltip("%s", display_version_tooltip_buffer);
             }
 
@@ -1450,7 +1456,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
                                  "to track stats locally per world. Check this if you're using this mod.\n\n"
                                  "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
-                                 "progress, and achievements will indicate if they were completed on a previous world.");
+                                 "progress, and achievements will indicate if they were completed on a previous world.\n"
+                                 "Default: Enabled");
                     }
                     ImGui::SetTooltip("%s", stats_per_world_tooltip_buffer);
                 }
@@ -1504,6 +1511,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     "  when the game actually saves.");
                 ImGui::Spacing();
                 ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
+                ImGui::TextDisabled("Default: Disabled");
                 if (hermes_net_active) {
                     ImGui::Spacing();
                     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
@@ -1674,7 +1682,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "by clicking the 'Open Template Editor' button or view the list of officially added\n"
                              "templates by clicking the '(Learn more)' button next to the 'Template Settings'.\n\n"
                              "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
-                             "Enable the 'Manual Layout' checkbox to use them.");
+                             "Enable the 'Manual Layout' checkbox to use them.\n"
+                             "Default: %s", DEFAULT_CATEGORY);
                 }
                 ImGui::SetTooltip("%s", category_tooltip_buffer);
             }
@@ -1746,7 +1755,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "Choose between available optional flags for the selected version and category.\n"
                              "The optional flag is used to differentiate between different alterations of the same template.\n\n"
                              "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
-                             "Enable the 'Manual Layout' checkbox to use them.");
+                             "Enable the 'Manual Layout' checkbox to use them.\n"
+                             "Default: %s", DEFAULT_OPTIONAL_FLAG);
                 }
                 ImGui::SetTooltip("%s", flag_tooltip_buffer);
             }
@@ -1803,7 +1813,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                      "Choose between available language files for the selected template.\n"
                                      "The Default `_lang.json` is usually english and comes with every template.\n\n"
                                      "If a language file declares a 'display_category' field, that value is used\n"
-                                     "to pre-fill the 'Display Category' field below (unless it is locked).");
+                                     "to pre-fill the 'Display Category' field below (unless it is locked).\n"
+                                     "Default: Default (_lang.json)");
                         }
                         ImGui::SetTooltip("%s", lang_tooltip_buffer);
                     }
@@ -1848,7 +1859,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                          "A layout file stores manual positions and decorations separately from the\n"
                                          "template, so a custom layout can survive official template updates.\n\n"
                                          "'Default' uses the template's `_layout.json`, or its built-in positions\n"
-                                         "if it has no separate layout file.");
+                                         "if it has no separate layout file.\n"
+                                         "Default: Default");
                             }
                             ImGui::SetTooltip("%s", layout_tooltip_buffer);
                         }
@@ -1882,7 +1894,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "This is the name used for display on the tracker, overlay, and in debug logs.\n"
                                  "Pre-filled from the selected language file's 'display_category' field if present,\n"
                                  "otherwise automatically formatted from the Category and Optional Flag.\n"
-                                 "You can override it with any custom text here.");
+                                 "You can override it with any custom text here.\n"
+                                 "Default: auto-filled from the template/language (e.g. \"%s\")", DEFAULT_DISPLAY_CATEGORY);
                     }
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -1890,8 +1903,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SameLine();
                 ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip(
-                        "Prevent the Display Name from changing automatically when switching templates or languages.");
+                    char lock_display_name_tooltip_buffer[256];
+                    snprintf(lock_display_name_tooltip_buffer, sizeof(lock_display_name_tooltip_buffer),
+                             "Prevent the Display Name from changing automatically when switching templates or languages.\n"
+                             "Default: Off");
+                    ImGui::SetTooltip("%s", lock_display_name_tooltip_buffer);
                 }
             }
 
@@ -1958,7 +1974,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         char adv_threshold_tooltip_buffer[512];
                         snprintf(adv_threshold_tooltip_buffer, sizeof(adv_threshold_tooltip_buffer),
                                  "When enabled, the run completes once this many %s are done.\n"
-                                 "The maximum (%d) is the number of %s in the selected template.",
+                                 "The maximum (%d) is the number of %s in the selected template.\n"
+                                 "Default: Off (resets when the template changes)",
                                  goal_word, max_adv, goal_word);
                         ImGui::SetTooltip("%s", adv_threshold_tooltip_buffer);
                     }
@@ -1975,7 +1992,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         if (ImGui::IsItemHovered()) {
                             char target_count_tooltip_buffer[256];
                             snprintf(target_count_tooltip_buffer, sizeof(target_count_tooltip_buffer),
-                                     "Number of completed %s required (1 to %d).", goal_word, max_adv);
+                                     "Number of completed %s required (1 to %d).\n"
+                                     "Default: %d", goal_word, max_adv, DEFAULT_COMPLETION_ADV_THRESHOLD);
                             ImGui::SetTooltip("%s", target_count_tooltip_buffer);
                         }
                     }
@@ -1987,7 +2005,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         snprintf(pct_threshold_tooltip_buffer, sizeof(pct_threshold_tooltip_buffer),
                                  "When enabled, the run completes once overall progress reaches this percentage.\n"
                                  "This is the same overall progress shown in the tracker and overlay\n"
-                                 "(every goal type except advancements contributes to it).");
+                                 "(every goal type except advancements contributes to it).\n"
+                                 "Default: Off (resets when the template changes)");
                         ImGui::SetTooltip("%s", pct_threshold_tooltip_buffer);
                     }
 
@@ -2005,7 +2024,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         if (ImGui::IsItemHovered()) {
                             char target_pct_tooltip_buffer[256];
                             snprintf(target_pct_tooltip_buffer, sizeof(target_pct_tooltip_buffer),
-                                     "Overall progress percentage required (0.00 to 100.00).");
+                                     "Overall progress percentage required (0.00 to 100.00).\n"
+                                     "Default: %.2f", DEFAULT_COMPLETION_PERCENT_THRESHOLD);
                             ImGui::SetTooltip("%s", target_pct_tooltip_buffer);
                         }
                     }
@@ -2026,7 +2046,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         } else {
                             snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
                                      "Checked: the run completes only when BOTH targets are met (AND).\n"
-                                     "Unchecked: the run completes as soon as EITHER target is met (OR).");
+                                     "Unchecked: the run completes as soon as EITHER target is met (OR).\n"
+                                     "Default: Off (either target, OR)");
                         }
                         ImGui::SetTooltip("%s", require_both_tooltip_buffer);
                     }
@@ -2099,7 +2120,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char always_on_top_tooltip_buffer[1024];
                 snprintf(always_on_top_tooltip_buffer, sizeof(always_on_top_tooltip_buffer),
-                         "Forces the tracker window to always display above any other window.");
+                         "Forces the tracker window to always display above any other window.\n"
+                         "Default: %s", DEFAULT_TRACKER_ALWAYS_ON_TOP ? "On" : "Off");
                 ImGui::SetTooltip("%s", always_on_top_tooltip_buffer);
             }
 
@@ -2111,8 +2133,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char tracker_fps_limit_tooltip_buffer[1024];
                 snprintf(tracker_fps_limit_tooltip_buffer, sizeof(tracker_fps_limit_tooltip_buffer),
-                         "Limits the frames per second of the tracker window. Default is 60 FPS.\n"
-                         "Higher values may result in higher CPU usage.");
+                         "Limits the frames per second of the tracker window.\n"
+                         "Higher values may result in higher CPU usage.\n"
+                         "Default: %d FPS", DEFAULT_FPS);
                 ImGui::SetTooltip("%s", tracker_fps_limit_tooltip_buffer);
             }
 
@@ -2230,7 +2253,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
                          "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
                          "\n\nNote: Scrollable lists are automatically disabled for a specific goal\n"
-                         "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates."
+                         "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates.\n"
                          "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
                 ImGui::SetTooltip("%s", scroll_tooltip);
             }
@@ -2263,7 +2286,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(section_order_tooltip_buffer, sizeof(section_order_tooltip_buffer),
                          "Drag and drop to reorder the sections in the main tracker window.\n"
                          "This doesn't affect the 'Manual Layout'.\n"
-                         "Drop items between others to insert them at that position.");
+                         "Drop items between others to insert them at that position.\n"
+                         "Default order: Counters, Advancements, Recipes, Unlocks, Stats, Custom, Multi-Stage");
                 ImGui::SetTooltip("%s", section_order_tooltip_buffer);
             }
 
@@ -2409,7 +2433,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Enable and adjust the horizontal width (in pixels) for *each item* within a section.\n"
                          "This overrides the dynamic width calculation. WARNING: Small values will cause text to overlap.\n"
-                         "Sections not available in the selected template version will be hidden.");
+                         "Sections not available in the selected template version will be hidden.\n"
+                         "Default: Off for every section (%.0fpx when enabled)", DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -2437,7 +2462,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Check this to override the dynamic width calculation for items in the '%s' section.\n"
-                                 "This allows you to set a fixed, uniform total width for all items in this row.",
+                                 "This allows you to set a fixed, uniform total width for all items in this row.\n"
+                                 "Default: Off",
                                  label);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
@@ -2493,7 +2519,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "the bottom control buttons, the notes window,\n"
                          "and manual layout text header decorations.\n"
                          "Only choose fonts within the resources/fonts directory.\n\n"
-                         "A restart is required to properly apply changes.");
+                         "A restart is required to properly apply changes.\n"
+                         "Default: %s", DEFAULT_TRACKER_FONT);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -2558,7 +2585,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char tracker_bg_tooltip_buffer[1024];
                 snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
-                         "Configure the color of the tracker background.");
+                         "Configure the color of the tracker background.\n"
+                         "Default: Dark theme (13, 17, 23)");
                 ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
             }
 
@@ -2579,7 +2607,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
                          "Configure the text color of the tracker window.\n"
                          "This also affects the info window, the checkboxes and\n"
-                         "the controls in the bottom right.");
+                         "the controls in the bottom right.\n"
+                         "Default: White (255, 255, 255)");
                 ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
             }
 
@@ -2601,7 +2630,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // --- Background Texture Settings ---
             // Helper lambda for Browse button and text display
             auto RenderBackgroundSetting = [&
-                    ](const char *label, char *path_buffer, size_t buffer_size, const char *setting_id) {
+                    ](const char *label, char *path_buffer, size_t buffer_size, const char *setting_id,
+                      const char *default_path) {
                 ImGui::Text("%s:", label);
                 ImGui::SameLine();
                 ImGui::TextWrapped("%s", path_buffer); // Display current path, wrapped
@@ -2621,17 +2651,19 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Select the background texture for %s items.\n"
                              "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
-                             "Must be a .png or .gif file located inside the resources/gui folder.", label);
+                             "Must be a .png or .gif file located inside the resources/gui folder.\n"
+                             "Default: %s", label, default_path);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
             };
 
             RenderBackgroundSetting("Default", temp_settings.adv_bg_path, sizeof(temp_settings.adv_bg_path),
-                                    "DefaultBg");
+                                    "DefaultBg", DEFAULT_ADV_BG_PATH);
             RenderBackgroundSetting("Half-Done", temp_settings.adv_bg_half_done_path,
-                                    sizeof(temp_settings.adv_bg_half_done_path), "HalfDoneBg");
+                                    sizeof(temp_settings.adv_bg_half_done_path), "HalfDoneBg",
+                                    DEFAULT_ADV_BG_HALF_DONE_PATH);
             RenderBackgroundSetting("Done", temp_settings.adv_bg_done_path, sizeof(temp_settings.adv_bg_done_path),
-                                    "DoneBg");
+                                    "DoneBg", DEFAULT_ADV_BG_DONE_PATH);
 
             // Duplicate Texture Warning
             bool duplicate_warning = false;
@@ -2675,7 +2707,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Select the font for UI windows.\n"
                          "This affects the Settings, Template Creator, and Notes windows.\n"
                          "Only choose fonts within the resources/fonts directory.\n\n"
-                         "IMPORTANT: Requires restarting Advancely to apply.");
+                         "IMPORTANT: Requires restarting Advancely to apply.\n"
+                         "Default: %s", DEFAULT_UI_FONT);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
             // UI Font Size
@@ -2723,7 +2756,9 @@ temp_settings.field_name = { \
 } \
 if (ImGui::IsItemHovered()) { \
 char tooltip_buffer[512]; \
-snprintf(tooltip_buffer, sizeof(tooltip_buffer), tooltip_fmt, ##__VA_ARGS__); \
+int _ttlen = snprintf(tooltip_buffer, sizeof(tooltip_buffer), tooltip_fmt, ##__VA_ARGS__); \
+if (_ttlen > 0 && _ttlen < (int)sizeof(tooltip_buffer)) \
+snprintf(tooltip_buffer + _ttlen, sizeof(tooltip_buffer) - _ttlen, "\nDefault: Default Dark Theme"); \
 ImGui::SetTooltip("%s", tooltip_buffer); \
 }
 
@@ -2820,7 +2855,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "IMPORTANT FOR STREAMERS:\n"
                              "On Windows you MUST use GAME CAPTURE for the overlay (NOT window capture).\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
-                             "You may need to reselect it in your streaming software (e.g., OBS).",
+                             "You may need to reselect it in your streaming software (e.g., OBS).\n"
+                             "Default: Off",
                              advancements_label_plural_lowercase
                     );
                 } else if (selected_version <= MC_VERSION_1_11_2) {
@@ -2839,7 +2875,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
-                             "You may need to reselect it in your streaming software (e.g., OBS).",
+                             "You may need to reselect it in your streaming software (e.g., OBS).\n"
+                             "Default: Off",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
                 } else if (selected_version == MC_VERSION_25W14CRAFTMINE) {
@@ -2858,7 +2895,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
-                             "You may need to reselect it in your streaming software (e.g., OBS).",
+                             "You may need to reselect it in your streaming software (e.g., OBS).\n"
+                             "Default: Off",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
                 } else {
@@ -2877,7 +2915,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
-                             "You may need to reselect it in your streaming software (e.g., OBS).",
+                             "You may need to reselect it in your streaming software (e.g., OBS).\n"
+                             "Default: Off",
                              advancement_label_uppercase, advancements_label_plural_lowercase
                     );
                 }
@@ -2892,8 +2931,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char overlay_fps_limit_tooltip_buffer[1024];
                     snprintf(overlay_fps_limit_tooltip_buffer, sizeof(overlay_fps_limit_tooltip_buffer),
-                             "Limits the frames per second of the overlay window. Default is 60 FPS.\n"
-                             "Higher values may result in higher GPU/CPU usage.");
+                             "Limits the frames per second of the overlay window.\n"
+                             "Higher values may result in higher GPU/CPU usage.\n"
+                             "Default: %d FPS", DEFAULT_OVERLAY_FPS);
                     ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
                 }
 
@@ -2917,7 +2957,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
                              "Shows the current world name.\n"
                              "For Co-op receivers, this shows 'Syncing with <Host>'\n"
-                             "or 'Syncing for <Player>' depending on the player dropdown selection.");
+                             "or 'Syncing for <Player>' depending on the player dropdown selection.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -2925,7 +2966,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char overlay_text_run_tooltip_buffer[1024];
                     snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
-                             "Shows the selected Template Version & Template Category.");
+                             "Shows the selected Template Version & Template Category.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -2954,6 +2996,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::BulletText("Multi-Stage Goal Stages");
                     ImGui::Unindent();
 
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("Default: On");
+
                     ImGui::PopTextWrapPos();
                     ImGui::EndTooltip();
                 }
@@ -2964,7 +3009,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
                              "Shows the in-game time since the start of the run.\n"
                              "It's read from the statistics file so it's in ticks\n"
-                             "and only updated when the game saves.");
+                             "and only updated when the game saves.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -2974,7 +3020,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
                              "Shows the time since the last game file update.\n"
                              "When Hermes is active this timer only represents the time\n"
-                             "since the last full game-save sync from disk.");
+                             "since the last full game-save sync from disk.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
                 }
 
@@ -2987,8 +3034,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "The character(s) drawn between segments anywhere a separator is shown:\n"
                              "the overlay's top bar, the tracker info bar, the tracker info window's\n"
                              "title bar, and the OS window title.\n"
-                             "Default is \"|\". Replace it if your tracker/overlay font does not have\n"
-                             "the pipe glyph. Up to %zu characters.",
+                             "Replace it if your tracker/overlay font does not have\n"
+                             "the pipe glyph. Up to %zu characters.\n"
+                             "Default: \"|\"",
                              sizeof(temp_settings.overlay_progress_separator) - 1);
                     ImGui::SetTooltip("%s", separator_tooltip_buffer);
                 }
@@ -2999,7 +3047,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
                              "Adds a space between every number and its unit in the IGT\n"
                              "and Update Timer display.\n"
-                             "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".");
+                             "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".\n"
+                             "Default: Off");
                     ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3009,7 +3058,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
                              "Always shows milliseconds in the IGT display,\n"
                              "even when the time exceeds one minute.\n"
-                             "Example: \"02m 04.500s\" instead of \"02m 04s\".");
+                             "Example: \"02m 04.500s\" instead of \"02m 04s\".\n"
+                             "Default: Off");
                     ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
                 }
 
@@ -3022,7 +3072,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "forced to Row 3) will disappear when completed.\n"
                              "This is independent of the main 'Goal Visibility' setting.\n\n"
                              "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
-                             "ignoring this setting.", advancements_label_plural_uppercase);
+                             "ignoring this setting.\n"
+                             "Default: Off", advancements_label_plural_uppercase);
 
                     ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
                 }
@@ -3036,7 +3087,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char substat_cycling_interval_tooltip_buffer[256];
                     snprintf(substat_cycling_interval_tooltip_buffer, sizeof(substat_cycling_interval_tooltip_buffer),
-                             "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
+                             "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n"
+                             "Default: %.1f s", DEFAULT_OVERLAY_STAT_CYCLE_SPEED);
                     ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
                 }
 
@@ -3050,7 +3102,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char clear_animation_tooltip_buffer[512];
                     snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
                              "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
-                             "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.");
+                             "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
+                             "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
                     ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
                 }
 
@@ -3162,8 +3215,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "A negative scroll speed animates from right-to-left\n"
                              "(items always appear in the same order as they are on the tracker).\n"
                              "A scroll speed of 0.0 is static.\n"
-                             "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
-                             "Holding SPACE while the overlay window is focused speeds up the animation.");
+                             "A value of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
+                             "Holding SPACE while the overlay window is focused speeds up the animation.\n"
+                             "Default: %.2f", DEFAULT_OVERLAY_SCROLL_SPEED);
                     ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
                 }
 
@@ -3174,7 +3228,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
                              "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static. Default: %.2f.",
+                             "Negative scrolls right-to-left; 0.0 is static.\n"
+                             "Default: Off (custom value default %.2f).",
                              DEFAULT_OVERLAY_SCROLL_SPEED);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -3196,7 +3251,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "When Row 1's still-visible items fit within the overlay width, stop scrolling\n"
                              "and show each item once, statically (measured with text width). Useful once only\n"
-                             "a few items remain so they no longer repeat across the row.");
+                             "a few items remain so they no longer repeat across the row.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 if (temp_settings.overlay_row1_freeze_enabled) {
@@ -3207,7 +3263,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 1's frozen items within the overlay width.");
+                                 "How to align Row 1's frozen items within the overlay width.\n"
+                                 "Default: Left");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                 }
@@ -3219,7 +3276,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Give Row 2 (%s, Unlocks, and items forced to Row 2) its own scroll speed,\n"
                              "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static. Default: %.2f.",
+                             "Negative scrolls right-to-left; 0.0 is static.\n"
+                             "Default: Off (custom value default %.2f).",
                              advancements_label_plural_uppercase, DEFAULT_OVERLAY_SCROLL_SPEED);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -3241,7 +3299,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "When Row 2's still-visible items fit within the overlay width, stop scrolling\n"
                              "and show each item once, statically (measured with text width). Useful once only\n"
-                             "a few items remain so they no longer repeat across the row.");
+                             "a few items remain so they no longer repeat across the row.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 if (temp_settings.overlay_row2_freeze_enabled) {
@@ -3252,7 +3311,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 2's frozen items within the overlay width.");
+                                 "How to align Row 2's frozen items within the overlay width.\n"
+                                 "Default: Left");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                 }
@@ -3264,7 +3324,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Give Row 3 (Stats, Goals, and items forced to Row 3) its own scroll speed,\n"
                              "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static. Default: %.2f.",
+                             "Negative scrolls right-to-left; 0.0 is static.\n"
+                             "Default: Off (custom value default %.2f).",
                              DEFAULT_OVERLAY_SCROLL_SPEED);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -3288,7 +3349,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "and show each item once, statically (measured with text width). Useful once only\n"
                              "a few items remain so they no longer repeat across the row.\n"
                              "Works best with 'Hide Completed Row 3 Goals' enabled, so the row actually\n"
-                             "clears out its completed goals and shrinks down to a static few.");
+                             "clears out its completed goals and shrinks down to a static few.\n"
+                             "Default: On");
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 if (temp_settings.overlay_row3_freeze_enabled) {
@@ -3299,7 +3361,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 3's frozen items within the overlay width.");
+                                 "How to align Row 3's frozen items within the overlay width.\n"
+                                 "Default: Left");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                 }
@@ -3330,7 +3393,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char overlay_title_alignment_tooltip_buffer[1024];
                     snprintf(overlay_title_alignment_tooltip_buffer, sizeof(overlay_title_alignment_tooltip_buffer),
-                             "Adjusts the horizontal positioning of the progress text on the overlay.");
+                             "Adjusts the horizontal positioning of the progress text on the overlay.\n"
+                             "Default: Left");
 
                     ImGui::SetTooltip("%s", overlay_title_alignment_tooltip_buffer);
                 }
@@ -3388,8 +3452,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Check this to override the dynamic width calculation for Row 2 items.\n"
                              "This allows you to set a fixed, uniform width for all items in this row.\n"
                              "Applies to %s, Unlocks (unless forced to Row 3),\n"
-                             "and any Stats/Goals forced to Row 2.",
-                             advancements_label_plural_uppercase);
+                             "and any Stats/Goals forced to Row 2.\n"
+                             "Default: Off (%.0fpx when enabled)",
+                             advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
 
@@ -3423,8 +3488,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Check this to override the dynamic width calculation for Row 3 items.\n"
                              "This allows you to set a fixed, uniform width for all items in this row.\n"
                              "Applies to Stats, Custom Goals, Multi-Stage Goals, Counters,\n"
-                             "and any %s/Unlocks forced to Row 3.",
-                             advancements_label_plural_uppercase);
+                             "and any %s/Unlocks forced to Row 3.\n"
+                             "Default: Off (%.0fpx when enabled)",
+                             advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
 
@@ -3469,7 +3535,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Select the font for the text in the separate stream overlay window.\n"
                              "Only choose fonts within the resources/fonts directory.\n"
-                             "Changing the font may change the overlay window height.");
+                             "Changing the font may change the overlay window height.\n"
+                             "Default: %s", DEFAULT_OVERLAY_FONT);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
 
@@ -3524,7 +3591,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
                                  "Configure the color of the overlay background.\n"
                                  "This is the color you'll need to color key in your streaming software (e.g., OBS).\n"
-                                 "Good settings to start within the color key filter: Similarity: 1, Smoothness: 210.");
+                                 "Good settings to start within the color key filter: Similarity: 1, Smoothness: 210.\n"
+                                 "Default: Blue (0, 80, 255)");
                         ImGui::SetTooltip("%s", overlay_bg_tooltip_buffer);
                     }
                 }
@@ -3545,7 +3613,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::IsItemHovered()) {
                         char tracker_bg_tooltip_buffer[1024];
                         snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
-                                 "Configure the text color of the overlay window.");
+                                 "Configure the text color of the overlay window.\n"
+                                 "Default: White (255, 255, 255)");
                         ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
                     }
                 }
@@ -3581,7 +3650,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Java Edition account. UUID is fetched automatically\n"
                              "from the Mojang API based on your username.\n"
-                             "Your Minecraft skin face is shown next to you in Co-op views.");
+                             "Your Minecraft skin face is shown next to you in Co-op views.\n"
+                             "Default: Online");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
@@ -3831,7 +3901,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Enable cooperative multiplayer tracking.\n"
                              "Defaults to the Advancely server (no port forwarding required).\n"
-                             "Toggle 'Host locally (LAN / VPN)' below to opt into direct hosting instead.");
+                             "Toggle 'Host locally (LAN / VPN)' below to opt into direct hosting instead.\n"
+                             "Default: Off");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
@@ -3892,7 +3963,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             char tooltip_buf[256];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Host a co-op lobby.\n"
-                                     "You read game files for all players and share a room code.");
+                                     "You read game files for all players and share a room code.\n"
+                                     "Default: Singleplayer (co-op disabled)");
                             ImGui::SetTooltip("%s", tooltip_buf);
                         }
                     }
@@ -3940,7 +4012,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 snprintf(tt, sizeof(tt),
                                          "Off (default): connect through the Advancely server (hosted in New York).\n"
                                          "On: classic LAN / VPN hosting with a direct IP + port.\n"
-                                         "Use this if everyone is on the same network or VPN.");
+                                         "Use this if everyone is on the same network or VPN.\n"
+                                         "Default: Off (Advancely server)");
                             }
                             ImGui::SetTooltip("%s", tt);
                         }
@@ -3975,7 +4048,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(aa_tip, sizeof(aa_tip),
                                              "When enabled, any valid join request is\n"
                                              "instantly accepted without an approval prompt.\n"
-                                             "Useful for trusted local groups.");
+                                             "Useful for trusted local groups.\n"
+                                             "Default: Off");
                                 }
                                 ImGui::SetTooltip("%s", aa_tip);
                             }
@@ -3996,7 +4070,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "covers players who disconnect mid-run or who never joined\n"
                                      "via Advancely, so their progress still counts toward 100%%.\n"
                                      "Only files touched within the last 7 days are picked up.\n"
-                                     "Works on modern, mid, and hybrid versions (not legacy).");
+                                     "Works on modern, mid, and hybrid versions (not legacy).\n"
+                                     "Default: On");
                             ImGui::SetTooltip("%s", ghost_tip);
                         }
                         ImGui::Spacing();
@@ -4177,7 +4252,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             } else {
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip_buf[256];
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 12345.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "The port the host listens on for direct (LAN / VPN) connections.\n"
+                                             "Default: %s", DEFAULT_HOST_PORT);
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                             }
@@ -4297,7 +4374,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Use whichever player has the highest value for each stat. "
-                                             "In the All Players view, their face is shown next to the sub-stat checkbox.");
+                                             "In the All Players view, their face is shown next to the sub-stat checkbox.\n"
+                                             "Default: Cumulative (Sum)");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::SameLine();
@@ -4308,7 +4386,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Sum stat values across all players. (Default)");
+                                             "Sum stat values across all players.\n"
+                                             "Default: Cumulative (Sum)");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
@@ -4326,7 +4405,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Only the host can manually check off stats.");
+                                             "Only the host can manually check off stats.\n"
+                                             "Default: Any Player");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::SameLine();
@@ -4337,7 +4417,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Any player can manually check off stats.");
+                                             "Any player can manually check off stats.\n"
+                                             "Default: Any Player");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
@@ -4355,7 +4436,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Only the host can modify custom goals and checkboxes.");
+                                             "Only the host can modify custom goals and checkboxes.\n"
+                                             "Default: Any Player");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::SameLine();
@@ -4366,7 +4448,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Any player can modify custom goals and checkboxes.");
+                                             "Any player can modify custom goals and checkboxes.\n"
+                                             "Default: Any Player");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
@@ -4390,7 +4473,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Show Minecraft skin faces next to goals in the All Players view to\n"
                                          "indicate which player contributed. Local visual preference; not shared\n"
-                                         "with other lobby members.");
+                                         "with other lobby members.\n"
+                                         "Default: On");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             temp_settings.coop_show_contributor_faces = show_faces;
@@ -4405,7 +4489,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the top-right corner of advancements,\n"
-                                             "simple stats, and counter custom goals.");
+                                             "simple stats, and counter custom goals.\n"
+                                             "Default: Bottom-Right");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
@@ -4413,7 +4498,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the bottom-left corner of advancements,\n"
-                                             "simple stats, and counter custom goals.");
+                                             "simple stats, and counter custom goals.\n"
+                                             "Default: Bottom-Right");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
@@ -4421,7 +4507,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the bottom-right corner of advancements,\n"
-                                             "simple stats, and counter custom goals. (Default)");
+                                             "simple stats, and counter custom goals.\n"
+                                             "Default: Bottom-Right");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 temp_settings.coop_face_corner = (CoopFaceCorner) corner;
@@ -5487,7 +5574,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
                          "You can see your current version (vX.X.X) in the title of the main Advancely window.\n"
                          "Through that notification you'll then be able to automatically install the update\n"
-                         "for your operating system. You can find more instructions on that popup.");
+                         "for your operating system. You can find more instructions on that popup.\n"
+                         "Default: On");
 #ifdef __linux__
                 if (auto_update_len > 0 && (size_t) auto_update_len < sizeof(auto_update_tooltip_buffer)) {
                     snprintf(auto_update_tooltip_buffer + auto_update_len,
@@ -5518,7 +5606,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "General status messages and errors are always printed to the console and saved to advancely_log.txt\n"
                          "and advancely_overlay_log.txt for the overlay.\n"
                          "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-                         "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+                         "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.\n"
+                         "Default: Off");
                 ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
             }
 
@@ -5824,89 +5913,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         temp_settings.goal_hiding_mode = current_hiding_mode;
         temp_settings.invert_hiding_mode = current_invert_hiding;
     }
-    // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[4096];
-
+        char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-                 "This does not modify your template files.\n\n"
-                 "Defaults:\n"
-                 "[Paths & Templates]\n"
-                 "  - Path Mode: %d\n"
-                 "  - Template/Display Version: %s\n"
-                 "  - StatsPerWorld Mod: %s; Hermes Mod: %s\n"
-                 "  - Category: %s, Optional Flag: %s, Display Category: %s (lock: %s), Language: Default\n"
-                 "[Tracker Visuals]\n"
-                 "  - Always On Top: %s; Tracker FPS Limit: %d\n"
-                 "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
-                 "  - Cursor Reveal: Checkbox %s, Text %s, Radius %.0f px\n"
-                 "  - Scrollable List Threshold: %d; List Scroll Speed: %.0f px\n"
-                 "  - Section Order: Counters -> %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
-                 "  - Tracker Vertical Spacing: %.1f px; Custom Section Width: %s (%.0f px)\n"
-                 "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt)\n"
-                 "  - Colors: Default Dark Theme\n"
-                 "  - Backgrounds: Default: %s, Half-Done: %s, Done: %s\n"
-                 "[UI Visuals]\n"
-                 "  - Settings/UI Font: %s (%.1f pt)\n"
-                 "  - UI Colors: Default Dark Theme\n"
-                 "[Overlay]\n"
-                 "  - Enable Overlay: %s; Overlay FPS Limit: %d\n"
-                 "  - Overlay Text Sections: All Enabled\n"
-                 "  - Timer Formatting: Both Disabled\n"
-                 "  - Hide Completed Row 3 Goals: %s\n"
-                 "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
-                 "  - Overlay Mode: Scrolling Belt\n"
-                 "  - Page Mode: Interval %.1f s, Alignment Left, Repeat To Fill %s\n"
-                 "  - Per-Row Custom Scroll Speed: Off (all rows use the global speed)\n"
-                 "  - Row Auto-Freeze: On (all rows; alignment Left)\n"
-                 "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
-                 "  - Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
-                 "  - Overlay Font: %s (Top Text: %.0f pt, Row Text: %.0f pt)\n"
-                 "  - Colors: Default Dark Theme\n"
-                 "[System & Debug]\n"
-                 "  - Check For Updates: %s\n"
-                 "  - Print Debug To Console: %s\n"
-                 "  - Show Welcome on Startup: %s; Notes Use Settings Font: %s\n\n"
-                 "More found in resources/reference_files/settings.json",
-
-                 DEFAULT_PATH_MODE,
-                 DEFAULT_VERSION,
-                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-                 DEFAULT_USING_HERMES ? "Enabled" : "Disabled",
-                 DEFAULT_CATEGORY, DEFAULT_OPTIONAL_FLAG, DEFAULT_DISPLAY_CATEGORY,
-                 DEFAULT_LOCK_CATEGORY_DISPLAY_NAME ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                 DEFAULT_FPS,
-                 DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
-                 DEFAULT_CHECKBOX_REVEAL_ENABLED ? "On" : "Off", DEFAULT_TEXT_REVEAL_ENABLED ? "On" : "Off",
-                 DEFAULT_CHECKBOX_REVEAL_RADIUS,
-                 DEFAULT_SCROLLABLE_LIST_THRESHOLD, DEFAULT_TRACKER_LIST_SCROLL_SPEED,
-                 advancements_label_plural_uppercase,
-                 DEFAULT_TRACKER_VERTICAL_SPACING,
-                 DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
-                 DEFAULT_TRACKER_FONT, DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE,
-                 DEFAULT_TRACKER_UI_FONT_SIZE,
-                 DEFAULT_ADV_BG_PATH, DEFAULT_ADV_BG_HALF_DONE_PATH, DEFAULT_ADV_BG_DONE_PATH,
-                 DEFAULT_UI_FONT, DEFAULT_UI_FONT_SIZE,
-                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_FPS,
-                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED, DEFAULT_OVERLAY_CLEAR_ANIMATION, DEFAULT_OVERLAY_SCROLL_SPEED,
-                 DEFAULT_OVERLAY_PAGE_INTERVAL, DEFAULT_OVERLAY_PAGE_REPEAT ? "On" : "Off",
-                 OVERLAY_DEFAULT_WIDTH,
-                 DEFAULT_OVERLAY_ROW1_SPACING,
-                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
-                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
-                 DEFAULT_OVERLAY_FONT, DEFAULT_OVERLAY_FONT_SIZE, DEFAULT_OVERLAY_FONT_SIZE,
-                 DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
-                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
-                 DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled",
-                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled"
-        );
+                 "Resets all settings (besides window size/position & hotkeys) in this window to their\n"
+                 "default values. This does not modify your template files.\n\n"
+                 "Hover over any individual setting to see the default value it will be reset to.\n"
+                 "The full default set also lives in resources/reference_files/settings.json.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
