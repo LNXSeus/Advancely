@@ -21,6 +21,7 @@
 #include "global_event_handler.h"
 #include "file_utils.h" // For cJSON_from_file
 #include "dialog_utils.h" // For open_icon_file_dialog()
+#include "imgui_internal.h" // For ImGui::ClearActiveID()
 
 #include <vector>
 #include <string>
@@ -3754,6 +3755,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<bool> s_template_import_lang_selected; // parallel to target_langs
     static bool s_template_import_multi_available = false;
     static std::map<std::string, std::map<std::string, std::string>> s_pending_lang_imports;
+    // A save triggered while a text field is still active must wait one frame: clearing the active
+    // ID lets that field's deactivation callbacks (e.g. goal rename propagation) run first, so the
+    // saved snapshot is fully consistent instead of resurrecting phantom "unsaved changes".
+    static bool s_save_after_deactivate = false;
     static std::vector<std::string> s_template_import_layout_flags;
     static int s_template_import_layout_index = 0;
     static std::vector<bool> s_template_import_selected;
@@ -4275,14 +4280,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
+    // Run a save that was deferred last frame so the just-finalized field's deactivation callbacks
+    // (rename propagation) have already updated current_template_data before we snapshot it.
+    if (s_save_after_deactivate) {
+        s_save_after_deactivate = false;
+        if (editing_template) {
+            validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
+                                       selected_layout_flag, current_template_data, saved_template_data,
+                                       save_message_type, status_message, app_settings, &s_pending_lang_imports);
+        }
+    }
+
     // Handle Ctrl+S / Cmd+S to save
     if (t && t->is_temp_creator_focused && editing_template &&
         !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) &&
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_S)) {
-        validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
-                                   selected_layout_flag, current_template_data, saved_template_data,
-                                   save_message_type, status_message, app_settings, &s_pending_lang_imports);
+        // Finalize any active field first (its deactivation callback runs this frame), then save
+        // next frame so pending rename propagation lands before the saved snapshot is taken.
+        ImGui::ClearActiveID();
+        s_save_after_deactivate = true;
     }
 
     if (roboto_font) {
@@ -6388,10 +6405,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
                                       ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
-            validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
-                                       selected_layout_flag, current_template_data,
-                                       saved_template_data, save_message_type, status_message, app_settings,
-                                       &s_pending_lang_imports);
+            // Finalize any active field first (its deactivation callback runs this frame), then save
+            // next frame so pending rename propagation lands before the saved snapshot is taken.
+            ImGui::ClearActiveID();
+            s_save_after_deactivate = true;
         }
 
         // Save button tooltip
