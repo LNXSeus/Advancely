@@ -79,6 +79,11 @@ struct Overlay {
     float scroll_offset_row1; // For animation of the first row (criteria and sub-stats)
     float scroll_offset_row2; // For animation of the second row (advancements, stat-cats and unlocks)
     float scroll_offset_row3; // For animation of the third row (custom goals and ms-goals)
+
+    // Page render mode: a single page counter shared by all rows so they flip in sync.
+    // Advanced by the interval timer in overlay_update or instantly by pressing SPACE.
+    int page_index; // Current page number
+    float page_timer; // Seconds accumulated toward the next automatic page flip
     int start_index_row1;
     int start_index_row2;
     int start_index_row3;

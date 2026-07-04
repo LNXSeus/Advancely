@@ -478,7 +478,7 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
 struct PageView {
     unsigned long long signature = 0;
     int page_offset = 0;   // start index into the not-removed item list for the current page
-    Uint32 last_page = 0;  // global page index (SDL ticks / interval) last snapped at
+    int last_page = -1;    // shared page index (Overlay::page_index) last snapped at
     bool init = false;
 
     std::vector<int> tiles; // item indices for the current page in template order (fixed slots; -1 handled at draw)
@@ -534,10 +534,11 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
 }
 
 // Advances the page view one frame and fills `out` with the current page's tiles,
-// centered within the window. `interval` is the seconds a page is shown before a
-// sharp cut to the next one. A cleared item keeps its slot (cropping over
-// `duration` seconds) before turning into a gap; duration <= 0 clears instantly.
-static void page_update(PageView &p, float interval, OverlayProgressTextAlignment align, bool repeat,
+// centered within the window. `page_index` is the shared page counter (advanced by
+// the interval timer or by SPACE); the page flips whenever it changes. A cleared
+// item keeps its slot (cropping over `duration` seconds) before turning into a gap;
+// duration <= 0 clears instantly.
+static void page_update(PageView &p, int page_index, OverlayProgressTextAlignment align, bool repeat,
                         int window_w, float iw, float cell,
                         int F, const std::vector<char> &removed, float duration,
                         unsigned long long signature, std::vector<BeltTile> &out) {
@@ -551,14 +552,6 @@ static void page_update(PageView &p, float interval, OverlayProgressTextAlignmen
     int per_page = page_capacity(window_w, iw, cell);
     Uint32 now = SDL_GetTicks();
 
-    // Global page index shared by every row: derived purely from the wall clock and
-    // the interval, so all rows cross a page boundary on the exact same frame instead
-    // of drifting apart on independent per-row timers.
-    float iv = interval < 0.1f ? 0.1f : interval;
-    Uint32 interval_ms = (Uint32) (iv * 1000.0f);
-    if (interval_ms == 0) interval_ms = 1;
-    Uint32 global_page = now / interval_ms;
-
     // Reset on first use, template change or item-count change.
     if (!p.init || p.signature != signature || (int) p.clear_elapsed.size() != F) {
         p.signature = signature;
@@ -570,7 +563,7 @@ static void page_update(PageView &p, float interval, OverlayProgressTextAlignmen
             if (removed[i]) { p.was_removed[i] = 1; p.clear_elapsed[i] = duration; }
         }
         p.anim_prev = now;
-        p.last_page = global_page;
+        p.last_page = page_index;
         page_snapshot(p, per_page, repeat, F, removed);
         p.init = true;
     }
@@ -590,12 +583,13 @@ static void page_update(PageView &p, float interval, OverlayProgressTextAlignmen
         p.was_removed[i] = removed[i];
     }
 
-    // Flip to the next page on a global boundary (sharp cut). Using the shared page
-    // index keeps every row switching simultaneously.
-    if (global_page != p.last_page) {
+    // Flip to the next page whenever the shared index changes (sharp cut), advanced
+    // by the interval timer or by SPACE. Every row reads the same index, so they all
+    // switch on the same frame.
+    if (page_index != p.last_page) {
         p.page_offset += per_page; // wraps inside page_snapshot
         page_snapshot(p, per_page, repeat, F, removed);
-        p.last_page = global_page;
+        p.last_page = page_index;
     }
 
     int slots = (int) p.tiles.size();
@@ -875,7 +869,17 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             break;
         case SDL_EVENT_KEY_DOWN:
             if (event->key.scancode == SDL_SCANCODE_SPACE) {
-                *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
+                if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+                    // Page mode: SPACE cuts to the next page. Ignore key-repeat so a
+                    // single press advances exactly one page (holding does not spam).
+                    if (!event->key.repeat) {
+                        o->page_index++;
+                        o->page_timer = 0.0f;
+                    }
+                } else {
+                    // Belt mode: holding SPACE speeds up the scroll.
+                    *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
+                }
             }
             break;
 
@@ -1132,6 +1136,21 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         o->social_media_timer -= SOCIAL_CYCLE_SECONDS;
         o->current_social_index = (o->current_social_index + 1) % NUM_SOCIALS;
     }
+
+    // --- Page mode: advance the shared page index on its own interval ---
+    // SPACE advances it directly (see overlay_events), so this only handles the
+    // automatic flip. deltaTime here is the real frame time (SPACE only speeds up
+    // scrolling in belt mode, not page mode).
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+        float iv = settings->overlay_page_interval < 0.1f ? 0.1f : settings->overlay_page_interval;
+        o->page_timer += *deltaTime;
+        while (o->page_timer >= iv) {
+            o->page_timer -= iv;
+            o->page_index++;
+        }
+    } else {
+        o->page_timer = 0.0f;
+    }
 }
 
 void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
@@ -1325,7 +1344,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             static PageView page_row1;
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                page_update(page_row1, settings->overlay_page_interval, settings->overlay_page_align,
+                page_update(page_row1, o->page_index, settings->overlay_page_align,
                             settings->overlay_page_repeat, window_w, item_full_width, ROW1_ICON_SIZE,
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
@@ -1769,7 +1788,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 static PageView page_row2;
                 std::vector<BeltTile> tiles;
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                    page_update(page_row2, settings->overlay_page_interval, settings->overlay_page_align,
+                    page_update(page_row2, o->page_index, settings->overlay_page_align,
                                 settings->overlay_page_repeat, window_w, item_full_width_row2, cell_width_row2,
                                 F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
@@ -2259,7 +2278,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             static PageView page_row3;
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                page_update(page_row3, settings->overlay_page_interval, settings->overlay_page_align,
+                page_update(page_row3, o->page_index, settings->overlay_page_align,
                             settings->overlay_page_repeat, window_w, item_full_width_row3, cell_width_row3,
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back

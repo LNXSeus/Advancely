@@ -3068,7 +3068,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_mode_belt_tooltip_buffer[512];
                     snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
                              "Items continuously scroll across the overlay as a conveyor belt.\n"
-                             "Enables the scroll speed, per-row custom speed and auto-freeze options below.");
+                             "Enables the scroll speed, per-row custom speed and auto-freeze options below.\n"
+                             "Default: Scrolling Belt");
                     ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3079,7 +3080,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_mode_page_tooltip_buffer[512];
                     snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
                              "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
-                             "After the interval below the overlay cuts to the next page of items (like a book)");
+                             "After the interval below the overlay cuts to the next page of items (like a book).\n"
+                             "Default: Scrolling Belt");
                     ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
                 }
                 temp_settings.overlay_render_mode = (OverlayRenderMode) overlay_mode;
@@ -3100,7 +3102,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         char page_interval_tooltip_buffer[512];
                         snprintf(page_interval_tooltip_buffer, sizeof(page_interval_tooltip_buffer),
                                  "How long each static page of items is shown before the overlay cuts\n"
-                                 "to the next page. A page holds as many items as fit the overlay width.");
+                                 "to the next page. A page holds as many items as fit the overlay width.\n"
+                                 "Pressing SPACE while the overlay window is focused cuts to the next page immediately.\n"
+                                 "Default: %.1f s", DEFAULT_OVERLAY_PAGE_INTERVAL);
                         ImGui::SetTooltip("%s", page_interval_tooltip_buffer);
                     }
 
@@ -3110,7 +3114,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(page_repeat_tooltip_buffer, sizeof(page_repeat_tooltip_buffer),
                                  "Repeat the remaining items so every page is completely full.\n"
                                  "With this on there is never any empty space, so the page alignment\n"
-                                 "option below does not apply.");
+                                 "option below does not apply.\n"
+                                 "Default: Off");
                         ImGui::SetTooltip("%s", page_repeat_tooltip_buffer);
                     }
 
@@ -3130,7 +3135,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "How to align a page that is not full (fewer items than fit the width).\n"
                                      "Left keeps the same left padding a full, centered page would have, so items\n"
                                      "stay put as the page empties. Center centers the remaining items. Right\n"
-                                     "pushes them to where a full page's right edge would be.");
+                                     "pushes them to where a full page's right edge would be.\n"
+                                     "Default: Left");
                         }
                         ImGui::SetTooltip("%s", page_align_tooltip_buffer);
                     }
@@ -5851,6 +5857,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Sub-Stat Cycle Interval: %.1f s; Clear Animation: %.2f s; Overlay Scroll Speed: %.2f\n"
                  "  - Overlay Mode: Scrolling Belt\n"
+                 "  - Page Mode: Interval %.1f s, Alignment Left, Repeat To Fill %s\n"
                  "  - Per-Row Custom Scroll Speed: Off (all rows use the global speed)\n"
                  "  - Row Auto-Freeze: On (all rows; alignment Left)\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
@@ -5887,6 +5894,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  DEFAULT_OVERLAY_FPS,
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_STAT_CYCLE_SPEED, DEFAULT_OVERLAY_CLEAR_ANIMATION, DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_PAGE_INTERVAL, DEFAULT_OVERLAY_PAGE_REPEAT ? "On" : "Off",
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_OVERLAY_ROW1_SPACING,
                  DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
