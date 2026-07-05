@@ -11557,8 +11557,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     float lock_checkbox_width = frame_height + style.ItemInnerSpacing.x + lock_text_size.x + frame_padding_x * 0.5f;
     // Approx checkbox width calculation
 
+    // "Reset Camera" is a button (text + horizontal frame padding on both sides).
     ImVec2 reset_text_size = ImGui::CalcTextSize("Reset Camera");
-    float reset_checkbox_width = frame_height + style.ItemInnerSpacing.x + reset_text_size.x + frame_padding_x * 0.5f;
+    float reset_checkbox_width = reset_text_size.x + frame_padding_x * 2.0f;
 
     ImVec2 manual_layout_text_size = ImGui::CalcTextSize("Manual Layout");
     float manual_layout_checkbox_width = frame_height + style.ItemInnerSpacing.x + manual_layout_text_size.x +
@@ -11918,13 +11919,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     ImGui::SameLine();
 
-    // "Reset Camera" checkbox (acts as a button), it turns off the lock layout
-    static bool reset_dummy = false;
-    if (ImGui::Checkbox("Reset Camera", &reset_dummy)) {
+    // "Reset Camera" button, it also turns off the lock layout
+    if (ImGui::Button("Reset Camera")) {
         t->camera_offset = ImVec2(0.0f, 0.0f);
         t->zoom_level = 1.0f;
         t->layout_locked = false; // Unlocks the layout
-        reset_dummy = false; // Ensure it's getting unchecked
     }
 
     if (ImGui::IsItemHovered()) {
