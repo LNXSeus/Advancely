@@ -1681,7 +1681,10 @@ int main(int argc, char *argv[]) {
     seed_macos_support_dir();
 #endif
 
-    // Check for write permissions in the current directory before doing anything else
+#if !defined(__APPLE__)
+    // Check for write permissions in the current directory before doing anything else.
+    // Skipped on macOS: all user-writable data lives in ~/Library/Application Support/Advancely
+    // (seeded above), so a read-only bundle location must not abort startup.
     FILE *write_test = fopen(".advancely-write-test", "w");
     if (write_test == nullptr) {
         // Get current working directory for the error message
@@ -1707,6 +1710,7 @@ int main(int argc, char *argv[]) {
     }
     fclose(write_test);
     remove(".advancely-write-test");
+#endif
 
     // --- Single-instance guard --------------------------------------------------
     // Two full Advancely instances both write settings.json with no cross-process
