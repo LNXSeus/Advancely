@@ -587,8 +587,8 @@ You can manipulate the view using several intuitive controls:
   their default positions.
 * **Goal Visibility Dropdown**: A dropdown in the bottom controls (next to `Manual Layout`) lets you switch the goal
   visibility mode on the fly. It exposes all six combinations of the three modes and the invert flag in one list:
-  `Hide All Completed`, `Hide All Incomplete (Inverted)`, `Hide Template-Hidden Only` (the default),
-  `Hide Template-Hidden (Inverted)`, `Show All`, and `Show All (Inverted)`. Changing it saves immediately and applies
+  `Hide All Completed`, `Hide All Incomplete (Inv.)`, `Hide Template-Hidden Only` (the default),
+  `Hide Template-Hidden (Inv.)`, `Show All`, and `Show All (Inv.)`. Changing it saves immediately and applies
   instantly **without restarting the overlay**. See [The Tracker Window](#the-tracker-window) - open the **Controls & Features** dropdown and scroll
   to **Section Completion Counters** for exactly how each mode affects what is shown and counted.
 
@@ -670,8 +670,8 @@ mode, completed goals are greyed out but remain visible.
 
 **Invert Hiding Mode:**
 
-The inverted variants in the **Goal Visibility Dropdown** (`Hide All Incomplete (Inverted)`,
-`Hide Template-Hidden (Inverted)`, `Show All (Inverted)`) flip the completion behaviour of whichever base mode is
+The inverted variants in the **Goal Visibility Dropdown** (`Hide All Incomplete (Inv.)`,
+`Hide Template-Hidden (Inv.)`, `Show All (Inv.)`) flip the completion behaviour of whichever base mode is
 selected:
 
 * **`Hide All Completed`** (warning): hides every goal that is **not yet completed** instead of the completed ones

@@ -11576,8 +11576,24 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             (controls_coop_state == COOP_NET_LISTENING || controls_coop_state == COOP_NET_CONNECTED) &&
             settings->coop_player_count > 0;
     // Visibility dropdown (goal hiding mode + invert flag, 6 entries). Same combo
-    // style as the coop player dropdown; width chosen to fit the longest label.
-    const float visibility_dropdown_width = 240.0f;
+    // style as the coop player dropdown; width measured from the longest label so
+    // no entry gets clipped by the dropdown arrow. Keep this list in sync with the
+    // visibility_options labels used to render the combo below.
+    static const char *const visibility_labels[] = {
+        "Hide All Completed",
+        "Hide All Incomplete (Inv.)",
+        "Hide Template-Hidden Only",
+        "Hide Template-Hidden (Inv.)",
+        "Show All",
+        "Show All (Inv.)",
+    };
+    float visibility_dropdown_width = 0.0f;
+    for (const char *label : visibility_labels) {
+        float w = ImGui::CalcTextSize(label).x;
+        if (w > visibility_dropdown_width) visibility_dropdown_width = w;
+    }
+    // Room for frame padding on both sides plus the dropdown arrow button.
+    visibility_dropdown_width += style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
 
     // Calculate total width using ImGui's ItemSpacing
     float controls_total_width = clear_button_width + button_padding_x +
@@ -11960,11 +11976,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         };
         static const VisibilityOption visibility_options[] = {
             {"Hide All Completed", HIDE_ALL_COMPLETED, false},
-            {"Hide All Incomplete (Inverted)", HIDE_ALL_COMPLETED, true},
+            {"Hide All Incomplete (Inv.)", HIDE_ALL_COMPLETED, true},
             {"Hide Template-Hidden Only", HIDE_ONLY_TEMPLATE_HIDDEN, false},
-            {"Hide Template-Hidden (Inverted)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
+            {"Hide Template-Hidden (Inv.)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
             {"Show All", SHOW_ALL, false},
-            {"Show All (Inverted)", SHOW_ALL, true},
+            {"Show All (Inv.)", SHOW_ALL, true},
         };
         const int visibility_option_count = (int) (sizeof(visibility_options) / sizeof(visibility_options[0]));
 
