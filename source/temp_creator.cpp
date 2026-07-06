@@ -2793,6 +2793,86 @@ static bool tc_linked_goals_contains(const std::vector<EditorCounterLinkedGoal> 
     return false;
 }
 
+// Resolves which template section a linked goal actually points at, mirroring the runtime's
+// is_goal_completed_by_root() search order (advancements, stats, unlocks, custom, multi-stage,
+// counters; first matching root_name wins). Used to display the type of legacy links that have
+// no stamped type, so the type shows consistently without needing to store it in the file.
+static LinkedGoalType tc_resolve_linked_goal_section(const EditorTemplate &tpl,
+                                                     const EditorCounterLinkedGoal &lg) {
+    const char *root = lg.root_name;
+    const char *parent = lg.parent_root;
+
+    for (const auto &adv: tpl.advancements) {
+        if (parent[0] == '\0' && strcmp(adv.root_name, root) == 0) return LINK_TYPE_ADVANCEMENT;
+        for (const auto &crit: adv.criteria) {
+            if (strcmp(crit.root_name, root) == 0) {
+                if (parent[0] != '\0' && strcmp(adv.root_name, parent) != 0) continue;
+                return LINK_TYPE_ADVANCEMENT;
+            }
+        }
+    }
+    for (const auto &stat: tpl.stats) {
+        if (parent[0] == '\0' && strcmp(stat.root_name, root) == 0) return LINK_TYPE_STAT;
+        for (const auto &sub: stat.criteria) {
+            if (strcmp(sub.root_name, root) == 0) {
+                if (parent[0] != '\0' && strcmp(stat.root_name, parent) != 0) continue;
+                return LINK_TYPE_STAT;
+            }
+        }
+    }
+    for (const auto &u: tpl.unlocks)
+        if (strcmp(u.root_name, root) == 0) return LINK_TYPE_UNLOCK;
+    for (const auto &cg: tpl.custom_goals)
+        if (strcmp(cg.root_name, root) == 0) return LINK_TYPE_CUSTOM;
+    for (const auto &msg: tpl.multi_stage_goals)
+        if (strcmp(msg.root_name, root) == 0) return LINK_TYPE_MULTI_STAGE;
+    for (const auto &c: tpl.counter_goals)
+        if (strcmp(c.root_name, root) == 0) return LINK_TYPE_COUNTER;
+    return LINK_TYPE_ANY;
+}
+
+// Short human-readable label for a linked goal's section, shown in the linked-goals lists so
+// goals that share an ID across sections stay distinguishable. The advancement section is
+// labeled "Ach." on versions that use achievements (1.11.2 and earlier) and "Adv." otherwise.
+// Returns "" only when the section can't be determined.
+static const char *tc_linked_goal_type_label(LinkedGoalType type, bool uses_achievements) {
+    switch (type) {
+        case LINK_TYPE_ADVANCEMENT: return uses_achievements ? "Ach." : "Adv.";
+        case LINK_TYPE_STAT:        return "Stat";
+        case LINK_TYPE_UNLOCK:      return "Unlock";
+        case LINK_TYPE_CUSTOM:      return "Custom";
+        case LINK_TYPE_MULTI_STAGE: return "MS-Goal";
+        case LINK_TYPE_COUNTER:     return "Counter";
+        default:                    return "";
+    }
+}
+
+// Formats a linked goal for display in a linked-goals list: "N. [Type] root" (plus "[stage]" or
+// "parent > root" disambiguation), with the section type in brackets before the goal ID so
+// identical IDs are clear. The type is derived from the template when the link carries no stamped
+// type (legacy links), so it displays consistently regardless of whether "type" is in the file.
+static void tc_format_linked_goal_display(char *buf, size_t sz, int index,
+                                          const EditorTemplate &tpl,
+                                          const EditorCounterLinkedGoal &lg,
+                                          const char *version_str) {
+    LinkedGoalType type = lg.type != LINK_TYPE_ANY ? lg.type : tc_resolve_linked_goal_section(tpl, lg);
+    bool uses_achievements = settings_get_version_from_string(version_str) <= MC_VERSION_1_11_2;
+    const char *type_label = tc_linked_goal_type_label(type, uses_achievements);
+    char prefix[32];
+    if (type_label[0] != '\0') {
+        snprintf(prefix, sizeof(prefix), "[%s] ", type_label);
+    } else {
+        prefix[0] = '\0';
+    }
+    if (lg.stage_id[0] != '\0') {
+        snprintf(buf, sz, "%d. %s%s [%s]", index, prefix, lg.root_name, lg.stage_id);
+    } else if (lg.parent_root[0] != '\0') {
+        snprintf(buf, sz, "%d. %s%s > %s", index, prefix, lg.parent_root, lg.root_name);
+    } else {
+        snprintf(buf, sz, "%d. %s%s", index, prefix, lg.root_name);
+    }
+}
+
 // Appends the Visual Layout Editor selection to a linked-goal list, in template order and
 // without duplicating entries already present. Returns the number of goals added.
 // The owner_* parameters identify the goal that owns this linked-goal list; a matching
@@ -10658,15 +10738,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) stat_cat.linked_goals.size(); li++) {
                                     auto &lg = stat_cat.linked_goals[li];
                                     char lg_display[512];
-                                    if (lg.stage_id[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                                 lg.root_name, lg.stage_id);
-                                    } else if (lg.parent_root[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                                 lg.parent_root, lg.root_name);
-                                    } else {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
-                                    }
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_stat_cat_lg_%d", li);
                                     if (ImGui::SmallButton(remove_btn)) {
@@ -11626,16 +11699,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         for (int li = 0; li < (int) crit.linked_goals.size(); li++) {
                                             auto &lg = crit.linked_goals[li];
                                             char lg_display[512];
-                                            if (lg.stage_id[0] != '\0') {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                                         lg.root_name, lg.stage_id);
-                                            } else if (lg.parent_root[0] != '\0') {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                                         lg.parent_root, lg.root_name);
-                                            } else {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1,
-                                                         lg.root_name);
-                                            }
+                                            tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                             char crit_remove_btn[64];
                                             snprintf(crit_remove_btn, sizeof(crit_remove_btn),
                                                      "X##remove_sub_stat_lg_%zu_%d", j, li);
@@ -13316,15 +13381,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) goal.linked_goals.size(); li++) {
                                     auto &lg = goal.linked_goals[li];
                                     char lg_display[512];
-                                    if (lg.stage_id[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                                 lg.root_name, lg.stage_id);
-                                    } else if (lg.parent_root[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                                 lg.parent_root, lg.root_name);
-                                    } else {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
-                                    }
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_cg_lg_%d", li);
                                     if (ImGui::SmallButton(remove_btn)) {
@@ -15816,16 +15874,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         for (int li = 0; li < (int) stage.linked_goals.size(); li++) {
                                             auto &lg = stage.linked_goals[li];
                                             char lg_display[512];
-                                            if (lg.stage_id[0] != '\0') {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                                         lg.root_name, lg.stage_id);
-                                            } else if (lg.parent_root[0] != '\0') {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                                         lg.parent_root, lg.root_name);
-                                            } else {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1,
-                                                         lg.root_name);
-                                            }
+                                            tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                             char stage_remove_btn[64];
                                             snprintf(stage_remove_btn, sizeof(stage_remove_btn),
                                                      "X##remove_stage_lg_%zu_%d", j, li);
@@ -17061,15 +17111,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 auto &lg = counter.linked_goals[li];
                                 // Build display text with numbering and full disambiguation
                                 char lg_display[512];
-                                if (lg.stage_id[0] != '\0') {
-                                    snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                             lg.root_name, lg.stage_id);
-                                } else if (lg.parent_root[0] != '\0') {
-                                    snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                             lg.parent_root, lg.root_name);
-                                } else {
-                                    snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
-                                }
+                                tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                 char remove_btn[64];
                                 snprintf(remove_btn, sizeof(remove_btn), "X##remove_lg_%d", li);
                                 if (ImGui::SmallButton(remove_btn)) {
@@ -17519,15 +17562,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) deco.linked_goals.size(); li++) {
                                     auto &lg = deco.linked_goals[li];
                                     char lg_display[512];
-                                    if (lg.stage_id[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
-                                                 lg.root_name, lg.stage_id);
-                                    } else if (lg.parent_root[0] != '\0') {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
-                                                 lg.parent_root, lg.root_name);
-                                    } else {
-                                        snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
-                                    }
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                                  creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_header_lg_%d", li);
                                     if (ImGui::SmallButton(remove_btn)) {
@@ -23898,12 +23934,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             return section_name && str_contains_insensitive(section_name, goal_selector_search_buffer);
         };
 
-        // Helper: check if a given root+stage+parent matches the current selection
+        // Helper: two goal types are compatible for selection matching if they are equal,
+        // or if either side is LINK_TYPE_ANY (legacy links loaded without a stamped type).
+        // This lets two goals of different types sharing the same ID be selected individually.
+        auto types_compatible = [](LinkedGoalType a, LinkedGoalType b) -> bool {
+            return a == b || a == LINK_TYPE_ANY || b == LINK_TYPE_ANY;
+        };
+
+        // Helper: check if a given root+stage+parent+type matches the current selection
         auto is_goal_selected = [&](const char *root_name, const char *stage_id,
-                                    const char *parent_root) -> bool {
+                                    const char *parent_root, LinkedGoalType type) -> bool {
             if (is_multi_select) {
                 for (const auto &sel: goal_selector_multi_selections) {
                     if (strcmp(sel.root_name, root_name) != 0) continue;
+                    if (!types_compatible(sel.type, type)) continue;
                     const char *sel_parent = sel.parent_root[0] != '\0' ? sel.parent_root : nullptr;
                     const char *chk_parent = (parent_root && parent_root[0] != '\0') ? parent_root : nullptr;
                     if (sel_parent && chk_parent) {
@@ -23953,6 +23997,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                        goal_selector_multi_selections.end(),
                                        [&](const EditorCounterLinkedGoal &sel) {
                                            if (strcmp(sel.root_name, root_name) != 0) return false;
+                                           if (!types_compatible(sel.type, type)) return false;
                                            const char *sel_parent = sel.parent_root[0] != '\0'
                                                                         ? sel.parent_root
                                                                         : nullptr;
@@ -24068,7 +24113,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         auto render_goal_checkbox = [&](const char *label, const char *root_name, const char *stage_id,
                                         const char *parent_root, LinkedGoalType type, bool indent) {
             if (indent) ImGui::Indent();
-            bool checked = is_goal_selected(root_name, stage_id, parent_root);
+            bool checked = is_goal_selected(root_name, stage_id, parent_root, type);
             int my_flat_index = current_flat_index++;
             bool is_self = is_owner_entry(root_name, parent_root, type);
             if (is_self) ImGui::BeginDisabled();
@@ -24079,7 +24124,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int range_end = std::max(goal_selector_last_clicked_flat_index, my_flat_index);
                     for (int ri = range_start; ri <= range_end && ri < (int) flat_goal_list.size(); ri++) {
                         auto &entry = flat_goal_list[ri];
-                        bool already = is_goal_selected(entry.root_name, entry.stage_id, entry.parent_root);
+                        bool already = is_goal_selected(entry.root_name, entry.stage_id, entry.parent_root, entry.type);
                         if (already != checked) {
                             select_goal(entry.root_name, entry.stage_id, entry.parent_root, entry.type, checked);
                         }

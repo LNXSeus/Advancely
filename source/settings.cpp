@@ -577,6 +577,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Force a rescan if the template files have been changed by the creator
     if (SDL_SetAtomicInt(&g_templates_changed, 0) == 1) {
         last_scanned_version[0] = '\0';
+        // Also regenerate the per-version template counts shown in the version dropdown
+        // so the "(N)" next to each version reflects added/removed templates without a restart.
+        version_counts_generated = false;
     }
 
     // --- State management for window open/close ---
