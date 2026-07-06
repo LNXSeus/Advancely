@@ -4074,6 +4074,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Default: On");
                             ImGui::SetTooltip("%s", ghost_tip);
                         }
+                        ImGui::TextDisabled("Note: Only players whose save files were touched within the last 7 days are counted as ghosts.");
                         ImGui::Spacing();
 
                         // IPv4 validation
