@@ -547,6 +547,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     };
 
     if (!version_counts_generated) {
+        // This can run more than once (regenerated when templates change). Clear first so we rebuild
+        // from scratch instead of appending a second set, and so the c_str pointers below don't dangle
+        // when version_display_names reallocates.
+        version_display_names.clear();
+        version_display_c_strs.clear();
         version_display_names.reserve(VERSION_STRINGS_COUNT);
         for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
             DiscoveredTemplate *templates = nullptr;

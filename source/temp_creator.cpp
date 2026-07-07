@@ -4076,6 +4076,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool version_counts_generated = false;
 
     if (!version_counts_generated) {
+        // This can run more than once (regenerated when templates change). Clear first so we rebuild
+        // from scratch instead of appending a second set, and so the c_str pointers below don't dangle
+        // when version_display_names reallocates.
+        version_display_names.clear();
+        version_display_c_strs.clear();
         version_display_names.reserve(VERSION_STRINGS_COUNT);
         for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
             DiscoveredTemplate *templates = nullptr;
@@ -4211,6 +4216,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // rescan from a lifecycle op (which clears last_scanned_version to "") preserves it so that
         // creating/copying/importing/deleting a language or layout file does not deselect the template.
         bool forced_rescan = (last_scanned_version[0] == '\0');
+
+        // A forced rescan means a template file was added/removed/changed by a lifecycle op, so the
+        // per-version "(N)" counts in the Template Version dropdown are stale. Regenerate them on the
+        // next frame. A plain version switch (forced_rescan == false) leaves the counts untouched to
+        // avoid a redundant full scan of every version.
+        if (forced_rescan) {
+            version_counts_generated = false;
+        }
 
         char preserved_category[MAX_PATH_LENGTH] = {0};
         char preserved_flag[MAX_PATH_LENGTH] = {0};
