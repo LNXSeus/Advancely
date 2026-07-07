@@ -1391,6 +1391,10 @@
 					"root_name":	"ms_goal:vex"
 				}, {
 					"root_name":	"ms_goal:spire"
+				}, {
+					"root_name":	"ms_goal:netherite",
+					"stage_id":	"2",
+					"type":	"multi_stage"
 				}]
 		}
 	},
@@ -1546,7 +1550,8 @@
 					"icon":	"items/netherite_upgrade_smithing_template_1.20.2.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:recipes/misc/netherite_upgrade_smithing_template",
-					"target":	1
+					"target":	1,
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
 					"icon":	"items/netherite_hoe_20w14infinite.png",
