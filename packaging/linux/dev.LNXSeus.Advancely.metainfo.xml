@@ -15,6 +15,26 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.6.0" date="2026-07-08">
+      <description>
+        <p>The Overlay Update: a major overhaul of the overlay, plus template editor improvements and important fixes.</p>
+        <ul>
+          <li>Overlay conveyor belt: all items now move perfectly in sync (no more jittering), completed items leave a gap that scrolls off-screen instead of snapping, and disappearing items fade out.</li>
+          <li>Dynamic overlay height: the window now sizes itself to the chosen font so row text can never overlap the row below, with separate Top Text Size and Row Text Size settings.</li>
+          <li>New Custom Vertical Spacing option: individually tune the gaps between each overlay row, with the window height adjusting to match.</li>
+          <li>Per-row scroll control: each row can use its own scroll speed and direction, and rows can auto-freeze (showing each item once, kept within the overlay borders) when few enough items remain.</li>
+          <li>New Page mode: a static, centered page of items that cuts to the next page like a book, with SPACE to advance manually.</li>
+          <li>The overlay now only restarts when an overlay-related setting actually changes (template and unrelated changes no longer bounce it), and static icons round to whole pixels to stay crisp.</li>
+          <li>Template editor: colored goal indicators (Hidden, Row 2/Row 3, etc.), searchable indicators and display names, reorganized editing buttons, and a proper rename that also renames the template's notes and snapshot files.</li>
+          <li>Template editor: creating, copying, or renaming a template can now replace an existing one with the same category and flag, and category/flag are split out correctly.</li>
+          <li>Cross-template imports: import across multiple language files at once, pre-select goals whose root name matches, select only new sub-goals, auto-scroll to imported goals, and get a warning (not an error) when importing from a different game era.</li>
+          <li>Visual layout editor: selections no longer pierce through windows and are preserved on save, checkmarks are non-selectable, checkboxes render as simplified squares for performance, and Reset Camera is now a button.</li>
+          <li>Fixed a severe memory leak in the overlay/tracker text-texture cache.</li>
+          <li>Every settings tooltip now lists its default value, the Hiding Mode dropdown fits all its options, and "Hide Template-Hidden Only" is the new default.</li>
+          <li>New and updated templates and textures: a 1.21.4 all_advancements template, 1.21.11+ categorical templates with 7 armadillo scutes, new 26.2 biome textures and biome icons, and completion fixes for the Netherite Upgrade trim and chest stat.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.5" date="2026-06-23">
       <description>
         <ul>
