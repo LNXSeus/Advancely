@@ -7833,11 +7833,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                    ? checkbox_hover_color
                                                    : checkbox_fill_color;
                             if (crit_cb_visible) {
-                                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill,
-                                                         3.0f * t->zoom_level);
-                                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
+                                float cb_round = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
+                                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill, cb_round);
+                                if (!t->is_visual_layout_editing) {
+                                    draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, cb_round);
+                                }
 
-                                if (crit->is_manually_completed) {
+                                if (crit->is_manually_completed && !t->is_visual_layout_editing) {
                                     // Draw checkmark
                                     ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
                                     ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
@@ -8310,12 +8312,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                   ? checkbox_hover_color
                                                   : checkbox_fill_color;
                     if (parent_cb_visible) {
+                        float cb_round_parent = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
                         draw_list->AddRectFilled(checkbox_rect_parent.Min, checkbox_rect_parent.Max, check_fill_parent,
-                                                 3.0f * t->zoom_level);
-                        draw_list->AddRect(checkbox_rect_parent.Min, checkbox_rect_parent.Max, text_color,
-                                           3.0f * t->zoom_level);
+                                                 cb_round_parent);
+                        if (!t->is_visual_layout_editing) {
+                            draw_list->AddRect(checkbox_rect_parent.Min, checkbox_rect_parent.Max, text_color,
+                                               cb_round_parent);
+                        }
 
-                        if (cat->is_manually_completed) {
+                        if (cat->is_manually_completed && !t->is_visual_layout_editing) {
                             // Draw checkmark
                             ImVec2 p1 = ImVec2(check_pos_parent.x + 5 * t->zoom_level,
                                                check_pos_parent.y + 10 * t->zoom_level);
@@ -9394,11 +9399,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                              ? checkbox_hover_color
                                              : checkbox_fill_color;
                 if (cg_cb_visible) {
-                    draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
-                    draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
-                                       3.0f * t->zoom_level);
+                    float cb_round = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
+                    draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, cb_round);
+                    if (!t->is_visual_layout_editing) {
+                        draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, cb_round);
+                    }
 
-                    if (item->is_manually_completed) {
+                    if (item->is_manually_completed && !t->is_visual_layout_editing) {
                         // Draw checkmark only when manually completed; auto-completion via linked goals does not place it
                         ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
                         ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
