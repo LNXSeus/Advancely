@@ -132,6 +132,17 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_OVERLAY_CLEAR_ANIMATION (-1.2f) // Seconds for the clear (crop) animation; 0 = instant, sign = direction
 
+// Overlay custom vertical spacing. Each value is added on top of the default,
+// font-driven layout, so the defaults are 0 and reproduce the stock spacing exactly.
+// Larger values push the rows below apart and grow the window height to match.
+#define DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED false
+#define DEFAULT_OVERLAY_GAP_TOP_TO_ROW1 0.0f
+#define DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2 0.0f
+#define DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3 0.0f
+#define DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM 0.0f
+#define OVERLAY_GAP_MIN 0.0f
+#define OVERLAY_GAP_MAX 2000.0f
+
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
@@ -367,6 +378,11 @@ struct AppSettings {
     bool overlay_row3_custom_spacing_enabled; // If true, use custom spacing for row 3
     float overlay_row3_custom_spacing; // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
+    bool overlay_custom_vertical_spacing_enabled; // If true, the overlay row gaps below are added to the default layout.
+    float overlay_gap_top_to_row1; // Extra vertical gap between the top info bar and row 1 (pixels).
+    float overlay_gap_row1_to_row2; // Extra vertical gap between row 1 and row 2 (pixels).
+    float overlay_gap_row2_to_row3; // Extra vertical gap between row 2 and row 3 (pixels).
+    float overlay_gap_row3_to_bottom; // Extra vertical gap between row 3 and the bottom window edge (pixels).
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
     float overlay_clear_animation; // Seconds for the item clear (crop) animation; 0 = instant, sign = direction.
 

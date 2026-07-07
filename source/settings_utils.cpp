@@ -512,6 +512,11 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
     settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+    settings->overlay_custom_vertical_spacing_enabled = DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED;
+    settings->overlay_gap_top_to_row1 = DEFAULT_OVERLAY_GAP_TOP_TO_ROW1;
+    settings->overlay_gap_row1_to_row2 = DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2;
+    settings->overlay_gap_row2_to_row3 = DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3;
+    settings->overlay_gap_row3_to_bottom = DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
     settings->overlay_clear_animation = DEFAULT_OVERLAY_CLEAR_ANIMATION;
 
@@ -1338,6 +1343,47 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        // --- Load Custom Vertical Spacing (row gaps) ---
+        const cJSON *vspacing_enabled = cJSON_GetObjectItem(visual_settings, "overlay_custom_vertical_spacing_enabled");
+        if (vspacing_enabled && cJSON_IsBool(vspacing_enabled))
+            settings->overlay_custom_vertical_spacing_enabled = cJSON_IsTrue(vspacing_enabled);
+        else {
+            settings->overlay_custom_vertical_spacing_enabled = DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *gap_top_row1 = cJSON_GetObjectItem(visual_settings, "overlay_gap_top_to_row1");
+        if (gap_top_row1 && cJSON_IsNumber(gap_top_row1))
+            settings->overlay_gap_top_to_row1 = (float) gap_top_row1->valuedouble;
+        else {
+            settings->overlay_gap_top_to_row1 = DEFAULT_OVERLAY_GAP_TOP_TO_ROW1;
+            defaults_were_used = true;
+        }
+
+        const cJSON *gap_row1_row2 = cJSON_GetObjectItem(visual_settings, "overlay_gap_row1_to_row2");
+        if (gap_row1_row2 && cJSON_IsNumber(gap_row1_row2))
+            settings->overlay_gap_row1_to_row2 = (float) gap_row1_row2->valuedouble;
+        else {
+            settings->overlay_gap_row1_to_row2 = DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2;
+            defaults_were_used = true;
+        }
+
+        const cJSON *gap_row2_row3 = cJSON_GetObjectItem(visual_settings, "overlay_gap_row2_to_row3");
+        if (gap_row2_row3 && cJSON_IsNumber(gap_row2_row3))
+            settings->overlay_gap_row2_to_row3 = (float) gap_row2_row3->valuedouble;
+        else {
+            settings->overlay_gap_row2_to_row3 = DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3;
+            defaults_were_used = true;
+        }
+
+        const cJSON *gap_row3_bottom = cJSON_GetObjectItem(visual_settings, "overlay_gap_row3_to_bottom");
+        if (gap_row3_bottom && cJSON_IsNumber(gap_row3_bottom))
+            settings->overlay_gap_row3_to_bottom = (float) gap_row3_bottom->valuedouble;
+        else {
+            settings->overlay_gap_row3_to_bottom = DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM;
+            defaults_were_used = true;
+        }
+
         // --- Load Per-Row Custom Scroll Speed ---
         const cJSON *row1_custom_speed_enabled = cJSON_GetObjectItem(
             visual_settings, "overlay_row1_custom_scroll_speed_enabled");
@@ -1575,6 +1621,11 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
         settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
+        settings->overlay_custom_vertical_spacing_enabled = DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED;
+        settings->overlay_gap_top_to_row1 = DEFAULT_OVERLAY_GAP_TOP_TO_ROW1;
+        settings->overlay_gap_row1_to_row2 = DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2;
+        settings->overlay_gap_row2_to_row3 = DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3;
+        settings->overlay_gap_row3_to_bottom = DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM;
         settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
         settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
         settings->overlay_row2_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
@@ -2279,6 +2330,22 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing",
                               cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_custom_vertical_spacing_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_custom_vertical_spacing_enabled",
+                              cJSON_CreateBool(settings->overlay_custom_vertical_spacing_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_gap_top_to_row1");
+        cJSON_AddItemToObject(visuals_obj, "overlay_gap_top_to_row1",
+                              cJSON_CreateNumber(settings->overlay_gap_top_to_row1));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_gap_row1_to_row2");
+        cJSON_AddItemToObject(visuals_obj, "overlay_gap_row1_to_row2",
+                              cJSON_CreateNumber(settings->overlay_gap_row1_to_row2));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_gap_row2_to_row3");
+        cJSON_AddItemToObject(visuals_obj, "overlay_gap_row2_to_row3",
+                              cJSON_CreateNumber(settings->overlay_gap_row2_to_row3));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_gap_row3_to_bottom");
+        cJSON_AddItemToObject(visuals_obj, "overlay_gap_row3_to_bottom",
+                              cJSON_CreateNumber(settings->overlay_gap_row3_to_bottom));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_custom_scroll_speed_enabled");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_custom_scroll_speed_enabled",

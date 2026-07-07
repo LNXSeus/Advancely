@@ -718,10 +718,15 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
 // At dt == dr == 0 the anchors equal the original tuned values, preserving the
 // default spacing exactly.
 //
+// On top of the font deltas the user can add custom per-gap spacing (all default 0
+// and never negative, so the stock layout is the minimum). Each gap cumulatively
+// shifts every anchor below it and grows the window height, matching the stacking:
+//   g1 = top bar -> row 1, g2 = row 1 -> row 2, g3 = row 2 -> row 3, g4 = row 3 -> bottom.
+//
 // This is called once, after the fonts are loaded in overlay_new. The overlay
 // process is fully restarted whenever settings change, so the layout never needs
 // to be recomputed at runtime and the window never resizes without a settings change.
-static void overlay_compute_layout(Overlay *o) {
+static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
     const float BASE_ROW1_Y = 47.0f; // Centered between the top text and row 2 (13px above and below)
     const float BASE_ROW2_Y = 108.0f;
     const float BASE_ROW3_Y = 260.0f;
@@ -747,10 +752,19 @@ static void overlay_compute_layout(Overlay *o) {
     float dt = top_line_height - ref_line_height;
     float dr = row_line_height - ref_line_height;
 
-    o->layout_row1_y = snap_px(BASE_ROW1_Y + dt);
-    o->layout_row2_y = snap_px(BASE_ROW2_Y + dt);
-    o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr);
-    o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr);
+    // Custom vertical spacing (0 unless the user enables it) is added cumulatively.
+    float g1 = 0.0f, g2 = 0.0f, g3 = 0.0f, g4 = 0.0f;
+    if (settings->overlay_custom_vertical_spacing_enabled) {
+        g1 = settings->overlay_gap_top_to_row1;
+        g2 = settings->overlay_gap_row1_to_row2;
+        g3 = settings->overlay_gap_row2_to_row3;
+        g4 = settings->overlay_gap_row3_to_bottom;
+    }
+
+    o->layout_row1_y = snap_px(BASE_ROW1_Y + dt + g1);
+    o->layout_row2_y = snap_px(BASE_ROW2_Y + dt + g1 + g2);
+    o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr + g1 + g2 + g3);
+    o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr + g1 + g2 + g3 + g4);
 }
 
 
@@ -851,7 +865,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 
     // Size the window to the loaded font. The window was created with a placeholder
     // height in overlay_init_sdl; resize it now that we know the font's line height.
-    overlay_compute_layout(o);
+    overlay_compute_layout(o, settings);
     int current_w;
     SDL_GetWindowSize(o->window, &current_w, nullptr);
     SDL_SetWindowSize(o->window, current_w, o->layout_height);

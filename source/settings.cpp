@@ -219,6 +219,12 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_show_update_timer != b->overlay_show_update_timer ||
         strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
+        a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
+        a->overlay_gap_top_to_row1 != b->overlay_gap_top_to_row1 ||
+        a->overlay_gap_row1_to_row2 != b->overlay_gap_row1_to_row2 ||
+        a->overlay_gap_row2_to_row3 != b->overlay_gap_row2_to_row3 ||
+        a->overlay_gap_row3_to_bottom != b->overlay_gap_row3_to_bottom ||
+
         strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
         a->tracker_font_size != b->tracker_font_size ||
         a->tracker_sub_font_size != b->tracker_sub_font_size ||
@@ -361,6 +367,13 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
         a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+
+        // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
+        a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
+        a->overlay_gap_top_to_row1 != b->overlay_gap_top_to_row1 ||
+        a->overlay_gap_row1_to_row2 != b->overlay_gap_row1_to_row2 ||
+        a->overlay_gap_row2_to_row3 != b->overlay_gap_row2_to_row3 ||
+        a->overlay_gap_row3_to_bottom != b->overlay_gap_row3_to_bottom ||
 
         // Fonts / colors / background textures loaded at overlay init.
         strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
@@ -3522,6 +3535,50 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
+                }
+
+                // --- Custom Vertical Spacing (overlay row gaps) ---
+                ImGui::Checkbox("Custom Vertical Spacing",
+                                &temp_settings.overlay_custom_vertical_spacing_enabled);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                                      "Adjust the vertical gaps between the overlay rows individually.\n"
+                                      "Each gap is added on top of the default, font-driven layout and\n"
+                                      "resizes the overlay window height to match.\n"
+                                      "When disabled, the overlay uses the stock spacing.\n"
+                                      "Default: off.");
+                }
+
+                // Only reveal the individual gap controls when the feature is enabled,
+                // keeping the settings window compact when it is off.
+                if (temp_settings.overlay_custom_vertical_spacing_enabled) {
+                    auto vspacing_gap = [&](const char *label, float *value, float default_value, const char *desc) {
+                        if (ImGui::DragFloat(label, value, 1.0f, OVERLAY_GAP_MIN, OVERLAY_GAP_MAX, "%.0f px")) {
+                            if (*value < OVERLAY_GAP_MIN) *value = OVERLAY_GAP_MIN;
+                            if (*value > OVERLAY_GAP_MAX) *value = OVERLAY_GAP_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[512];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "%s\n"
+                                     "Larger values add space and grow the overlay window height to match.\n"
+                                     "Default: %.0f px.", desc, default_value);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                    };
+
+                    vspacing_gap("Top Bar -> Row 1 Gap", &temp_settings.overlay_gap_top_to_row1,
+                                 DEFAULT_OVERLAY_GAP_TOP_TO_ROW1,
+                                 "Extra vertical space between the top info bar and the first row.");
+                    vspacing_gap("Row 1 -> Row 2 Gap", &temp_settings.overlay_gap_row1_to_row2,
+                                 DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2,
+                                 "Extra vertical space between the first and second rows.");
+                    vspacing_gap("Row 2 -> Row 3 Gap", &temp_settings.overlay_gap_row2_to_row3,
+                                 DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3,
+                                 "Extra vertical space between the second and third rows.");
+                    vspacing_gap("Row 3 -> Bottom Gap", &temp_settings.overlay_gap_row3_to_bottom,
+                                 DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM,
+                                 "Extra vertical space below the third row, at the window's bottom edge.");
                 }
 
                 ImGui::Separator();
