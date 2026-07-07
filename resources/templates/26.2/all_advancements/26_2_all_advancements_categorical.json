@@ -411,7 +411,7 @@
 					"icon":	"ovBiomes/1.21.11+/old_growth_birch_forest.png"
 				},
 				"minecraft:dripstone_caves":	{
-					"icon":	"ovBiomes/1.21.11+/dripstone_caves.png"
+					"icon":	"ovBiomes/1.21.11+/dripstone_caves_26_2.png"
 				},
 				"minecraft:sulfur_caves":	{
 					"icon":	"ovBiomes/1.21.11+/sulfur_caves.png"
@@ -420,7 +420,7 @@
 					"icon":	"ovBiomes/1.21.11+/lush_caves.png"
 				},
 				"minecraft:deep_dark":	{
-					"icon":	"ovBiomes/1.21.11+/deep_dark.png"
+					"icon":	"ovBiomes/1.21.11+/deep_dark_26_2.png"
 				},
 				"minecraft:grove":	{
 					"icon":	"ovBiomes/1.21.11+/grove.png"
@@ -574,7 +574,7 @@
 					"icon":	"neBiomes/crimson_forest.png"
 				},
 				"minecraft:basalt_deltas":	{
-					"icon":	"neBiomes/basalt_deltas.png"
+					"icon":	"neBiomes/26.2+/basalt_deltas_26_2.png"
 				},
 				"minecraft:soul_sand_valley":	{
 					"icon":	"neBiomes/soul_sand_valley.png"

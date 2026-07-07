@@ -188,7 +188,7 @@
 					"icon":	"neBiomes/26.2+/warped_forest.png"
 				},
 				"minecraft:basalt_deltas":	{
-					"icon":	"neBiomes/26.2+/basalt_deltas.png"
+					"icon":	"neBiomes/26.2+/basalt_deltas_26_2.png"
 				},
 				"minecraft:soul_sand_valley":	{
 					"icon":	"neBiomes/26.2+/soul_sand_valley.png"
@@ -1196,13 +1196,13 @@
 					"icon":	"ovBiomes/1.21.11+/sulfur_caves.png"
 				},
 				"minecraft:dripstone_caves":	{
-					"icon":	"ovBiomes/1.21.11+/dripstone_caves.png"
+					"icon":	"ovBiomes/1.21.11+/dripstone_caves_26_2.png"
 				},
 				"minecraft:lush_caves":	{
 					"icon":	"ovBiomes/1.21.11+/lush_caves.png"
 				},
 				"minecraft:deep_dark":	{
-					"icon":	"ovBiomes/1.21.11+/deep_dark.png"
+					"icon":	"ovBiomes/1.21.11+/deep_dark_26_2.png"
 				}
 			}
 		},
