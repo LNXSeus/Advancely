@@ -14251,8 +14251,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     }
 
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s%s%s    -    %s%s%s%s%s IGT%s%s %s",
-             ADVANCELY_VERSION, title_sep, world_display,
+             "  %s  %s%s%s    -    %s%s%s%s%s IGT%s%s %s",
+             TRACKER_TITLE, ADVANCELY_VERSION, title_sep, world_display,
              settings->display_version_str,
              category_chunk,
              progress_chunk, title_sep, formatted_time,

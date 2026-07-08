@@ -68,7 +68,7 @@ const char *get_templates_display_path();
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO
 
-#define TRACKER_TITLE "Advancely"
+#define TRACKER_TITLE "LNXS' Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
 // This automatically applies versioning to metainfo.xml through GitHub Actions.
