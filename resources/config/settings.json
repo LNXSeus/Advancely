@@ -22,7 +22,7 @@
 		"overlay_render_mode":	0,
 		"overlay_page_interval":	8,
 		"overlay_page_align":	0,
-		"overlay_page_repeat":	false,
+		"overlay_page_repeat":	true,
 		"overlay_scroll_speed":	1,
 		"overlay_progress_text_align":	"left",
 		"overlay_row3_remove_completed":	false,

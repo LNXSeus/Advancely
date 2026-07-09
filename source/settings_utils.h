@@ -112,7 +112,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_RENDER_MODE OVERLAY_RENDER_MODE_BELT // Classic scrolling belt by default
 #define DEFAULT_OVERLAY_PAGE_INTERVAL 8.0f // Seconds each static page is shown before flipping (Page mode)
 #define DEFAULT_OVERLAY_PAGE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Partial (not-full) pages left-align by default
-#define DEFAULT_OVERLAY_PAGE_REPEAT false // Repeat items so every page is full, off by default
+#define DEFAULT_OVERLAY_PAGE_REPEAT true // Repeat items so every page is full, on by default
 #define DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED false // Per-row custom scroll speed off by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ENABLED true // Per-row freeze-when-items-fit on by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Frozen items left-aligned by default
