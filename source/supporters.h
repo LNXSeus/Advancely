@@ -24,7 +24,8 @@ static const Supporter SUPPORTERS[] = {
     {"zurtleTif", 20.0f},
     {"ethansplace98", 30.0f},
     {"Totorewa", 31.0f},
-    {"Zesskyo", 10.0f}
+    {"Zesskyo", 10.0f},
+    {"diggitydingdong", 100.0f}
 };
 static const int NUM_SUPPORTERS = (int) (sizeof(SUPPORTERS) / sizeof(Supporter));
 

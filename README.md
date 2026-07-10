@@ -70,6 +70,7 @@ Love using Advancely? You can have your name immortalized in the tracker!
 
 **Supporters:**
 
+* diggitydingdong: $100
 * Totorewa: $31
 * ethansplace98: $30
 * zurtleTif: $20
@@ -1029,7 +1030,10 @@ overlay.
   smaller goal that must be completed in order. A newly created goal already comes with one editable stage plus the
   mandatory `Final` stage, so you can start filling it in right away. A stage's `Type` determines its trigger:
     * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
-      `stats` folder).
+      `stats` folder). A `Target Value` above `0` completes the stage when the stat reaches it. A `Target Value` of `-1`
+      makes it an infinite counter that never completes on its own, so it must be completed by a linked goal or the
+      `Auto-complete if next stage is completed` checkbox instead. A `Target Value` of `0` is not allowed and is flagged
+      as an error on save.
     * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
     * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
       biome for "Adventuring Time").

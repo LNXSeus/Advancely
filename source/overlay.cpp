@@ -1743,6 +1743,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
                             snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
                                      stage->required_progress, stage->required_progress);
+                        } else if (stage->type == SUBGOAL_STAT && stage->required_progress == -1) {
+                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d)", stage->display_text,
+                                     stage->current_stat_progress);
                         } else {
                             strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
                             temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
@@ -1984,6 +1987,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                         snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
                                                  active_stage->display_text, active_stage->current_stat_progress,
                                                  active_stage->required_progress);
+                                    } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
+                                        snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
+                                                 active_stage->display_text, active_stage->current_stat_progress);
                                     } else {
                                         snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
                                     }
@@ -2229,6 +2235,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
                             snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
                                      stage->required_progress, stage->required_progress);
+                        } else if (stage->type == SUBGOAL_STAT && stage->required_progress == -1) {
+                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d)", stage->display_text,
+                                     stage->current_stat_progress);
                         } else {
                             strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
                             temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
@@ -2488,6 +2497,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
                                              active_stage->display_text, active_stage->current_stat_progress,
                                              active_stage->required_progress);
+                                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
+                                    snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
+                                             active_stage->display_text, active_stage->current_stat_progress);
                                 } else {
                                     snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
                                 }

@@ -3196,8 +3196,10 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                         }
                     }
 
-                    // Check for completion
-                    if (stat_found && current_progress >= stage_to_check->required_progress) {
+                    // Check for completion. A required_progress of -1 is an infinite counter
+                    // that never completes on its own (only via linked goals or complete_with_next).
+                    if (stat_found && stage_to_check->required_progress > 0 &&
+                        current_progress >= stage_to_check->required_progress) {
                         stage_completed = true;
                     }
                     stage_to_check->current_stat_progress = current_progress;
@@ -3417,7 +3419,8 @@ static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
             // Stat stages re-derive live (Hermes/full updates keep current_stat_progress accurate); other
             // stage types rely on the stored game_trigger_met flag.
             bool game_met = (stage->type == SUBGOAL_STAT)
-                                ? (stage->current_stat_progress >= stage->required_progress)
+                                ? (stage->required_progress > 0 &&
+                                   stage->current_stat_progress >= stage->required_progress)
                                 : stage->game_trigger_met;
             base_satisfied[j] = game_met ||
                                 (stage->linked_goal_count > 0 &&
@@ -4666,7 +4669,9 @@ static bool coop_finalize_multi_stage(TemplateData *td) {
 
             bool stage_completed = false;
             if (stage->type == SUBGOAL_STAT) {
-                stage_completed = (stage->current_stat_progress >= stage->required_progress);
+                // A required_progress of -1 is an infinite counter that never completes on its own.
+                stage_completed = (stage->required_progress > 0 &&
+                                   stage->current_stat_progress >= stage->required_progress);
             } else {
                 stage_completed = stage->coop_completed;
             }
@@ -10031,6 +10036,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d/%d)",
                              active_stage_width->display_text,
                              active_stage_width->current_stat_progress, active_stage_width->required_progress);
+                } else if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress == -1) {
+                    snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d)",
+                             active_stage_width->display_text, active_stage_width->current_stat_progress);
                 } else {
                     strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
                     stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
@@ -10150,6 +10158,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
                 snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
                          active_stage_render->current_stat_progress, active_stage_render->required_progress);
+            } else if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress == -1) {
+                snprintf(stage_text, sizeof(stage_text), "%s (%d)", active_stage_render->display_text,
+                         active_stage_render->current_stat_progress);
             } else {
                 strncpy(stage_text, active_stage_render->display_text, sizeof(stage_text) - 1);
                 stage_text[sizeof(stage_text) - 1] = '\0';
@@ -14543,6 +14554,11 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                                 active_stage->display_text,
                                 active_stage->current_stat_progress,
                                 active_stage->required_progress);
+                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
+                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s (%d)\n",
+                                goal->display_name,
+                                active_stage->display_text,
+                                active_stage->current_stat_progress);
                 } else {
                     // If it's not "stat" print this
                     log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s\n", goal->display_name,

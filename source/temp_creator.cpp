@@ -3157,6 +3157,21 @@ static bool validate_and_save_template(const char *creator_version_str,
             }
         }
     }
+    // --- Check for stat stages with a Target Value of 0 ---
+    if (validation_passed) {
+        for (const auto &goal: current_template_data.multi_stage_goals) {
+            for (const auto &stage: goal.stages) {
+                if (stage.type == SUBGOAL_STAT && stage.required_progress == 0) {
+                    snprintf(status_message, 256,
+                             "Error: Stat stage '%s' in multi-stage goal '%s' cannot have a Target Value of 0.",
+                             stage.stage_id, goal.root_name);
+                    validation_passed = false;
+                    break;
+                }
+            }
+            if (!validation_passed) break;
+        }
+    }
 
     // --- Counter Goals Validation ---
     if (validation_passed) {
@@ -15771,17 +15786,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 // Only show target value for stat/achievements
                                 if (stage.type == SUBGOAL_STAT) {
                                     if (ImGui::InputInt("Target Value", &stage.required_progress)) {
-                                        if (stage.required_progress < 1) {
-                                            stage.required_progress = 1; // Clamp to minimum of 1
+                                        if (stage.required_progress < -1) {
+                                            stage.required_progress = -1; // Clamp to minimum of -1
                                         }
                                         ms_goal_data_changed = true;
                                         save_message_type = MSG_NONE;
                                     }
                                     if (ImGui::IsItemHovered()) {
-                                        char tooltip_buffer[256];
+                                        char tooltip_buffer[640];
                                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                                  "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n"
-                                                 "Must be 1 or greater.");
+                                                 ">0 = Progress-based counter that completes when the value is reached.\n"
+                                                 "-1 = Infinite counter (never completes on its own).\n"
+                                                 "0 = NOT ALLOWED.\n\n"
+                                                 "Warning: A -1 stage is an infinite counter and will never complete by itself.\n"
+                                                 "Something else must complete it: a linked auto-complete goal, or the\n"
+                                                 "'Auto-complete if next stage is completed' checkbox on this stage.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
                                 }
