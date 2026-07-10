@@ -9,7 +9,7 @@
 # A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
 
 <p align="center">
-  <img src="readme_assets/Advancely-v0.9.455-Preview.gif" alt="Advancely_Tracker_Preview">
+  <img src="readme_assets/Advancely-v1.6.1-Preview.gif" alt="Advancely_Tracker_Preview">
   <br>
   <em>This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly sharp.</em>
 </p>
@@ -65,7 +65,7 @@
 Love using Advancely? You can have your name immortalized in the tracker!
 
 <p align="center">
-  <img src="readme_assets/Supporters_Screen_Overlay_v1.0.5.png" alt="Supporters Screen">
+  <img src="readme_assets/Supporters_Screen_Overlay_v1.6.1.png" alt="Supporters Screen">
 </p>
 
 **Supporters:**
@@ -298,7 +298,7 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
 ## Performance & Optimization
 
 <p align="center">
-  <img src="readme_assets/v0.9.497_LOD_Example.png" alt="Template_Editor">
+  <img src="readme_assets/v1.6.1_LOD_Example.png" alt="Template_Editor">
 </p>
 
 Advancely tries to be as lightweight as possible when it comes to system resources despite allowing for 1000+ goals
@@ -562,7 +562,7 @@ Your custom template will appear separately in the template list and will not be
 > 📺 **Video Guide:** [Main Tracker Overview (18:23)](https://youtu.be/Rxd1RJqg2WQ?t=18m23s) • [Controls & Navigation (6:22)](https://youtu.be/Rxd1RJqg2WQ?t=6m22s)
 
 <p align="center">
-  <img src="readme_assets/v0.9.286_Tracker_Window.png" alt="Tracker_Window">
+  <img src="readme_assets/v1.6.1_Tracker_Window.png" alt="Tracker_Window">
 </p>
 
 The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to
@@ -855,7 +855,7 @@ share the rulesets or `templates` that the tracker uses. You can access it by op
 the `Open Template Editor` button.
 
 <p align="center">
-  <img src="readme_assets/v1.5.3_Template_Editor.png" alt="Template_Editor">
+  <img src="readme_assets/v1.6.1_Template_Editor.png" alt="Template_Editor">
 </p>
 
 <details>
@@ -1265,7 +1265,7 @@ settings file also saves the status on manual overrides of stats and custom goal
 templates._
 
 <p align="center">
-  <img src="readme_assets/v1.2.0_Settings_Window.png"/>
+  <img src="readme_assets/v1.6.1_Settings_Window.png"/>
 </p>
 
 <details>
