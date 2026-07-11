@@ -5104,6 +5104,62 @@ static void coop_merge_one_player_from_disk(Tracker *t, const AppSettings *setti
                 }
             }
         }
+
+        // SUBGOAL_STAT stages in multi-stage goals share the same delta cache but
+        // are never covered by the regular stat-category seed above. Without a
+        // baseline the first live Hermes event treats the player's entire disk
+        // total as a delta and double-counts it into the stage (self-heals only on
+        // the next game save). Seed each stat stage's per-player disk value here,
+        // keyed exactly like the live-event path in hermes_apply_stat_event_cumulative.
+        for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+            MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+            if (!goal) continue;
+            for (int j = 0; j < goal->stage_count; j++) {
+                SubGoal *stage = goal->stages[j];
+                if (!stage || stage->type != SUBGOAL_STAT) continue;
+
+                int player_value = 0;
+                std::string stat_key;
+
+                if (version >= MC_VERSION_1_13) {
+                    // Modern stage root_name: "minecraft:picked_up/minecraft:oak_log"
+                    const char *slash = strchr(stage->root_name, '/');
+                    if (!slash) continue;
+                    size_t cat_len = (size_t) (slash - stage->root_name);
+                    char cat_json[192], item_json[192];
+                    if (cat_len == 0 || cat_len >= sizeof(cat_json)) continue;
+                    strncpy(cat_json, stage->root_name, cat_len);
+                    cat_json[cat_len] = '\0';
+                    strncpy(item_json, slash + 1, sizeof(item_json) - 1);
+                    item_json[sizeof(item_json) - 1] = '\0';
+
+                    cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+                    if (!stats_obj) continue;
+                    cJSON *cat_obj = cJSON_GetObjectItem(stats_obj, cat_json);
+                    if (!cat_obj) continue;
+                    cJSON *val = cJSON_GetObjectItem(cat_obj, item_json);
+                    if (!cJSON_IsNumber(val)) continue;
+                    player_value = val->valueint;
+
+                    // Rebuild the Hermes-format key: colons in cat/item become dots.
+                    char *colon_pos = strchr(cat_json, ':');
+                    if (colon_pos) *colon_pos = '.';
+                    colon_pos = strchr(item_json, ':');
+                    if (colon_pos) *colon_pos = '.';
+                    char hermes_key[384];
+                    snprintf(hermes_key, sizeof(hermes_key), "%s:%s", cat_json, item_json);
+                    stat_key = hermes_key;
+                } else {
+                    // Mid-era: flat JSON, cache key is the stage root_name verbatim.
+                    cJSON *val = cJSON_GetObjectItem(player_stats_json, stage->root_name);
+                    if (!cJSON_IsNumber(val)) continue;
+                    player_value = val->valueint;
+                    stat_key = stage->root_name;
+                }
+
+                (*hermes_cache)[uuid_prefix + stat_key] = player_value;
+            }
+        }
     }
 
     // Clean up this player's JSON
