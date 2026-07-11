@@ -6224,12 +6224,19 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     // Stable identity for this draggable element, used to restore the selection across a template
     // reload. The four parts uniquely identify each handle (e.g. an advancement's Icon vs Text, or a
     // decoration's Endpoint 1 vs Bend 2). \x1f is a non-printable separator that can't appear in names.
+    // The key is only ever read for selected items (captured just before a reload) and the single
+    // post-reload frame that rematches every item, so only build it in those cases. Building this
+    // 512-byte string for every handle every frame was needless per-frame work while layout editing.
     char visual_item_key[512];
-    snprintf(visual_item_key, sizeof(visual_item_key), "%s\x1f%s\x1f%s\x1f%s",
-             goal_type ? goal_type : "",
-             parent_root_name ? parent_root_name : "",
-             root_name ? root_name : "",
-             element_type ? element_type : "");
+    if (s_visual_remap_after_reload || is_just_clicked || s_visual_selected_items.count(&target_pos) > 0) {
+        snprintf(visual_item_key, sizeof(visual_item_key), "%s\x1f%s\x1f%s\x1f%s",
+                 goal_type ? goal_type : "",
+                 parent_root_name ? parent_root_name : "",
+                 root_name ? root_name : "",
+                 element_type ? element_type : "");
+    } else {
+        visual_item_key[0] = '\0';
+    }
 
     // Register this item for selection rectangle hit-testing
     s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable,

@@ -6010,120 +6010,121 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 sync_pos(ed_item.progress_pos, tr_item->progress_pos); // for custom goal progress
             };
 
+            // Build a name/id -> tracker-object index per section so each editor item is matched in
+            // O(1) instead of a nested linear scan. The old O(N^2) match ran on every drag frame and
+            // was the main cause of drag lag on large templates. decltype(+arr[0]) deduces the decayed
+            // element pointer type (the unary + strips the reference) without pulling in <type_traits>.
+            auto index_by = [](auto **arr, int count, auto member) {
+                std::unordered_map<std::string, decltype(+arr[0])> m;
+                m.reserve((size_t) count);
+                for (int i = 0; i < count; i++) {
+                    if (arr[i]) m.emplace(arr[i]->*member, arr[i]);
+                }
+                return m;
+            };
+
             // Sync Advancements
+            auto tr_adv_idx = index_by(t->template_data->advancements, t->template_data->advancement_count,
+                                       &TrackableCategory::root_name);
             for (auto &ed_adv: current_template_data.advancements) {
-                for (int i = 0; i < t->template_data->advancement_count; i++) {
-                    if (t->template_data->advancements[i] && strcmp(ed_adv.root_name,
-                                                                    t->template_data->advancements[i]->root_name) ==
-                        0) {
-                        TrackableCategory *tr_adv = t->template_data->advancements[i];
-                        sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
-                        sync_pos(ed_adv.text_pos, tr_adv->text_pos);
-                        sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
-                        // Sync criteria
-                        for (auto &ed_crit: ed_adv.criteria) {
-                            for (int j = 0; j < tr_adv->criteria_count; j++) {
-                                if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) ==
-                                    0) {
-                                    sync_item(ed_crit, tr_adv->criteria[j]);
-                                }
-                            }
+                auto adv_it = tr_adv_idx.find(ed_adv.root_name);
+                if (adv_it == tr_adv_idx.end()) continue;
+                TrackableCategory *tr_adv = adv_it->second;
+                sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
+                sync_pos(ed_adv.text_pos, tr_adv->text_pos);
+                sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
+                // Sync criteria
+                for (auto &ed_crit: ed_adv.criteria) {
+                    for (int j = 0; j < tr_adv->criteria_count; j++) {
+                        if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) == 0) {
+                            sync_item(ed_crit, tr_adv->criteria[j]);
                         }
                     }
                 }
             }
 
             // Sync Stats
+            auto tr_stat_idx = index_by(t->template_data->stats, t->template_data->stat_count,
+                                        &TrackableCategory::root_name);
             for (auto &ed_stat: current_template_data.stats) {
-                for (int i = 0; i < t->template_data->stat_count; i++) {
-                    if (t->template_data->stats[i] && strcmp(ed_stat.root_name, t->template_data->stats[i]->root_name)
-                        == 0) {
-                        TrackableCategory *tr_stat = t->template_data->stats[i];
-                        sync_pos(ed_stat.icon_pos, tr_stat->icon_pos);
-                        sync_pos(ed_stat.text_pos, tr_stat->text_pos);
-                        sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
-                        // Sync criteria
-                        for (auto &ed_crit: ed_stat.criteria) {
-                            for (int j = 0; j < tr_stat->criteria_count; j++) {
-                                if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name)
-                                    == 0) {
-                                    sync_item(ed_crit, tr_stat->criteria[j]);
-                                }
-                            }
+                auto stat_it = tr_stat_idx.find(ed_stat.root_name);
+                if (stat_it == tr_stat_idx.end()) continue;
+                TrackableCategory *tr_stat = stat_it->second;
+                sync_pos(ed_stat.icon_pos, tr_stat->icon_pos);
+                sync_pos(ed_stat.text_pos, tr_stat->text_pos);
+                sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
+                // Sync criteria
+                for (auto &ed_crit: ed_stat.criteria) {
+                    for (int j = 0; j < tr_stat->criteria_count; j++) {
+                        if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name) == 0) {
+                            sync_item(ed_crit, tr_stat->criteria[j]);
                         }
                     }
                 }
             }
 
             // Sync Simple Items
+            auto tr_unlock_idx = index_by(t->template_data->unlocks, t->template_data->unlock_count,
+                                          &TrackableItem::root_name);
             for (auto &ed_unlock: current_template_data.unlocks) {
-                for (int i = 0; i < t->template_data->unlock_count; i++) {
-                    if (t->template_data->unlocks[i] && strcmp(ed_unlock.root_name,
-                                                               t->template_data->unlocks[i]->root_name) == 0) {
-                        sync_item(ed_unlock, t->template_data->unlocks[i]);
-                    }
-                }
+                auto it = tr_unlock_idx.find(ed_unlock.root_name);
+                if (it != tr_unlock_idx.end()) sync_item(ed_unlock, it->second);
             }
+            auto tr_custom_idx = index_by(t->template_data->custom_goals, t->template_data->custom_goal_count,
+                                          &TrackableItem::root_name);
             for (auto &ed_cg: current_template_data.custom_goals) {
-                for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-                    if (t->template_data->custom_goals[i] && strcmp(ed_cg.root_name,
-                                                                    t->template_data->custom_goals[i]->root_name) ==
-                        0) {
-                        sync_item(ed_cg, t->template_data->custom_goals[i]);
-                    }
-                }
+                auto it = tr_custom_idx.find(ed_cg.root_name);
+                if (it != tr_custom_idx.end()) sync_item(ed_cg, it->second);
             }
 
             // Sync MS Goals
+            auto tr_msg_idx = index_by(t->template_data->multi_stage_goals, t->template_data->multi_stage_goal_count,
+                                       &MultiStageGoal::root_name);
             for (auto &ed_msg: current_template_data.multi_stage_goals) {
-                for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-                    if (t->template_data->multi_stage_goals[i] && strcmp(
-                            ed_msg.root_name, t->template_data->multi_stage_goals[i]->root_name) == 0) {
-                        MultiStageGoal *tr_msg = t->template_data->multi_stage_goals[i];
-                        sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
-                        sync_pos(ed_msg.text_pos, tr_msg->text_pos);
-                        sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
-                    }
-                }
+                auto it = tr_msg_idx.find(ed_msg.root_name);
+                if (it == tr_msg_idx.end()) continue;
+                MultiStageGoal *tr_msg = it->second;
+                sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
+                sync_pos(ed_msg.text_pos, tr_msg->text_pos);
+                sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
             }
 
             // Sync Counters
+            auto tr_counter_idx = index_by(t->template_data->counter_goals, t->template_data->counter_goal_count,
+                                           &CounterGoal::root_name);
             for (auto &ed_counter: current_template_data.counter_goals) {
-                for (int i = 0; i < t->template_data->counter_goal_count; i++) {
-                    if (t->template_data->counter_goals[i] && strcmp(
-                            ed_counter.root_name, t->template_data->counter_goals[i]->root_name) == 0) {
-                        CounterGoal *tr_counter = t->template_data->counter_goals[i];
-                        sync_pos(ed_counter.icon_pos, tr_counter->icon_pos);
-                        sync_pos(ed_counter.text_pos, tr_counter->text_pos);
-                        sync_pos(ed_counter.progress_pos, tr_counter->progress_pos);
-                    }
-                }
+                auto it = tr_counter_idx.find(ed_counter.root_name);
+                if (it == tr_counter_idx.end()) continue;
+                CounterGoal *tr_counter = it->second;
+                sync_pos(ed_counter.icon_pos, tr_counter->icon_pos);
+                sync_pos(ed_counter.text_pos, tr_counter->text_pos);
+                sync_pos(ed_counter.progress_pos, tr_counter->progress_pos);
             }
 
             // Sync Decorations
+            auto tr_deco_idx = index_by(t->template_data->decorations, t->template_data->decoration_count,
+                                        &DecorationElement::id);
             for (auto &ed_deco: current_template_data.decorations) {
-                for (int i = 0; i < t->template_data->decoration_count; i++) {
-                    if (t->template_data->decorations[i] && strcmp(
-                            ed_deco.id, t->template_data->decorations[i]->id) == 0) {
-                        sync_pos(ed_deco.pos, t->template_data->decorations[i]->pos);
-                        if (ed_deco.type == DECORATION_LINE) {
-                            sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
-                            // Push editor values to runtime to prevent flickering on template reload
-                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
-                            t->template_data->decorations[i]->opacity = ed_deco.opacity;
-                        }
-                        if (ed_deco.type == DECORATION_ARROW) {
-                            sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
-                            for (int b = 0; b < ed_deco.bend_count && b < MAX_ARROW_BENDS; b++) {
-                                sync_pos(ed_deco.bends[b], t->template_data->decorations[i]->bends[b]);
-                            }
-                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
-                            t->template_data->decorations[i]->arrowhead_size = ed_deco.arrowhead_size;
-                            t->template_data->decorations[i]->bend_count = ed_deco.bend_count;
-                            t->template_data->decorations[i]->opacity_before = ed_deco.opacity_before;
-                            t->template_data->decorations[i]->opacity_after = ed_deco.opacity_after;
-                        }
+                auto it = tr_deco_idx.find(ed_deco.id);
+                if (it == tr_deco_idx.end()) continue;
+                DecorationElement *tr_deco = it->second;
+                sync_pos(ed_deco.pos, tr_deco->pos);
+                if (ed_deco.type == DECORATION_LINE) {
+                    sync_pos(ed_deco.pos2, tr_deco->pos2);
+                    // Push editor values to runtime to prevent flickering on template reload
+                    tr_deco->thickness = ed_deco.thickness;
+                    tr_deco->opacity = ed_deco.opacity;
+                }
+                if (ed_deco.type == DECORATION_ARROW) {
+                    sync_pos(ed_deco.pos2, tr_deco->pos2);
+                    for (int b = 0; b < ed_deco.bend_count && b < MAX_ARROW_BENDS; b++) {
+                        sync_pos(ed_deco.bends[b], tr_deco->bends[b]);
                     }
+                    tr_deco->thickness = ed_deco.thickness;
+                    tr_deco->arrowhead_size = ed_deco.arrowhead_size;
+                    tr_deco->bend_count = ed_deco.bend_count;
+                    tr_deco->opacity_before = ed_deco.opacity_before;
+                    tr_deco->opacity_after = ed_deco.opacity_after;
                 }
             }
 
