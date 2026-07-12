@@ -597,7 +597,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         last_scanned_version[0] = '\0';
         // Also regenerate the per-version template counts shown in the version dropdown
         // so the "(N)" next to each version reflects added/removed templates without a restart.
-        version_counts_generated = false;
+        // Skip during visual layout editing: that drag raises g_templates_changed every frame,
+        // and rescanning all 100+ versions each frame spikes disk I/O and halves the frame rate.
+        // Templates can't be added or removed while layout editing, so the counts can't change.
+        if (!t || !t->is_visual_layout_editing) {
+            version_counts_generated = false;
+        }
     }
 
     // --- State management for window open/close ---
