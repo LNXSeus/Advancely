@@ -54,12 +54,20 @@ struct Overlay {
     TTF_Font *font; // Rows 2 & 3 text (sdl ttf), sized by overlay_row_font_size
     TTF_Font *font_top; // Top progress/info bar text, sized by overlay_progress_font_size
 
+    // Compact mode fonts: goal-type label, big count, and pop-out stack (each its own face + size).
+    TTF_Font *compact_label_font;
+    TTF_Font *compact_count_font;
+    TTF_Font *compact_stack_font;
+
     SDL_Texture *adv_bg;
     SDL_Texture *adv_bg_half_done;
     SDL_Texture *adv_bg_done;
     AnimatedTexture *adv_bg_anim;
     AnimatedTexture *adv_bg_half_done_anim;
     AnimatedTexture *adv_bg_done_anim;
+
+    SDL_Texture *compact_panel; // 9-slice counter panel texture for Compact render mode (cache-owned).
+    AnimatedTexture *compact_panel_anim; // Animated (.gif) counter panel for Compact mode (cache-owned).
 
     // Cahces for textures to improve performance
     TextureCacheEntry *texture_cache;

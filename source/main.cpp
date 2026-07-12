@@ -1650,10 +1650,14 @@ int main(int argc, char *argv[]) {
         // spurious tracker dmon reloads.
         if (overlay && overlay->window) {
             SDL_GetWindowPosition(overlay->window, &settings.overlay_window.x, &settings.overlay_window.y);
-            int w, h;
-            SDL_GetWindowSize(overlay->window, &w, &h);
-            settings.overlay_window.w = w;
-            settings.overlay_window.h = overlay->layout_height;
+            // Compact mode auto-fits its window every frame, so its size is transient - keep the
+            // user's configured width/height (used by the belt/page modes) instead of overwriting it.
+            if (settings.overlay_render_mode != OVERLAY_RENDER_MODE_COMPACT) {
+                int w, h;
+                SDL_GetWindowSize(overlay->window, &w, &h);
+                settings.overlay_window.w = w;
+                settings.overlay_window.h = overlay->layout_height;
+            }
             settings_save(&settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM);
         }
 

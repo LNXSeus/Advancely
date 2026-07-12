@@ -171,6 +171,20 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_page_interval != b->overlay_page_interval ||
         a->overlay_page_align != b->overlay_page_align ||
         a->overlay_page_repeat != b->overlay_page_repeat ||
+        strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
+        a->compact_panel_inset_left != b->compact_panel_inset_left ||
+        a->compact_panel_inset_right != b->compact_panel_inset_right ||
+        a->compact_panel_inset_top != b->compact_panel_inset_top ||
+        a->compact_panel_inset_bottom != b->compact_panel_inset_bottom ||
+        a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
+        a->compact_panel_padding != b->compact_panel_padding ||
+        a->compact_panel_align != b->compact_panel_align ||
+        strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
+        strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
+        strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
+        a->compact_label_font_size != b->compact_label_font_size ||
+        a->compact_count_font_size != b->compact_count_font_size ||
+        a->compact_stack_font_size != b->compact_stack_font_size ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
@@ -343,6 +357,20 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->overlay_page_interval != b->overlay_page_interval ||
         a->overlay_page_align != b->overlay_page_align ||
         a->overlay_page_repeat != b->overlay_page_repeat ||
+        strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
+        a->compact_panel_inset_left != b->compact_panel_inset_left ||
+        a->compact_panel_inset_right != b->compact_panel_inset_right ||
+        a->compact_panel_inset_top != b->compact_panel_inset_top ||
+        a->compact_panel_inset_bottom != b->compact_panel_inset_bottom ||
+        a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
+        a->compact_panel_padding != b->compact_panel_padding ||
+        a->compact_panel_align != b->compact_panel_align ||
+        strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
+        strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
+        strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
+        a->compact_label_font_size != b->compact_label_font_size ||
+        a->compact_count_font_size != b->compact_count_font_size ||
+        a->compact_stack_font_size != b->compact_stack_font_size ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
         a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
@@ -2963,6 +2991,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
                 }
 
+                // Content & Behavior drives the belt/page top info bar and 3-row layout (text sections,
+                // separator, IGT formatting, sub-stat cycling, clear animation). Compact mode uses none
+                // of these, so hide the whole section while it is active.
+                if (temp_settings.overlay_render_mode != OVERLAY_RENDER_MODE_COMPACT) {
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Content & Behavior");
@@ -3132,6 +3164,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
                     ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
                 }
+                } // End of Content & Behavior (belt/page only; hidden in Compact mode)
 
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -3163,9 +3196,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Default: Scrolling Belt");
                     ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
                 }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Compact", overlay_mode == OVERLAY_RENDER_MODE_COMPACT)) {
+                    overlay_mode = OVERLAY_RENDER_MODE_COMPACT;
+                }
+                if (ImGui::IsItemHovered()) {
+                    const char *overlay_mode_names[] = {"Scrolling Belt", "Page", "Compact"};
+                    char overlay_mode_compact_tooltip_buffer[512];
+                    snprintf(overlay_mode_compact_tooltip_buffer, sizeof(overlay_mode_compact_tooltip_buffer),
+                             "A tall, compact counter panel that cycles through goal types, with completed goals\n"
+                             "popping out beneath it. Inspired by Zesskyo.\n"
+                             "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                    ImGui::SetTooltip("%s", overlay_mode_compact_tooltip_buffer);
+                }
                 temp_settings.overlay_render_mode = (OverlayRenderMode) overlay_mode;
 
                 const bool overlay_page_mode = (temp_settings.overlay_render_mode == OVERLAY_RENDER_MODE_PAGE);
+                const bool overlay_compact_mode = (temp_settings.overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT);
 
                 // Only relevant to Page mode; reveal the page-flip interval when it is selected.
                 if (overlay_page_mode) {
@@ -3222,9 +3269,106 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::EndDisabled();
                 }
 
+                // Compact mode: the counter panel's 9-slice texture and geometry. Only relevant to
+                // Compact mode, so shown only while it is selected.
+                if (overlay_compact_mode) {
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Compact Mode Settings");
+
+                    ImGui::Text("Panel Texture:");
+                    ImGui::SameLine();
+                    ImGui::TextWrapped("%s", temp_settings.compact_panel_path);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##CompactPanel")) {
+                        char selected_file[MAX_PATH_LENGTH];
+                        if (open_gui_texture_dialog(selected_file, sizeof(selected_file))) {
+                            strncpy(temp_settings.compact_panel_path, selected_file,
+                                    sizeof(temp_settings.compact_panel_path) - 1);
+                            temp_settings.compact_panel_path[sizeof(temp_settings.compact_panel_path) - 1] = '\0';
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_panel_tex_tooltip_buffer[512];
+                        snprintf(compact_panel_tex_tooltip_buffer, sizeof(compact_panel_tex_tooltip_buffer),
+                                 "The 9-slice panel texture drawn behind the counter.\n"
+                                 "Use a small square texture; its border pixels repeat to fit any size.\n"
+                                 "Must be a .png or .gif inside the resources/gui folder.\n"
+                                 "Default: %s", DEFAULT_COMPACT_PANEL_PATH);
+                        ImGui::SetTooltip("%s", compact_panel_tex_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragInt("Panel Pixel Scale", &temp_settings.compact_panel_pixel_scale, 0.1f, 1, 16)) {
+                        if (temp_settings.compact_panel_pixel_scale < 1) temp_settings.compact_panel_pixel_scale = 1;
+                        if (temp_settings.compact_panel_pixel_scale > 16) temp_settings.compact_panel_pixel_scale = 16;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_panel_scale_tooltip_buffer[512];
+                        snprintf(compact_panel_scale_tooltip_buffer, sizeof(compact_panel_scale_tooltip_buffer),
+                                 "On-screen pixels drawn per source texture pixel, so the panel border\n"
+                                 "matches the pixel size of the item backgrounds.\n"
+                                 "Default: %d", DEFAULT_COMPACT_PANEL_PIXEL_SCALE);
+                        ImGui::SetTooltip("%s", compact_panel_scale_tooltip_buffer);
+                    }
+
+                    int compact_insets[4] = {
+                        temp_settings.compact_panel_inset_left, temp_settings.compact_panel_inset_right,
+                        temp_settings.compact_panel_inset_top, temp_settings.compact_panel_inset_bottom
+                    };
+                    if (ImGui::DragInt4("Panel Border (L/R/T/B)", compact_insets, 0.1f, 0, 64)) {
+                        for (int i = 0; i < 4; i++) {
+                            if (compact_insets[i] < 0) compact_insets[i] = 0;
+                            if (compact_insets[i] > 64) compact_insets[i] = 64;
+                        }
+                        temp_settings.compact_panel_inset_left = compact_insets[0];
+                        temp_settings.compact_panel_inset_right = compact_insets[1];
+                        temp_settings.compact_panel_inset_top = compact_insets[2];
+                        temp_settings.compact_panel_inset_bottom = compact_insets[3];
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_panel_border_tooltip_buffer[768];
+                        snprintf(compact_panel_border_tooltip_buffer, sizeof(compact_panel_border_tooltip_buffer),
+                                 "Border thickness in the texture's OWN pixels, per edge (Left / Right / Top / Bottom).\n"
+                                 "The texture is cut into a 3x3 grid: the four corners of this size are drawn without\n"
+                                 "stretching, the top/bottom edges repeat sideways, the left/right edges repeat down,\n"
+                                 "and the leftover middle fills the rest. That keeps the border crisp while the panel\n"
+                                 "grows to fit the text. Example: the default 5x5 panel uses 2, leaving a 1px center.\n"
+                                 "Each of these pixels is then multiplied on screen by Panel Pixel Scale.\n"
+                                 "Default: %d on every edge", DEFAULT_COMPACT_PANEL_INSET);
+                        ImGui::SetTooltip("%s", compact_panel_border_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Panel Padding", &temp_settings.compact_panel_padding, 0.5f, 0.0f, 128.0f,
+                                         "%.0f px")) {
+                        if (temp_settings.compact_panel_padding < 0.0f) temp_settings.compact_panel_padding = 0.0f;
+                        if (temp_settings.compact_panel_padding > 128.0f) temp_settings.compact_panel_padding = 128.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_panel_pad_tooltip_buffer[512];
+                        snprintf(compact_panel_pad_tooltip_buffer, sizeof(compact_panel_pad_tooltip_buffer),
+                                 "Space in on-screen pixels between the counter text and the panel border.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_PANEL_PADDING);
+                        ImGui::SetTooltip("%s", compact_panel_pad_tooltip_buffer);
+                    }
+
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::Combo("Panel Alignment", (int *) &temp_settings.compact_panel_align, "Left\0Center\0Right\0");
+                    if (ImGui::IsItemHovered()) {
+                        const char *compact_align_names[] = {"Left", "Center", "Right"};
+                        char compact_panel_align_tooltip_buffer[640];
+                        snprintf(compact_panel_align_tooltip_buffer, sizeof(compact_panel_align_tooltip_buffer),
+                                 "How the panel sits within the auto-fitted overlay window.\n"
+                                 "Left keeps the panel's left edge fixed as the background grows (best for\n"
+                                 "left-aligning the overlay in OBS), Center keeps it centered, Right keeps its\n"
+                                 "right edge fixed. The pop-out stack below always left-aligns to the panel's left edge.\n"
+                                 "Default: %s", compact_align_names[DEFAULT_COMPACT_PANEL_ALIGN]);
+                        ImGui::SetTooltip("%s", compact_panel_align_tooltip_buffer);
+                    }
+                }
+
                 // The scroll speed, per-row custom speeds and auto-freeze toggles only affect the
-                // scrolling belt mode, so hide the whole Scrolling section while Page mode is active.
-                if (!overlay_page_mode) {
+                // scrolling belt mode, so hide the whole Scrolling section for Page and Compact modes.
+                if (!overlay_page_mode && !overlay_compact_mode) {
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Scrolling");
@@ -3395,6 +3539,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 } // End of belt-only scrolling / freeze options (hidden in Page mode)
 
+                // Layout & Spacing controls the belt/page 3-row overlay (width, row spacing, alignment).
+                // Compact auto-fits its window and has no rows, so hide the whole section while active.
+                if (!overlay_compact_mode) {
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Layout & Spacing");
@@ -3585,11 +3732,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM,
                                  "Extra vertical space below the third row, at the window's bottom edge.");
                 }
+                } // End of Layout & Spacing (belt/page only; hidden in Compact mode)
 
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Aesthetics");
 
+                // The single overlay font and the Top/Row text sizes drive the belt/page 3-row layout.
+                // Compact mode has its own per-element fonts below, so hide these while it is active.
+                if (!overlay_compact_mode) {
                 ImGui::Text("Overlay Font: %s", temp_settings.overlay_font_name);
                 ImGui::SameLine();
                 if (ImGui::Button("Browse##OverlayFont")) {
@@ -3640,6 +3791,113 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "A larger size increases the overlay window height to fit the taller text.\n"
                              "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
                     ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+                } // End of belt/page font + text-size controls (hidden in Compact mode)
+
+                // Compact mode: the goal-type label, the big count and the pop-out stack each have their
+                // own font face and size. Shown only while Compact mode is active.
+                if (overlay_compact_mode) {
+                    ImGui::Text("Label Font: %s", temp_settings.compact_label_font_name);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##CompactLabelFont")) {
+                        char selected_font[256];
+                        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+                            strncpy(temp_settings.compact_label_font_name, selected_font,
+                                    sizeof(temp_settings.compact_label_font_name) - 1);
+                            temp_settings.compact_label_font_name[sizeof(temp_settings.compact_label_font_name) - 1] =
+                                    '\0';
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_label_font_tooltip_buffer[512];
+                        snprintf(compact_label_font_tooltip_buffer, sizeof(compact_label_font_tooltip_buffer),
+                                 "Font for the goal-type label (e.g. 'Advancements:').\n"
+                                 "Only choose fonts within the resources/fonts directory.\n"
+                                 "Default: %s", DEFAULT_COMPACT_LABEL_FONT);
+                        ImGui::SetTooltip("%s", compact_label_font_tooltip_buffer);
+                    }
+                    if (ImGui::DragFloat("Label Text Size", &temp_settings.compact_label_font_size, 0.5f,
+                                         OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.compact_label_font_size < OVERLAY_FONT_SIZE_MIN)
+                            temp_settings.compact_label_font_size = OVERLAY_FONT_SIZE_MIN;
+                        if (temp_settings.compact_label_font_size > OVERLAY_FONT_SIZE_MAX)
+                            temp_settings.compact_label_font_size = OVERLAY_FONT_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_label_size_tooltip_buffer[512];
+                        snprintf(compact_label_size_tooltip_buffer, sizeof(compact_label_size_tooltip_buffer),
+                                 "Point size of the goal-type label.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_LABEL_FONT_SIZE);
+                        ImGui::SetTooltip("%s", compact_label_size_tooltip_buffer);
+                    }
+
+                    ImGui::Text("Count Font: %s", temp_settings.compact_count_font_name);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##CompactCountFont")) {
+                        char selected_font[256];
+                        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+                            strncpy(temp_settings.compact_count_font_name, selected_font,
+                                    sizeof(temp_settings.compact_count_font_name) - 1);
+                            temp_settings.compact_count_font_name[sizeof(temp_settings.compact_count_font_name) - 1] =
+                                    '\0';
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_count_font_tooltip_buffer[512];
+                        snprintf(compact_count_font_tooltip_buffer, sizeof(compact_count_font_tooltip_buffer),
+                                 "Font for the big progress count (e.g. '70/80').\n"
+                                 "Only choose fonts within the resources/fonts directory.\n"
+                                 "Default: %s", DEFAULT_COMPACT_COUNT_FONT);
+                        ImGui::SetTooltip("%s", compact_count_font_tooltip_buffer);
+                    }
+                    if (ImGui::DragFloat("Count Text Size", &temp_settings.compact_count_font_size, 0.5f,
+                                         OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.compact_count_font_size < OVERLAY_FONT_SIZE_MIN)
+                            temp_settings.compact_count_font_size = OVERLAY_FONT_SIZE_MIN;
+                        if (temp_settings.compact_count_font_size > OVERLAY_FONT_SIZE_MAX)
+                            temp_settings.compact_count_font_size = OVERLAY_FONT_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_count_size_tooltip_buffer[512];
+                        snprintf(compact_count_size_tooltip_buffer, sizeof(compact_count_size_tooltip_buffer),
+                                 "Point size of the big progress count.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_COUNT_FONT_SIZE);
+                        ImGui::SetTooltip("%s", compact_count_size_tooltip_buffer);
+                    }
+
+                    ImGui::Text("Stack Font: %s", temp_settings.compact_stack_font_name);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##CompactStackFont")) {
+                        char selected_font[256];
+                        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+                            strncpy(temp_settings.compact_stack_font_name, selected_font,
+                                    sizeof(temp_settings.compact_stack_font_name) - 1);
+                            temp_settings.compact_stack_font_name[sizeof(temp_settings.compact_stack_font_name) - 1] =
+                                    '\0';
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_stack_font_tooltip_buffer[512];
+                        snprintf(compact_stack_font_tooltip_buffer, sizeof(compact_stack_font_tooltip_buffer),
+                                 "Font for the pop-out goals stacked below the panel.\n"
+                                 "Only choose fonts within the resources/fonts directory.\n"
+                                 "Default: %s", DEFAULT_COMPACT_STACK_FONT);
+                        ImGui::SetTooltip("%s", compact_stack_font_tooltip_buffer);
+                    }
+                    if (ImGui::DragFloat("Stack Text Size", &temp_settings.compact_stack_font_size, 0.5f,
+                                         OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.compact_stack_font_size < OVERLAY_FONT_SIZE_MIN)
+                            temp_settings.compact_stack_font_size = OVERLAY_FONT_SIZE_MIN;
+                        if (temp_settings.compact_stack_font_size > OVERLAY_FONT_SIZE_MAX)
+                            temp_settings.compact_stack_font_size = OVERLAY_FONT_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_stack_size_tooltip_buffer[512];
+                        snprintf(compact_stack_size_tooltip_buffer, sizeof(compact_stack_size_tooltip_buffer),
+                                 "Point size of the pop-out stack text.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_STACK_FONT_SIZE);
+                        ImGui::SetTooltip("%s", compact_stack_size_tooltip_buffer);
+                    }
                 }
 
                 static float overlay_bg[4];

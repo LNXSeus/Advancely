@@ -23,6 +23,11 @@
 
 #define SOCIAL_CYCLE_SECONDS 15.0f
 
+// Minimum width of the auto-fitted Compact-mode window. A small counter panel would otherwise
+// make the window narrower than its "Advancely Overlay" title bar; this lower bound keeps the
+// title fully visible. Tune by trial and error - the panel stays centered within this width.
+#define COMPACT_MIN_WINDOW_WIDTH 440
+
 // TODO: Add more socials here
 const char *SOCIALS[] = {
     "Advancely " ADVANCELY_VERSION "!",
@@ -701,6 +706,194 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
 }
 
 
+// Returns the animated texture's current frame based on the elapsed time, mirroring the frame
+// selection in render_texture_with_alpha. Used so a .gif panel can be 9-sliced frame by frame.
+static SDL_Texture *anim_current_frame(AnimatedTexture *anim) {
+    if (!anim || anim->frame_count <= 0) return nullptr;
+    if (anim->delays && anim->total_duration > 0) {
+        Uint32 elapsed = SDL_GetTicks() % anim->total_duration;
+        Uint32 sum = 0;
+        for (int i = 0; i < anim->frame_count; ++i) {
+            sum += anim->delays[i];
+            if (elapsed < sum) return anim->frames[i];
+        }
+    }
+    return anim->frames[0];
+}
+
+// Draws a 9-slice (9-patch) texture stretched to `dest`. The four inset x inset source
+// corners are drawn at `scale` (constant pixel size), the edges stretch along one axis
+// and the center stretches both, so a small square panel can grow to any size while the
+// bevelled border keeps a constant pixel thickness. Used by the Compact overlay mode;
+// plain stretch suits the default 1px-center panel (integer tiling for multi-px custom
+// centers can be added later).
+static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *dest,
+                            int il, int ir, int it, int ib, int scale) {
+    if (!tex || scale < 1 || !dest) return;
+
+    float tw = 0.0f, th = 0.0f;
+    SDL_GetTextureSize(tex, &tw, &th);
+    int tex_w = (int) tw, tex_h = (int) th;
+    if (tex_w <= 0 || tex_h <= 0) return;
+
+    if (il < 0) il = 0;
+    if (ir < 0) ir = 0;
+    if (it < 0) it = 0;
+    if (ib < 0) ib = 0;
+    if (il + ir >= tex_w) { il = 0; ir = 0; } // insets must leave a center strip
+    if (it + ib >= tex_h) { it = 0; ib = 0; }
+
+    float src_cw = (float) (tex_w - il - ir); // center source width / height
+    float src_ch = (float) (tex_h - it - ib);
+    float dl = (float) (il * scale); // destination corner sizes
+    float dr = (float) (ir * scale);
+    float dt = (float) (it * scale);
+    float db = (float) (ib * scale);
+    float dcw = dest->w - dl - dr; // stretched center width / height
+    float dch = dest->h - dt - db;
+    if (dcw < 0.0f) dcw = 0.0f;
+    if (dch < 0.0f) dch = 0.0f;
+
+    float rx = (float) (tex_w - ir); // right column source x
+    float by = (float) (tex_h - ib); // bottom row source y
+    float dx = dest->x, dy = dest->y;
+
+    SDL_SetTextureColorMod(tex, 255, 255, 255);
+    SDL_SetTextureAlphaMod(tex, 255);
+
+    struct { SDL_FRect s, d; } quads[9] = {
+        {{0.0f, 0.0f, (float) il, (float) it},     {dx, dy, dl, dt}}, // top-left
+        {{rx, 0.0f, (float) ir, (float) it},       {dx + dl + dcw, dy, dr, dt}}, // top-right
+        {{0.0f, by, (float) il, (float) ib},       {dx, dy + dt + dch, dl, db}}, // bottom-left
+        {{rx, by, (float) ir, (float) ib},         {dx + dl + dcw, dy + dt + dch, dr, db}}, // bottom-right
+        {{(float) il, 0.0f, src_cw, (float) it},   {dx + dl, dy, dcw, dt}}, // top edge
+        {{(float) il, by, src_cw, (float) ib},     {dx + dl, dy + dt + dch, dcw, db}}, // bottom edge
+        {{0.0f, (float) it, (float) il, src_ch},   {dx, dy + dt, dl, dch}}, // left edge
+        {{rx, (float) it, (float) ir, src_ch},     {dx + dl + dcw, dy + dt, dr, dch}}, // right edge
+        {{(float) il, (float) it, src_cw, src_ch}, {dx + dl, dy + dt, dcw, dch}}, // center
+    };
+    for (int i = 0; i < 9; i++) {
+        if (quads[i].s.w <= 0.0f || quads[i].s.h <= 0.0f || quads[i].d.w <= 0.0f || quads[i].d.h <= 0.0f) continue;
+        SDL_RenderTexture(r, tex, &quads[i].s, &quads[i].d);
+    }
+}
+
+// Compact render mode: a tall/narrow counter panel (Zesskyo-style). Stage 1 draws a
+// static 9-slice panel showing the advancement/achievement count. Cycling through goal
+// types and pop-out goals below the panel are added in later stages.
+static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettings *settings) {
+    SDL_Color text_color = {
+        settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
+    };
+
+    char label_buf[64];
+    char count_buf[64];
+    int completed = 0, goal = 0;
+    if (t && t->template_data) {
+        completed = t->template_data->advancements_completed_count;
+        goal = t->template_data->advancement_goal_count;
+        MC_Version version = settings_get_version_from_string(settings->version_str);
+        snprintf(label_buf, sizeof(label_buf), "%s:", (version >= MC_VERSION_1_12) ? "Advancements" : "Achievements");
+    } else {
+        snprintf(label_buf, sizeof(label_buf), "Advancements:");
+    }
+    snprintf(count_buf, sizeof(count_buf), "%d/%d", completed, goal);
+
+    // Dedicated Compact fonts (goal-type label + big count), falling back to the overlay fonts.
+    TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
+    TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
+
+    SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_buf, text_color);
+    SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_buf, text_color);
+
+    float lw = 0.0f, lh = 0.0f, cw = 0.0f, ch = 0.0f;
+    if (label_tex) SDL_GetTextureSize(label_tex, &lw, &lh);
+    if (count_tex) SDL_GetTextureSize(count_tex, &cw, &ch);
+
+    // Widest possible count for this run: a numerator with as many digits as the goal, using the
+    // font's widest digit, over the goal. Sizing the panel to this (never the live count) keeps the
+    // background a fixed size for the whole run, so it never jumps as the numerator grows from
+    // "7/80" to "70/80" and stays alignable in OBS. (Extended to all goal types once cycling lands.)
+    char widest_digit = '0';
+    int widest_dw = 0;
+    for (char c = '0'; c <= '9'; ++c) {
+        char one[2] = {c, '\0'};
+        int dw = 0;
+        TTF_MeasureString(count_font, one, 0, 0, &dw, nullptr);
+        if (dw > widest_dw) { widest_dw = dw; widest_digit = c; }
+    }
+    int goal_digits = 1;
+    for (int g = goal; g >= 10; g /= 10) goal_digits++;
+    char worst_count[64];
+    int wp = 0;
+    for (int i = 0; i < goal_digits && wp < 30; ++i) worst_count[wp++] = widest_digit;
+    worst_count[wp++] = '/';
+    for (int i = 0; i < goal_digits && wp < 62; ++i) worst_count[wp++] = widest_digit;
+    worst_count[wp] = '\0';
+    SDL_Texture *worst_tex = get_text_texture_from_cache(o, count_font, worst_count, text_color);
+    float worst_cw = 0.0f, worst_ch = 0.0f;
+    if (worst_tex) SDL_GetTextureSize(worst_tex, &worst_cw, &worst_ch);
+    (void) worst_ch;
+
+    const float line_gap = 4.0f;
+    float pad = settings->compact_panel_padding;
+    float border_x = (float) ((settings->compact_panel_inset_left + settings->compact_panel_inset_right) *
+                              settings->compact_panel_pixel_scale);
+    float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
+                              settings->compact_panel_pixel_scale);
+
+    // The count line's text texture includes the font's descent (empty space below the digits).
+    // Trim it from the content height so that space folds into the bottom padding instead of
+    // showing as extra room under the count, keeping the two lines visually centered.
+    int count_descent = TTF_GetFontDescent(count_font);
+    if (count_descent < 0) count_descent = -count_descent;
+
+    float content_w = fmaxf(lw, worst_cw);
+    float content_h = lh + line_gap + ch - (float) count_descent;
+    float panel_w = snap_px(content_w + 2.0f * pad + border_x);
+    float panel_h = snap_px(content_h + 2.0f * pad + border_y);
+
+    // Auto-fit the overlay window to the panel plus a pad-sized margin all around. Only resizes
+    // when the needed size actually changes (a new template with more digits, or a settings tweak),
+    // so it stays put during a run. The panel is then centered by that equal margin.
+    int want_w = (int) snap_px(panel_w + 2.0f * pad);
+    if (want_w < COMPACT_MIN_WINDOW_WIDTH) want_w = COMPACT_MIN_WINDOW_WIDTH;
+    int want_h = (int) snap_px(panel_h + 2.0f * pad);
+    int cur_w = 0, cur_h = 0;
+    SDL_GetWindowSize(o->window, &cur_w, &cur_h);
+    if (cur_w != want_w || cur_h != want_h) SDL_SetWindowSize(o->window, want_w, want_h);
+
+    // Place the panel within the (possibly min-width-widened) window per the alignment setting.
+    // Left keeps the left edge fixed as the panel grows (easy to left-align in OBS), Right the
+    // right edge, Center keeps it centered.
+    float panel_x;
+    if (settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_LEFT)
+        panel_x = snap_px(pad);
+    else if (settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
+        panel_x = snap_px((float) want_w - panel_w - pad);
+    else
+        panel_x = snap_px(((float) want_w - panel_w) / 2.0f);
+    float panel_y = snap_px(pad);
+
+    SDL_Texture *panel_tex = o->compact_panel ? o->compact_panel : anim_current_frame(o->compact_panel_anim);
+    SDL_FRect panel_dest = {panel_x, panel_y, panel_w, panel_h};
+    draw_nine_slice(o->renderer, panel_tex, &panel_dest,
+                    settings->compact_panel_inset_left, settings->compact_panel_inset_right,
+                    settings->compact_panel_inset_top, settings->compact_panel_inset_bottom,
+                    settings->compact_panel_pixel_scale);
+
+    float content_top = panel_y + (float) (settings->compact_panel_inset_top * settings->compact_panel_pixel_scale) +
+                        pad;
+    if (label_tex) {
+        SDL_FRect d = {snap_px(panel_x + (panel_w - lw) / 2.0f), content_top, lw, lh};
+        SDL_RenderTexture(o->renderer, label_tex, nullptr, &d);
+    }
+    if (count_tex) {
+        SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
+        SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
+    }
+}
+
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.
 //
 // The base numbers (47 / 108 / 260 / 420) were tuned for the default Minecraft
@@ -727,6 +920,28 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
 // process is fully restarted whenever settings change, so the layout never needs
 // to be recomputed at runtime and the window never resizes without a settings change.
 static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
+    // Compact mode uses a completely different, tall/narrow layout: a counter panel near
+    // the top. Stage 1 sizes the window height to the panel; pop-out and promo space is
+    // added in later stages. Width stays user-controlled (overlay_window.w).
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+        TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
+        TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
+        float label_lh = (float) TTF_GetFontHeight(label_font);
+        float count_lh = (float) TTF_GetFontHeight(count_font);
+        int count_descent = TTF_GetFontDescent(count_font);
+        if (count_descent < 0) count_descent = -count_descent;
+        const float line_gap = 4.0f;
+        float pad = settings->compact_panel_padding;
+        float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
+                                  settings->compact_panel_pixel_scale);
+        float panel_h = label_lh + line_gap + count_lh - (float) count_descent + 2.0f * pad + border_y;
+        o->layout_row1_y = 0.0f;
+        o->layout_row2_y = 0.0f;
+        o->layout_row3_y = 0.0f;
+        o->layout_height = (int) snap_px(pad + panel_h + pad);
+        return;
+    }
+
     const float BASE_ROW1_Y = 47.0f; // Centered between the top text and row 2 (13px above and below)
     const float BASE_ROW2_Y = 108.0f;
     const float BASE_ROW3_Y = 260.0f;
@@ -841,6 +1056,30 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false; // Critical failure if defaults also fail
     }
 
+    // Compact mode 9-slice panel texture. Like the item backgrounds it can be a static .png or an
+    // animated .gif (each frame is 9-sliced). Not critical: the draw path guards a null.
+    char compact_panel_full_path[MAX_PATH_LENGTH];
+    snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_application_dir(),
+             settings->compact_panel_path);
+    if (strstr(compact_panel_full_path, ".gif")) {
+        o->compact_panel_anim = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                                &o->anim_cache_capacity, compact_panel_full_path,
+                                                                SDL_SCALEMODE_NEAREST);
+    } else {
+        o->compact_panel = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                  &o->texture_cache_capacity, compact_panel_full_path,
+                                                  SDL_SCALEMODE_NEAREST);
+    }
+    if (!o->compact_panel && !o->compact_panel_anim) {
+        log_message(LOG_ERROR, "[OVERLAY] Failed to load Compact panel '%s'. Trying default...\n",
+                    settings->compact_panel_path);
+        snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_application_dir(),
+                 DEFAULT_COMPACT_PANEL_PATH);
+        o->compact_panel = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                  &o->texture_cache_capacity, compact_panel_full_path,
+                                                  SDL_SCALEMODE_NEAREST);
+    }
+
     // The overlay uses one font face at two point sizes: one for the top info bar
     // and one for the row 2 & 3 text. Fonts are HiDPI aware; SDL_ttf scales them
     // correctly on any monitor at render time.
@@ -863,12 +1102,42 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false;
     }
 
+    // Compact mode fonts: three configurable faces/sizes (goal-type label, big count, pop-out
+    // stack). Each falls back to the bundled Minecraft font if its chosen face is missing. A
+    // failure here is non-fatal: Compact rendering falls back to the main overlay fonts, so a bad
+    // filename never breaks the overlay for belt/page users.
+    auto load_compact_font = [&](const char *font_name, float size) -> TTF_Font * {
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/fonts/%s", get_application_dir(), font_name);
+        if (!path_exists(path)) {
+            snprintf(path, sizeof(path), "%s/fonts/Minecraft.ttf", get_application_dir());
+        }
+        return TTF_OpenFont(path, size);
+    };
+    o->compact_label_font = load_compact_font(settings->compact_label_font_name, settings->compact_label_font_size);
+    o->compact_count_font = load_compact_font(settings->compact_count_font_name, settings->compact_count_font_size);
+    o->compact_stack_font = load_compact_font(settings->compact_stack_font_name, settings->compact_stack_font_size);
+    if (!o->compact_label_font || !o->compact_count_font || !o->compact_stack_font) {
+        log_message(LOG_ERROR, "[OVERLAY] A Compact mode font failed to load; using overlay font fallback. %s\n",
+                    SDL_GetError());
+    }
+
     // Size the window to the loaded font. The window was created with a placeholder
     // height in overlay_init_sdl; resize it now that we know the font's line height.
     overlay_compute_layout(o, settings);
     int current_w;
     SDL_GetWindowSize(o->window, &current_w, nullptr);
-    SDL_SetWindowSize(o->window, current_w, o->layout_height);
+    int init_w = current_w;
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+        // Open at the auto-fit minimum instead of the saved belt/page width, so the Compact window
+        // appears small immediately. overlay_render widens it per-template afterward if needed.
+        init_w = COMPACT_MIN_WINDOW_WIDTH;
+    }
+    SDL_SetWindowSize(o->window, init_w, o->layout_height);
+
+    // The Compact window is created hidden (see overlay_init_sdl) to avoid a resize flash; reveal it
+    // now that it is correctly sized. Harmless no-op for the already-visible belt/page window.
+    SDL_ShowWindow(o->window);
 
     return true;
 }
@@ -905,6 +1174,14 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             SDL_GetWindowPosition(o->window, &settings->overlay_window.x, &settings->overlay_window.y);
             int w, h;
             SDL_GetWindowSize(o->window, &w, &h);
+
+            // Compact mode auto-fits its own window in overlay_render (width and height both track
+            // the panel), so don't persist the transient size or force it back here - that would
+            // fight the auto-fit. Only the position is worth keeping.
+            if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+                break;
+            }
+
             settings->overlay_window.w = w;
             settings->overlay_window.h = o->layout_height;
 
@@ -1171,6 +1448,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     SDL_SetRenderDrawColor(o->renderer, settings->overlay_bg_color.r, settings->overlay_bg_color.g,
                            settings->overlay_bg_color.b, settings->overlay_bg_color.a);
     SDL_RenderClear(o->renderer);
+
+    // Compact render mode replaces the top info bar and the 3-row layout entirely.
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+        overlay_render_compact(o, t, settings);
+        SDL_RenderPresent(o->renderer);
+        return;
+    }
 
     // Get version
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -2664,6 +2948,21 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
         if (o->font_top) {
             TTF_CloseFont(o->font_top);
             o->font_top = nullptr;
+        }
+
+        if (o->compact_label_font) {
+            TTF_CloseFont(o->compact_label_font);
+            o->compact_label_font = nullptr;
+        }
+
+        if (o->compact_count_font) {
+            TTF_CloseFont(o->compact_count_font);
+            o->compact_count_font = nullptr;
+        }
+
+        if (o->compact_stack_font) {
+            TTF_CloseFont(o->compact_stack_font);
+            o->compact_stack_font = nullptr;
         }
 
         if (o->renderer) {

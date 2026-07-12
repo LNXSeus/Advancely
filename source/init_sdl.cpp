@@ -98,6 +98,13 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
+    // Compact mode auto-fits its window to a small counter panel. The window is created at the saved
+    // (belt/page) width here, so create it hidden and let overlay_new size it before showing it,
+    // otherwise it flashes large before shrinking on the first frame.
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+        window_flags |= SDL_WINDOW_HIDDEN;
+    }
+
     int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS)
                 ? (int) SDL_WINDOWPOS_CENTERED
                 : settings->overlay_window.x;

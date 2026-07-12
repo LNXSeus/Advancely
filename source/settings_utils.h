@@ -143,6 +143,12 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define OVERLAY_GAP_MIN 0.0f
 #define OVERLAY_GAP_MAX 2000.0f
 
+// Overlay Compact Mode Settings
+#define DEFAULT_COMPACT_PANEL_INSET 2 // 9-slice source-pixel border on each edge of the default 5x5 panel
+#define DEFAULT_COMPACT_PANEL_PIXEL_SCALE 4 // On-screen px per source px, matching the 24x24 -> 96px backgrounds
+#define DEFAULT_COMPACT_PANEL_PADDING 12.0f // On-screen px between the panel text and its border
+#define DEFAULT_COMPACT_PANEL_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Panel alignment within the overlay window
+
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
@@ -201,6 +207,18 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_ADV_BG_PATH "advancement_background.png"
 #define DEFAULT_ADV_BG_HALF_DONE_PATH "advancement_background_half_done.png"
 #define DEFAULT_ADV_BG_DONE_PATH "advancement_background_done.png"
+
+// Compact mode 9-slice counter panel texture (inset / pixel scale / padding live in the
+// "Overlay Compact Mode Settings" block above).
+#define DEFAULT_COMPACT_PANEL_PATH "compact_panel_default.png" // 9-slice panel texture in resources/gui/
+
+// Compact mode fonts: the goal-type label, the big count, and the pop-out stack are each configurable.
+#define DEFAULT_COMPACT_LABEL_FONT "Minecraft.ttf" // Goal-type label (regular Minecraft font)
+#define DEFAULT_COMPACT_COUNT_FONT "MinecraftBold.otf" // Big progress count (bold Minecraft font)
+#define DEFAULT_COMPACT_STACK_FONT "Minecraft.ttf" // Pop-out stack below the panel (regular Minecraft font)
+#define DEFAULT_COMPACT_LABEL_FONT_SIZE 24.0f
+#define DEFAULT_COMPACT_COUNT_FONT_SIZE 48.0f
+#define DEFAULT_COMPACT_STACK_FONT_SIZE 20.0f
 
 #define DEFAULT_OVERLAY_FONT_SIZE 24.0f // Default point size for both overlay text sizes (top bar and rows)
 #define OVERLAY_FONT_SIZE_MIN 8.0f
@@ -276,9 +294,13 @@ enum OverlayProgressTextAlignment {
 // overlay render code and settings UI switch on this value. BELT is the classic
 // scrolling conveyor (with optional per-row auto-freeze); PAGE shows a static,
 // centered slice of items and flips between slices like the pages of a book.
+// COMPACT replaces the 3-row layout entirely with a tall/narrow counter panel
+// (Zesskyo-style) and pop-out goals. COMPACT must stay the LAST value: the
+// settings loader validates the saved index against this range.
 enum OverlayRenderMode {
     OVERLAY_RENDER_MODE_BELT,
-    OVERLAY_RENDER_MODE_PAGE
+    OVERLAY_RENDER_MODE_PAGE,
+    OVERLAY_RENDER_MODE_COMPACT
 };
 
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
@@ -355,6 +377,22 @@ struct AppSettings {
     float overlay_page_interval; // Seconds each static page is shown before flipping (Page mode only).
     OverlayProgressTextAlignment overlay_page_align; // How a not-full page is aligned within the window (Page mode).
     bool overlay_page_repeat; // If true, items repeat so every page is full (Page mode); disables page alignment.
+
+    // --- Compact mode (Zesskyo-style counter panel + pop-outs) ---
+    char compact_panel_path[MAX_PATH_LENGTH]; // 9-slice panel texture in resources/gui/ (Compact mode).
+    int compact_panel_inset_left; // 9-slice source-pixel border widths; these corners stay fixed while the
+    int compact_panel_inset_right; // middle stretches to fit the counter text.
+    int compact_panel_inset_top;
+    int compact_panel_inset_bottom;
+    int compact_panel_pixel_scale; // On-screen pixels per source pixel (keeps the border pixel size consistent).
+    float compact_panel_padding; // On-screen px between the counter text and the panel border.
+    OverlayProgressTextAlignment compact_panel_align; // Panel alignment (left/center/right) within the window.
+    char compact_label_font_name[256]; // Font face for the goal-type label (e.g. "Advancements:").
+    char compact_count_font_name[256]; // Font face for the big progress count (e.g. "70/80").
+    char compact_stack_font_name[256]; // Font face for the pop-out stack text below the panel.
+    float compact_label_font_size; // Point size for the goal-type label.
+    float compact_count_font_size; // Point size for the big progress count.
+    float compact_stack_font_size; // Point size for the pop-out stack text.
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.

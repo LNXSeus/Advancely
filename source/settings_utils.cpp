@@ -486,6 +486,24 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_page_interval = DEFAULT_OVERLAY_PAGE_INTERVAL;
     settings->overlay_page_align = DEFAULT_OVERLAY_PAGE_ALIGN;
     settings->overlay_page_repeat = DEFAULT_OVERLAY_PAGE_REPEAT;
+    strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
+    settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
+    settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET;
+    settings->compact_panel_inset_right = DEFAULT_COMPACT_PANEL_INSET;
+    settings->compact_panel_inset_top = DEFAULT_COMPACT_PANEL_INSET;
+    settings->compact_panel_inset_bottom = DEFAULT_COMPACT_PANEL_INSET;
+    settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
+    settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
+    settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
+    strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT, sizeof(settings->compact_label_font_name) - 1);
+    settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
+    strncpy(settings->compact_count_font_name, DEFAULT_COMPACT_COUNT_FONT, sizeof(settings->compact_count_font_name) - 1);
+    settings->compact_count_font_name[sizeof(settings->compact_count_font_name) - 1] = '\0';
+    strncpy(settings->compact_stack_font_name, DEFAULT_COMPACT_STACK_FONT, sizeof(settings->compact_stack_font_name) - 1);
+    settings->compact_stack_font_name[sizeof(settings->compact_stack_font_name) - 1] = '\0';
+    settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
+    settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
+    settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -943,7 +961,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         const cJSON *render_mode = cJSON_GetObjectItem(general_settings, "overlay_render_mode");
         if (render_mode && cJSON_IsNumber(render_mode) && render_mode->valueint >= OVERLAY_RENDER_MODE_BELT &&
-            render_mode->valueint <= OVERLAY_RENDER_MODE_PAGE) {
+            render_mode->valueint <= OVERLAY_RENDER_MODE_COMPACT) {
             settings->overlay_render_mode = (OverlayRenderMode) render_mode->valueint;
         } else {
             settings->overlay_render_mode = DEFAULT_OVERLAY_RENDER_MODE;
@@ -1294,6 +1312,101 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
             defaults_were_used = true;
         }
+
+        // --- Compact mode panel ---
+        const cJSON *compact_path_json = cJSON_GetObjectItem(visual_settings, "compact_panel_path");
+        if (compact_path_json && cJSON_IsString(compact_path_json)) {
+            strncpy(settings->compact_panel_path, compact_path_json->valuestring, sizeof(settings->compact_panel_path) - 1);
+            settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
+        } else {
+            strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
+            settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_il = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_left");
+        if (compact_il && cJSON_IsNumber(compact_il)) settings->compact_panel_inset_left = compact_il->valueint;
+        else { settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+
+        const cJSON *compact_ir = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_right");
+        if (compact_ir && cJSON_IsNumber(compact_ir)) settings->compact_panel_inset_right = compact_ir->valueint;
+        else { settings->compact_panel_inset_right = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+
+        const cJSON *compact_it = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_top");
+        if (compact_it && cJSON_IsNumber(compact_it)) settings->compact_panel_inset_top = compact_it->valueint;
+        else { settings->compact_panel_inset_top = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+
+        const cJSON *compact_ib = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_bottom");
+        if (compact_ib && cJSON_IsNumber(compact_ib)) settings->compact_panel_inset_bottom = compact_ib->valueint;
+        else { settings->compact_panel_inset_bottom = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+
+        const cJSON *compact_scale = cJSON_GetObjectItem(visual_settings, "compact_panel_pixel_scale");
+        if (compact_scale && cJSON_IsNumber(compact_scale)) settings->compact_panel_pixel_scale = compact_scale->valueint;
+        else { settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE; defaults_were_used = true; }
+
+        const cJSON *compact_pad = cJSON_GetObjectItem(visual_settings, "compact_panel_padding");
+        if (compact_pad && cJSON_IsNumber(compact_pad)) settings->compact_panel_padding = (float) compact_pad->valuedouble;
+        else { settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING; defaults_were_used = true; }
+
+        const cJSON *compact_align = cJSON_GetObjectItem(visual_settings, "compact_panel_align");
+        if (compact_align && cJSON_IsNumber(compact_align) && compact_align->valueint >= OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
+            && compact_align->valueint <= OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) {
+            settings->compact_panel_align = (OverlayProgressTextAlignment) compact_align->valueint;
+        } else {
+            settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_label_font = cJSON_GetObjectItem(visual_settings, "compact_label_font_name");
+        if (compact_label_font && cJSON_IsString(compact_label_font)) {
+            strncpy(settings->compact_label_font_name, compact_label_font->valuestring,
+                    sizeof(settings->compact_label_font_name) - 1);
+            settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
+        } else {
+            strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT,
+                    sizeof(settings->compact_label_font_name) - 1);
+            settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_count_font = cJSON_GetObjectItem(visual_settings, "compact_count_font_name");
+        if (compact_count_font && cJSON_IsString(compact_count_font)) {
+            strncpy(settings->compact_count_font_name, compact_count_font->valuestring,
+                    sizeof(settings->compact_count_font_name) - 1);
+            settings->compact_count_font_name[sizeof(settings->compact_count_font_name) - 1] = '\0';
+        } else {
+            strncpy(settings->compact_count_font_name, DEFAULT_COMPACT_COUNT_FONT,
+                    sizeof(settings->compact_count_font_name) - 1);
+            settings->compact_count_font_name[sizeof(settings->compact_count_font_name) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_stack_font = cJSON_GetObjectItem(visual_settings, "compact_stack_font_name");
+        if (compact_stack_font && cJSON_IsString(compact_stack_font)) {
+            strncpy(settings->compact_stack_font_name, compact_stack_font->valuestring,
+                    sizeof(settings->compact_stack_font_name) - 1);
+            settings->compact_stack_font_name[sizeof(settings->compact_stack_font_name) - 1] = '\0';
+        } else {
+            strncpy(settings->compact_stack_font_name, DEFAULT_COMPACT_STACK_FONT,
+                    sizeof(settings->compact_stack_font_name) - 1);
+            settings->compact_stack_font_name[sizeof(settings->compact_stack_font_name) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_label_size = cJSON_GetObjectItem(visual_settings, "compact_label_font_size");
+        if (compact_label_size && cJSON_IsNumber(compact_label_size))
+            settings->compact_label_font_size = (float) compact_label_size->valuedouble;
+        else { settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE; defaults_were_used = true; }
+
+        const cJSON *compact_count_size = cJSON_GetObjectItem(visual_settings, "compact_count_font_size");
+        if (compact_count_size && cJSON_IsNumber(compact_count_size))
+            settings->compact_count_font_size = (float) compact_count_size->valuedouble;
+        else { settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE; defaults_were_used = true; }
+
+        const cJSON *compact_stack_size = cJSON_GetObjectItem(visual_settings, "compact_stack_font_size");
+        if (compact_stack_size && cJSON_IsNumber(compact_stack_size))
+            settings->compact_stack_font_size = (float) compact_stack_size->valuedouble;
+        else { settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE; defaults_were_used = true; }
 
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
@@ -1665,6 +1778,28 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
         strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
         settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
+
+        strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
+        settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
+        settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET;
+        settings->compact_panel_inset_right = DEFAULT_COMPACT_PANEL_INSET;
+        settings->compact_panel_inset_top = DEFAULT_COMPACT_PANEL_INSET;
+        settings->compact_panel_inset_bottom = DEFAULT_COMPACT_PANEL_INSET;
+        settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
+        settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
+        settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
+        strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT,
+                sizeof(settings->compact_label_font_name) - 1);
+        settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
+        strncpy(settings->compact_count_font_name, DEFAULT_COMPACT_COUNT_FONT,
+                sizeof(settings->compact_count_font_name) - 1);
+        settings->compact_count_font_name[sizeof(settings->compact_count_font_name) - 1] = '\0';
+        strncpy(settings->compact_stack_font_name, DEFAULT_COMPACT_STACK_FONT,
+                sizeof(settings->compact_stack_font_name) - 1);
+        settings->compact_stack_font_name[sizeof(settings->compact_stack_font_name) - 1] = '\0';
+        settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
+        settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
+        settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
     }
 
     // Load Account Settings (new top-level section; falls back to coop.local_player for migration)
@@ -2310,6 +2445,49 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateString(settings->adv_bg_half_done_path));
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_done_path");
         cJSON_AddItemToObject(visuals_obj, "adv_bg_done_path", cJSON_CreateString(settings->adv_bg_done_path));
+
+        // --- Save Compact mode panel ---
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_path");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_path", cJSON_CreateString(settings->compact_panel_path));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_inset_left");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_inset_left",
+                              cJSON_CreateNumber(settings->compact_panel_inset_left));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_inset_right");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_inset_right",
+                              cJSON_CreateNumber(settings->compact_panel_inset_right));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_inset_top");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_inset_top",
+                              cJSON_CreateNumber(settings->compact_panel_inset_top));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_inset_bottom");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_inset_bottom",
+                              cJSON_CreateNumber(settings->compact_panel_inset_bottom));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_pixel_scale");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_pixel_scale",
+                              cJSON_CreateNumber(settings->compact_panel_pixel_scale));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_padding");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_padding",
+                              cJSON_CreateNumber(settings->compact_panel_padding));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_align");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_align",
+                              cJSON_CreateNumber(settings->compact_panel_align));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_label_font_name");
+        cJSON_AddItemToObject(visuals_obj, "compact_label_font_name",
+                              cJSON_CreateString(settings->compact_label_font_name));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_count_font_name");
+        cJSON_AddItemToObject(visuals_obj, "compact_count_font_name",
+                              cJSON_CreateString(settings->compact_count_font_name));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_font_name");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_font_name",
+                              cJSON_CreateString(settings->compact_stack_font_name));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_label_font_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_label_font_size",
+                              cJSON_CreateNumber(settings->compact_label_font_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_count_font_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_count_font_size",
+                              cJSON_CreateNumber(settings->compact_count_font_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_font_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_font_size",
+                              cJSON_CreateNumber(settings->compact_stack_font_size));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
