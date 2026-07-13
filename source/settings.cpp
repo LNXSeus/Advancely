@@ -185,6 +185,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_label_font_size != b->compact_label_font_size ||
         a->compact_count_font_size != b->compact_count_font_size ||
         a->compact_stack_font_size != b->compact_stack_font_size ||
+        a->compact_pinned_type != b->compact_pinned_type ||
+        a->compact_cycle_interval != b->compact_cycle_interval ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
@@ -371,6 +373,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_label_font_size != b->compact_label_font_size ||
         a->compact_count_font_size != b->compact_count_font_size ||
         a->compact_stack_font_size != b->compact_stack_font_size ||
+        a->compact_pinned_type != b->compact_pinned_type ||
+        a->compact_cycle_interval != b->compact_cycle_interval ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
         a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
@@ -3363,6 +3367,43 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "right edge fixed. The pop-out stack below always left-aligns to the panel's left edge.\n"
                                  "Default: %s", compact_align_names[DEFAULT_COMPACT_PANEL_ALIGN]);
                         ImGui::SetTooltip("%s", compact_panel_align_tooltip_buffer);
+                    }
+
+                    // Which goal type is pinned as the big counter, and how the rest cycle below it.
+                    // Labels/presence follow the same MC-version rules as the tracker's section separators.
+                    const char *compact_type_names[] = {
+                        "Advancements / Achievements", "Recipes", "Criteria", "Statistics", "Sub-Stats",
+                        "Unlocks", "Custom Goals", "Multi-Stage Goals", "Counters"
+                    };
+                    ImGui::SetNextItemWidth(220.0f);
+                    ImGui::Combo("Pinned Counter", (int *) &temp_settings.compact_pinned_type,
+                                 "Advancements / Achievements\0Recipes\0Criteria\0Statistics\0Sub-Stats\0"
+                                 "Unlocks\0Custom Goals\0Multi-Stage Goals\0Counters\0");
+                    if (ImGui::IsItemHovered()) {
+                        char compact_pinned_tooltip_buffer[768];
+                        snprintf(compact_pinned_tooltip_buffer, sizeof(compact_pinned_tooltip_buffer),
+                                 "The goal type shown big (label over count) on the panel. Every other goal type\n"
+                                 "present in the template cycles through a small line below it. Criteria and\n"
+                                 "sub-stats count as their own categories. If the pinned type isn't\n"
+                                 "present in the template, the first available type is pinned instead.\n"
+                                 "Default: %s", compact_type_names[DEFAULT_COMPACT_PINNED_TYPE]);
+                        ImGui::SetTooltip("%s", compact_pinned_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
+                                         COMPACT_CYCLE_INTERVAL_MIN, COMPACT_CYCLE_INTERVAL_MAX, "%.1f s")) {
+                        if (temp_settings.compact_cycle_interval < COMPACT_CYCLE_INTERVAL_MIN)
+                            temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MIN;
+                        if (temp_settings.compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
+                            temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_cycle_tooltip_buffer[512];
+                        snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
+                                 "How long each non-pinned goal type stays in the small\n"
+                                 "cycling line below the panel before advancing to the next one.\n"
+                                 "Default: %.1f s", DEFAULT_COMPACT_CYCLE_INTERVAL);
+                        ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
                     }
                 }
 

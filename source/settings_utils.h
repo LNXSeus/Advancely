@@ -148,6 +148,10 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_PANEL_PIXEL_SCALE 4 // On-screen px per source px, matching the 24x24 -> 96px backgrounds
 #define DEFAULT_COMPACT_PANEL_PADDING 12.0f // On-screen px between the panel text and its border
 #define DEFAULT_COMPACT_PANEL_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Panel alignment within the overlay window
+#define DEFAULT_COMPACT_PINNED_TYPE COMPACT_COUNTER_ADVANCEMENTS // Goal type shown big; others cycle below it
+#define DEFAULT_COMPACT_CYCLE_INTERVAL 3.0f // Seconds each non-pinned goal type shows in the small cycling line
+#define COMPACT_CYCLE_INTERVAL_MIN 0.5f
+#define COMPACT_CYCLE_INTERVAL_MAX 60.0f
 
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
@@ -303,6 +307,24 @@ enum OverlayRenderMode {
     OVERLAY_RENDER_MODE_COMPACT
 };
 
+// Goal-type categories the Compact-mode counter panel can show. One is "pinned" as the big
+// counter; the rest cycle through a small line below it. These mirror the tracker's section
+// breakdown (criteria and sub-stats are their own categories, like the section separators),
+// and the version-correct label/presence rules are applied at render time. COMPACT_COUNTER_TYPE_COUNT
+// must stay last: it sizes the pinned-type Combo and validates the saved index.
+enum OverlayCompactCounterType {
+    COMPACT_COUNTER_ADVANCEMENTS, // Advancements (>= 1.12) / Achievements (<= 1.11.2), recipes excluded
+    COMPACT_COUNTER_RECIPES, // Recipes only (>= 1.12)
+    COMPACT_COUNTER_CRITERIA, // Advancement / achievement criteria
+    COMPACT_COUNTER_STATS, // Stat categories
+    COMPACT_COUNTER_SUB_STATS, // Individual sub-stats (stat criteria)
+    COMPACT_COUNTER_UNLOCKS, // Unlocks
+    COMPACT_COUNTER_CUSTOM, // Custom goals
+    COMPACT_COUNTER_MULTISTAGE, // Multi-stage goals
+    COMPACT_COUNTER_COUNTERS, // Completion counters
+    COMPACT_COUNTER_TYPE_COUNT
+};
+
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
 extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
 extern const ColorRGBA DEFAULT_OVERLAY_BG_COLOR;
@@ -393,6 +415,8 @@ struct AppSettings {
     float compact_label_font_size; // Point size for the goal-type label.
     float compact_count_font_size; // Point size for the big progress count.
     float compact_stack_font_size; // Point size for the pop-out stack text.
+    OverlayCompactCounterType compact_pinned_type; // Which goal type is pinned as the big counter panel.
+    float compact_cycle_interval; // Seconds each non-pinned goal type shows in the small cycling line below.
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.

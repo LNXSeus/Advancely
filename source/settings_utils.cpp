@@ -504,6 +504,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
     settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
     settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
+    settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+    settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -1408,6 +1410,24 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->compact_stack_font_size = (float) compact_stack_size->valuedouble;
         else { settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE; defaults_were_used = true; }
 
+        const cJSON *compact_pinned = cJSON_GetObjectItem(visual_settings, "compact_pinned_type");
+        if (compact_pinned && cJSON_IsNumber(compact_pinned) && compact_pinned->valueint >= 0
+            && compact_pinned->valueint < COMPACT_COUNTER_TYPE_COUNT) {
+            settings->compact_pinned_type = (OverlayCompactCounterType) compact_pinned->valueint;
+        } else {
+            settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_cycle = cJSON_GetObjectItem(visual_settings, "compact_cycle_interval");
+        if (compact_cycle && cJSON_IsNumber(compact_cycle)) {
+            settings->compact_cycle_interval = (float) compact_cycle->valuedouble;
+            if (settings->compact_cycle_interval < COMPACT_CYCLE_INTERVAL_MIN)
+                settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MIN;
+            if (settings->compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
+                settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
+        } else { settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL; defaults_were_used = true; }
+
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
             settings->overlay_row1_spacing = (float) row1_spacing_json->valuedouble;
@@ -1800,6 +1820,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
         settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
         settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
+        settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+        settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
     }
 
     // Load Account Settings (new top-level section; falls back to coop.local_player for migration)
@@ -2488,6 +2510,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_font_size");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_font_size",
                               cJSON_CreateNumber(settings->compact_stack_font_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_pinned_type");
+        cJSON_AddItemToObject(visuals_obj, "compact_pinned_type",
+                              cJSON_CreateNumber(settings->compact_pinned_type));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_interval");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_interval",
+                              cJSON_CreateNumber(settings->compact_cycle_interval));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
