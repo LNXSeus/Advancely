@@ -779,12 +779,20 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
 }
 
 // One entry in the Compact panel's cycle: a display label (a section name like "Advancements" or an
-// individual goal's own name) over its completed/total. The label is wider than CompactCounter's so
-// it can hold an individual goal's full display name.
+// individual goal's own name) over its count. The label is wider than CompactCounter's so it can hold
+// an individual goal's full display name. Targeted entries render "completed/total"; open-ended ones
+// (a stat with target -1, or a custom goal with target -1/0) drop the denominator and show just the
+// count. Manually-completable goals (simple stats, multi-stats, open-ended custom goals) additionally
+// get a plain-ASCII checkbox prefix - "[x] " when manually checked off, "[o] " when not - which is
+// the only way to see a manual override that the raw count can't convey (e.g. a stat marked done at
+// 12/40).
 struct CompactEntry {
     char label[200];
     int completed;
-    int total;
+    int total;       // valid only when !no_target
+    bool no_target;  // open-ended goal: show the count with no denominator
+    bool checkbox;   // manually-completable goal: prefix a [o]/[x] manual-completion checkbox
+    bool manual_done; // checkbox state (is_manually_completed): [x] if set, [o] otherwise
 };
 
 // True if the user selected the individual goal (kind + root_name) into the Compact cycle.
@@ -805,8 +813,8 @@ static const char *compact_display_name(const char *display, const char *root) {
 // Build the ordered list of Compact cycle entries from the user's selection: first each selected
 // whole-section type count that is present in the template (fixed enum order), then each selected
 // individual goal, walked in TEMPLATE order per category and in the same category order the settings
-// dropdowns present them (complex advancements, multi-stats, custom goals, counters) so the cycle
-// order stays consistent with the dropdowns regardless of the order they were checked. Version rules
+// dropdowns present them (complex advancements, simple stats, multi-stats, custom goals, counters) so
+// the cycle order stays consistent with the dropdowns regardless of the order they were checked. Version rules
 // for the type counts come from the shared compact_compute_type_counters. Falls back to a single
 // entry (first present type, else an empty Advancements/Achievements 0/0). Returns >= 1.
 static int compact_build_cycle(const Tracker *t, const AppSettings *settings, CompactEntry *out, int max_entries) {
@@ -822,6 +830,9 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         snprintf(out[n].label, sizeof(out[n].label), "%s", cc[i].label);
         out[n].completed = cc[i].completed;
         out[n].total = cc[i].total;
+        out[n].no_target = false;
+        out[n].checkbox = false;
+        out[n].manual_done = false;
         n++;
     }
     if (td) {
@@ -833,6 +844,31 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(a->display_name, a->root_name));
             out[n].completed = a->completed_criteria_count;
             out[n].total = a->criteria_progress_total;
+            out[n].no_target = false;
+            out[n].checkbox = false;
+            out[n].manual_done = false;
+            n++;
+        }
+        // Simple stats (single-value stat categories). A real target (goal > 0) shows value / target;
+        // an open-ended stat (goal -1) shows the checkbox + running value. goal 0 = legacy helper, skip.
+        for (int i = 0; i < td->stat_count && n < max_entries; i++) {
+            TrackableCategory *s = td->stats[i];
+            if (!s || !s->is_single_stat_category || s->is_hidden) continue;
+            if (s->criteria_count < 1 || !s->criteria[0]) continue;
+            int goal = s->criteria[0]->goal;
+            if (goal <= 0 && goal != -1) continue;
+            if (!compact_item_selected(settings, COMPACT_COUNTER_STATS, s->root_name)) continue;
+            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
+            out[n].completed = s->criteria[0]->progress;
+            out[n].checkbox = true; // simple stats can be completed manually
+            out[n].manual_done = s->is_manually_completed;
+            if (goal > 0) {
+                out[n].total = goal;
+                out[n].no_target = false;
+            } else {
+                out[n].total = 0;
+                out[n].no_target = true;
+            }
             n++;
         }
         // Multi-stats (complex stat categories) -> their sub-stat progress.
@@ -843,20 +879,30 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
             out[n].completed = s->completed_criteria_count;
             out[n].total = s->criteria_count;
+            out[n].no_target = false;
+            out[n].checkbox = true; // multi-stats can be completed manually
+            out[n].manual_done = s->is_manually_completed;
             n++;
         }
-        // Custom goals -> progress/goal, or done state if the goal has no target.
+        // Custom goals -> a real target (goal > 0) shows progress / goal; an open-ended custom goal
+        // (goal -1 or 0) shows the checkbox + running count and its manual done state.
         for (int i = 0; i < td->custom_goal_count && n < max_entries; i++) {
             TrackableItem *c = td->custom_goals[i];
             if (!c || c->is_hidden) continue;
             if (!compact_item_selected(settings, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
+            out[n].completed = c->progress;
             if (c->goal > 0) {
-                out[n].completed = c->progress;
+                // Targeted custom goals are counter-driven, not manually completable: no checkbox.
                 out[n].total = c->goal;
+                out[n].no_target = false;
+                out[n].checkbox = false;
+                out[n].manual_done = false;
             } else {
-                out[n].completed = c->done ? 1 : 0;
-                out[n].total = 1;
+                out[n].total = 0;
+                out[n].no_target = true;
+                out[n].checkbox = true;
+                out[n].manual_done = c->is_manually_completed;
             }
             n++;
         }
@@ -868,6 +914,9 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
             out[n].completed = c->completed_count;
             out[n].total = c->linked_goal_count;
+            out[n].no_target = false;
+            out[n].checkbox = false;
+            out[n].manual_done = false;
             n++;
         }
     }
@@ -877,6 +926,9 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 snprintf(out[0].label, sizeof(out[0].label), "%s", cc[i].label);
                 out[0].completed = cc[i].completed;
                 out[0].total = cc[i].total;
+                out[0].no_target = false;
+                out[0].checkbox = false;
+                out[0].manual_done = false;
                 n = 1;
                 break;
             }
@@ -886,6 +938,9 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                      (version >= MC_VERSION_1_12) ? "Advancements" : "Achievements");
             out[0].completed = 0;
             out[0].total = 0;
+            out[0].no_target = false;
+            out[0].checkbox = false;
+            out[0].manual_done = false;
             n = 1;
         }
     }
@@ -920,6 +975,39 @@ static void compact_worst_count(char *buf, size_t buf_sz, int total, char wdigit
     snprintf(buf + p, buf_sz - (size_t) p, "%d", total);
 }
 
+// Format the count line an entry shows. The body is "completed/total" for targeted goals, or just
+// the running count for open-ended ones. Manually-completable goals get a leading plain-ASCII
+// checkbox ("[x] " manually checked off, "[o] " not) - ASCII only so it renders in any font.
+static void compact_format_count(char *buf, size_t buf_sz, const CompactEntry *e) {
+    const char *box = e->checkbox ? (e->manual_done ? "[x] " : "[o] ") : "";
+    if (e->no_target)
+        snprintf(buf, buf_sz, "%s%d", box, e->completed);
+    else
+        snprintf(buf, buf_sz, "%s%d/%d", box, e->completed, e->total);
+}
+
+// Worst-case count string for panel sizing. Targeted goals: widest digit repeated over the total.
+// Open-ended goals: the widest digit repeated for the running count's current digit length (so the
+// panel only grows if the value gains a digit). A checkbox prefix is reserved for checkbox entries;
+// "[x]"/"[o]" are the same length so a manual-toggle never resizes the panel.
+static void compact_worst_count_entry(char *buf, size_t buf_sz, const CompactEntry *e, char wdigit) {
+    char body[48];
+    if (e->no_target) {
+        int v = e->completed < 0 ? -e->completed : e->completed;
+        int digits = 1;
+        for (int d = v; d >= 10; d /= 10) digits++;
+        int p = 0;
+        for (int i = 0; i < digits && p < (int) sizeof(body) - 1; i++) body[p++] = wdigit;
+        body[p] = '\0';
+    } else {
+        compact_worst_count(body, sizeof(body), e->total, wdigit);
+    }
+    if (e->checkbox)
+        snprintf(buf, buf_sz, "[x] %s", body);
+    else
+        snprintf(buf, buf_sz, "%s", body);
+}
+
 // Compact render mode: a tall/narrow counter panel (Zesskyo-style). One big "label over count"
 // block that cycles through the user-selected entries (whole-section type counts and/or individual
 // goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
@@ -945,7 +1033,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     char label_buf[224];
     snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
     char count_buf[64];
-    snprintf(count_buf, sizeof(count_buf), "%d/%d", cur->completed, cur->total);
+    compact_format_count(count_buf, sizeof(count_buf), cur);
 
     SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_buf, text_color);
     SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_buf, text_color);
@@ -966,7 +1054,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         int lwm = 0;
         TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
         char wc[64];
-        compact_worst_count(wc, sizeof(wc), entries[i].total, wdig);
+        compact_worst_count_entry(wc, sizeof(wc), &entries[i], wdig);
         int cwm = 0;
         TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
         float w = fmaxf((float) lwm, (float) cwm);

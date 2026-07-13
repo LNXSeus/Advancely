@@ -565,6 +565,15 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
                         present = true;
                 }
                 break;
+            case COMPACT_COUNTER_STATS: // simple (single-value) stat: targeted (goal>0) or open-ended (goal -1)
+                for (int j = 0; j < td->stat_count && !present; j++) {
+                    const TrackableCategory *s = td->stats[j];
+                    if (s && s->is_single_stat_category && !s->is_hidden && s->criteria_count >= 1 && s->criteria[0] &&
+                        (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1) &&
+                        strcmp(s->root_name, ci->root_name) == 0)
+                        present = true;
+                }
+                break;
             case COMPACT_COUNTER_SUB_STATS: // multi-stat (complex stat category)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];

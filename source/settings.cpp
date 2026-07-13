@@ -3489,6 +3489,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         for (int i = 0; i < ctd->advancement_count; i++)
                             if (ctd->advancements[i] && ctd->advancements[i]->criteria_count > 0 &&
                                 !ctd->advancements[i]->is_hidden) complex_adv++;
+                        int simple_stats = 0;
+                        for (int i = 0; i < ctd->stat_count; i++) {
+                            const TrackableCategory *s = ctd->stats[i];
+                            // Targeted (goal > 0) or open-ended (goal -1) single stats; goal 0 = legacy helper.
+                            if (s && s->is_single_stat_category && !s->is_hidden && s->criteria_count >= 1 &&
+                                s->criteria[0] && (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1))
+                                simple_stats++;
+                        }
                         int multi_stats = 0;
                         for (int i = 0; i < ctd->stat_count; i++)
                             if (ctd->stats[i] && !ctd->stats[i]->is_single_stat_category && !ctd->stats[i]->is_hidden)
@@ -3521,6 +3529,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                  a->completed_criteria_count, a->criteria_progress_total);
                                         if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
                                             item_toggle(kind, a->root_name);
+                                    }
+                                } else if (kind == COMPACT_COUNTER_STATS) {
+                                    for (int i = 0; i < ctd->stat_count; i++) {
+                                        TrackableCategory *st = ctd->stats[i];
+                                        if (!st || !st->is_single_stat_category || st->is_hidden) continue;
+                                        if (st->criteria_count < 1 || !st->criteria[0]) continue;
+                                        int goal = st->criteria[0]->goal;
+                                        if (goal <= 0 && goal != -1) continue; // goal 0 = legacy helper
+                                        bool s = item_index(kind, st->root_name) >= 0;
+                                        const char *nm = st->display_name[0] ? st->display_name : st->root_name;
+                                        char row[224];
+                                        if (goal > 0)
+                                            snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
+                                        else
+                                            snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
+                                        if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
+                                            item_toggle(kind, st->root_name);
                                     }
                                 } else if (kind == COMPACT_COUNTER_SUB_STATS) {
                                     for (int i = 0; i < ctd->stat_count; i++) {
@@ -3568,6 +3593,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                         };
                         item_combo("Complex Advancements", COMPACT_COUNTER_CRITERIA, complex_adv);
+                        item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats);
                         item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats);
                         item_combo("Custom Goals##items", COMPACT_COUNTER_CUSTOM, custom_present);
                         item_combo("Counters##items", COMPACT_COUNTER_COUNTERS, counters_present);
