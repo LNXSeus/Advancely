@@ -148,8 +148,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_PANEL_PIXEL_SCALE 4 // On-screen px per source px, matching the 24x24 -> 96px backgrounds
 #define DEFAULT_COMPACT_PANEL_PADDING 12.0f // On-screen px between the panel text and its border
 #define DEFAULT_COMPACT_PANEL_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Panel alignment within the overlay window
-#define DEFAULT_COMPACT_PINNED_TYPE COMPACT_COUNTER_ADVANCEMENTS // Goal type shown big; others cycle below it
-#define DEFAULT_COMPACT_CYCLE_INTERVAL 3.0f // Seconds each non-pinned goal type shows in the small cycling line
+#define DEFAULT_COMPACT_CYCLE_INTERVAL 3.0f // Seconds each selected entry shows before the cycle advances
 #define COMPACT_CYCLE_INTERVAL_MIN 0.5f
 #define COMPACT_CYCLE_INTERVAL_MAX 60.0f
 
@@ -307,15 +306,17 @@ enum OverlayRenderMode {
     OVERLAY_RENDER_MODE_COMPACT
 };
 
-// Goal-type categories the Compact-mode counter panel can show. One is "pinned" as the big
-// counter; the rest cycle through a small line below it. These mirror the tracker's section
-// breakdown (criteria and sub-stats are their own categories, like the section separators),
-// and the version-correct label/presence rules are applied at render time. COMPACT_COUNTER_TYPE_COUNT
-// must stay last: it sizes the pinned-type Combo and validates the saved index.
+// Goal-type categories the Compact-mode counter panel can cycle through. The user selects any
+// number of these; each selected-and-present type contributes one "label over count" entry to the
+// cycle. These mirror the tracker's section breakdown (criteria and sub-stats are their own
+// categories, like the section separators), and the version-correct label/presence rules are
+// applied at render time. COMPACT_COUNTER_TYPE_COUNT must stay last: it sizes the selection mask
+// and validates saved indices.
 enum OverlayCompactCounterType {
     COMPACT_COUNTER_ADVANCEMENTS, // Advancements (>= 1.12) / Achievements (<= 1.11.2), recipes excluded
     COMPACT_COUNTER_RECIPES, // Recipes only (>= 1.12)
-    COMPACT_COUNTER_CRITERIA, // Advancement / achievement criteria
+    COMPACT_COUNTER_CRITERIA, // Advancement / achievement criteria (non-recipe advancements only)
+    COMPACT_COUNTER_RECIPE_CRITERIA, // Recipe criteria (>= 1.12)
     COMPACT_COUNTER_STATS, // Stat categories
     COMPACT_COUNTER_SUB_STATS, // Individual sub-stats (stat criteria)
     COMPACT_COUNTER_UNLOCKS, // Unlocks
@@ -324,6 +325,27 @@ enum OverlayCompactCounterType {
     COMPACT_COUNTER_COUNTERS, // Completion counters
     COMPACT_COUNTER_TYPE_COUNT
 };
+
+// A single individual goal selected to appear in the Compact cycle by its own name (as opposed to
+// a whole-section type count). Stored globally by goal ID (root_name), mirroring stat_progress_override
+// / custom_progress; the overlay skips any item not present in the current template. `kind` selects
+// how the count is computed: CRITERIA = complex advancement (its criteria progress),
+// SUB_STATS = complex stat category / multi-stat (its sub-stat progress), CUSTOM = custom goal,
+// COUNTERS = completion counter.
+typedef struct {
+    OverlayCompactCounterType kind;
+    char root_name[192];
+} CompactCycleItem;
+
+#define MAX_COMPACT_CYCLE_ITEMS 128
+
+// One whole-section counter category for the Compact panel: a version-correct display label and its
+// completed/total. total == 0 means the category is not present in the template.
+typedef struct {
+    char label[40];
+    int completed;
+    int total;
+} CompactCounter;
 
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
 extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
@@ -415,8 +437,10 @@ struct AppSettings {
     float compact_label_font_size; // Point size for the goal-type label.
     float compact_count_font_size; // Point size for the big progress count.
     float compact_stack_font_size; // Point size for the pop-out stack text.
-    OverlayCompactCounterType compact_pinned_type; // Which goal type is pinned as the big counter panel.
-    float compact_cycle_interval; // Seconds each non-pinned goal type shows in the small cycling line below.
+    bool compact_cycle_type[COMPACT_COUNTER_TYPE_COUNT]; // Which whole-section type counts are in the cycle.
+    CompactCycleItem compact_cycle_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals selected into the cycle by name.
+    int compact_cycle_item_count; // Number of valid entries in compact_cycle_items.
+    float compact_cycle_interval; // Seconds each selected entry shows before the cycle advances.
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.
@@ -572,6 +596,16 @@ struct AppSettings {
  * @return The corresponding MC_Version enum, or MC_VERSION_UNKNOWN.
  */
 MC_Version settings_get_version_from_string(const char *version_str);
+
+// Fills out[COMPACT_COUNTER_TYPE_COUNT] (indexed by OverlayCompactCounterType) with each Compact
+// counter category's version-correct label and completed/total; total == 0 marks a category absent.
+// Shared by the Compact settings UI and the overlay so their counts never drift.
+void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out);
+
+// Drops any selected Compact individual-goal items that no longer exist in `td`, so switching
+// templates (including via the template editor) doesn't leave stale selections in the dropdowns.
+// A null template clears them all. Type-count selections (universal categories) are left untouched.
+void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td);
 
 /**
  * @brief Returns the owner UUID assigned to an advancement, or NULL if unassigned.

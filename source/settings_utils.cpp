@@ -409,6 +409,192 @@ MC_Version settings_get_version_from_string(const char *version_str) {
     return MC_VERSION_UNKNOWN;
 }
 
+// Fills out[COMPACT_COUNTER_TYPE_COUNT] (indexed by OverlayCompactCounterType) with each Compact
+// counter category's completed/total and a version-correct label. total == 0 marks a category not
+// present. The rules mirror the tracker's section separators with the hiding mode set to "Show All":
+// Advancements vs Achievements naming, recipes and recipe-criteria only on 1.12+, advancement-criteria
+// excludes recipe-criteria, legacy hidden single-criterion helper stats (<= 1.6.4) excluded from the
+// stat count. Template-"hidden" goals ARE counted here (the panel shows the real totals, e.g. all
+// advancements, even if some are hidden from the overlay's item rows). Shared by the Compact settings
+// UI (presence + labels) and the overlay renderer (counts) so they never drift.
+void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out) {
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+        out[i].label[0] = '\0';
+        out[i].completed = 0;
+        out[i].total = 0;
+    }
+    if (!td) return;
+    bool modern = (version >= MC_VERSION_1_12);
+
+    // Advancements / Achievements (non-recipe) and their criteria; recipes and recipe criteria split out.
+    int adv_done = 0, adv_total = 0, adv_crit_done = 0, adv_crit_total = 0;
+    int rec_done = 0, rec_total = 0, rec_crit_done = 0, rec_crit_total = 0;
+    for (int i = 0; i < td->advancement_count; i++) {
+        const TrackableCategory *a = td->advancements[i];
+        if (!a) continue;
+        if (a->is_recipe) {
+            rec_total++;
+            if (a->done) rec_done++;
+            rec_crit_done += a->completed_criteria_count;
+            rec_crit_total += a->criteria_progress_total;
+        } else {
+            adv_total++;
+            if (a->done) adv_done++;
+            adv_crit_done += a->completed_criteria_count;
+            adv_crit_total += a->criteria_progress_total;
+        }
+    }
+
+    CompactCounter *adv = &out[COMPACT_COUNTER_ADVANCEMENTS];
+    snprintf(adv->label, sizeof(adv->label), "%s", modern ? "Advancements" : "Achievements");
+    adv->completed = adv_done;
+    adv->total = adv_total;
+
+    if (modern) {
+        CompactCounter *rec = &out[COMPACT_COUNTER_RECIPES];
+        snprintf(rec->label, sizeof(rec->label), "Recipes");
+        rec->completed = rec_done;
+        rec->total = rec_total;
+
+        CompactCounter *rc = &out[COMPACT_COUNTER_RECIPE_CRITERIA];
+        snprintf(rc->label, sizeof(rc->label), "Rcp. Criteria");
+        rc->completed = rec_crit_done;
+        rc->total = rec_crit_total;
+    }
+
+    CompactCounter *crit = &out[COMPACT_COUNTER_CRITERIA];
+    snprintf(crit->label, sizeof(crit->label), "%s Criteria", modern ? "Adv." : "Ach.");
+    crit->completed = adv_crit_done;
+    crit->total = adv_crit_total;
+
+    // Stat categories and their sub-stats (skip only the legacy hidden single-criterion helper stats
+    // on <= 1.6.4, which aren't real goals; template-hidden stats still count).
+    int stat_done = 0, stat_total = 0, sub_done = 0, sub_total = 0;
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *s = td->stats[i];
+        if (!s) continue;
+        if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
+            continue;
+        stat_total++;
+        if (s->done) stat_done++;
+        // Sub-stats only exist for multi-stat categories (template "Multi-Stat Category" checked). A
+        // single stat's lone synthetic criterion is not a sub-stat and must not count here.
+        if (!s->is_single_stat_category) {
+            for (int j = 0; j < s->criteria_count; j++) {
+                const TrackableItem *sub_stat = s->criteria[j];
+                if (!sub_stat) continue;
+                sub_total++;
+                if (sub_stat->done) sub_done++;
+            }
+        }
+    }
+    CompactCounter *stats = &out[COMPACT_COUNTER_STATS];
+    snprintf(stats->label, sizeof(stats->label), "Statistics");
+    stats->completed = stat_done;
+    stats->total = stat_total;
+
+    CompactCounter *sub = &out[COMPACT_COUNTER_SUB_STATS];
+    snprintf(sub->label, sizeof(sub->label), "Sub-Stats");
+    sub->completed = sub_done;
+    sub->total = sub_total;
+
+    int unl_done = 0, unl_total = 0;
+    for (int i = 0; i < td->unlock_count; i++) {
+        const TrackableItem *u = td->unlocks[i];
+        if (!u) continue;
+        unl_total++;
+        if (u->done) unl_done++;
+    }
+    CompactCounter *unl = &out[COMPACT_COUNTER_UNLOCKS];
+    snprintf(unl->label, sizeof(unl->label), "Unlocks");
+    unl->completed = unl_done;
+    unl->total = unl_total;
+
+    int custom_done = 0, custom_total = 0;
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        const TrackableItem *c = td->custom_goals[i];
+        if (!c) continue;
+        custom_total++;
+        if (c->done) custom_done++;
+    }
+    CompactCounter *cus = &out[COMPACT_COUNTER_CUSTOM];
+    snprintf(cus->label, sizeof(cus->label), "Custom Goals");
+    cus->completed = custom_done;
+    cus->total = custom_total;
+
+    int ms_done = 0, ms_total = 0;
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        const MultiStageGoal *g = td->multi_stage_goals[i];
+        if (!g) continue;
+        ms_total++;
+        if (g->current_stage >= g->stage_count - 1) ms_done++;
+    }
+    CompactCounter *ms = &out[COMPACT_COUNTER_MULTISTAGE];
+    snprintf(ms->label, sizeof(ms->label), "MS-Goals");
+    ms->completed = ms_done;
+    ms->total = ms_total;
+
+    int cnt_done = 0, cnt_total = 0;
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        const CounterGoal *c = td->counter_goals[i];
+        if (!c) continue;
+        cnt_total++;
+        if (c->done) cnt_done++;
+    }
+    CompactCounter *cnt = &out[COMPACT_COUNTER_COUNTERS];
+    snprintf(cnt->label, sizeof(cnt->label), "Counters");
+    cnt->completed = cnt_done;
+    cnt->total = cnt_total;
+}
+
+void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td) {
+    if (!settings) return;
+    if (!td) {
+        settings->compact_cycle_item_count = 0;
+        return;
+    }
+    int kept = 0;
+    for (int i = 0; i < settings->compact_cycle_item_count; i++) {
+        const CompactCycleItem *ci = &settings->compact_cycle_items[i];
+        bool present = false;
+        switch (ci->kind) {
+            case COMPACT_COUNTER_CRITERIA: // complex advancement
+                for (int j = 0; j < td->advancement_count && !present; j++) {
+                    const TrackableCategory *a = td->advancements[j];
+                    if (a && a->criteria_count > 0 && !a->is_hidden && strcmp(a->root_name, ci->root_name) == 0)
+                        present = true;
+                }
+                break;
+            case COMPACT_COUNTER_SUB_STATS: // multi-stat (complex stat category)
+                for (int j = 0; j < td->stat_count && !present; j++) {
+                    const TrackableCategory *s = td->stats[j];
+                    if (s && !s->is_single_stat_category && !s->is_hidden && strcmp(s->root_name, ci->root_name) == 0)
+                        present = true;
+                }
+                break;
+            case COMPACT_COUNTER_CUSTOM:
+                for (int j = 0; j < td->custom_goal_count && !present; j++) {
+                    const TrackableItem *c = td->custom_goals[j];
+                    if (c && !c->is_hidden && strcmp(c->root_name, ci->root_name) == 0) present = true;
+                }
+                break;
+            case COMPACT_COUNTER_COUNTERS:
+                for (int j = 0; j < td->counter_goal_count && !present; j++) {
+                    const CounterGoal *c = td->counter_goals[j];
+                    if (c && !c->is_hidden && strcmp(c->root_name, ci->root_name) == 0) present = true;
+                }
+                break;
+            default:
+                break;
+        }
+        if (present) {
+            if (kept != i) settings->compact_cycle_items[kept] = settings->compact_cycle_items[i];
+            kept++;
+        }
+    }
+    settings->compact_cycle_item_count = kept;
+}
+
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
     if (mode_str && strcmp(mode_str, "manual") == 0) return PATH_MODE_MANUAL;
     if (mode_str && strcmp(mode_str, "instance") == 0) return PATH_MODE_INSTANCE;
@@ -504,7 +690,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
     settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
     settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
-    settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+    settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
+    settings->compact_cycle_item_count = 0;
     settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
@@ -1410,13 +1598,38 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->compact_stack_font_size = (float) compact_stack_size->valuedouble;
         else { settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE; defaults_were_used = true; }
 
-        const cJSON *compact_pinned = cJSON_GetObjectItem(visual_settings, "compact_pinned_type");
-        if (compact_pinned && cJSON_IsNumber(compact_pinned) && compact_pinned->valueint >= 0
-            && compact_pinned->valueint < COMPACT_COUNTER_TYPE_COUNT) {
-            settings->compact_pinned_type = (OverlayCompactCounterType) compact_pinned->valueint;
+        const cJSON *compact_types = cJSON_GetObjectItem(visual_settings, "compact_cycle_types");
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+        if (compact_types && cJSON_IsArray(compact_types)) {
+            const cJSON *type_entry = nullptr;
+            cJSON_ArrayForEach(type_entry, compact_types) {
+                if (cJSON_IsNumber(type_entry) && type_entry->valueint >= 0
+                    && type_entry->valueint < COMPACT_COUNTER_TYPE_COUNT) {
+                    settings->compact_cycle_type[type_entry->valueint] = true;
+                }
+            }
         } else {
-            settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+            settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
             defaults_were_used = true;
+        }
+
+        settings->compact_cycle_item_count = 0;
+        const cJSON *compact_items = cJSON_GetObjectItem(visual_settings, "compact_cycle_items");
+        if (compact_items && cJSON_IsArray(compact_items)) {
+            const cJSON *item_entry = nullptr;
+            cJSON_ArrayForEach(item_entry, compact_items) {
+                if (settings->compact_cycle_item_count >= MAX_COMPACT_CYCLE_ITEMS) break;
+                const cJSON *kind = cJSON_GetObjectItem(item_entry, "kind");
+                const cJSON *root = cJSON_GetObjectItem(item_entry, "root");
+                if (!cJSON_IsNumber(kind) || kind->valueint < 0 || kind->valueint >= COMPACT_COUNTER_TYPE_COUNT)
+                    continue;
+                if (!cJSON_IsString(root) || !root->valuestring || root->valuestring[0] == '\0') continue;
+                CompactCycleItem *ci = &settings->compact_cycle_items[settings->compact_cycle_item_count];
+                ci->kind = (OverlayCompactCounterType) kind->valueint;
+                strncpy(ci->root_name, root->valuestring, sizeof(ci->root_name) - 1);
+                ci->root_name[sizeof(ci->root_name) - 1] = '\0';
+                settings->compact_cycle_item_count++;
+            }
         }
 
         const cJSON *compact_cycle = cJSON_GetObjectItem(visual_settings, "compact_cycle_interval");
@@ -1820,7 +2033,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
         settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
         settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
-        settings->compact_pinned_type = DEFAULT_COMPACT_PINNED_TYPE;
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+        settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
+        settings->compact_cycle_item_count = 0;
         settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
     }
 
@@ -2510,9 +2725,25 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_font_size");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_font_size",
                               cJSON_CreateNumber(settings->compact_stack_font_size));
-        cJSON_DeleteItemFromObject(visuals_obj, "compact_pinned_type");
-        cJSON_AddItemToObject(visuals_obj, "compact_pinned_type",
-                              cJSON_CreateNumber(settings->compact_pinned_type));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_types");
+        cJSON *compact_types_array = cJSON_CreateArray();
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            if (settings->compact_cycle_type[i])
+                cJSON_AddItemToArray(compact_types_array, cJSON_CreateNumber(i));
+        }
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_types", compact_types_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_items");
+        cJSON *compact_items_array = cJSON_CreateArray();
+        for (int i = 0; i < settings->compact_cycle_item_count; i++) {
+            const CompactCycleItem *ci = &settings->compact_cycle_items[i];
+            cJSON *item_obj = cJSON_CreateObject();
+            cJSON_AddItemToObject(item_obj, "kind", cJSON_CreateNumber(ci->kind));
+            cJSON_AddItemToObject(item_obj, "root", cJSON_CreateString(ci->root_name));
+            cJSON_AddItemToArray(compact_items_array, item_obj);
+        }
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_items", compact_items_array);
+
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_interval");
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_interval",
                               cJSON_CreateNumber(settings->compact_cycle_interval));

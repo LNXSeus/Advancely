@@ -778,141 +778,117 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
     }
 }
 
-// One goal-type entry for the Compact-mode counter panel: a version-correct display name
-// (e.g. "Advancements", "Achievements", "Sub-Stats") and its completed/total counts.
-struct CompactCounter {
-    char label[40];
+// One entry in the Compact panel's cycle: a display label (a section name like "Advancements" or an
+// individual goal's own name) over its completed/total. The label is wider than CompactCounter's so
+// it can hold an individual goal's full display name.
+struct CompactEntry {
+    char label[200];
     int completed;
     int total;
 };
 
-// Fill `out` / `out_types` (each of capacity COMPACT_COUNTER_TYPE_COUNT) with the completed/total
-// for every goal-type category PRESENT in this template (total > 0), in the fixed
-// OverlayCompactCounterType order. Presence and naming follow the same MC-version rules the
-// tracker's section separators use: Advancements vs Achievements naming, recipes only on 1.12+,
-// criteria and sub-stats as their own categories, etc. Returns the number of present entries.
-static int compact_build_counters(const Tracker *t, const AppSettings *settings,
-                                  CompactCounter *out, OverlayCompactCounterType *out_types) {
-    if (!t || !t->template_data) return 0;
-    const TemplateData *td = t->template_data;
-    MC_Version version = settings_get_version_from_string(settings->version_str);
-    bool modern = (version >= MC_VERSION_1_12);
-    int n = 0;
+// True if the user selected the individual goal (kind + root_name) into the Compact cycle.
+static bool compact_item_selected(const AppSettings *settings, OverlayCompactCounterType kind, const char *root) {
+    for (int i = 0; i < settings->compact_cycle_item_count; i++)
+        if (settings->compact_cycle_items[i].kind == kind &&
+            strcmp(settings->compact_cycle_items[i].root_name, root) == 0)
+            return true;
+    return false;
+}
 
-    // Advancements / Achievements (recipes are excluded from this count, like the tracker).
-    if (td->advancement_goal_count > 0) {
-        snprintf(out[n].label, sizeof(out[n].label), "%s", modern ? "Advancements" : "Achievements");
-        out[n].completed = td->advancements_completed_count;
-        out[n].total = td->advancement_goal_count;
-        out_types[n] = COMPACT_COUNTER_ADVANCEMENTS;
+// Display label for a goal, falling back to its root_name/ID when the display name is empty
+// (matching how the rest of the app renders unnamed goals).
+static const char *compact_display_name(const char *display, const char *root) {
+    return (display && display[0] != '\0') ? display : root;
+}
+
+// Build the ordered list of Compact cycle entries from the user's selection: first each selected
+// whole-section type count that is present in the template (fixed enum order), then each selected
+// individual goal, walked in TEMPLATE order per category and in the same category order the settings
+// dropdowns present them (complex advancements, multi-stats, custom goals, counters) so the cycle
+// order stays consistent with the dropdowns regardless of the order they were checked. Version rules
+// for the type counts come from the shared compact_compute_type_counters. Falls back to a single
+// entry (first present type, else an empty Advancements/Achievements 0/0). Returns >= 1.
+static int compact_build_cycle(const Tracker *t, const AppSettings *settings, CompactEntry *out, int max_entries) {
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+    const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
+
+    CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
+    compact_compute_type_counters(td, version, cc);
+
+    int n = 0;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT && n < max_entries; i++) {
+        if (!settings->compact_cycle_type[i] || cc[i].total <= 0) continue;
+        snprintf(out[n].label, sizeof(out[n].label), "%s", cc[i].label);
+        out[n].completed = cc[i].completed;
+        out[n].total = cc[i].total;
         n++;
     }
-
-    // Recipes: a distinct section only on 1.12+. Counted from the advancements array.
-    if (modern) {
-        int rc = 0, rt = 0;
-        for (int i = 0; i < td->advancement_count; i++) {
+    if (td) {
+        // Complex advancements -> their criteria progress.
+        for (int i = 0; i < td->advancement_count && n < max_entries; i++) {
             TrackableCategory *a = td->advancements[i];
-            if (a && a->is_recipe) {
-                rt++;
-                if (a->done) rc++;
+            if (!a || a->criteria_count <= 0 || a->is_hidden) continue;
+            if (!compact_item_selected(settings, COMPACT_COUNTER_CRITERIA, a->root_name)) continue;
+            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(a->display_name, a->root_name));
+            out[n].completed = a->completed_criteria_count;
+            out[n].total = a->criteria_progress_total;
+            n++;
+        }
+        // Multi-stats (complex stat categories) -> their sub-stat progress.
+        for (int i = 0; i < td->stat_count && n < max_entries; i++) {
+            TrackableCategory *s = td->stats[i];
+            if (!s || s->is_single_stat_category || s->is_hidden) continue;
+            if (!compact_item_selected(settings, COMPACT_COUNTER_SUB_STATS, s->root_name)) continue;
+            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
+            out[n].completed = s->completed_criteria_count;
+            out[n].total = s->criteria_count;
+            n++;
+        }
+        // Custom goals -> progress/goal, or done state if the goal has no target.
+        for (int i = 0; i < td->custom_goal_count && n < max_entries; i++) {
+            TrackableItem *c = td->custom_goals[i];
+            if (!c || c->is_hidden) continue;
+            if (!compact_item_selected(settings, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
+            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
+            if (c->goal > 0) {
+                out[n].completed = c->progress;
+                out[n].total = c->goal;
+            } else {
+                out[n].completed = c->done ? 1 : 0;
+                out[n].total = 1;
+            }
+            n++;
+        }
+        // Completion counters -> completed/linked goals.
+        for (int i = 0; i < td->counter_goal_count && n < max_entries; i++) {
+            CounterGoal *c = td->counter_goals[i];
+            if (!c || c->is_hidden) continue;
+            if (!compact_item_selected(settings, COMPACT_COUNTER_COUNTERS, c->root_name)) continue;
+            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
+            out[n].completed = c->completed_count;
+            out[n].total = c->linked_goal_count;
+            n++;
+        }
+    }
+    if (n == 0) {
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            if (cc[i].total > 0) {
+                snprintf(out[0].label, sizeof(out[0].label), "%s", cc[i].label);
+                out[0].completed = cc[i].completed;
+                out[0].total = cc[i].total;
+                n = 1;
+                break;
             }
         }
-        if (rt > 0) {
-            snprintf(out[n].label, sizeof(out[n].label), "Recipes");
-            out[n].completed = rc;
-            out[n].total = rt;
-            out_types[n] = COMPACT_COUNTER_RECIPES;
-            n++;
+        if (n == 0) {
+            snprintf(out[0].label, sizeof(out[0].label), "%s",
+                     (version >= MC_VERSION_1_12) ? "Advancements" : "Achievements");
+            out[0].completed = 0;
+            out[0].total = 0;
+            n = 1;
         }
     }
-
-    // Advancement / achievement criteria.
-    if (td->total_criteria_count > 0) {
-        snprintf(out[n].label, sizeof(out[n].label), "%s Criteria", modern ? "Advancement" : "Achievement");
-        out[n].completed = td->completed_criteria_count;
-        out[n].total = td->total_criteria_count;
-        out_types[n] = COMPACT_COUNTER_CRITERIA;
-        n++;
-    }
-
-    // Stat categories. On <= 1.6.4 the hidden single-criterion helper stats (goal 0) used for
-    // legacy multi-stage goals don't count, matching the tracker's stat section.
-    if (td->stat_count > 0) {
-        int sc = 0, st = 0;
-        for (int i = 0; i < td->stat_count; i++) {
-            TrackableCategory *s = td->stats[i];
-            if (!s) continue;
-            if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
-                continue;
-            st++;
-            if (s->done) sc++;
-        }
-        if (st > 0) {
-            snprintf(out[n].label, sizeof(out[n].label), "Statistics");
-            out[n].completed = sc;
-            out[n].total = st;
-            out_types[n] = COMPACT_COUNTER_STATS;
-            n++;
-        }
-    }
-
-    // Individual sub-stats (stat criteria).
-    if (td->stat_total_criteria_count > 0) {
-        snprintf(out[n].label, sizeof(out[n].label), "Sub-Stats");
-        out[n].completed = td->stats_completed_criteria_count;
-        out[n].total = td->stat_total_criteria_count;
-        out_types[n] = COMPACT_COUNTER_SUB_STATS;
-        n++;
-    }
-
-    // Unlocks.
-    if (td->unlock_count > 0) {
-        snprintf(out[n].label, sizeof(out[n].label), "Unlocks");
-        out[n].completed = td->unlocks_completed_count;
-        out[n].total = td->unlock_count;
-        out_types[n] = COMPACT_COUNTER_UNLOCKS;
-        n++;
-    }
-
-    // Custom goals.
-    if (td->custom_goal_count > 0) {
-        int c = 0;
-        for (int i = 0; i < td->custom_goal_count; i++)
-            if (td->custom_goals[i] && td->custom_goals[i]->done) c++;
-        snprintf(out[n].label, sizeof(out[n].label), "Custom Goals");
-        out[n].completed = c;
-        out[n].total = td->custom_goal_count;
-        out_types[n] = COMPACT_COUNTER_CUSTOM;
-        n++;
-    }
-
-    // Multi-stage goals (complete once at or past the final stage).
-    if (td->multi_stage_goal_count > 0) {
-        int c = 0;
-        for (int i = 0; i < td->multi_stage_goal_count; i++) {
-            MultiStageGoal *g = td->multi_stage_goals[i];
-            if (g && g->current_stage >= g->stage_count - 1) c++;
-        }
-        snprintf(out[n].label, sizeof(out[n].label), "Multi-Stage");
-        out[n].completed = c;
-        out[n].total = td->multi_stage_goal_count;
-        out_types[n] = COMPACT_COUNTER_MULTISTAGE;
-        n++;
-    }
-
-    // Completion counters (complete once all their linked goals are done).
-    if (td->counter_goal_count > 0) {
-        int c = 0;
-        for (int i = 0; i < td->counter_goal_count; i++)
-            if (td->counter_goals[i] && td->counter_goals[i]->done) c++;
-        snprintf(out[n].label, sizeof(out[n].label), "Counters");
-        out[n].completed = c;
-        out[n].total = td->counter_goal_count;
-        out_types[n] = COMPACT_COUNTER_COUNTERS;
-        n++;
-    }
-
     return n;
 }
 
@@ -944,48 +920,32 @@ static void compact_worst_count(char *buf, size_t buf_sz, int total, char wdigit
     snprintf(buf + p, buf_sz - (size_t) p, "%d", total);
 }
 
-// Compact render mode: a tall/narrow counter panel (Zesskyo-style). The pinned goal type shows
-// big (label over count); every other goal type present cycles through a small line below it.
-// The 9-slice panel is sized to the worst-case width across ALL cycled types so the background
-// stays fixed for the whole run. Pop-out goals below the panel arrive in a later stage.
+// Compact render mode: a tall/narrow counter panel (Zesskyo-style). One big "label over count"
+// block that cycles through the user-selected entries (whole-section type counts and/or individual
+// goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
+// selected entries so the background stays fixed for the whole run. Pop-out goals arrive later.
 static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettings *settings) {
     SDL_Color text_color = {
         settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
     };
 
-    // Fonts: dedicated Compact label/count/stack faces, each falling back to an overlay font.
+    // Fonts: dedicated Compact label/count faces, each falling back to an overlay font.
     TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
     TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
-    TTF_Font *stack_font = o->compact_stack_font ? o->compact_stack_font : o->font;
 
-    // Build every present goal-type counter, then pick the pinned one (the configured type if
-    // present, otherwise the first present type; a hardcoded Advancements 0/0 covers an empty
-    // template). The rest cycle through a small line below the big pinned counter.
-    CompactCounter counters[COMPACT_COUNTER_TYPE_COUNT];
-    OverlayCompactCounterType types[COMPACT_COUNTER_TYPE_COUNT];
-    int counter_count = compact_build_counters(t, settings, counters, types);
+    // Build the selected cycle, then pick the entry showing this frame. The shared page_index is
+    // advanced by the cycle-interval timer (overlay_update) and by SPACE (overlay_events), exactly
+    // like Page mode; static when there's only one entry.
+    CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
+    int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
 
-    int pinned_idx = -1;
-    for (int i = 0; i < counter_count; i++) {
-        if (types[i] == settings->compact_pinned_type) { pinned_idx = i; break; }
-    }
-    if (pinned_idx < 0 && counter_count > 0) pinned_idx = 0;
+    int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;
+    CompactEntry *cur = &entries[cur_idx];
 
-    CompactCounter pinned;
-    if (pinned_idx >= 0) {
-        pinned = counters[pinned_idx];
-    } else {
-        MC_Version version = settings_get_version_from_string(settings->version_str);
-        snprintf(pinned.label, sizeof(pinned.label), "%s", (version >= MC_VERSION_1_12) ? "Advancements" : "Achievements");
-        pinned.completed = 0;
-        pinned.total = 0;
-    }
-
-    // --- Big pinned block (label over count) ---
-    char label_buf[64];
-    snprintf(label_buf, sizeof(label_buf), "%s:", pinned.label);
+    char label_buf[224];
+    snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
     char count_buf[64];
-    snprintf(count_buf, sizeof(count_buf), "%d/%d", pinned.completed, pinned.total);
+    snprintf(count_buf, sizeof(count_buf), "%d/%d", cur->completed, cur->total);
 
     SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_buf, text_color);
     SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_buf, text_color);
@@ -994,53 +954,24 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     if (label_tex) SDL_GetTextureSize(label_tex, &lw, &lh);
     if (count_tex) SDL_GetTextureSize(count_tex, &cw, &ch);
 
-    // Widest possible pinned count for this run: the widest digit repeated for the goal's digit
-    // count over the goal. Sizing the panel to this (never the live count) keeps the background a
-    // fixed size for the whole run, so it never jumps as the numerator grows and stays alignable in OBS.
-    char worst_count[64];
-    compact_worst_count(worst_count, sizeof(worst_count), pinned.total, compact_widest_digit(count_font));
-    SDL_Texture *worst_tex = get_text_texture_from_cache(o, count_font, worst_count, text_color);
-    float worst_cw = 0.0f, worst_ch = 0.0f;
-    if (worst_tex) SDL_GetTextureSize(worst_tex, &worst_cw, &worst_ch);
-    (void) worst_ch;
-
-    // --- Small cycling line (every non-pinned present type) ---
-    // The visible one advances on a wall-clock timer; the panel is sized to the widest possible
-    // line across ALL of them so the background stays fixed as the cycle rotates.
-    int other_count = (pinned_idx >= 0) ? (counter_count - 1) : 0;
-    bool has_cycle = other_count > 0;
-    char stack_buf[128];
-    stack_buf[0] = '\0';
-    float worst_sw = 0.0f;
-    if (has_cycle) {
-        char wdig_s = compact_widest_digit(stack_font);
-        int order[COMPACT_COUNTER_TYPE_COUNT];
-        int on = 0;
-        for (int i = 0; i < counter_count; i++) if (i != pinned_idx) order[on++] = i;
-
-        for (int k = 0; k < on; k++) {
-            CompactCounter *e = &counters[order[k]];
-            char wcs[64];
-            compact_worst_count(wcs, sizeof(wcs), e->total, wdig_s);
-            char line[192];
-            snprintf(line, sizeof(line), "%s: %s", e->label, wcs);
-            SDL_Texture *wt = get_text_texture_from_cache(o, stack_font, line, text_color);
-            float ww = 0.0f, wh = 0.0f;
-            if (wt) SDL_GetTextureSize(wt, &ww, &wh);
-            (void) wh;
-            if (ww > worst_sw) worst_sw = ww;
-        }
-
-        float interval = settings->compact_cycle_interval;
-        if (interval < COMPACT_CYCLE_INTERVAL_MIN) interval = COMPACT_CYCLE_INTERVAL_MIN;
-        int idx = (int) (((float) SDL_GetTicks() / 1000.0f) / interval) % on;
-        CompactCounter *cur = &counters[order[idx]];
-        snprintf(stack_buf, sizeof(stack_buf), "%s: %d/%d", cur->label, cur->completed, cur->total);
+    // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
+    // possible count each can display (widest digit repeated over the total, never the live count).
+    // Sizing the panel to this keeps the background a fixed size for the whole run, so it never
+    // jumps as the cycle rotates or the numerator grows and stays alignable in OBS.
+    char wdig = compact_widest_digit(count_font);
+    float content_w = 0.0f;
+    for (int i = 0; i < entry_count; i++) {
+        char lbl[224];
+        snprintf(lbl, sizeof(lbl), "%s:", entries[i].label);
+        int lwm = 0;
+        TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
+        char wc[64];
+        compact_worst_count(wc, sizeof(wc), entries[i].total, wdig);
+        int cwm = 0;
+        TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
+        float w = fmaxf((float) lwm, (float) cwm);
+        if (w > content_w) content_w = w;
     }
-    SDL_Texture *stack_tex = has_cycle ? get_text_texture_from_cache(o, stack_font, stack_buf, text_color) : nullptr;
-    float sw = 0.0f, sh = 0.0f;
-    if (stack_tex) SDL_GetTextureSize(stack_tex, &sw, &sh);
-    float stack_line_h = has_cycle ? (float) TTF_GetFontHeight(stack_font) : 0.0f;
 
     const float line_gap = 4.0f;
     float pad = settings->compact_panel_padding;
@@ -1049,18 +980,13 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
                               settings->compact_panel_pixel_scale);
 
-    // The bottom-most line's text texture includes the font's descent (empty space below the
-    // glyphs). Trim it from the content height so that space folds into the bottom padding instead
-    // of showing as extra room, keeping the block visually centered. The bottom line is the small
-    // cycling line when present, otherwise the big count.
-    TTF_Font *bottom_font = has_cycle ? stack_font : count_font;
-    int bottom_descent = TTF_GetFontDescent(bottom_font);
-    if (bottom_descent < 0) bottom_descent = -bottom_descent;
+    // The count line's text texture includes the font's descent (empty space below the digits).
+    // Trim it from the content height so that space folds into the bottom padding instead of
+    // showing as extra room under the count, keeping the two lines visually centered.
+    int count_descent = TTF_GetFontDescent(count_font);
+    if (count_descent < 0) count_descent = -count_descent;
 
-    float content_w = fmaxf(fmaxf(lw, worst_cw), worst_sw);
-    float content_h = lh + line_gap + ch;
-    if (has_cycle) content_h += line_gap + stack_line_h;
-    content_h -= (float) bottom_descent;
+    float content_h = lh + line_gap + ch - (float) count_descent;
     float panel_w = snap_px(content_w + 2.0f * pad + border_x);
     float panel_h = snap_px(content_h + 2.0f * pad + border_y);
 
@@ -1103,12 +1029,6 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
     }
-    if (stack_tex) {
-        SDL_FRect d = {
-            snap_px(panel_x + (panel_w - sw) / 2.0f), snap_px(content_top + lh + line_gap + ch + line_gap), sw, sh
-        };
-        SDL_RenderTexture(o->renderer, stack_tex, nullptr, &d);
-    }
 }
 
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.
@@ -1137,27 +1057,22 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
 // process is fully restarted whenever settings change, so the layout never needs
 // to be recomputed at runtime and the window never resizes without a settings change.
 static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
-    // Compact mode uses a completely different, tall/narrow layout: a counter panel near the top.
-    // The height fits the pinned label + big count plus the small cycling line below it. Template
-    // data isn't available here, so we assume the cycling line is present (the common multi-type
-    // case); overlay_render auto-fits the exact size on the first frame if the template has only a
-    // single goal type. Width stays user-controlled (overlay_window.w). Pop-out and promo space is
-    // added in later stages.
+    // Compact mode uses a completely different, tall/narrow layout: a counter panel near the top,
+    // sized to one "label over count" block (the cycle shows one entry at a time). Width stays
+    // user-controlled (overlay_window.w); overlay_render auto-fits the exact panel size each frame.
+    // Pop-out and promo space is added in later stages.
     if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
         TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
         TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
-        TTF_Font *stack_font = o->compact_stack_font ? o->compact_stack_font : o->font;
         float label_lh = (float) TTF_GetFontHeight(label_font);
         float count_lh = (float) TTF_GetFontHeight(count_font);
-        float stack_lh = (float) TTF_GetFontHeight(stack_font);
-        int stack_descent = TTF_GetFontDescent(stack_font);
-        if (stack_descent < 0) stack_descent = -stack_descent;
+        int count_descent = TTF_GetFontDescent(count_font);
+        if (count_descent < 0) count_descent = -count_descent;
         const float line_gap = 4.0f;
         float pad = settings->compact_panel_padding;
         float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
                                   settings->compact_panel_pixel_scale);
-        float panel_h = label_lh + line_gap + count_lh + line_gap + stack_lh - (float) stack_descent +
-                        2.0f * pad + border_y;
+        float panel_h = label_lh + line_gap + count_lh - (float) count_descent + 2.0f * pad + border_y;
         o->layout_row1_y = 0.0f;
         o->layout_row2_y = 0.0f;
         o->layout_row3_y = 0.0f;
@@ -1375,9 +1290,10 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             break;
         case SDL_EVENT_KEY_DOWN:
             if (event->key.scancode == SDL_SCANCODE_SPACE) {
-                if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                    // Page mode: SPACE cuts to the next page. Ignore key-repeat so a
-                    // single press advances exactly one page (holding does not spam).
+                if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE ||
+                    settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+                    // Page/Compact mode: SPACE cuts to the next page / cycle entry. Ignore key-repeat
+                    // so a single press advances exactly one step (holding does not spam).
                     if (!event->key.repeat) {
                         o->page_index++;
                         o->page_timer = 0.0f;
@@ -1651,12 +1567,19 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         o->current_social_index = (o->current_social_index + 1) % NUM_SOCIALS;
     }
 
-    // --- Page mode: advance the shared page index on its own interval ---
+    // --- Page/Compact mode: advance the shared page index on its own interval ---
     // SPACE advances it directly (see overlay_events), so this only handles the
     // automatic flip. deltaTime here is the real frame time (SPACE only speeds up
-    // scrolling in belt mode, not page mode).
-    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-        float iv = settings->overlay_page_interval < 0.1f ? 0.1f : settings->overlay_page_interval;
+    // scrolling in belt mode). Page mode uses its page interval; Compact uses its cycle interval.
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE ||
+        settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
+        float iv;
+        if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT)
+            iv = settings->compact_cycle_interval < COMPACT_CYCLE_INTERVAL_MIN
+                     ? COMPACT_CYCLE_INTERVAL_MIN
+                     : settings->compact_cycle_interval;
+        else
+            iv = settings->overlay_page_interval < 0.1f ? 0.1f : settings->overlay_page_interval;
         o->page_timer += *deltaTime;
         while (o->page_timer >= iv) {
             o->page_timer -= iv;
