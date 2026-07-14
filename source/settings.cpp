@@ -3027,6 +3027,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
                              "Items continuously scroll across the overlay as a conveyor belt.\n"
                              "Enables the scroll speed, per-row custom speed and auto-freeze options below.\n"
+                             "Hold SPACE while the overlay window is focused to speed up the scroll 5x.\n"
                              "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
                 }
@@ -3039,6 +3040,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
                              "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
                              "After the interval below the overlay cuts to the next page of items (like a book).\n"
+                             "Press SPACE while the overlay window is focused to flip to the next page.\n"
                              "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
                 }
@@ -3050,7 +3052,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_mode_compact_tooltip_buffer[512];
                     snprintf(overlay_mode_compact_tooltip_buffer, sizeof(overlay_mode_compact_tooltip_buffer),
                              "A tall, compact counter panel that cycles through goal types,\n"
-                             "with completed goals popping out beneath it.\n"
+                             "with completed goals popping out beneath it. Press SPACE while the\n"
+                             "overlay window is focused to cycle to the next goal on the panel.\n"
                              "Inspired by Zesskyo.\n"
                              "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_compact_tooltip_buffer);
@@ -3386,6 +3389,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", compact_panel_align_tooltip_buffer);
                     }
 
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Panel Content");
+
                     // What the panel cycles through: any number of whole-section type counts, plus any
                     // number of individual goals shown by name. Only what's present in the loaded template
                     // is selectable; presence and labels follow the same MC-version rules as the tracker's
@@ -3402,17 +3409,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         settings_prune_compact_cycle_items(&saved_settings, ctd);
 
                         MC_Version cver = settings_get_version_from_string(temp_settings.version_str);
+                        bool modern = (cver >= MC_VERSION_1_12);
                         CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
                         compact_compute_type_counters(ctd, cver, cc);
 
-                        // --- Whole-section type counts (multiselect) ---
+                        // Per-dropdown range-select anchors for Shift+Click (template index of the last
+                        // row clicked without shift). -1 = no anchor yet.
+                        static int s_type_anchor = -1;
+                        static int s_item_anchor[COMPACT_COUNTER_TYPE_COUNT];
+                        static bool s_anchors_init = false;
+                        if (!s_anchors_init) {
+                            for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) s_item_anchor[i] = -1;
+                            s_anchors_init = true;
+                        }
+
+                        // --- Main goal types (multiselect) ---
+                        // Count only types PRESENT in this template, so a template lacking a selected type
+                        // (e.g. Advancements is on by default but absent) correctly reads 0, not 1.
                         int sel_type_count = 0;
                         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
-                            if (temp_settings.compact_cycle_type[i]) sel_type_count++;
+                            if (temp_settings.compact_cycle_type[i] && cc[i].total > 0) sel_type_count++;
                         char types_preview[48];
                         snprintf(types_preview, sizeof(types_preview), "%d selected", sel_type_count);
                         ImGui::SetNextItemWidth(260.0f);
-                        if (ImGui::BeginCombo("Cycle Goal Types", types_preview)) {
+                        if (ImGui::BeginCombo("Main Goal Types", types_preview)) {
                             bool any_present = false;
                             for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
                                 if (cc[i].total <= 0) continue;
@@ -3420,8 +3440,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 bool sel = temp_settings.compact_cycle_type[i];
                                 char row[64];
                                 snprintf(row, sizeof(row), "%s (%d/%d)", cc[i].label, cc[i].completed, cc[i].total);
-                                if (ImGui::Selectable(row, sel, ImGuiSelectableFlags_NoAutoClosePopups))
-                                    temp_settings.compact_cycle_type[i] = !sel;
+                                if (ImGui::Selectable(row, sel, ImGuiSelectableFlags_NoAutoClosePopups)) {
+                                    bool new_state = !sel;
+                                    if (ImGui::GetIO().KeyShift && s_type_anchor >= 0 && s_type_anchor != i) {
+                                        int lo = s_type_anchor < i ? s_type_anchor : i;
+                                        int hi = s_type_anchor < i ? i : s_type_anchor;
+                                        for (int k = lo; k <= hi; k++)
+                                            if (cc[k].total > 0) temp_settings.compact_cycle_type[k] = new_state;
+                                    } else {
+                                        temp_settings.compact_cycle_type[i] = new_state;
+                                    }
+                                    s_type_anchor = i;
+                                }
                             }
                             if (!any_present) ImGui::TextDisabled("No goal types in this template.");
                             ImGui::EndCombo();
@@ -3430,8 +3460,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             char compact_types_tooltip_buffer[640];
                             snprintf(compact_types_tooltip_buffer, sizeof(compact_types_tooltip_buffer),
                                      "Each checked goal type adds one big \"label over count\" entry to the panel's\n"
-                                     "cycle (e.g. \"Advancements 12/80\"). Only types present in this template are\n"
-                                     "listed. The totals are the real counts, including goals hidden from the overlay.\n"
+                                     "cycle. Only types present in this template are listed. The totals are the real\n"
+                                     "counts, including goals hidden from the overlay. Shift+Click to range-select.\n"
                                      "At least one entry across these and the individual-goal dropdowns must stay selected.\n"
                                      "Default: Advancements / Achievements only.");
                             ImGui::SetTooltip("%s", compact_types_tooltip_buffer);
@@ -3481,6 +3511,60 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ci->root_name[sizeof(ci->root_name) - 1] = '\0';
                             }
                         };
+                        auto item_set = [&](OverlayCompactCounterType kind, const char *root, bool on) {
+                            if ((item_index(kind, root) >= 0) != on) item_toggle(kind, root);
+                        };
+                        // The root_name of the listed item at template index i for `kind`, or nullptr if i
+                        // isn't a valid (present, non-hidden, matching) row - mirrors item_combo's filters.
+                        // Used to apply a Shift+Click range across a category's rows.
+                        auto item_root_at = [&](OverlayCompactCounterType kind, int i) -> const char * {
+                            if (kind == COMPACT_COUNTER_CRITERIA) {
+                                if (i < ctd->advancement_count) {
+                                    TrackableCategory *a = ctd->advancements[i];
+                                    if (a && a->criteria_count > 0 && !a->is_hidden) return a->root_name;
+                                }
+                            } else if (kind == COMPACT_COUNTER_STATS) {
+                                if (i < ctd->stat_count) {
+                                    TrackableCategory *st = ctd->stats[i];
+                                    if (st && st->is_single_stat_category && !st->is_hidden && st->criteria_count >= 1 &&
+                                        st->criteria[0] && (st->criteria[0]->goal > 0 || st->criteria[0]->goal == -1))
+                                        return st->root_name;
+                                }
+                            } else if (kind == COMPACT_COUNTER_SUB_STATS) {
+                                if (i < ctd->stat_count) {
+                                    TrackableCategory *st = ctd->stats[i];
+                                    if (st && !st->is_single_stat_category && !st->is_hidden) return st->root_name;
+                                }
+                            } else if (kind == COMPACT_COUNTER_CUSTOM) {
+                                if (i < ctd->custom_goal_count) {
+                                    TrackableItem *cg = ctd->custom_goals[i];
+                                    if (cg && !cg->is_hidden) return cg->root_name;
+                                }
+                            } else if (kind == COMPACT_COUNTER_COUNTERS) {
+                                if (i < ctd->counter_goal_count) {
+                                    CounterGoal *cg = ctd->counter_goals[i];
+                                    if (cg && !cg->is_hidden) return cg->root_name;
+                                }
+                            }
+                            return nullptr;
+                        };
+                        // Handle a click on the item row at template index i. Shift+Click applies the
+                        // clicked new state to every listed row between the per-kind anchor and i.
+                        auto item_click = [&](OverlayCompactCounterType kind, int i, const char *root, bool selected) {
+                            bool new_state = !selected;
+                            int &anchor = s_item_anchor[kind];
+                            if (ImGui::GetIO().KeyShift && anchor >= 0 && anchor != i) {
+                                int lo = anchor < i ? anchor : i;
+                                int hi = anchor < i ? i : anchor;
+                                for (int k = lo; k <= hi; k++) {
+                                    const char *kr = item_root_at(kind, k);
+                                    if (kr) item_set(kind, kr, new_state);
+                                }
+                            } else {
+                                item_set(kind, root, new_state);
+                            }
+                            anchor = i;
+                        };
 
                         // Present, non-hidden individual goals per category. Hidden goals are hidden
                         // from the overlay, so they aren't selectable here either (consistent with the
@@ -3508,8 +3592,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         for (int i = 0; i < ctd->counter_goal_count; i++)
                             if (ctd->counter_goals[i] && !ctd->counter_goals[i]->is_hidden) counters_present++;
 
-                        // Renders one category combo listing the given items with checkboxes.
-                        auto item_combo = [&](const char *combo_label, OverlayCompactCounterType kind, int present) {
+                        // Renders one category combo listing that category's items with checkboxes.
+                        // `tip` describes this specific goal type for the combo's tooltip.
+                        auto item_combo = [&](const char *combo_label, OverlayCompactCounterType kind, int present,
+                                              const char *tip) {
                             if (present <= 0) return;
                             int sel = 0;
                             for (int i = 0; i < temp_settings.compact_cycle_item_count; i++)
@@ -3528,7 +3614,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                  a->display_name[0] ? a->display_name : a->root_name,
                                                  a->completed_criteria_count, a->criteria_progress_total);
                                         if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                                            item_toggle(kind, a->root_name);
+                                            item_click(kind, i, a->root_name, s);
                                     }
                                 } else if (kind == COMPACT_COUNTER_STATS) {
                                     for (int i = 0; i < ctd->stat_count; i++) {
@@ -3545,7 +3631,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         else
                                             snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
                                         if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                                            item_toggle(kind, st->root_name);
+                                            item_click(kind, i, st->root_name, s);
                                     }
                                 } else if (kind == COMPACT_COUNTER_SUB_STATS) {
                                     for (int i = 0; i < ctd->stat_count; i++) {
@@ -3557,7 +3643,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                  st->display_name[0] ? st->display_name : st->root_name,
                                                  st->completed_criteria_count, st->criteria_count);
                                         if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                                            item_toggle(kind, st->root_name);
+                                            item_click(kind, i, st->root_name, s);
                                     }
                                 } else if (kind == COMPACT_COUNTER_CUSTOM) {
                                     for (int i = 0; i < ctd->custom_goal_count; i++) {
@@ -3566,7 +3652,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         bool s = item_index(kind, cg->root_name) >= 0;
                                         if (ImGui::Selectable(cg->display_name[0] ? cg->display_name : cg->root_name, s,
                                                               ImGuiSelectableFlags_NoAutoClosePopups))
-                                            item_toggle(kind, cg->root_name);
+                                            item_click(kind, i, cg->root_name, s);
                                     }
                                 } else if (kind == COMPACT_COUNTER_COUNTERS) {
                                     for (int i = 0; i < ctd->counter_goal_count; i++) {
@@ -3578,25 +3664,36 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                  cg->display_name[0] ? cg->display_name : cg->root_name,
                                                  cg->completed_count, cg->linked_goal_count);
                                         if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                                            item_toggle(kind, cg->root_name);
+                                            item_click(kind, i, cg->root_name, s);
                                     }
                                 }
                                 ImGui::EndCombo();
                             }
                             if (ImGui::IsItemHovered()) {
-                                char item_combo_tooltip_buffer[384];
+                                char item_combo_tooltip_buffer[512];
                                 snprintf(item_combo_tooltip_buffer, sizeof(item_combo_tooltip_buffer),
-                                         "Add specific goals to the cycle, shown by their own name over their own\n"
-                                         "count (e.g. \"A Balanced Diet 12/39\").\n"
-                                         "At least one entry across all these dropdowns must stay selected.");
+                                         "%s\n"
+                                         "Shift+Click to range-select.\n"
+                                         "At least one entry across all these dropdowns must stay selected;\n"
+                                         "up to %d individual goals can be added in total.", tip, MAX_COMPACT_CYCLE_ITEMS);
                                 ImGui::SetTooltip("%s", item_combo_tooltip_buffer);
                             }
                         };
-                        item_combo("Complex Advancements", COMPACT_COUNTER_CRITERIA, complex_adv);
-                        item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats);
-                        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats);
-                        item_combo("Custom Goals##items", COMPACT_COUNTER_CUSTOM, custom_present);
-                        item_combo("Counters##items", COMPACT_COUNTER_COUNTERS, counters_present);
+                        char complex_adv_label[48];
+                        snprintf(complex_adv_label, sizeof(complex_adv_label), "Complex %s",
+                                 modern ? "Advancements" : "Achievements");
+                        item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA, complex_adv,
+                                   modern
+                                       ? "Add specific complex advancements (those with criteria) to the cycle, shown by\nname with their criteria progress."
+                                       : "Add specific complex achievements (those with criteria) to the cycle, shown by\nname with their criteria progress.");
+                        item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
+                                   "Add specific simple stats to the cycle, shown by name with their value.");
+                        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,
+                                   "Add specific multi-stats to the cycle, shown by name with their sub-stat progress.");
+                        item_combo("Custom Goals##items", COMPACT_COUNTER_CUSTOM, custom_present,
+                                   "Add specific custom goals to the cycle, shown by name with their progress.");
+                        item_combo("Counters##items", COMPACT_COUNTER_COUNTERS, counters_present,
+                                   "Add specific counters to the cycle, shown by name with their linked-goal progress.");
                     }
 
                     if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
@@ -3611,7 +3708,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
                                  "How long each selected entry stays on the panel before the\n"
                                  "cycle advances to the next one. With a single entry selected the\n"
-                                 "panel is static.\n"
+                                 "panel is static. Press SPACE while the overlay window is focused\n"
+                                 "to jump to the next goal.\n"
                                  "Default: %.1f s", DEFAULT_COMPACT_CYCLE_INTERVAL);
                         ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
                     }

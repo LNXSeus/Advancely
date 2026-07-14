@@ -337,7 +337,7 @@ typedef struct {
     char root_name[192];
 } CompactCycleItem;
 
-#define MAX_COMPACT_CYCLE_ITEMS 128
+#define MAX_COMPACT_CYCLE_ITEMS 1024 // High enough to be effectively unlimited for any real template
 
 // One whole-section counter category for the Compact panel: a version-correct display label and its
 // completed/total. total == 0 means the category is not present in the template.
