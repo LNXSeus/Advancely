@@ -547,15 +547,17 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     cnt->total = cnt_total;
 }
 
-void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td) {
-    if (!settings) return;
+// Drops any selected individual goals that aren't present (or are now hidden) in the loaded
+// template. Shared by the panel-cycle and pop-out-stack item lists (identical presence rules).
+static void prune_compact_items(const TemplateData *td, CompactCycleItem *items, int *count) {
+    if (!items || !count) return;
     if (!td) {
-        settings->compact_cycle_item_count = 0;
+        *count = 0;
         return;
     }
     int kept = 0;
-    for (int i = 0; i < settings->compact_cycle_item_count; i++) {
-        const CompactCycleItem *ci = &settings->compact_cycle_items[i];
+    for (int i = 0; i < *count; i++) {
+        const CompactCycleItem *ci = &items[i];
         bool present = false;
         switch (ci->kind) {
             case COMPACT_COUNTER_CRITERIA: // complex advancement
@@ -597,11 +599,21 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
                 break;
         }
         if (present) {
-            if (kept != i) settings->compact_cycle_items[kept] = settings->compact_cycle_items[i];
+            if (kept != i) items[kept] = items[i];
             kept++;
         }
     }
-    settings->compact_cycle_item_count = kept;
+    *count = kept;
+}
+
+void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td) {
+    if (!settings) return;
+    prune_compact_items(td, settings->compact_cycle_items, &settings->compact_cycle_item_count);
+}
+
+void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td) {
+    if (!settings) return;
+    prune_compact_items(td, settings->compact_stack_items, &settings->compact_stack_item_count);
 }
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
@@ -703,6 +715,14 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
     settings->compact_cycle_item_count = 0;
     settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
+    settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancement completions pop by default
+    settings->compact_stack_item_count = 0;
+    settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
+    settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
+    settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
+    settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
+    settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -1650,6 +1670,89 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
         } else { settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL; defaults_were_used = true; }
 
+        // Pop-out stack selection (independent of the panel cycle) + its motion/layout settings.
+        const cJSON *compact_stack_types = cJSON_GetObjectItem(visual_settings, "compact_stack_types");
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
+        if (compact_stack_types && cJSON_IsArray(compact_stack_types)) {
+            const cJSON *type_entry = nullptr;
+            cJSON_ArrayForEach(type_entry, compact_stack_types) {
+                if (cJSON_IsNumber(type_entry) && type_entry->valueint >= 0
+                    && type_entry->valueint < COMPACT_COUNTER_TYPE_COUNT) {
+                    settings->compact_stack_type[type_entry->valueint] = true;
+                }
+            }
+        } else {
+            settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
+            defaults_were_used = true;
+        }
+
+        settings->compact_stack_item_count = 0;
+        const cJSON *compact_stack_items = cJSON_GetObjectItem(visual_settings, "compact_stack_items");
+        if (compact_stack_items && cJSON_IsArray(compact_stack_items)) {
+            const cJSON *item_entry = nullptr;
+            cJSON_ArrayForEach(item_entry, compact_stack_items) {
+                if (settings->compact_stack_item_count >= MAX_COMPACT_CYCLE_ITEMS) break;
+                const cJSON *kind = cJSON_GetObjectItem(item_entry, "kind");
+                const cJSON *root = cJSON_GetObjectItem(item_entry, "root");
+                if (!cJSON_IsNumber(kind) || kind->valueint < 0 || kind->valueint >= COMPACT_COUNTER_TYPE_COUNT)
+                    continue;
+                if (!cJSON_IsString(root) || !root->valuestring || root->valuestring[0] == '\0') continue;
+                CompactCycleItem *ci = &settings->compact_stack_items[settings->compact_stack_item_count];
+                ci->kind = (OverlayCompactCounterType) kind->valueint;
+                strncpy(ci->root_name, root->valuestring, sizeof(ci->root_name) - 1);
+                ci->root_name[sizeof(ci->root_name) - 1] = '\0';
+                settings->compact_stack_item_count++;
+            }
+        }
+
+        const cJSON *compact_stack_max = cJSON_GetObjectItem(visual_settings, "compact_stack_max_lines");
+        if (compact_stack_max && cJSON_IsNumber(compact_stack_max)) {
+            settings->compact_stack_max_lines = compact_stack_max->valueint;
+            if (settings->compact_stack_max_lines < COMPACT_STACK_MAX_LINES_MIN)
+                settings->compact_stack_max_lines = COMPACT_STACK_MAX_LINES_MIN;
+            if (settings->compact_stack_max_lines > COMPACT_STACK_MAX_LINES_MAX)
+                settings->compact_stack_max_lines = COMPACT_STACK_MAX_LINES_MAX;
+        } else { settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES; defaults_were_used = true; }
+
+        const cJSON *compact_stack_hold = cJSON_GetObjectItem(visual_settings, "compact_stack_hold_time");
+        if (compact_stack_hold && cJSON_IsNumber(compact_stack_hold)) {
+            settings->compact_stack_hold_time = (float) compact_stack_hold->valuedouble;
+            if (settings->compact_stack_hold_time < COMPACT_STACK_HOLD_TIME_MIN)
+                settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MIN;
+            if (settings->compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
+                settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MAX;
+        } else { settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME; defaults_were_used = true; }
+
+        const cJSON *compact_stack_rise = cJSON_GetObjectItem(visual_settings, "compact_stack_rise_time");
+        if (compact_stack_rise && cJSON_IsNumber(compact_stack_rise)) {
+            settings->compact_stack_rise_time = (float) compact_stack_rise->valuedouble;
+            if (settings->compact_stack_rise_time < COMPACT_STACK_RISE_TIME_MIN)
+                settings->compact_stack_rise_time = COMPACT_STACK_RISE_TIME_MIN;
+            if (settings->compact_stack_rise_time > COMPACT_STACK_RISE_TIME_MAX)
+                settings->compact_stack_rise_time = COMPACT_STACK_RISE_TIME_MAX;
+        } else { settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME; defaults_were_used = true; }
+
+        const cJSON *compact_pop_icon = cJSON_GetObjectItem(visual_settings, "compact_pop_icon_size");
+        if (compact_pop_icon && cJSON_IsNumber(compact_pop_icon)) {
+            settings->compact_pop_icon_size = (float) compact_pop_icon->valuedouble;
+            if (settings->compact_pop_icon_size < COMPACT_POP_ICON_SIZE_MIN)
+                settings->compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MIN;
+            if (settings->compact_pop_icon_size > COMPACT_POP_ICON_SIZE_MAX)
+                settings->compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MAX;
+        } else { settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE; defaults_were_used = true; }
+
+        const cJSON *compact_stack_shared = cJSON_GetObjectItem(visual_settings, "compact_stack_shared_icon_size");
+        if (compact_stack_shared && cJSON_IsNumber(compact_stack_shared)) {
+            settings->compact_stack_shared_icon_size = (float) compact_stack_shared->valuedouble;
+            if (settings->compact_stack_shared_icon_size < COMPACT_STACK_SHARED_ICON_SIZE_MIN)
+                settings->compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MIN;
+            if (settings->compact_stack_shared_icon_size > COMPACT_STACK_SHARED_ICON_SIZE_MAX)
+                settings->compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MAX;
+        } else {
+            settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
+            defaults_were_used = true;
+        }
+
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
             settings->overlay_row1_spacing = (float) row1_spacing_json->valuedouble;
@@ -2046,6 +2149,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_cycle_item_count = 0;
         settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
+        settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
+        settings->compact_stack_item_count = 0;
+        settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
+        settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
+        settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
+        settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
+        settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
     }
 
     // Load Account Settings (new top-level section; falls back to coop.local_player for migration)
@@ -2756,6 +2867,41 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_interval");
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_interval",
                               cJSON_CreateNumber(settings->compact_cycle_interval));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_types");
+        cJSON *compact_stack_types_array = cJSON_CreateArray();
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            if (settings->compact_stack_type[i])
+                cJSON_AddItemToArray(compact_stack_types_array, cJSON_CreateNumber(i));
+        }
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_types", compact_stack_types_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_items");
+        cJSON *compact_stack_items_array = cJSON_CreateArray();
+        for (int i = 0; i < settings->compact_stack_item_count; i++) {
+            const CompactCycleItem *ci = &settings->compact_stack_items[i];
+            cJSON *item_obj = cJSON_CreateObject();
+            cJSON_AddItemToObject(item_obj, "kind", cJSON_CreateNumber(ci->kind));
+            cJSON_AddItemToObject(item_obj, "root", cJSON_CreateString(ci->root_name));
+            cJSON_AddItemToArray(compact_stack_items_array, item_obj);
+        }
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_items", compact_stack_items_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_max_lines");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_max_lines",
+                              cJSON_CreateNumber(settings->compact_stack_max_lines));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_hold_time");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_hold_time",
+                              cJSON_CreateNumber(settings->compact_stack_hold_time));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_rise_time");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_rise_time",
+                              cJSON_CreateNumber(settings->compact_stack_rise_time));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_pop_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_pop_icon_size",
+                              cJSON_CreateNumber(settings->compact_pop_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_shared_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_shared_icon_size",
+                              cJSON_CreateNumber(settings->compact_stack_shared_icon_size));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));

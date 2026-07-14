@@ -20,6 +20,7 @@
 #include <string>
 #include <vector> // Required for collecting items to render
 #include <algorithm> // Required for std::reverse
+#include <unordered_map> // Compact pop-out stack: previous-state snapshot for the diff engine
 
 #define SOCIAL_CYCLE_SECONDS 15.0f
 
@@ -1008,10 +1009,509 @@ static void compact_worst_count_entry(char *buf, size_t buf_sz, const CompactEnt
         snprintf(buf, buf_sz, "%s", body);
 }
 
+// ---------------------------------------------------------------------------
+// Compact pop-out stack (Stage 4)
+//
+// As goals progress or complete in-game a horizontal "[icon] text" line (or a 2-line
+// parent + criterion group) slides out from under the counter panel and stacks below
+// it, holds, then leaves. Motion is purely positional + clip (never alpha) so OBS
+// chroma keying stays clean. Which goals may pop is configured independently of the
+// panel cycle via compact_stack_type / compact_stack_items.
+// ---------------------------------------------------------------------------
+
+#define COMPACT_POP_LINE_GAP 8.0f   // Vertical gap below each pop-out line (folded into the line height)
+#define COMPACT_POP_TEXT_GAP 10.0f  // Horizontal gap between a pop-out icon and its text
+
+// One active on-screen pop-out group. Criterion / sub-stat completions are 2-line groups (the parent
+// advancement/category on top, the criterion below); everything else is a single line.
+struct CompactPopGroup {
+    std::string key;          // stable identity, used to coalesce repeat increments in place
+    bool two_line;
+    std::string parent_icon;  // resolved icon path (used directly, like the item rows)
+    std::string parent_text;
+    std::string item_icon;
+    std::string item_text;
+    bool item_shared;         // overlay the parent icon on the item icon (shared criterion)
+    float hold_left;          // seconds until it disappears
+    float anim_y;             // current top Y (lerps toward the settled slot)
+    bool placed;              // anim_y initialised
+};
+
+struct CompactStackEngine {
+    unsigned long long signature = 0;
+    bool seeded = false;
+    Uint64 last_tick = 0;
+    std::unordered_map<std::string, unsigned long long> prev; // last-seen encoded value per key
+    std::vector<CompactPopGroup> groups;                      // newest first (index 0 = top)
+};
+
+static CompactStackEngine s_compact_stack;
+
+// Encodes a goal's (progress, done) into one monotonically-rising value: the done bit sits above the
+// progress so completing a goal always reads as an increase, and progress increments do too. Lets the
+// diff pop on "value went up" without tracking done separately. Regressions (undo) decrease it, so
+// they never pop.
+static unsigned long long compact_enc(int progress, bool done) {
+    unsigned long long p = progress > 0 ? (unsigned long long) progress : 0ULL;
+    return (done ? (1ULL << 40) : 0ULL) + p;
+}
+
+// Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): regular
+// advancements, recipes, unlocks and multi-stage goals pop as whole completions. Every other kind is
+// chosen per-goal in its own dropdown, so its type toggle is ignored (avoids the confusing overlap).
+static bool compact_type_is_pickerless(OverlayCompactCounterType k) {
+    return k == COMPACT_COUNTER_ADVANCEMENTS || k == COMPACT_COUNTER_RECIPES ||
+           k == COMPACT_COUNTER_UNLOCKS || k == COMPACT_COUNTER_MULTISTAGE;
+}
+
+// True if the stack may show a goal: for a pickerless kind, its whole-type toggle is on; for any other
+// kind, the specific goal (`indiv_kind` + `indiv_root`) is individually whitelisted. indiv_root may be
+// null for pickerless kinds.
+static bool compact_stack_allows(const AppSettings *s, OverlayCompactCounterType type_kind,
+                                 OverlayCompactCounterType indiv_kind, const char *indiv_root) {
+    if (compact_type_is_pickerless(type_kind) && s->compact_stack_type[type_kind]) return true;
+    if (indiv_root) {
+        for (int i = 0; i < s->compact_stack_item_count; i++)
+            if (s->compact_stack_items[i].kind == indiv_kind &&
+                strcmp(s->compact_stack_items[i].root_name, indiv_root) == 0)
+                return true;
+    }
+    return false;
+}
+
+// FNV-1a over every poppable goal's root_name(s), so the stack reseeds (and clears) only when the
+// template itself changes - mirrors the belt/page signature approach.
+static unsigned long long compact_stack_signature(const TemplateData *td) {
+    unsigned long long sig = 1469598103934665603ULL;
+    auto mix = [&](const char *s) {
+        for (; s && *s; s++) sig = (sig ^ (unsigned char) *s) * 1099511628211ULL;
+        sig = (sig ^ 0xFFu) * 1099511628211ULL; // separator so a|b differs from ab
+    };
+    if (!td) return sig;
+    for (int i = 0; i < td->advancement_count; i++) {
+        const TrackableCategory *a = td->advancements[i];
+        if (!a) continue;
+        mix(a->root_name);
+        for (int j = 0; j < a->criteria_count; j++)
+            if (a->criteria[j]) mix(a->criteria[j]->root_name);
+    }
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *s = td->stats[i];
+        if (!s) continue;
+        mix(s->root_name);
+        for (int j = 0; j < s->criteria_count; j++)
+            if (s->criteria[j]) mix(s->criteria[j]->root_name);
+    }
+    for (int i = 0; i < td->unlock_count; i++)
+        if (td->unlocks[i]) mix(td->unlocks[i]->root_name);
+    for (int i = 0; i < td->custom_goal_count; i++)
+        if (td->custom_goals[i]) mix(td->custom_goals[i]->root_name);
+    for (int i = 0; i < td->multi_stage_goal_count; i++)
+        if (td->multi_stage_goals[i]) mix(td->multi_stage_goals[i]->root_name);
+    for (int i = 0; i < td->counter_goal_count; i++)
+        if (td->counter_goals[i]) mix(td->counter_goals[i]->root_name);
+    return sig;
+}
+
+// Diffs the template against the previous snapshot and updates the pop-out stack (seed on load /
+// template change, enqueue or coalesce on any increase, expire on hold, cut on overflow), then lays
+// out and draws the stack below the panel. Called every frame from overlay_render_compact once the
+// panel geometry is known. `stack_x` is the panel's left edge (the stack always left-aligns there).
+static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings *settings,
+                                 float stack_x, float panel_bottom, float stack_top, int window_bottom,
+                                 SDL_Color text_color) {
+    CompactStackEngine &eng = s_compact_stack;
+    const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
+    TTF_Font *stack_font = o->compact_stack_font ? o->compact_stack_font : o->font;
+
+    // Reseed (and clear) when the template changes or on the first frame, so nothing pops on load.
+    unsigned long long sig = compact_stack_signature(td);
+    if (!eng.seeded || eng.signature != sig) {
+        eng.signature = sig;
+        eng.prev.clear();
+        eng.groups.clear();
+        eng.seeded = false; // this frame's walk only records the baseline; no pops
+    }
+
+    Uint64 now = SDL_GetTicks();
+    float dt = (eng.last_tick == 0) ? 0.0f : (float) (now - eng.last_tick) / 1000.0f;
+    eng.last_tick = now;
+    if (dt > 0.25f) dt = 0.25f; // clamp after a stall / first frame
+
+    // --- Diff walk: record every poppable goal. A NEW increase enqueues a group; a goal already
+    // showing is refreshed in place on any change (progress up or reverted) and removed if it has
+    // reverted all the way back to nothing. ---
+    auto consider = [&](OverlayCompactCounterType type_kind, OverlayCompactCounterType indiv_kind,
+                        const char *indiv_root, const char *key, int progress, bool done, bool two_line,
+                        const char *parent_icon, const char *parent_text, const char *item_icon,
+                        const char *item_text, bool item_shared) {
+        unsigned long long enc = compact_enc(progress, done);
+        std::string k(key);
+        auto it = eng.prev.find(k);
+        unsigned long long old = (it == eng.prev.end()) ? 0ULL : it->second;
+        eng.prev[k] = enc;
+        if (!eng.seeded) return; // seeding pass: record only
+        // Already on-screen? Refresh in place regardless of direction (revert or progress).
+        for (size_t gi = 0; gi < eng.groups.size(); gi++) {
+            if (eng.groups[gi].key != k) continue;
+            if (enc == 0ULL) { // reverted to no progress and not done -> just disappear
+                eng.groups.erase(eng.groups.begin() + (long) gi);
+                return;
+            }
+            CompactPopGroup &g = eng.groups[gi];
+            g.two_line = two_line;
+            g.parent_icon = parent_icon ? parent_icon : "";
+            g.parent_text = parent_text ? parent_text : "";
+            g.item_icon = item_icon ? item_icon : "";
+            g.item_text = item_text ? item_text : "";
+            g.item_shared = item_shared;
+            if (enc > old) g.hold_left = settings->compact_stack_hold_time; // only a real increment refreshes the hold
+            return;
+        }
+        if (enc <= old) return; // not showing: only appear on a real increase
+        if (!compact_stack_allows(settings, type_kind, indiv_kind, indiv_root)) return;
+        CompactPopGroup g;
+        g.key = k;
+        g.two_line = two_line;
+        g.parent_icon = parent_icon ? parent_icon : "";
+        g.parent_text = parent_text ? parent_text : "";
+        g.item_icon = item_icon ? item_icon : "";
+        g.item_text = item_text ? item_text : "";
+        g.item_shared = item_shared;
+        g.hold_left = settings->compact_stack_hold_time;
+        g.anim_y = 0.0f;
+        g.placed = false;
+        eng.groups.insert(eng.groups.begin(), g); // newest on top
+    };
+
+    if (td) {
+        char key[512], ptext[256], itext[256];
+        // Advancements / recipes: the whole goal (1 line) + each criterion (2-line group).
+        for (int i = 0; i < td->advancement_count; i++) {
+            TrackableCategory *a = td->advancements[i];
+            if (!a || a->is_hidden) continue;
+            bool recipe = a->is_recipe;
+            OverlayCompactCounterType whole_kind = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
+            OverlayCompactCounterType crit_kind = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
+            const char *aname = compact_display_name(a->display_name, a->root_name);
+            snprintf(key, sizeof(key), "advw|%s", a->root_name);
+            consider(whole_kind, whole_kind, nullptr, key, 0, a->done, false,
+                     nullptr, nullptr, a->icon_path, aname, false);
+            snprintf(ptext, sizeof(ptext), "%s (%d/%d)", aname, a->completed_criteria_count,
+                     a->criteria_progress_total);
+            for (int j = 0; j < a->criteria_count; j++) {
+                TrackableItem *c = a->criteria[j];
+                if (!c || c->is_hidden) continue;
+                snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
+                consider(crit_kind, COMPACT_COUNTER_CRITERIA, a->root_name, key, 0, c->done, true,
+                         a->icon_path, ptext, c->icon_path,
+                         compact_display_name(c->display_name, c->root_name), c->is_shared);
+            }
+        }
+        // Stats: simple stats pop as a graded single line; multi-stat sub-stats pop as 2-line groups.
+        for (int i = 0; i < td->stat_count; i++) {
+            TrackableCategory *s = td->stats[i];
+            if (!s || s->is_hidden) continue;
+            const char *sname = compact_display_name(s->display_name, s->root_name);
+            if (s->is_single_stat_category) {
+                if (s->criteria_count < 1 || !s->criteria[0]) continue;
+                int goal = s->criteria[0]->goal;
+                if (goal <= 0 && goal != -1) continue; // goal 0 = legacy helper
+                int prog = s->criteria[0]->progress;
+                // Simple stats can be checked off manually; show the [x]/[o] box like the panel so a
+                // manual override is visible even when the raw count wouldn't reveal it.
+                const char *box = s->is_manually_completed ? "[x] " : "[o] ";
+                if (goal > 0) snprintf(itext, sizeof(itext), "%s%s (%d/%d)", box, sname, prog, goal);
+                else snprintf(itext, sizeof(itext), "%s%s (%d)", box, sname, prog);
+                snprintf(key, sizeof(key), "stat|%s", s->root_name);
+                consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key, prog, s->done, false,
+                         nullptr, nullptr, s->icon_path, itext, false);
+            } else {
+                snprintf(ptext, sizeof(ptext), "%s (%d/%d)", sname, s->completed_criteria_count,
+                         s->criteria_count);
+                for (int j = 0; j < s->criteria_count; j++) {
+                    TrackableItem *sub = s->criteria[j];
+                    if (!sub || sub->is_hidden) continue;
+                    // Sub-stats can be checked off manually; show the [x]/[o] box on the criterion line.
+                    const char *subbox = sub->is_manually_completed ? "[x] " : "[o] ";
+                    snprintf(itext, sizeof(itext), "%s%s", subbox,
+                             compact_display_name(sub->display_name, sub->root_name));
+                    snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
+                    consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key, 0,
+                             sub->done, true, s->icon_path, ptext, sub->icon_path, itext, sub->is_shared);
+                }
+            }
+        }
+        for (int i = 0; i < td->unlock_count; i++) {
+            TrackableItem *u = td->unlocks[i];
+            if (!u || u->is_hidden) continue;
+            snprintf(key, sizeof(key), "unl|%s", u->root_name);
+            consider(COMPACT_COUNTER_UNLOCKS, COMPACT_COUNTER_UNLOCKS, nullptr, key, 0, u->done, false,
+                     nullptr, nullptr, u->icon_path, compact_display_name(u->display_name, u->root_name), false);
+        }
+        for (int i = 0; i < td->custom_goal_count; i++) {
+            TrackableItem *c = td->custom_goals[i];
+            if (!c || c->is_hidden) continue;
+            const char *cname = compact_display_name(c->display_name, c->root_name);
+            if (c->goal > 0) {
+                // Targeted custom goals are counter-driven, not manually checkable: no box.
+                snprintf(itext, sizeof(itext), "%s (%d/%d)", cname, c->progress, c->goal);
+            } else {
+                // Open-ended custom goals can be checked off manually; show the [x]/[o] box.
+                const char *box = c->is_manually_completed ? "[x] " : "[o] ";
+                snprintf(itext, sizeof(itext), "%s%s (%d)", box, cname, c->progress);
+            }
+            snprintf(key, sizeof(key), "cus|%s", c->root_name);
+            consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key, c->progress, c->done,
+                     false, nullptr, nullptr, c->icon_path, itext, false);
+        }
+        for (int i = 0; i < td->multi_stage_goal_count; i++) {
+            MultiStageGoal *g = td->multi_stage_goals[i];
+            if (!g || g->is_hidden) continue;
+            int stage = g->current_stage;
+            bool done = (g->stage_count > 0 && stage >= g->stage_count - 1);
+            const char *stage_text = "";
+            const char *icon = g->icon_path;
+            if (stage >= 0 && stage < g->stage_count && g->stages && g->stages[stage]) {
+                stage_text = g->stages[stage]->display_text;
+                if (g->use_stage_icons && g->stages[stage]->icon_path[0]) icon = g->stages[stage]->icon_path;
+            }
+            snprintf(itext, sizeof(itext), "%s: %s", compact_display_name(g->display_name, g->root_name),
+                     stage_text);
+            snprintf(key, sizeof(key), "ms|%s", g->root_name);
+            consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr, key, stage, done, false,
+                     nullptr, nullptr, icon, itext, false);
+        }
+        for (int i = 0; i < td->counter_goal_count; i++) {
+            CounterGoal *c = td->counter_goals[i];
+            if (!c || c->is_hidden) continue;
+            snprintf(itext, sizeof(itext), "%s (%d/%d)", compact_display_name(c->display_name, c->root_name),
+                     c->completed_count, c->linked_goal_count);
+            snprintf(key, sizeof(key), "cnt|%s", c->root_name);
+            consider(COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name, key, c->completed_count,
+                     c->done, false, nullptr, nullptr, c->icon_path, itext, false);
+        }
+    }
+    eng.seeded = true; // baseline recorded; subsequent frames pop on increases
+
+    float icon_size = settings->compact_pop_icon_size;
+    float line_h = icon_size + COMPACT_POP_LINE_GAP;
+    int max_lines = settings->compact_stack_max_lines;
+
+    // Expire by hold: a group whose hold has run out just disappears (no slide-off). Iterate back to
+    // front so erasing doesn't skip entries.
+    for (int i = (int) eng.groups.size() - 1; i >= 0; i--) {
+        eng.groups[i].hold_left -= dt;
+        if (eng.groups[i].hold_left <= 0.0f) eng.groups.erase(eng.groups.begin() + i);
+    }
+
+    // Overflow: while more than the line budget is on-screen, drop the oldest (bottom) group
+    // immediately. A 2-line group counts as 2 lines.
+    for (;;) {
+        int lines = 0, oldest = -1;
+        for (int i = 0; i < (int) eng.groups.size(); i++) {
+            lines += eng.groups[i].two_line ? 2 : 1;
+            oldest = i;
+        }
+        if (lines <= max_lines || oldest < 0) break;
+        eng.groups.erase(eng.groups.begin() + oldest);
+    }
+
+    if (eng.groups.empty()) return;
+
+    // Layout: settle groups top-to-bottom from stack_top; a fresh group starts hidden behind the
+    // panel bottom and slides down into place (the only animation - removal is instant).
+    float y = stack_top;
+    float rise = settings->compact_stack_rise_time;
+    for (auto &g : eng.groups) {
+        float gh = (g.two_line ? 2.0f : 1.0f) * line_h;
+        float target = y;
+        y += gh;
+        if (!g.placed) {
+            g.anim_y = panel_bottom - gh; // emerge from under the panel
+            g.placed = true;
+        }
+        float f = (rise <= 0.0f) ? 1.0f : fminf(1.0f, dt / rise);
+        g.anim_y += (target - g.anim_y) * f;
+    }
+
+    // Clip the stack to the band below the panel so a group emerging from under the panel stays
+    // hidden until it clears the panel's bottom edge (positional reveal, no alpha).
+    int window_w = 0;
+    SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);
+    SDL_Rect clip = {0, (int) snap_px(panel_bottom), window_w, window_bottom - (int) snap_px(panel_bottom)};
+    if (clip.h < 0) clip.h = 0;
+    SDL_SetRenderClipRect(o->renderer, &clip);
+
+    auto draw_icon = [&](const std::string &path, float ix, float iy, float sz) {
+        if (path.empty()) return;
+        SDL_Texture *tex = nullptr;
+        AnimatedTexture *anim = nullptr;
+        if (strstr(path.c_str(), ".gif"))
+            anim = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                   &o->anim_cache_capacity, path.c_str(), SDL_SCALEMODE_NEAREST);
+        else
+            tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                         &o->texture_cache_capacity, path.c_str(), SDL_SCALEMODE_NEAREST);
+        SDL_FRect d = {snap_px(ix), snap_px(iy), sz, sz};
+        if (tex || anim) render_texture_with_alpha(o->renderer, tex, anim, &d, 255);
+    };
+    auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
+                         const std::string &shared_icon) {
+        draw_icon(icon, stack_x, ly, icon_size);
+        if (shared && settings->compact_stack_shared_icon_size > 0.0f)
+            draw_icon(shared_icon, stack_x, ly, settings->compact_stack_shared_icon_size);
+        if (!text.empty()) {
+            SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
+            if (tt) {
+                float tw = 0.0f, th = 0.0f;
+                SDL_GetTextureSize(tt, &tw, &th);
+                SDL_FRect d = {snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP),
+                               snap_px(ly + (icon_size - th) / 2.0f), tw, th};
+                SDL_RenderTexture(o->renderer, tt, nullptr, &d);
+            }
+        }
+    };
+    for (auto &g : eng.groups) {
+        if (g.two_line) {
+            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon);
+            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon);
+        } else {
+            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon);
+        }
+    }
+    SDL_SetRenderClipRect(o->renderer, nullptr);
+}
+
+// Widest line (icon + gap + text) any pop-out could ever show for the current stack selection, so the
+// overlay window can be widened to fit long lines instead of clipping them. Uses the widest digit
+// repeated over each total (like the panel) so the width is stable for the whole run. Returns 0 if
+// nothing can pop. Mirrors compact_render_stack's walk, filters and text (incl. the [x]/[o] box).
+static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSettings *settings) {
+    const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
+    if (!td) return 0.0f;
+    // Cache the result: it only depends on the template (totals + names) and the stack settings, and
+    // any settings change restarts the overlay - so it is stable for a run and need only be measured
+    // once per template (keyed by the same signature the stack engine uses).
+    static unsigned long long cached_sig = ~0ULL;
+    static float cached_w = 0.0f;
+    unsigned long long sig = compact_stack_signature(td);
+    if (sig == cached_sig) return cached_w;
+    TTF_Font *font = o->compact_stack_font ? o->compact_stack_font : o->font;
+    char wdig = compact_widest_digit(font);
+    float max_text = 0.0f;
+    auto measure = [&](const char *s) {
+        int w = 0;
+        TTF_MeasureString(font, s, 0, 0, &w, nullptr);
+        if ((float) w > max_text) max_text = (float) w;
+    };
+    char buf[300], cnt[64];
+    char open[16]; // worst-case open-ended count: widest digit x 6 (covers up to 999999)
+    for (int i = 0; i < 6; i++) open[i] = wdig;
+    open[6] = '\0';
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *a = td->advancements[i];
+        if (!a || a->is_hidden) continue;
+        bool recipe = a->is_recipe;
+        OverlayCompactCounterType wk = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
+        OverlayCompactCounterType ck = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
+        const char *an = compact_display_name(a->display_name, a->root_name);
+        if (compact_stack_allows(settings, wk, wk, nullptr)) measure(an);
+        if (compact_stack_allows(settings, ck, COMPACT_COUNTER_CRITERIA, a->root_name)) {
+            compact_worst_count(cnt, sizeof(cnt), a->criteria_progress_total, wdig);
+            snprintf(buf, sizeof(buf), "%s (%s)", an, cnt);
+            measure(buf);
+            for (int j = 0; j < a->criteria_count; j++) {
+                TrackableItem *c = a->criteria[j];
+                if (!c || c->is_hidden) continue;
+                measure(compact_display_name(c->display_name, c->root_name));
+            }
+        }
+    }
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *s = td->stats[i];
+        if (!s || s->is_hidden) continue;
+        const char *sn = compact_display_name(s->display_name, s->root_name);
+        if (s->is_single_stat_category) {
+            if (s->criteria_count < 1 || !s->criteria[0]) continue;
+            int goal = s->criteria[0]->goal;
+            if (goal <= 0 && goal != -1) continue;
+            if (!compact_stack_allows(settings, COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name)) continue;
+            if (goal > 0) {
+                compact_worst_count(cnt, sizeof(cnt), goal, wdig);
+                snprintf(buf, sizeof(buf), "[x] %s (%s)", sn, cnt);
+            } else {
+                snprintf(buf, sizeof(buf), "[x] %s (%s)", sn, open);
+            }
+            measure(buf);
+        } else {
+            if (!compact_stack_allows(settings, COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name)) continue;
+            compact_worst_count(cnt, sizeof(cnt), s->criteria_count, wdig);
+            snprintf(buf, sizeof(buf), "%s (%s)", sn, cnt);
+            measure(buf);
+            for (int j = 0; j < s->criteria_count; j++) {
+                TrackableItem *sub = s->criteria[j];
+                if (!sub || sub->is_hidden) continue;
+                snprintf(buf, sizeof(buf), "[x] %s", compact_display_name(sub->display_name, sub->root_name));
+                measure(buf);
+            }
+        }
+    }
+    for (int i = 0; i < td->unlock_count; i++) {
+        TrackableItem *u = td->unlocks[i];
+        if (!u || u->is_hidden) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_UNLOCKS, COMPACT_COUNTER_UNLOCKS, nullptr)) continue;
+        measure(compact_display_name(u->display_name, u->root_name));
+    }
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        TrackableItem *c = td->custom_goals[i];
+        if (!c || c->is_hidden) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
+        const char *cn = compact_display_name(c->display_name, c->root_name);
+        if (c->goal > 0) {
+            compact_worst_count(cnt, sizeof(cnt), c->goal, wdig);
+            snprintf(buf, sizeof(buf), "%s (%s)", cn, cnt);
+        } else {
+            snprintf(buf, sizeof(buf), "[x] %s (%s)", cn, open);
+        }
+        measure(buf);
+    }
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        MultiStageGoal *g = td->multi_stage_goals[i];
+        if (!g || g->is_hidden) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr)) continue;
+        const char *gn = compact_display_name(g->display_name, g->root_name);
+        const char *longest = "";
+        int longest_w = 0;
+        for (int j = 0; j < g->stage_count; j++) {
+            if (g->stages && g->stages[j]) {
+                int w = 0;
+                TTF_MeasureString(font, g->stages[j]->display_text, 0, 0, &w, nullptr);
+                if (w > longest_w) { longest_w = w; longest = g->stages[j]->display_text; }
+            }
+        }
+        snprintf(buf, sizeof(buf), "%s: %s", gn, longest);
+        measure(buf);
+    }
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        CounterGoal *c = td->counter_goals[i];
+        if (!c || c->is_hidden) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name)) continue;
+        const char *cn = compact_display_name(c->display_name, c->root_name);
+        compact_worst_count(cnt, sizeof(cnt), c->linked_goal_count, wdig);
+        snprintf(buf, sizeof(buf), "%s (%s)", cn, cnt);
+        measure(buf);
+    }
+    cached_sig = sig;
+    cached_w = (max_text <= 0.0f) ? 0.0f : (settings->compact_pop_icon_size + COMPACT_POP_TEXT_GAP + max_text);
+    return cached_w;
+}
+
 // Compact render mode: a tall/narrow counter panel (Zesskyo-style). One big "label over count"
 // block that cycles through the user-selected entries (whole-section type counts and/or individual
 // goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
-// selected entries so the background stays fixed for the whole run. Pop-out goals arrive later.
+// selected entries so the background stays fixed for the whole run. Completed/progressing goals then
+// slide out from under the panel and stack below it (compact_render_stack).
 static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettings *settings) {
     SDL_Color text_color = {
         settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
@@ -1078,12 +1578,25 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float panel_w = snap_px(content_w + 2.0f * pad + border_x);
     float panel_h = snap_px(content_h + 2.0f * pad + border_y);
 
-    // Auto-fit the overlay window to the panel plus a pad-sized margin all around. Only resizes
-    // when the needed size actually changes (a new template with more digits, or a settings tweak),
-    // so it stays put during a run. The panel is then centered by that equal margin.
+    // Reserve room below the panel for the pop-out stack: a pad-sized gap then the full line budget
+    // (a 2-line group uses 2 lines). The window height is thus fixed for the whole run (inputs are
+    // settings), so the stack always has space and the empty area below is transparent / keyed out.
+    float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
+    float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
+
+    // Auto-fit the overlay window to the panel plus a pad-sized margin all around (and the reserved
+    // stack area). Only resizes when the needed size actually changes (a new template with more
+    // digits, or a settings tweak), so it stays put during a run. The panel is placed by alignment.
     int want_w = (int) snap_px(panel_w + 2.0f * pad);
+    // Also widen to fit the worst-case pop-out line so long stack text isn't clipped. The stack
+    // left-aligns at the panel's left edge (pad for Left alignment), so it needs stack_w + 2*pad.
+    float stack_w = compact_stack_worst_width(o, t, settings);
+    if (stack_w > 0.0f) {
+        int stack_want_w = (int) snap_px(stack_w + 2.0f * pad);
+        if (stack_want_w > want_w) want_w = stack_want_w;
+    }
     if (want_w < COMPACT_MIN_WINDOW_WIDTH) want_w = COMPACT_MIN_WINDOW_WIDTH;
-    int want_h = (int) snap_px(panel_h + 2.0f * pad);
+    int want_h = (int) snap_px(panel_h + 2.0f * pad + stack_reserve);
     int cur_w = 0, cur_h = 0;
     SDL_GetWindowSize(o->window, &cur_w, &cur_h);
     if (cur_w != want_w || cur_h != want_h) SDL_SetWindowSize(o->window, want_w, want_h);
@@ -1117,6 +1630,12 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
     }
+
+    // Diff the template and draw the pop-out stack below the panel. The stack always left-aligns to
+    // the panel's left edge regardless of the panel alignment setting.
+    float panel_bottom = panel_y + panel_h;
+    float stack_top = snap_px(panel_bottom + pad);
+    compact_render_stack(o, t, settings, panel_x, panel_bottom, stack_top, want_h, text_color);
 }
 
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.
@@ -1145,10 +1664,10 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
 // process is fully restarted whenever settings change, so the layout never needs
 // to be recomputed at runtime and the window never resizes without a settings change.
 static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
-    // Compact mode uses a completely different, tall/narrow layout: a counter panel near the top,
-    // sized to one "label over count" block (the cycle shows one entry at a time). Width stays
-    // user-controlled (overlay_window.w); overlay_render auto-fits the exact panel size each frame.
-    // Pop-out and promo space is added in later stages.
+    // Compact mode uses a completely different, tall/narrow layout: a counter panel near the top plus
+    // the reserved pop-out stack below it. Width stays user-controlled (overlay_window.w); overlay_render
+    // auto-fits the exact panel size each frame. This initial height must match overlay_render_compact's
+    // want_h so the window is created at the right size (no startup resize flash).
     if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
         TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
         TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
@@ -1161,10 +1680,12 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
         float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
                                   settings->compact_panel_pixel_scale);
         float panel_h = label_lh + line_gap + count_lh - (float) count_descent + 2.0f * pad + border_y;
+        float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
+        float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
         o->layout_row1_y = 0.0f;
         o->layout_row2_y = 0.0f;
         o->layout_row3_y = 0.0f;
-        o->layout_height = (int) snap_px(pad + panel_h + pad);
+        o->layout_height = (int) snap_px(pad + panel_h + pad + stack_reserve);
         return;
     }
 

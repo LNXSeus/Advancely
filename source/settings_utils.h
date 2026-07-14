@@ -152,6 +152,23 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_CYCLE_INTERVAL_MIN 0.5f
 #define COMPACT_CYCLE_INTERVAL_MAX 60.0f
 
+// Compact pop-out stack (goals slide out from under the panel as they progress/complete).
+#define DEFAULT_COMPACT_STACK_MAX_LINES 6 // Line budget below the panel; a 2-line group uses 2 lines
+#define COMPACT_STACK_MAX_LINES_MIN 1
+#define COMPACT_STACK_MAX_LINES_MAX 64
+#define DEFAULT_COMPACT_STACK_HOLD_TIME 8.0f // Seconds a pop-out holds before it leaves the stack
+#define COMPACT_STACK_HOLD_TIME_MIN 0.5f
+#define COMPACT_STACK_HOLD_TIME_MAX 120.0f
+#define DEFAULT_COMPACT_STACK_RISE_TIME 0.25f // Seconds a pop-out takes to slide into place
+#define COMPACT_STACK_RISE_TIME_MIN 0.0f
+#define COMPACT_STACK_RISE_TIME_MAX 5.0f
+#define DEFAULT_COMPACT_POP_ICON_SIZE 48.0f // Pop-out line icon size (matches the row-1 icon size)
+#define COMPACT_POP_ICON_SIZE_MIN 8.0f
+#define COMPACT_POP_ICON_SIZE_MAX 256.0f
+#define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line
+#define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f
+#define COMPACT_STACK_SHARED_ICON_SIZE_MAX 256.0f
+
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
@@ -441,6 +458,16 @@ struct AppSettings {
     CompactCycleItem compact_cycle_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals selected into the cycle by name.
     int compact_cycle_item_count; // Number of valid entries in compact_cycle_items.
     float compact_cycle_interval; // Seconds each selected entry shows before the cycle advances.
+    // Pop-out stack selection (independent of the panel cycle): which goals may slide out below the
+    // panel as they progress or complete. Same additive model as the cycle (type OR individual goal).
+    bool compact_stack_type[COMPACT_COUNTER_TYPE_COUNT]; // Which whole-section types may pop into the stack.
+    CompactCycleItem compact_stack_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals allowed into the stack by name.
+    int compact_stack_item_count; // Number of valid entries in compact_stack_items.
+    int compact_stack_max_lines; // Line budget for the stack below the panel (a 2-line group uses 2).
+    float compact_stack_hold_time; // Seconds a pop-out holds before it leaves the stack.
+    float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.
+    float compact_pop_icon_size; // Pop-out line icon size.
+    float compact_stack_shared_icon_size; // Shared-parent overlay icon size on a pop-out line.
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.
@@ -606,6 +633,9 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
 // templates (including via the template editor) doesn't leave stale selections in the dropdowns.
 // A null template clears them all. Type-count selections (universal categories) are left untouched.
 void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td);
+
+// Same as settings_prune_compact_cycle_items, for the independent pop-out-stack item selection.
+void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td);
 
 /**
  * @brief Returns the owner UUID assigned to an advancement, or NULL if unassigned.

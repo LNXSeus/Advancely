@@ -12420,9 +12420,11 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
         }
     }
 
-    // Drop Compact-cycle individual-goal selections that don't exist in the new template, so the
-    // settings dropdowns don't keep stale selections after a template switch (manual or via editor).
+    // Drop Compact-cycle and pop-out-stack individual-goal selections that don't exist in the new
+    // template, so the settings dropdowns don't keep stale selections after a template switch
+    // (manual or via editor).
     settings_prune_compact_cycle_items(settings, t->template_data);
+    settings_prune_compact_stack_items(settings, t->template_data);
 }
 
 void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings) {
