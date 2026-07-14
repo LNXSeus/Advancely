@@ -129,6 +129,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED false
 #define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING 256.0f // 96px icon + more (took spacing from 1.16 AA template)
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
+#define DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS false // If true, goals marked hidden in the template still show in the overlay
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_OVERLAY_CLEAR_ANIMATION (-1.2f) // Seconds for the clear (crop) animation; 0 = instant, sign = direction
 
@@ -491,6 +492,7 @@ struct AppSettings {
     bool overlay_row3_custom_spacing_enabled; // If true, use custom spacing for row 3
     float overlay_row3_custom_spacing; // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
+    bool overlay_show_hidden_goals; // If true, goals marked hidden in the template are still shown in the overlay (all modes).
     bool overlay_custom_vertical_spacing_enabled; // If true, the overlay row gaps below are added to the default layout.
     float overlay_gap_top_to_row1; // Extra vertical gap between the top info bar and row 1 (pixels).
     float overlay_gap_row1_to_row2; // Extra vertical gap between row 1 and row 2 (pixels).

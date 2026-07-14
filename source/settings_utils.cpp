@@ -547,9 +547,11 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     cnt->total = cnt_total;
 }
 
-// Drops any selected individual goals that aren't present (or are now hidden) in the loaded
-// template. Shared by the panel-cycle and pop-out-stack item lists (identical presence rules).
-static void prune_compact_items(const TemplateData *td, CompactCycleItem *items, int *count) {
+// Drops any selected individual goals that aren't present in the loaded template. Shared by the
+// panel-cycle and pop-out-stack item lists (identical presence rules). A goal hidden in the template
+// counts as absent UNLESS `show_hidden` is set (the "Show Hidden Goals" overlay option), so a hidden
+// goal the user deliberately selected isn't silently dropped while that option is on.
+static void prune_compact_items(const TemplateData *td, CompactCycleItem *items, int *count, bool show_hidden) {
     if (!items || !count) return;
     if (!td) {
         *count = 0;
@@ -563,15 +565,16 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
             case COMPACT_COUNTER_CRITERIA: // complex advancement
                 for (int j = 0; j < td->advancement_count && !present; j++) {
                     const TrackableCategory *a = td->advancements[j];
-                    if (a && a->criteria_count > 0 && !a->is_hidden && strcmp(a->root_name, ci->root_name) == 0)
+                    if (a && a->criteria_count > 0 && (show_hidden || !a->is_hidden) &&
+                        strcmp(a->root_name, ci->root_name) == 0)
                         present = true;
                 }
                 break;
             case COMPACT_COUNTER_STATS: // simple (single-value) stat: targeted (goal>0) or open-ended (goal -1)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];
-                    if (s && s->is_single_stat_category && !s->is_hidden && s->criteria_count >= 1 && s->criteria[0] &&
-                        (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1) &&
+                    if (s && s->is_single_stat_category && (show_hidden || !s->is_hidden) && s->criteria_count >= 1 &&
+                        s->criteria[0] && (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1) &&
                         strcmp(s->root_name, ci->root_name) == 0)
                         present = true;
                 }
@@ -579,20 +582,21 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
             case COMPACT_COUNTER_SUB_STATS: // multi-stat (complex stat category)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];
-                    if (s && !s->is_single_stat_category && !s->is_hidden && strcmp(s->root_name, ci->root_name) == 0)
+                    if (s && !s->is_single_stat_category && (show_hidden || !s->is_hidden) &&
+                        strcmp(s->root_name, ci->root_name) == 0)
                         present = true;
                 }
                 break;
             case COMPACT_COUNTER_CUSTOM:
                 for (int j = 0; j < td->custom_goal_count && !present; j++) {
                     const TrackableItem *c = td->custom_goals[j];
-                    if (c && !c->is_hidden && strcmp(c->root_name, ci->root_name) == 0) present = true;
+                    if (c && (show_hidden || !c->is_hidden) && strcmp(c->root_name, ci->root_name) == 0) present = true;
                 }
                 break;
             case COMPACT_COUNTER_COUNTERS:
                 for (int j = 0; j < td->counter_goal_count && !present; j++) {
                     const CounterGoal *c = td->counter_goals[j];
-                    if (c && !c->is_hidden && strcmp(c->root_name, ci->root_name) == 0) present = true;
+                    if (c && (show_hidden || !c->is_hidden) && strcmp(c->root_name, ci->root_name) == 0) present = true;
                 }
                 break;
             default:
@@ -608,12 +612,14 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
 
 void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
-    prune_compact_items(td, settings->compact_cycle_items, &settings->compact_cycle_item_count);
+    prune_compact_items(td, settings->compact_cycle_items, &settings->compact_cycle_item_count,
+                        settings->overlay_show_hidden_goals);
 }
 
 void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
-    prune_compact_items(td, settings->compact_stack_items, &settings->compact_stack_item_count);
+    prune_compact_items(td, settings->compact_stack_items, &settings->compact_stack_item_count,
+                        settings->overlay_show_hidden_goals);
 }
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
@@ -749,6 +755,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
     settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+    settings->overlay_show_hidden_goals = DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS;
     settings->overlay_custom_vertical_spacing_enabled = DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED;
     settings->overlay_gap_top_to_row1 = DEFAULT_OVERLAY_GAP_TOP_TO_ROW1;
     settings->overlay_gap_row1_to_row2 = DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2;
@@ -1261,6 +1268,13 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         if (row3_hide && cJSON_IsBool(row3_hide)) settings->overlay_row3_remove_completed = cJSON_IsTrue(row3_hide);
         else {
             settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *show_hidden = cJSON_GetObjectItem(general_settings, "overlay_show_hidden_goals");
+        if (show_hidden && cJSON_IsBool(show_hidden)) settings->overlay_show_hidden_goals = cJSON_IsTrue(show_hidden);
+        else {
+            settings->overlay_show_hidden_goals = DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS;
             defaults_were_used = true;
         }
 
@@ -2634,6 +2648,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
         cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed",
                               cJSON_CreateBool(settings->overlay_row3_remove_completed));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_hidden_goals");
+        cJSON_AddItemToObject(general_obj, "overlay_show_hidden_goals",
+                              cJSON_CreateBool(settings->overlay_show_hidden_goals));
         cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
         cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed",
                               cJSON_CreateNumber(settings->overlay_stat_cycle_speed));

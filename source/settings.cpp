@@ -183,7 +183,10 @@ struct CompactSelTarget {
 // Presence/label rules match compact_compute_type_counters and the tracker's section separators.
 static void compact_selection_ui(const char *suffix, const TemplateData *ctd, const CompactCounter *cc,
                                   bool modern, const char *types_label, CompactSelTarget tgt,
-                                  int *type_anchor, int *item_anchor, bool is_cycle) {
+                                  int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden) {
+    // A goal hidden in the template is normally not listed here; the "Show Hidden Goals" overlay
+    // option surfaces it so it can be selected. hidden_now() folds that in (true = treat as hidden).
+    auto hidden_now = [&](bool h) { return h && !show_hidden; };
     // --- Goal types (multiselect) ---
     // The panel cycle lists every present type (each is one big "label over count" cycle entry). The
     // pop-out stack lists ONLY the "pickerless" whole-goal types (advancements, recipes, unlocks,
@@ -282,29 +285,29 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         if (kind == COMPACT_COUNTER_CRITERIA) {
             if (i < ctd->advancement_count) {
                 TrackableCategory *a = ctd->advancements[i];
-                if (a && a->criteria_count > 0 && !a->is_hidden) return a->root_name;
+                if (a && a->criteria_count > 0 && !hidden_now(a->is_hidden)) return a->root_name;
             }
         } else if (kind == COMPACT_COUNTER_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && st->is_single_stat_category && !st->is_hidden && st->criteria_count >= 1 &&
+                if (st && st->is_single_stat_category && !hidden_now(st->is_hidden) && st->criteria_count >= 1 &&
                     st->criteria[0] && (st->criteria[0]->goal > 0 || st->criteria[0]->goal == -1))
                     return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_SUB_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && !st->is_single_stat_category && !st->is_hidden) return st->root_name;
+                if (st && !st->is_single_stat_category && !hidden_now(st->is_hidden)) return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_CUSTOM) {
             if (i < ctd->custom_goal_count) {
                 TrackableItem *cg = ctd->custom_goals[i];
-                if (cg && !cg->is_hidden) return cg->root_name;
+                if (cg && !hidden_now(cg->is_hidden)) return cg->root_name;
             }
         } else if (kind == COMPACT_COUNTER_COUNTERS) {
             if (i < ctd->counter_goal_count) {
                 CounterGoal *cg = ctd->counter_goals[i];
-                if (cg && !cg->is_hidden) return cg->root_name;
+                if (cg && !hidden_now(cg->is_hidden)) return cg->root_name;
             }
         }
         return nullptr;
@@ -341,24 +344,24 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     int complex_adv = 0;
     for (int i = 0; i < ctd->advancement_count; i++)
         if (ctd->advancements[i] && ctd->advancements[i]->criteria_count > 0 &&
-            !ctd->advancements[i]->is_hidden) complex_adv++;
+            !hidden_now(ctd->advancements[i]->is_hidden)) complex_adv++;
     int simple_stats = 0;
     for (int i = 0; i < ctd->stat_count; i++) {
         const TrackableCategory *s = ctd->stats[i];
-        if (s && s->is_single_stat_category && !s->is_hidden && s->criteria_count >= 1 &&
+        if (s && s->is_single_stat_category && !hidden_now(s->is_hidden) && s->criteria_count >= 1 &&
             s->criteria[0] && (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1))
             simple_stats++;
     }
     int multi_stats = 0;
     for (int i = 0; i < ctd->stat_count; i++)
-        if (ctd->stats[i] && !ctd->stats[i]->is_single_stat_category && !ctd->stats[i]->is_hidden)
+        if (ctd->stats[i] && !ctd->stats[i]->is_single_stat_category && !hidden_now(ctd->stats[i]->is_hidden))
             multi_stats++;
     int custom_present = 0;
     for (int i = 0; i < ctd->custom_goal_count; i++)
-        if (ctd->custom_goals[i] && !ctd->custom_goals[i]->is_hidden) custom_present++;
+        if (ctd->custom_goals[i] && !hidden_now(ctd->custom_goals[i]->is_hidden)) custom_present++;
     int counters_present = 0;
     for (int i = 0; i < ctd->counter_goal_count; i++)
-        if (ctd->counter_goals[i] && !ctd->counter_goals[i]->is_hidden) counters_present++;
+        if (ctd->counter_goals[i] && !hidden_now(ctd->counter_goals[i]->is_hidden)) counters_present++;
 
     // Renders one category combo listing that category's items with checkboxes. `base_label` is the
     // visible text; `suffix` makes the ImGui ID unique between the cycle and stack copies. `tip`
@@ -377,7 +380,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             if (kind == COMPACT_COUNTER_CRITERIA) {
                 for (int i = 0; i < ctd->advancement_count; i++) {
                     TrackableCategory *a = ctd->advancements[i];
-                    if (!a || a->criteria_count <= 0 || a->is_hidden) continue;
+                    if (!a || a->criteria_count <= 0 || hidden_now(a->is_hidden)) continue;
                     bool s = item_index(kind, a->root_name) >= 0;
                     char row[224];
                     snprintf(row, sizeof(row), "%s (%d/%d)",
@@ -389,7 +392,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             } else if (kind == COMPACT_COUNTER_STATS) {
                 for (int i = 0; i < ctd->stat_count; i++) {
                     TrackableCategory *st = ctd->stats[i];
-                    if (!st || !st->is_single_stat_category || st->is_hidden) continue;
+                    if (!st || !st->is_single_stat_category || hidden_now(st->is_hidden)) continue;
                     if (st->criteria_count < 1 || !st->criteria[0]) continue;
                     int goal = st->criteria[0]->goal;
                     if (goal <= 0 && goal != -1) continue; // goal 0 = legacy helper
@@ -406,7 +409,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             } else if (kind == COMPACT_COUNTER_SUB_STATS) {
                 for (int i = 0; i < ctd->stat_count; i++) {
                     TrackableCategory *st = ctd->stats[i];
-                    if (!st || st->is_single_stat_category || st->is_hidden) continue;
+                    if (!st || st->is_single_stat_category || hidden_now(st->is_hidden)) continue;
                     bool s = item_index(kind, st->root_name) >= 0;
                     char row[224];
                     snprintf(row, sizeof(row), "%s (%d/%d)",
@@ -418,7 +421,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             } else if (kind == COMPACT_COUNTER_CUSTOM) {
                 for (int i = 0; i < ctd->custom_goal_count; i++) {
                     TrackableItem *cg = ctd->custom_goals[i];
-                    if (!cg || cg->is_hidden) continue;
+                    if (!cg || hidden_now(cg->is_hidden)) continue;
                     bool s = item_index(kind, cg->root_name) >= 0;
                     if (ImGui::Selectable(cg->display_name[0] ? cg->display_name : cg->root_name, s,
                                           ImGuiSelectableFlags_NoAutoClosePopups))
@@ -427,7 +430,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             } else if (kind == COMPACT_COUNTER_COUNTERS) {
                 for (int i = 0; i < ctd->counter_goal_count; i++) {
                     CounterGoal *cg = ctd->counter_goals[i];
-                    if (!cg || cg->is_hidden) continue;
+                    if (!cg || hidden_now(cg->is_hidden)) continue;
                     bool s = item_index(kind, cg->root_name) >= 0;
                     char row[224];
                     snprintf(row, sizeof(row), "%s (%d/%d)",
@@ -572,6 +575,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
         a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+        a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
@@ -769,6 +773,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
         a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+        a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
 
         // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
         a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
@@ -3418,6 +3423,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 const bool overlay_page_mode = (temp_settings.overlay_render_mode == OVERLAY_RENDER_MODE_PAGE);
                 const bool overlay_compact_mode = (temp_settings.overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT);
 
+                // Applies to every render mode, so it lives here (outside the mode-specific sections).
+                ImGui::Checkbox("Show Hidden Goals", &temp_settings.overlay_show_hidden_goals);
+                if (ImGui::IsItemHovered()) {
+                    char show_hidden_tooltip_buffer[512];
+                    snprintf(show_hidden_tooltip_buffer, sizeof(show_hidden_tooltip_buffer),
+                             "Show goals that are marked hidden in the template anyway, in every overlay mode\n"
+                             "(scrolling belt, page and compact). Turn this on to also select hidden goals in\n"
+                             "the Compact panel/stack dropdowns above.\n"
+                             "Default: %s", DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS ? "On" : "Off");
+                    ImGui::SetTooltip("%s", show_hidden_tooltip_buffer);
+                }
+
                 // Content & Behavior drives the belt/page top info bar and 3-row layout (text sections,
                 // separator, IGT formatting, sub-stat cycling, clear animation). Compact mode uses none
                 // of these, so hide the whole section while it is active.
@@ -3784,7 +3801,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                       temp_settings.compact_cycle_items,
                                                       &temp_settings.compact_cycle_item_count};
                         compact_selection_ui("cycle", ctd, cc, modern, "Main Goal Types", cycle_tgt,
-                                             &s_type_anchor, s_item_anchor, true);
+                                             &s_type_anchor, s_item_anchor, true,
+                                             temp_settings.overlay_show_hidden_goals);
 
                         // Never allow an empty cycle across ALL these dropdowns. If no goal type is
                         // selected AND no individual goal is selected, keep the first present type on so
@@ -3857,7 +3875,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                       temp_settings.compact_stack_items,
                                                       &temp_settings.compact_stack_item_count};
                         compact_selection_ui("stack", sctd, scc, smodern, "Stack Goal Types", stack_tgt,
-                                             &s_stack_type_anchor, s_stack_item_anchor, false);
+                                             &s_stack_type_anchor, s_stack_item_anchor, false,
+                                             temp_settings.overlay_show_hidden_goals);
                     }
 
                     if (ImGui::DragInt("Max Stack Lines", &temp_settings.compact_stack_max_lines, 0.1f,
