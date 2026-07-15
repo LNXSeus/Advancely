@@ -282,10 +282,12 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     // The root_name of the listed item at template index i for `kind`, or nullptr if i isn't a valid
     // (present, non-hidden, matching) row - mirrors item_combo's filters. Used for Shift+Click ranges.
     auto item_root_at = [&](OverlayCompactCounterType kind, int i) -> const char * {
-        if (kind == COMPACT_COUNTER_CRITERIA) {
+        if (kind == COMPACT_COUNTER_CRITERIA || kind == COMPACT_COUNTER_RECIPE_CRITERIA) {
             if (i < ctd->advancement_count) {
                 TrackableCategory *a = ctd->advancements[i];
-                if (a && a->criteria_count > 0 && !hidden_now(a->is_hidden)) return a->root_name;
+                bool want_recipe = (kind == COMPACT_COUNTER_RECIPE_CRITERIA);
+                if (a && a->is_recipe == want_recipe && a->criteria_count > 0 && !hidden_now(a->is_hidden))
+                    return a->root_name;
             }
         } else if (kind == COMPACT_COUNTER_STATS) {
             if (i < ctd->stat_count) {
@@ -341,10 +343,13 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     };
 
     // Present, non-hidden individual goals per category (hidden goals aren't selectable anywhere).
-    int complex_adv = 0;
-    for (int i = 0; i < ctd->advancement_count; i++)
-        if (ctd->advancements[i] && ctd->advancements[i]->criteria_count > 0 &&
-            !hidden_now(ctd->advancements[i]->is_hidden)) complex_adv++;
+    int complex_adv = 0, complex_recipes = 0;
+    for (int i = 0; i < ctd->advancement_count; i++) {
+        const TrackableCategory *a = ctd->advancements[i];
+        if (!a || a->criteria_count <= 0 || hidden_now(a->is_hidden)) continue;
+        if (a->is_recipe) complex_recipes++;
+        else complex_adv++;
+    }
     int simple_stats = 0;
     for (int i = 0; i < ctd->stat_count; i++) {
         const TrackableCategory *s = ctd->stats[i];
@@ -377,10 +382,13 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         char combo_label[96];
         snprintf(combo_label, sizeof(combo_label), "%s##%s", base_label, suffix);
         if (ImGui::BeginCombo(combo_label, preview)) {
-            if (kind == COMPACT_COUNTER_CRITERIA) {
+            if (kind == COMPACT_COUNTER_CRITERIA || kind == COMPACT_COUNTER_RECIPE_CRITERIA) {
+                bool want_recipe = (kind == COMPACT_COUNTER_RECIPE_CRITERIA);
                 for (int i = 0; i < ctd->advancement_count; i++) {
                     TrackableCategory *a = ctd->advancements[i];
-                    if (!a || a->criteria_count <= 0 || hidden_now(a->is_hidden)) continue;
+                    if (!a || a->is_recipe != want_recipe || a->criteria_count <= 0 ||
+                        hidden_now(a->is_hidden))
+                        continue;
                     bool s = item_index(kind, a->root_name) >= 0;
                     char row[224];
                     snprintf(row, sizeof(row), "%s (%d/%d)",
@@ -472,8 +480,10 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     if (is_cycle) {
         item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA, complex_adv,
                    modern
-                       ? "Add specific complex advancements (those with criteria) to the cycle, shown by\nname with their criteria progress."
+                       ? "Add specific complex advancements (those with criteria) to the cycle, shown by\nname with their criteria progress. Recipes have their own dropdown."
                        : "Add specific complex achievements (those with criteria) to the cycle, shown by\nname with their criteria progress.");
+        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA, complex_recipes,
+                   "Add specific complex recipes (those with criteria) to the cycle, shown by\nname with their criteria progress.");
         item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
                    "Add specific simple stats to the cycle, shown by name with their value.");
         item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,
@@ -485,8 +495,10 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     } else {
         item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA, complex_adv,
                    modern
-                       ? "Let specific complex advancements' criteria pop into the stack as they complete."
+                       ? "Let specific complex advancements' criteria pop into the stack as they complete.\nRecipes have their own dropdown."
                        : "Let specific complex achievements' criteria pop into the stack as they complete.");
+        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA, complex_recipes,
+                   "Let specific complex recipes' criteria pop into the stack as they complete.");
         item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
                    "Let specific simple stats pop into the stack as their value climbs.");
         item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,

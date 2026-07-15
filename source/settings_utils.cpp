@@ -562,14 +562,17 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
         const CompactCycleItem *ci = &items[i];
         bool present = false;
         switch (ci->kind) {
-            case COMPACT_COUNTER_CRITERIA: // complex advancement
+            case COMPACT_COUNTER_CRITERIA: // complex advancement (recipes are their own kind)
+            case COMPACT_COUNTER_RECIPE_CRITERIA: { // complex recipe
+                bool want_recipe = (ci->kind == COMPACT_COUNTER_RECIPE_CRITERIA);
                 for (int j = 0; j < td->advancement_count && !present; j++) {
                     const TrackableCategory *a = td->advancements[j];
-                    if (a && a->criteria_count > 0 && (show_hidden || !a->is_hidden) &&
-                        strcmp(a->root_name, ci->root_name) == 0)
+                    if (a && a->is_recipe == want_recipe && a->criteria_count > 0 &&
+                        (show_hidden || !a->is_hidden) && strcmp(a->root_name, ci->root_name) == 0)
                         present = true;
                 }
                 break;
+            }
             case COMPACT_COUNTER_STATS: // simple (single-value) stat: targeted (goal>0) or open-ended (goal -1)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];

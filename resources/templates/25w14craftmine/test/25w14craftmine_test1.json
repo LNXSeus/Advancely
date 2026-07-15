@@ -71,6 +71,9 @@
 			"is_recipe":	true,
 			"groups_enabled":	false,
 			"criteria":	{
+				"has_log":	{
+					"icon":	"blocks/Oak_Log_(UD)_JE8_BE3.png"
+				}
 			}
 		}
 	},

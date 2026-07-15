@@ -823,8 +823,9 @@ static const char *compact_display_name(const char *display, const char *root) {
 // Build the ordered list of Compact cycle entries from the user's selection: first each selected
 // whole-section type count that is present in the template (fixed enum order), then each selected
 // individual goal, walked in TEMPLATE order per category and in the same category order the settings
-// dropdowns present them (complex advancements, simple stats, multi-stats, custom goals, counters) so
-// the cycle order stays consistent with the dropdowns regardless of the order they were checked. Version rules
+// dropdowns present them (complex advancements, complex recipes, simple stats, multi-stats, custom
+// goals, counters) so the cycle order stays consistent with the dropdowns regardless of the order
+// they were checked. Version rules
 // for the type counts come from the shared compact_compute_type_counters. Falls back to a single
 // entry (first present type, else an empty Advancements/Achievements 0/0). Returns >= 1.
 static int compact_build_cycle(const Tracker *t, const AppSettings *settings, CompactEntry *out, int max_entries) {
@@ -848,20 +849,30 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         n++;
     }
     if (td) {
-        // Complex advancements -> their criteria progress.
-        for (int i = 0; i < td->advancement_count && n < max_entries; i++) {
-            TrackableCategory *a = td->advancements[i];
-            if (!a || a->criteria_count <= 0 || goal_is_hidden(a->is_hidden, settings)) continue;
-            if (!compact_item_selected(settings, COMPACT_COUNTER_CRITERIA, a->root_name)) continue;
-            snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(a->display_name, a->root_name));
-            out[n].completed = a->completed_criteria_count;
-            out[n].total = a->criteria_progress_total;
-            out[n].no_target = false;
-            out[n].checkbox = false;
-            out[n].auto_mark = false;
-            out[n].manual = false;
-            out[n].done = false;
-            n++;
+        // Complex advancements, then complex recipes -> their criteria progress. Two passes so the
+        // cycle order matches the two separate settings dropdowns.
+        for (int pass = 0; pass < 2; pass++) {
+            bool want_recipe = (pass == 1);
+            OverlayCompactCounterType kind = want_recipe
+                                                 ? COMPACT_COUNTER_RECIPE_CRITERIA
+                                                 : COMPACT_COUNTER_CRITERIA;
+            for (int i = 0; i < td->advancement_count && n < max_entries; i++) {
+                TrackableCategory *a = td->advancements[i];
+                if (!a || a->is_recipe != want_recipe || a->criteria_count <= 0 ||
+                    goal_is_hidden(a->is_hidden, settings))
+                    continue;
+                if (!compact_item_selected(settings, kind, a->root_name)) continue;
+                snprintf(out[n].label, sizeof(out[n].label), "%s",
+                         compact_display_name(a->display_name, a->root_name));
+                out[n].completed = a->completed_criteria_count;
+                out[n].total = a->criteria_progress_total;
+                out[n].no_target = false;
+                out[n].checkbox = false;
+                out[n].auto_mark = false;
+                out[n].manual = false;
+                out[n].done = false;
+                n++;
+            }
         }
         // Simple stats (single-value stat categories). A real target (goal > 0) shows value / target;
         // an open-ended stat (goal -1) shows the checkbox + running value. goal 0 = legacy helper, skip.
@@ -1245,7 +1256,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 TrackableItem *c = a->criteria[j];
                 if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
-                consider(crit_kind, COMPACT_COUNTER_CRITERIA, a->root_name, key, 0, c->done, true,
+                consider(crit_kind, crit_kind, a->root_name, key, 0, c->done, true,
                          a->icon_path, ptext, c->icon_path,
                          compact_display_name(c->display_name, c->root_name), c->is_shared);
             }
@@ -1467,7 +1478,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         OverlayCompactCounterType ck = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
         const char *an = compact_display_name(a->display_name, a->root_name);
         if (compact_stack_allows(settings, wk, wk, nullptr)) measure(an);
-        if (compact_stack_allows(settings, ck, COMPACT_COUNTER_CRITERIA, a->root_name)) {
+        if (compact_stack_allows(settings, ck, ck, a->root_name)) {
             compact_worst_count(cnt, sizeof(cnt), a->criteria_progress_total, wdig);
             snprintf(buf, sizeof(buf), "%s (%s)", an, cnt);
             measure(buf);

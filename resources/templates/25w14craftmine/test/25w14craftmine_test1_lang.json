@@ -16,6 +16,7 @@
 	"advancement.minecraft.feats.kuiper_world":	"Kuiper Belt",
 	"advancement.minecraft.feats.kuiper_world.criteria.completed_event":	"Visit the Kuiper Belt",
 	"advancement.minecraft.recipes.misc.charcoal":	"Renewable Energy",
+	"advancement.minecraft.recipes.misc.charcoal.criteria.has_log":	"Has Log",
 	"stat.stat_category:3_armor_trims":	"Applied Armor Trims",
 	"stat.stat_category:3_armor_trims.criteria.minecraft:used/minecraft:sentry_armor_trim_smithing_template":	"Apply Sentry",
 	"stat.stat_category:3_armor_trims.criteria.minecraft:used/minecraft:vex_armor_trim_smithing_template":	"Apply Vex Armor Trim",
