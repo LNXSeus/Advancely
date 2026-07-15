@@ -158,6 +158,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_STACK_MAX_LINES_MIN 1
 #define COMPACT_STACK_MAX_LINES_MAX 64
 #define DEFAULT_COMPACT_STACK_HOLD_TIME 8.0f // Seconds a pop-out holds before it leaves the stack
+#define COMPACT_STACK_HOLD_TIME_INFINITE (-1.0f) // -1 = infinite: a pop-out only leaves on overflow
 #define COMPACT_STACK_HOLD_TIME_MIN 0.5f
 #define COMPACT_STACK_HOLD_TIME_MAX 120.0f
 #define DEFAULT_COMPACT_STACK_RISE_TIME 0.25f // Seconds a pop-out takes to slide into place

@@ -1731,9 +1731,11 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         const cJSON *compact_stack_hold = cJSON_GetObjectItem(visual_settings, "compact_stack_hold_time");
         if (compact_stack_hold && cJSON_IsNumber(compact_stack_hold)) {
             settings->compact_stack_hold_time = (float) compact_stack_hold->valuedouble;
-            if (settings->compact_stack_hold_time < COMPACT_STACK_HOLD_TIME_MIN)
+            if (settings->compact_stack_hold_time <= COMPACT_STACK_HOLD_TIME_INFINITE)
+                settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_INFINITE;
+            else if (settings->compact_stack_hold_time < COMPACT_STACK_HOLD_TIME_MIN)
                 settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MIN;
-            if (settings->compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
+            else if (settings->compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
                 settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MAX;
         } else { settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME; defaults_were_used = true; }
 

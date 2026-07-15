@@ -3897,10 +3897,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", compact_stack_lines_tooltip_buffer);
                     }
 
+                    float compact_stack_hold_before = temp_settings.compact_stack_hold_time;
+                    bool compact_stack_hold_infinite =
+                            temp_settings.compact_stack_hold_time <= COMPACT_STACK_HOLD_TIME_INFINITE;
                     if (ImGui::DragFloat("Hold Time", &temp_settings.compact_stack_hold_time, 0.1f,
-                                         COMPACT_STACK_HOLD_TIME_MIN, COMPACT_STACK_HOLD_TIME_MAX, "%.1f s")) {
+                                         COMPACT_STACK_HOLD_TIME_INFINITE, COMPACT_STACK_HOLD_TIME_MAX,
+                                         compact_stack_hold_infinite ? "Infinite" : "%.1f s")) {
+                        // Below the minimum the value snaps to -1 (infinite) when dragged down, or back up
+                        // to the minimum when dragged up, so the unusable 0 to MIN band is skipped.
                         if (temp_settings.compact_stack_hold_time < COMPACT_STACK_HOLD_TIME_MIN)
-                            temp_settings.compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MIN;
+                            temp_settings.compact_stack_hold_time =
+                                    (temp_settings.compact_stack_hold_time < compact_stack_hold_before)
+                                        ? COMPACT_STACK_HOLD_TIME_INFINITE
+                                        : COMPACT_STACK_HOLD_TIME_MIN;
                         if (temp_settings.compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
                             temp_settings.compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MAX;
                     }
@@ -3909,7 +3918,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(compact_stack_hold_tooltip_buffer, sizeof(compact_stack_hold_tooltip_buffer),
                                  "How long a pop-out line stays before it leaves the stack. A fresh\n"
                                  "increment on a line already showing resets this timer.\n"
-                                 "Default: %.1f s", DEFAULT_COMPACT_STACK_HOLD_TIME);
+                                 "-1 = Infinite: lines never time out and only leave once the stack\n"
+                                 "overflows Max Stack Lines. Drag below %.1f s to reach it.\n"
+                                 "Default: %.1f s", COMPACT_STACK_HOLD_TIME_MIN, DEFAULT_COMPACT_STACK_HOLD_TIME);
                         ImGui::SetTooltip("%s", compact_stack_hold_tooltip_buffer);
                     }
 
