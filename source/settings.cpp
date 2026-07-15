@@ -191,14 +191,14 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     auto hidden_now = [&](bool h) { return h && !show_hidden; };
     // --- Goal types (multiselect) ---
     // The panel cycle lists every present type (each is one big "label over count" cycle entry). The
-    // pop-out stack lists ONLY the "pickerless" whole-goal types (advancements, recipes, unlocks,
-    // multi-stage) - every other kind is chosen per goal in its own dropdown below, so listing it
-    // here too would just be a confusing duplicate.
+    // pop-out stack lists ONLY the "pickerless" whole-goal types (advancements, recipes, unlocks) -
+    // every other kind is chosen per goal in its own dropdown below, so listing it here too would
+    // just be a confusing duplicate.
     auto type_shown = [&](int i) -> bool {
         if (cc[i].total <= 0) return false;
         if (is_cycle) return true;
         return i == COMPACT_COUNTER_ADVANCEMENTS || i == COMPACT_COUNTER_RECIPES ||
-               i == COMPACT_COUNTER_UNLOCKS || i == COMPACT_COUNTER_MULTISTAGE;
+               i == COMPACT_COUNTER_UNLOCKS;
     };
     int sel_type_count = 0;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
@@ -241,8 +241,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         else
             snprintf(tip, sizeof(tip),
                      "Whole-goal types that pop into the stack when they complete. Only kinds without their\n"
-                     "own dropdown are listed here (advancements, recipes, unlocks, multi-stage). Criteria,\n"
-                     "stats, custom goals and counters are chosen per goal in the dropdowns below instead.\n"
+                     "own dropdown are listed here (advancements, recipes, unlocks). Criteria, stats, custom\n"
+                     "goals, multi-stage goals and counters are chosen per goal in the dropdowns below instead.\n"
                      "The totals count only goals that can actually pop: goals hidden in the template are\n"
                      "left out unless \"Show Hidden Goals\" is on, and a type with none left is not listed.\n"
                      "Shift+Click to range-select. Default: Advancements.");
@@ -310,6 +310,11 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                 TrackableItem *cg = ctd->custom_goals[i];
                 if (cg && !hidden_now(cg->is_hidden)) return cg->root_name;
             }
+        } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
+            if (i < ctd->multi_stage_goal_count) {
+                MultiStageGoal *g = ctd->multi_stage_goals[i];
+                if (g && !hidden_now(g->is_hidden)) return g->root_name;
+            }
         } else if (kind == COMPACT_COUNTER_COUNTERS) {
             if (i < ctd->counter_goal_count) {
                 CounterGoal *cg = ctd->counter_goals[i];
@@ -339,6 +344,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         int maxN = ctd->advancement_count;
         if (ctd->stat_count > maxN) maxN = ctd->stat_count;
         if (ctd->custom_goal_count > maxN) maxN = ctd->custom_goal_count;
+        if (ctd->multi_stage_goal_count > maxN) maxN = ctd->multi_stage_goal_count;
         if (ctd->counter_goal_count > maxN) maxN = ctd->counter_goal_count;
         for (int i = 0; i < maxN; i++) {
             const char *r = item_root_at(kind, i);
@@ -368,6 +374,9 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     int custom_present = 0;
     for (int i = 0; i < ctd->custom_goal_count; i++)
         if (ctd->custom_goals[i] && !hidden_now(ctd->custom_goals[i]->is_hidden)) custom_present++;
+    int ms_present = 0;
+    for (int i = 0; i < ctd->multi_stage_goal_count; i++)
+        if (ctd->multi_stage_goals[i] && !hidden_now(ctd->multi_stage_goals[i]->is_hidden)) ms_present++;
     int counters_present = 0;
     for (int i = 0; i < ctd->counter_goal_count; i++)
         if (ctd->counter_goals[i] && !hidden_now(ctd->counter_goals[i]->is_hidden)) counters_present++;
@@ -438,6 +447,19 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                     if (ImGui::Selectable(cg->display_name[0] ? cg->display_name : cg->root_name, s,
                                           ImGuiSelectableFlags_NoAutoClosePopups))
                         item_click(kind, i, cg->root_name, s);
+                }
+            } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
+                for (int i = 0; i < ctd->multi_stage_goal_count; i++) {
+                    MultiStageGoal *g = ctd->multi_stage_goals[i];
+                    if (!g || hidden_now(g->is_hidden)) continue;
+                    bool s = item_index(kind, g->root_name) >= 0;
+                    int last_stage = g->stage_count > 0 ? g->stage_count - 1 : 0;
+                    char row[224];
+                    snprintf(row, sizeof(row), "%s (%d/%d)",
+                             g->display_name[0] ? g->display_name : g->root_name,
+                             g->current_stage, last_stage);
+                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
+                        item_click(kind, i, g->root_name, s);
                 }
             } else if (kind == COMPACT_COUNTER_COUNTERS) {
                 for (int i = 0; i < ctd->counter_goal_count; i++) {
@@ -511,6 +533,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                    "Let specific multi-stats' sub-stats pop into the stack as their value climbs\nor they complete.");
         item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM, custom_present,
                    "Let specific custom goals pop into the stack as they progress or complete.");
+        item_combo("Multi-Stage Goals", COMPACT_COUNTER_MULTISTAGE, ms_present,
+                   "Let specific multi-stage goals pop into the stack as they advance a stage\nor their current stat stage climbs.");
         item_combo("Counters", COMPACT_COUNTER_COUNTERS, counters_present,
                    "Let specific counters pop into the stack as their linked-goal count climbs.");
     }

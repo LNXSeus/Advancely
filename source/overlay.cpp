@@ -1127,11 +1127,11 @@ static void compact_ms_label(char *buf, size_t buf_sz, const char *name) {
 }
 
 // Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): regular
-// advancements, recipes, unlocks and multi-stage goals pop as whole completions. Every other kind is
-// chosen per-goal in its own dropdown, so its type toggle is ignored (avoids the confusing overlap).
+// advancements, recipes and unlocks pop as whole completions. Every other kind is chosen per-goal in
+// its own dropdown, so its type toggle is ignored (avoids the confusing overlap).
 static bool compact_type_is_pickerless(OverlayCompactCounterType k) {
     return k == COMPACT_COUNTER_ADVANCEMENTS || k == COMPACT_COUNTER_RECIPES ||
-           k == COMPACT_COUNTER_UNLOCKS || k == COMPACT_COUNTER_MULTISTAGE;
+           k == COMPACT_COUNTER_UNLOCKS;
 }
 
 // True if the stack may show a goal: for a pickerless kind, its whole-type toggle is on; for any other
@@ -1385,7 +1385,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 }
             }
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
-            consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr, key,
+            consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name, key,
                      compact_ms_pack(stage, stat_prog), done, false,
                      nullptr, nullptr, icon, itext, false);
         }
@@ -1597,7 +1597,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *g = td->multi_stage_goals[i];
         if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
-        if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr)) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name)) continue;
         char gn[224];
         compact_ms_label(gn, sizeof(gn), compact_display_name(g->display_name, g->root_name));
         for (int j = 0; j < g->stage_count; j++) {

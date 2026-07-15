@@ -609,6 +609,12 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
                     if (c && (show_hidden || !c->is_hidden) && strcmp(c->root_name, ci->root_name) == 0) present = true;
                 }
                 break;
+            case COMPACT_COUNTER_MULTISTAGE:
+                for (int j = 0; j < td->multi_stage_goal_count && !present; j++) {
+                    const MultiStageGoal *g = td->multi_stage_goals[j];
+                    if (g && (show_hidden || !g->is_hidden) && strcmp(g->root_name, ci->root_name) == 0) present = true;
+                }
+                break;
             case COMPACT_COUNTER_COUNTERS:
                 for (int j = 0; j < td->counter_goal_count && !present; j++) {
                     const CounterGoal *c = td->counter_goals[j];
