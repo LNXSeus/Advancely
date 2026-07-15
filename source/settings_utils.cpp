@@ -414,10 +414,16 @@ MC_Version settings_get_version_from_string(const char *version_str) {
 // present. The rules mirror the tracker's section separators with the hiding mode set to "Show All":
 // Advancements vs Achievements naming, recipes and recipe-criteria only on 1.12+, advancement-criteria
 // excludes recipe-criteria, legacy hidden single-criterion helper stats (<= 1.6.4) excluded from the
-// stat count. Template-"hidden" goals ARE counted here (the panel shows the real totals, e.g. all
-// advancements, even if some are hidden from the overlay's item rows). Shared by the Compact settings
-// UI (presence + labels) and the overlay renderer (counts) so they never drift.
-void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out) {
+// stat count. Shared by the Compact settings UI (presence + labels) and the overlay renderer (counts)
+// so they never drift.
+// `count_hidden` picks which totals these are. True: template-"hidden" goals still count, i.e. the
+// real totals the panel shows (all 80 advancements, even if some are hidden from the item rows).
+// False: hidden goals are left out entirely, matching what can actually pop into the pop-out stack.
+// A hidden goal takes its criteria / sub-stats out with it; a hidden criterion inside a VISIBLE
+// advancement still counts, because the criteria totals are pre-grouped aggregates (the stack's type
+// list only offers the whole-goal types, so this never surfaces there).
+void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out,
+                                   bool count_hidden) {
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
         out[i].label[0] = '\0';
         out[i].completed = 0;
@@ -432,6 +438,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->advancement_count; i++) {
         const TrackableCategory *a = td->advancements[i];
         if (!a) continue;
+        if (!count_hidden && a->is_hidden) continue;
         if (a->is_recipe) {
             rec_total++;
             if (a->done) rec_done++;
@@ -475,6 +482,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
         if (!s) continue;
         if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
             continue;
+        if (!count_hidden && s->is_hidden) continue;
         stat_total++;
         if (s->done) stat_done++;
         // Sub-stats only exist for multi-stat categories (template "Multi-Stat Category" checked). A
@@ -483,6 +491,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
             for (int j = 0; j < s->criteria_count; j++) {
                 const TrackableItem *sub_stat = s->criteria[j];
                 if (!sub_stat) continue;
+                if (!count_hidden && sub_stat->is_hidden) continue;
                 sub_total++;
                 if (sub_stat->done) sub_done++;
             }
@@ -502,6 +511,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->unlock_count; i++) {
         const TrackableItem *u = td->unlocks[i];
         if (!u) continue;
+        if (!count_hidden && u->is_hidden) continue;
         unl_total++;
         if (u->done) unl_done++;
     }
@@ -514,6 +524,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->custom_goal_count; i++) {
         const TrackableItem *c = td->custom_goals[i];
         if (!c) continue;
+        if (!count_hidden && c->is_hidden) continue;
         custom_total++;
         if (c->done) custom_done++;
     }
@@ -526,6 +537,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         const MultiStageGoal *g = td->multi_stage_goals[i];
         if (!g) continue;
+        if (!count_hidden && g->is_hidden) continue;
         ms_total++;
         if (g->current_stage >= g->stage_count - 1) ms_done++;
     }
@@ -538,6 +550,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->counter_goal_count; i++) {
         const CounterGoal *c = td->counter_goals[i];
         if (!c) continue;
+        if (!count_hidden && c->is_hidden) continue;
         cnt_total++;
         if (c->done) cnt_done++;
     }

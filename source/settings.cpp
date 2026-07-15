@@ -180,7 +180,9 @@ struct CompactSelTarget {
 // place. Used by both the panel cycle and the pop-out stack. `suffix` disambiguates ImGui IDs
 // between the two callers; `type_anchor`/`item_anchor` are the caller's own Shift+Click anchors;
 // `is_cycle` picks cycle-vs-stack wording (and the cycle's "at least one must stay selected" note).
-// Presence/label rules match compact_compute_type_counters and the tracker's section separators.
+// Presence/label rules match compact_compute_type_counters and the tracker's section separators, so
+// `cc` has to come from it with the caller's own hidden rule: real totals for the cycle, hidden-aware
+// (`show_hidden`) for the stack, which only lists what can really pop.
 static void compact_selection_ui(const char *suffix, const TemplateData *ctd, const CompactCounter *cc,
                                   bool modern, const char *types_label, CompactSelTarget tgt,
                                   int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden) {
@@ -241,6 +243,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                      "Whole-goal types that pop into the stack when they complete. Only kinds without their\n"
                      "own dropdown are listed here (advancements, recipes, unlocks, multi-stage). Criteria,\n"
                      "stats, custom goals and counters are chosen per goal in the dropdowns below instead.\n"
+                     "The totals count only goals that can actually pop: goals hidden in the template are\n"
+                     "left out unless \"Show Hidden Goals\" is on, and a type with none left is not listed.\n"
                      "Shift+Click to range-select. Default: Advancements.");
         ImGui::SetTooltip("%s", tip);
     }
@@ -461,6 +465,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             else
                 snprintf(item_combo_tooltip_buffer, sizeof(item_combo_tooltip_buffer),
                          "%s\n"
+                         "Only goals that can actually pop are listed: goals hidden in the template are\n"
+                         "left out unless \"Show Hidden Goals\" is on.\n"
                          "Shift+Click to range-select.\n"
                          "Up to %d individual goals can be added in total.", tip, MAX_COMPACT_CYCLE_ITEMS);
             ImGui::SetTooltip("%s", item_combo_tooltip_buffer);
@@ -3443,6 +3449,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Show goals that are marked hidden in the template anyway, in every overlay mode\n"
                              "(scrolling belt, page and compact). Turn this on to also select hidden goals in\n"
                              "the Compact panel/stack dropdowns above.\n"
+                             "The Stack Content dropdowns list and count only goals that can pop, so an\n"
+                             "optimized template shows fewer of them there until this is on. The Panel Content\n"
+                             "counts are the real section totals and don't change with this.\n"
                              "Default: %s", DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS ? "On" : "Off");
                     ImGui::SetTooltip("%s", show_hidden_tooltip_buffer);
                 }
@@ -3795,7 +3804,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         MC_Version cver = settings_get_version_from_string(temp_settings.version_str);
                         bool modern = (cver >= MC_VERSION_1_12);
                         CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
-                        compact_compute_type_counters(ctd, cver, cc);
+                        // The panel cycles whole-section counts, which are the real totals: a hidden
+                        // goal is still part of "Advancements 12/80", so it counts here either way.
+                        compact_compute_type_counters(ctd, cver, cc, true);
 
                         // Per-dropdown range-select anchors for Shift+Click (template index of the last
                         // row clicked without shift). -1 = no anchor yet.
@@ -3873,7 +3884,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         MC_Version sver = settings_get_version_from_string(temp_settings.version_str);
                         bool smodern = (sver >= MC_VERSION_1_12);
                         CompactCounter scc[COMPACT_COUNTER_TYPE_COUNT];
-                        compact_compute_type_counters(sctd, sver, scc);
+                        // The stack pops individual goals, and a hidden goal never pops, so these
+                        // counts leave hidden goals out: an optimized template shows how many
+                        // advancements can really appear, and "Show Hidden Goals" brings the rest back.
+                        compact_compute_type_counters(sctd, sver, scc, temp_settings.overlay_show_hidden_goals);
 
                         static int s_stack_type_anchor = -1;
                         static int s_stack_item_anchor[COMPACT_COUNTER_TYPE_COUNT];

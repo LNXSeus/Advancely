@@ -629,8 +629,11 @@ MC_Version settings_get_version_from_string(const char *version_str);
 
 // Fills out[COMPACT_COUNTER_TYPE_COUNT] (indexed by OverlayCompactCounterType) with each Compact
 // counter category's version-correct label and completed/total; total == 0 marks a category absent.
-// Shared by the Compact settings UI and the overlay so their counts never drift.
-void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out);
+// Shared by the Compact settings UI and the overlay so their counts never drift. `count_hidden` true
+// counts template-hidden goals (the panel's real totals), false leaves them out (what the pop-out
+// stack can actually show) - pass the "Show Hidden Goals" setting for the latter.
+void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out,
+                                   bool count_hidden);
 
 // Drops any selected Compact individual-goal items that no longer exist in `td`, so switching
 // templates (including via the template editor) doesn't leave stale selections in the dropdowns.

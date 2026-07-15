@@ -833,7 +833,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
 
     CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
-    compact_compute_type_counters(td, version, cc);
+    compact_compute_type_counters(td, version, cc, true); // panel counts show the real totals
 
     int n = 0;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT && n < max_entries; i++) {
