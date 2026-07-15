@@ -167,6 +167,55 @@ static bool compact_stack_different(const AppSettings *a, const AppSettings *b) 
     return false;
 }
 
+// The frame an animated icon is on right now, or the static texture when the goal has no .gif.
+// Timed off SDL_GetTicks like the tracker's own GIF selection, so both animate in step.
+static SDL_Texture *compact_icon_texture(SDL_Texture *tex, const AnimatedTexture *anim) {
+    if (anim && anim->frame_count > 0) {
+        if (anim->delays && anim->total_duration > 0) {
+            Uint32 elapsed = (Uint32) (SDL_GetTicks() % anim->total_duration);
+            Uint32 sum = 0;
+            for (int i = 0; i < anim->frame_count; i++) {
+                sum += anim->delays[i];
+                if (elapsed < sum) return anim->frames[i];
+            }
+        }
+        return anim->frames[0];
+    }
+    return tex;
+}
+
+// Height of one icon row, so the list clipper can skip rows without measuring them.
+static float compact_icon_row_height() {
+    return ImGui::GetTextLineHeight() * 1.5f + ImGui::GetStyle().ItemSpacing.y;
+}
+
+// One goal row inside a Compact selection combo: the goal's icon on the left, its text to the right.
+// A full-width Selectable is the only layout item, so a click anywhere on the row (icon included)
+// toggles it and the cursor advances normally; the icon and text are painted on top through the draw
+// list, which keeps them out of the layout entirely (cursor rewinding here would extend the popup's
+// bounds and trip ImGui's SetCursorPos error check). `id` only has to be unique within one combo (a
+// root_name is), since each combo is its own popup.
+static bool compact_icon_selectable(const char *id, const char *text, bool selected,
+                                    SDL_Texture *tex, const AnimatedTexture *anim) {
+    const float ico = ImGui::GetTextLineHeight() * 1.5f;
+    const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+    char sel_id[320];
+    snprintf(sel_id, sizeof(sel_id), "##%s", id);
+    const ImVec2 row_min = ImGui::GetCursorScreenPos();
+    bool clicked = ImGui::Selectable(sel_id, selected, ImGuiSelectableFlags_NoAutoClosePopups,
+                                     ImVec2(0.0f, ico));
+    if (ImGui::IsItemVisible()) {
+        ImDrawList *dl = ImGui::GetWindowDrawList();
+        SDL_Texture *draw_tex = compact_icon_texture(tex, anim);
+        if (draw_tex)
+            dl->AddImage((ImTextureID) draw_tex, row_min, ImVec2(row_min.x + ico, row_min.y + ico));
+        // Goals with no icon keep the same text column, so the names stay lined up.
+        dl->AddText(ImVec2(row_min.x + ico + gap, row_min.y + (ico - ImGui::GetTextLineHeight()) * 0.5f),
+                    ImGui::GetColorU32(ImGuiCol_Text), text);
+    }
+    return clicked;
+}
+
 // Points at one of the two Compact goal-selection models (panel cycle or pop-out stack) so the
 // shared selection UI below can edit either.
 struct CompactSelTarget {
@@ -338,55 +387,98 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         }
         anchor = i;
     };
+    // Far enough to cover whichever template array a kind maps to (item_root_at range-checks).
+    int scan_max = ctd->advancement_count;
+    if (ctd->stat_count > scan_max) scan_max = ctd->stat_count;
+    if (ctd->custom_goal_count > scan_max) scan_max = ctd->custom_goal_count;
+    if (ctd->multi_stage_goal_count > scan_max) scan_max = ctd->multi_stage_goal_count;
+    if (ctd->counter_goal_count > scan_max) scan_max = ctd->counter_goal_count;
+
     // Select or deselect every present, non-hidden goal of a kind (the Select All / None buttons).
-    // Iterates far enough to cover whichever template array this kind maps to (item_root_at range-checks).
     auto select_all_kind = [&](OverlayCompactCounterType kind, bool on) {
-        int maxN = ctd->advancement_count;
-        if (ctd->stat_count > maxN) maxN = ctd->stat_count;
-        if (ctd->custom_goal_count > maxN) maxN = ctd->custom_goal_count;
-        if (ctd->multi_stage_goal_count > maxN) maxN = ctd->multi_stage_goal_count;
-        if (ctd->counter_goal_count > maxN) maxN = ctd->counter_goal_count;
-        for (int i = 0; i < maxN; i++) {
+        for (int i = 0; i < scan_max; i++) {
             const char *r = item_root_at(kind, i);
             if (r) item_set(kind, r, on);
         }
     };
 
-    // Present, non-hidden individual goals per category (hidden goals aren't selectable anywhere).
-    int complex_adv = 0, complex_recipes = 0;
-    for (int i = 0; i < ctd->advancement_count; i++) {
-        const TrackableCategory *a = ctd->advancements[i];
-        if (!a || a->criteria_count <= 0 || hidden_now(a->is_hidden)) continue;
-        if (a->is_recipe) complex_recipes++;
-        else complex_adv++;
-    }
-    int simple_stats = 0;
-    for (int i = 0; i < ctd->stat_count; i++) {
-        const TrackableCategory *s = ctd->stats[i];
-        if (s && s->is_single_stat_category && !hidden_now(s->is_hidden) && s->criteria_count >= 1 &&
-            s->criteria[0] && (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1))
-            simple_stats++;
-    }
-    int multi_stats = 0;
-    for (int i = 0; i < ctd->stat_count; i++)
-        if (ctd->stats[i] && !ctd->stats[i]->is_single_stat_category && !hidden_now(ctd->stats[i]->is_hidden))
-            multi_stats++;
-    int custom_present = 0;
-    for (int i = 0; i < ctd->custom_goal_count; i++)
-        if (ctd->custom_goals[i] && !hidden_now(ctd->custom_goals[i]->is_hidden)) custom_present++;
-    int ms_present = 0;
-    for (int i = 0; i < ctd->multi_stage_goal_count; i++)
-        if (ctd->multi_stage_goals[i] && !hidden_now(ctd->multi_stage_goals[i]->is_hidden)) ms_present++;
-    int counters_present = 0;
-    for (int i = 0; i < ctd->counter_goal_count; i++)
-        if (ctd->counter_goals[i] && !hidden_now(ctd->counter_goals[i]->is_hidden)) counters_present++;
+    // Renders one row of a category combo: the goal at template index `i`, which item_root_at has
+    // already vetted as present, non-hidden and of this kind, so the pointers here are known good.
+    auto render_row = [&](OverlayCompactCounterType kind, int i) {
+        if (kind == COMPACT_COUNTER_CRITERIA || kind == COMPACT_COUNTER_RECIPE_CRITERIA) {
+            TrackableCategory *a = ctd->advancements[i];
+            bool s = item_index(kind, a->root_name) >= 0;
+            char row[224];
+            snprintf(row, sizeof(row), "%s (%d/%d)", a->display_name[0] ? a->display_name : a->root_name,
+                     a->completed_criteria_count, a->criteria_progress_total);
+            if (compact_icon_selectable(a->root_name, row, s, a->texture, a->anim_texture))
+                item_click(kind, i, a->root_name, s);
+        } else if (kind == COMPACT_COUNTER_STATS) {
+            TrackableCategory *st = ctd->stats[i];
+            int goal = st->criteria[0]->goal;
+            bool s = item_index(kind, st->root_name) >= 0;
+            const char *nm = st->display_name[0] ? st->display_name : st->root_name;
+            char row[224];
+            if (goal > 0) snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
+            else snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
+            if (compact_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
+                item_click(kind, i, st->root_name, s);
+        } else if (kind == COMPACT_COUNTER_SUB_STATS) {
+            TrackableCategory *st = ctd->stats[i];
+            bool s = item_index(kind, st->root_name) >= 0;
+            char row[224];
+            snprintf(row, sizeof(row), "%s (%d/%d)", st->display_name[0] ? st->display_name : st->root_name,
+                     st->completed_criteria_count, st->criteria_count);
+            if (compact_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
+                item_click(kind, i, st->root_name, s);
+        } else if (kind == COMPACT_COUNTER_CUSTOM) {
+            TrackableItem *cg = ctd->custom_goals[i];
+            bool s = item_index(kind, cg->root_name) >= 0;
+            if (compact_icon_selectable(cg->root_name, cg->display_name[0] ? cg->display_name : cg->root_name,
+                                        s, cg->texture, cg->anim_texture))
+                item_click(kind, i, cg->root_name, s);
+        } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
+            MultiStageGoal *g = ctd->multi_stage_goals[i];
+            bool s = item_index(kind, g->root_name) >= 0;
+            int last_stage = g->stage_count > 0 ? g->stage_count - 1 : 0;
+            char row[224];
+            snprintf(row, sizeof(row), "%s (%d/%d)", g->display_name[0] ? g->display_name : g->root_name,
+                     g->current_stage, last_stage);
+            // With per-stage icons on, show the stage the goal is actually on, like the overlay
+            // does; otherwise the goal's own icon.
+            SDL_Texture *ms_tex = g->texture;
+            AnimatedTexture *ms_anim = g->anim_texture;
+            if (g->use_stage_icons && g->stages && g->current_stage >= 0 &&
+                g->current_stage < g->stage_count && g->stages[g->current_stage] &&
+                g->stages[g->current_stage]->icon_path[0]) {
+                ms_tex = g->stages[g->current_stage]->texture;
+                ms_anim = g->stages[g->current_stage]->anim_texture;
+            }
+            if (compact_icon_selectable(g->root_name, row, s, ms_tex, ms_anim))
+                item_click(kind, i, g->root_name, s);
+        } else if (kind == COMPACT_COUNTER_COUNTERS) {
+            CounterGoal *cg = ctd->counter_goals[i];
+            bool s = item_index(kind, cg->root_name) >= 0;
+            char row[224];
+            snprintf(row, sizeof(row), "%s (%d/%d)", cg->display_name[0] ? cg->display_name : cg->root_name,
+                     cg->completed_count, cg->linked_goal_count);
+            if (compact_icon_selectable(cg->root_name, row, s, cg->texture, cg->anim_texture))
+                item_click(kind, i, cg->root_name, s);
+        }
+    };
 
     // Renders one category combo listing that category's items with checkboxes. `base_label` is the
     // visible text; `suffix` makes the ImGui ID unique between the cycle and stack copies. `tip`
-    // describes this specific goal type for the combo's tooltip.
-    auto item_combo = [&](const char *base_label, OverlayCompactCounterType kind, int present,
-                          const char *tip) {
-        if (present <= 0) return;
+    // describes this specific goal type for the combo's tooltip. The combo is skipped entirely when
+    // the template has no goals of this kind.
+    std::vector<int> rows;
+    auto item_combo = [&](const char *base_label, OverlayCompactCounterType kind, const char *tip) {
+        // Template indices this kind lists, so the clipper below has a contiguous row space and the
+        // rows always agree with item_root_at (and so with Shift+Click ranges and Select All).
+        rows.clear();
+        for (int i = 0; i < scan_max; i++)
+            if (item_root_at(kind, i)) rows.push_back(i);
+        if (rows.empty()) return;
         int sel = 0;
         for (int i = 0; i < *tgt.count; i++)
             if (tgt.items[i].kind == kind) sel++;
@@ -395,85 +487,13 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         char combo_label[96];
         snprintf(combo_label, sizeof(combo_label), "%s##%s", base_label, suffix);
         if (ImGui::BeginCombo(combo_label, preview)) {
-            if (kind == COMPACT_COUNTER_CRITERIA || kind == COMPACT_COUNTER_RECIPE_CRITERIA) {
-                bool want_recipe = (kind == COMPACT_COUNTER_RECIPE_CRITERIA);
-                for (int i = 0; i < ctd->advancement_count; i++) {
-                    TrackableCategory *a = ctd->advancements[i];
-                    if (!a || a->is_recipe != want_recipe || a->criteria_count <= 0 ||
-                        hidden_now(a->is_hidden))
-                        continue;
-                    bool s = item_index(kind, a->root_name) >= 0;
-                    char row[224];
-                    snprintf(row, sizeof(row), "%s (%d/%d)",
-                             a->display_name[0] ? a->display_name : a->root_name,
-                             a->completed_criteria_count, a->criteria_progress_total);
-                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, a->root_name, s);
-                }
-            } else if (kind == COMPACT_COUNTER_STATS) {
-                for (int i = 0; i < ctd->stat_count; i++) {
-                    TrackableCategory *st = ctd->stats[i];
-                    if (!st || !st->is_single_stat_category || hidden_now(st->is_hidden)) continue;
-                    if (st->criteria_count < 1 || !st->criteria[0]) continue;
-                    int goal = st->criteria[0]->goal;
-                    if (goal <= 0 && goal != -1) continue; // goal 0 = legacy helper
-                    bool s = item_index(kind, st->root_name) >= 0;
-                    const char *nm = st->display_name[0] ? st->display_name : st->root_name;
-                    char row[224];
-                    if (goal > 0)
-                        snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
-                    else
-                        snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
-                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, st->root_name, s);
-                }
-            } else if (kind == COMPACT_COUNTER_SUB_STATS) {
-                for (int i = 0; i < ctd->stat_count; i++) {
-                    TrackableCategory *st = ctd->stats[i];
-                    if (!st || st->is_single_stat_category || hidden_now(st->is_hidden)) continue;
-                    bool s = item_index(kind, st->root_name) >= 0;
-                    char row[224];
-                    snprintf(row, sizeof(row), "%s (%d/%d)",
-                             st->display_name[0] ? st->display_name : st->root_name,
-                             st->completed_criteria_count, st->criteria_count);
-                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, st->root_name, s);
-                }
-            } else if (kind == COMPACT_COUNTER_CUSTOM) {
-                for (int i = 0; i < ctd->custom_goal_count; i++) {
-                    TrackableItem *cg = ctd->custom_goals[i];
-                    if (!cg || hidden_now(cg->is_hidden)) continue;
-                    bool s = item_index(kind, cg->root_name) >= 0;
-                    if (ImGui::Selectable(cg->display_name[0] ? cg->display_name : cg->root_name, s,
-                                          ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, cg->root_name, s);
-                }
-            } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
-                for (int i = 0; i < ctd->multi_stage_goal_count; i++) {
-                    MultiStageGoal *g = ctd->multi_stage_goals[i];
-                    if (!g || hidden_now(g->is_hidden)) continue;
-                    bool s = item_index(kind, g->root_name) >= 0;
-                    int last_stage = g->stage_count > 0 ? g->stage_count - 1 : 0;
-                    char row[224];
-                    snprintf(row, sizeof(row), "%s (%d/%d)",
-                             g->display_name[0] ? g->display_name : g->root_name,
-                             g->current_stage, last_stage);
-                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, g->root_name, s);
-                }
-            } else if (kind == COMPACT_COUNTER_COUNTERS) {
-                for (int i = 0; i < ctd->counter_goal_count; i++) {
-                    CounterGoal *cg = ctd->counter_goals[i];
-                    if (!cg || hidden_now(cg->is_hidden)) continue;
-                    bool s = item_index(kind, cg->root_name) >= 0;
-                    char row[224];
-                    snprintf(row, sizeof(row), "%s (%d/%d)",
-                             cg->display_name[0] ? cg->display_name : cg->root_name,
-                             cg->completed_count, cg->linked_goal_count);
-                    if (ImGui::Selectable(row, s, ImGuiSelectableFlags_NoAutoClosePopups))
-                        item_click(kind, i, cg->root_name, s);
-                }
-            }
+            // Rows are a fixed height, so the clipper gets it up front and submits only the ones on
+            // screen. A template with hundreds of goals then costs a few visible rows per frame.
+            ImGuiListClipper clipper;
+            clipper.Begin((int) rows.size(), compact_icon_row_height());
+            while (clipper.Step())
+                for (int r = clipper.DisplayStart; r < clipper.DisplayEnd; r++)
+                    render_row(kind, rows[r]);
             ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered()) {
@@ -506,36 +526,36 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     char complex_adv_label[48];
     snprintf(complex_adv_label, sizeof(complex_adv_label), "Complex %s", modern ? "Advancements" : "Achievements");
     if (is_cycle) {
-        item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA, complex_adv,
+        item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA,
                    modern
                        ? "Add specific complex advancements (those with criteria) to the cycle, shown by\nname with their criteria progress. Recipes have their own dropdown."
                        : "Add specific complex achievements (those with criteria) to the cycle, shown by\nname with their criteria progress.");
-        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA, complex_recipes,
+        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA,
                    "Add specific complex recipes (those with criteria) to the cycle, shown by\nname with their criteria progress.");
-        item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
+        item_combo("Simple Stats", COMPACT_COUNTER_STATS,
                    "Add specific simple stats to the cycle, shown by name with their value.");
-        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,
+        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS,
                    "Add specific multi-stats to the cycle, shown by name with their sub-stat progress.");
-        item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM, custom_present,
+        item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM,
                    "Add specific custom goals to the cycle, shown by name with their progress.");
-        item_combo("Counters", COMPACT_COUNTER_COUNTERS, counters_present,
+        item_combo("Counters", COMPACT_COUNTER_COUNTERS,
                    "Add specific counters to the cycle, shown by name with their linked-goal progress.");
     } else {
-        item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA, complex_adv,
+        item_combo(complex_adv_label, COMPACT_COUNTER_CRITERIA,
                    modern
                        ? "Let specific complex advancements' criteria pop into the stack as they complete.\nRecipes have their own dropdown."
                        : "Let specific complex achievements' criteria pop into the stack as they complete.");
-        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA, complex_recipes,
+        item_combo("Complex Recipes", COMPACT_COUNTER_RECIPE_CRITERIA,
                    "Let specific complex recipes' criteria pop into the stack as they complete.");
-        item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
+        item_combo("Simple Stats", COMPACT_COUNTER_STATS,
                    "Let specific simple stats pop into the stack as their value climbs.");
-        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,
+        item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS,
                    "Let specific multi-stats' sub-stats pop into the stack as their value climbs\nor they complete.");
-        item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM, custom_present,
+        item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM,
                    "Let specific custom goals pop into the stack as they progress or complete.");
-        item_combo("Multi-Stage Goals", COMPACT_COUNTER_MULTISTAGE, ms_present,
+        item_combo("Multi-Stage Goals", COMPACT_COUNTER_MULTISTAGE,
                    "Let specific multi-stage goals pop into the stack as they advance a stage\nor their current stat stage climbs.");
-        item_combo("Counters", COMPACT_COUNTER_COUNTERS, counters_present,
+        item_combo("Counters", COMPACT_COUNTER_COUNTERS,
                    "Let specific counters pop into the stack as their linked-goal count climbs.");
     }
 }
