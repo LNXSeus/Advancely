@@ -1094,9 +1094,23 @@ static CompactStackEngine s_compact_stack;
 // progress so completing a goal always reads as an increase, and progress increments do too. Lets the
 // diff pop on "value went up" without tracking done separately. Regressions (undo) decrease it, so
 // they never pop.
-static unsigned long long compact_enc(int progress, bool done) {
+static unsigned long long compact_enc(long long progress, bool done) {
     unsigned long long p = progress > 0 ? (unsigned long long) progress : 0ULL;
     return (done ? (1ULL << 40) : 0ULL) + p;
+}
+
+// Multi-stage goals: fold the stage index and the stat progress inside the active stage into one
+// rising value for compact_enc. A stat stage counts up on its own and restarts at every stage, so the
+// stage index has to outweigh it: the progress gets the low 31 bits (game stats are 32-bit ints, so it
+// never has to be clamped) and the stage sits above it, capped at what stays under compact_enc's done
+// bit. Non-stat stages just pass 0 progress and move only when the stage does.
+#define COMPACT_MS_STAGE_SHIFT 31
+#define COMPACT_MS_MAX_STAGE 511
+static long long compact_ms_pack(int stage, int stat_progress) {
+    if (stage < 0) stage = 0;
+    if (stage > COMPACT_MS_MAX_STAGE) stage = COMPACT_MS_MAX_STAGE;
+    long long p = stat_progress > 0 ? (long long) stat_progress : 0LL;
+    return ((long long) stage << COMPACT_MS_STAGE_SHIFT) + p;
 }
 
 // Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): regular
@@ -1195,7 +1209,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     // showing is refreshed in place on any change (progress up or reverted) and removed if it has
     // reverted all the way back to nothing. ---
     auto consider = [&](OverlayCompactCounterType type_kind, OverlayCompactCounterType indiv_kind,
-                        const char *indiv_root, const char *key, int progress, bool done, bool two_line,
+                        const char *indiv_root, const char *key, long long progress, bool done, bool two_line,
                         const char *parent_icon, const char *parent_text, const char *item_icon,
                         const char *item_text, bool item_shared) {
         unsigned long long enc = compact_enc(progress, done);
@@ -1335,16 +1349,30 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
             int stage = g->current_stage;
             bool done = (g->stage_count > 0 && stage >= g->stage_count - 1);
-            const char *stage_text = "";
+            const char *gname = compact_display_name(g->display_name, g->root_name);
             const char *icon = g->icon_path;
+            int stat_prog = 0;
+            snprintf(itext, sizeof(itext), "%s: ", gname);
             if (stage >= 0 && stage < g->stage_count && g->stages && g->stages[stage]) {
-                stage_text = g->stages[stage]->display_text;
-                if (g->use_stage_icons && g->stages[stage]->icon_path[0]) icon = g->stages[stage]->icon_path;
+                const SubGoal *st = g->stages[stage];
+                if (g->use_stage_icons && st->icon_path[0]) icon = st->icon_path;
+                // A stat stage counts up inside the stage, so it shows its value and pops on every
+                // increment, like the Belt and Page rows do. Other stage types only move on a stage
+                // change, so they stay text-only.
+                if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
+                    stat_prog = st->current_stat_progress;
+                    snprintf(itext, sizeof(itext), "%s: %s (%d/%d)", gname, st->display_text, stat_prog,
+                             st->required_progress);
+                } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
+                    stat_prog = st->current_stat_progress;
+                    snprintf(itext, sizeof(itext), "%s: %s (%d)", gname, st->display_text, stat_prog);
+                } else {
+                    snprintf(itext, sizeof(itext), "%s: %s", gname, st->display_text);
+                }
             }
-            snprintf(itext, sizeof(itext), "%s: %s", compact_display_name(g->display_name, g->root_name),
-                     stage_text);
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
-            consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr, key, stage, done, false,
+            consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr, key,
+                     compact_ms_pack(stage, stat_prog), done, false,
                      nullptr, nullptr, icon, itext, false);
         }
         for (int i = 0; i < td->counter_goal_count; i++) {
@@ -1557,17 +1585,19 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr)) continue;
         const char *gn = compact_display_name(g->display_name, g->root_name);
-        const char *longest = "";
-        int longest_w = 0;
         for (int j = 0; j < g->stage_count; j++) {
-            if (g->stages && g->stages[j]) {
-                int w = 0;
-                TTF_MeasureString(font, g->stages[j]->display_text, 0, 0, &w, nullptr);
-                if (w > longest_w) { longest_w = w; longest = g->stages[j]->display_text; }
+            const SubGoal *st = (g->stages) ? g->stages[j] : nullptr;
+            if (!st) continue;
+            if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
+                compact_worst_count(cnt, sizeof(cnt), st->required_progress, wdig);
+                snprintf(buf, sizeof(buf), "%s: %s (%s)", gn, st->display_text, cnt);
+            } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
+                snprintf(buf, sizeof(buf), "%s: %s (%s)", gn, st->display_text, open);
+            } else {
+                snprintf(buf, sizeof(buf), "%s: %s", gn, st->display_text);
             }
+            measure(buf);
         }
-        snprintf(buf, sizeof(buf), "%s: %s", gn, longest);
-        measure(buf);
     }
     for (int i = 0; i < td->counter_goal_count; i++) {
         CounterGoal *c = td->counter_goals[i];
