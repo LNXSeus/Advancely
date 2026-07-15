@@ -502,7 +502,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         item_combo("Simple Stats", COMPACT_COUNTER_STATS, simple_stats,
                    "Let specific simple stats pop into the stack as their value climbs.");
         item_combo("Multi-Stats", COMPACT_COUNTER_SUB_STATS, multi_stats,
-                   "Let specific multi-stats' sub-stats pop into the stack as they complete.");
+                   "Let specific multi-stats' sub-stats pop into the stack as their value climbs\nor they complete.");
         item_combo("Custom Goals", COMPACT_COUNTER_CUSTOM, custom_present,
                    "Let specific custom goals pop into the stack as they progress or complete.");
         item_combo("Counters", COMPACT_COUNTER_COUNTERS, counters_present,

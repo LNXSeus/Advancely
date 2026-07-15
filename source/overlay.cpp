@@ -1280,18 +1280,27 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key, prog, s->done, false,
                          nullptr, nullptr, s->icon_path, itext, false);
             } else {
-                snprintf(ptext, sizeof(ptext), "%s (%d/%d)", sname, s->completed_criteria_count,
+                // The category itself is manually checkable, so its parent line carries a box too.
+                const char *catbox = compact_done_box(s->is_manually_completed, s->done);
+                snprintf(ptext, sizeof(ptext), "%s%s (%d/%d)", catbox, sname, s->completed_criteria_count,
                          s->criteria_count);
                 for (int j = 0; j < s->criteria_count; j++) {
                     TrackableItem *sub = s->criteria[j];
                     if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
-                    // [x] manually checked off, [a] auto-completed (linked goal), [o] not done.
+                    // [x] manually checked off, [a] auto-completed (linked goal), [o] not done. A
+                    // sub-stat counts up, so it shows its value and pops on every increment (goal > 0
+                    // shows value / target, an open-ended one just the value).
                     const char *subbox = compact_done_box(sub->is_manually_completed, sub->done);
-                    snprintf(itext, sizeof(itext), "%s%s", subbox,
-                             compact_display_name(sub->display_name, sub->root_name));
+                    const char *subname = compact_display_name(sub->display_name, sub->root_name);
+                    if (sub->goal > 0)
+                        snprintf(itext, sizeof(itext), "%s%s (%d/%d)", subbox, subname, sub->progress,
+                                 sub->goal);
+                    else
+                        snprintf(itext, sizeof(itext), "%s%s (%d)", subbox, subname, sub->progress);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
-                    consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key, 0,
-                             sub->done, true, s->icon_path, ptext, sub->icon_path, itext, sub->is_shared);
+                    consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
+                             sub->progress, sub->done, true, s->icon_path, ptext, sub->icon_path, itext,
+                             sub->is_shared);
                 }
             }
         }
@@ -1508,12 +1517,18 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         } else {
             if (!compact_stack_allows(settings, COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name)) continue;
             compact_worst_count(cnt, sizeof(cnt), s->criteria_count, wdig);
-            snprintf(buf, sizeof(buf), "%s (%s)", sn, cnt);
+            snprintf(buf, sizeof(buf), "[x] %s (%s)", sn, cnt);
             measure(buf);
             for (int j = 0; j < s->criteria_count; j++) {
                 TrackableItem *sub = s->criteria[j];
                 if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
-                snprintf(buf, sizeof(buf), "[x] %s", compact_display_name(sub->display_name, sub->root_name));
+                const char *subn = compact_display_name(sub->display_name, sub->root_name);
+                if (sub->goal > 0) {
+                    compact_worst_count(cnt, sizeof(cnt), sub->goal, wdig);
+                    snprintf(buf, sizeof(buf), "[x] %s (%s)", subn, cnt);
+                } else {
+                    snprintf(buf, sizeof(buf), "[x] %s (%s)", subn, open);
+                }
                 measure(buf);
             }
         }
