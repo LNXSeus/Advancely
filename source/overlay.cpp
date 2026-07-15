@@ -1113,6 +1113,19 @@ static long long compact_ms_pack(int stage, int stat_progress) {
     return ((long long) stage << COMPACT_MS_STAGE_SHIFT) + p;
 }
 
+// A multi-stage goal pops as one line ("name: stage"), so its name needs the separator the Belt and
+// Page rows get for free by putting the stage on its own line. A template can already end the name
+// with a colon ("Need:"), which would read as "Need:: stage", so the colon is only added when there
+// is not one there: trailing blanks are dropped first, then one colon is appended if needed.
+static void compact_ms_label(char *buf, size_t buf_sz, const char *name) {
+    size_t n = name ? strlen(name) : 0;
+    while (n > 0 && (name[n - 1] == ' ' || name[n - 1] == '\t')) n--;
+    if (n > buf_sz - 2) n = buf_sz - 2;
+    if (n > 0) memcpy(buf, name, n);
+    if (n > 0 && buf[n - 1] != ':') buf[n++] = ':';
+    buf[n] = '\0';
+}
+
 // Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): regular
 // advancements, recipes, unlocks and multi-stage goals pop as whole completions. Every other kind is
 // chosen per-goal in its own dropdown, so its type toggle is ignored (avoids the confusing overlap).
@@ -1349,10 +1362,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
             int stage = g->current_stage;
             bool done = (g->stage_count > 0 && stage >= g->stage_count - 1);
-            const char *gname = compact_display_name(g->display_name, g->root_name);
+            char gname[224];
+            compact_ms_label(gname, sizeof(gname), compact_display_name(g->display_name, g->root_name));
             const char *icon = g->icon_path;
             int stat_prog = 0;
-            snprintf(itext, sizeof(itext), "%s: ", gname);
+            snprintf(itext, sizeof(itext), "%s", gname);
             if (stage >= 0 && stage < g->stage_count && g->stages && g->stages[stage]) {
                 const SubGoal *st = g->stages[stage];
                 if (g->use_stage_icons && st->icon_path[0]) icon = st->icon_path;
@@ -1361,13 +1375,13 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // change, so they stay text-only.
                 if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
                     stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s: %s (%d/%d)", gname, st->display_text, stat_prog,
+                    snprintf(itext, sizeof(itext), "%s %s (%d/%d)", gname, st->display_text, stat_prog,
                              st->required_progress);
                 } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
                     stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s: %s (%d)", gname, st->display_text, stat_prog);
+                    snprintf(itext, sizeof(itext), "%s %s (%d)", gname, st->display_text, stat_prog);
                 } else {
-                    snprintf(itext, sizeof(itext), "%s: %s", gname, st->display_text);
+                    snprintf(itext, sizeof(itext), "%s %s", gname, st->display_text);
                 }
             }
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
@@ -1584,17 +1598,18 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         MultiStageGoal *g = td->multi_stage_goals[i];
         if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, nullptr)) continue;
-        const char *gn = compact_display_name(g->display_name, g->root_name);
+        char gn[224];
+        compact_ms_label(gn, sizeof(gn), compact_display_name(g->display_name, g->root_name));
         for (int j = 0; j < g->stage_count; j++) {
             const SubGoal *st = (g->stages) ? g->stages[j] : nullptr;
             if (!st) continue;
             if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
                 compact_worst_count(cnt, sizeof(cnt), st->required_progress, wdig);
-                snprintf(buf, sizeof(buf), "%s: %s (%s)", gn, st->display_text, cnt);
+                snprintf(buf, sizeof(buf), "%s %s (%s)", gn, st->display_text, cnt);
             } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
-                snprintf(buf, sizeof(buf), "%s: %s (%s)", gn, st->display_text, open);
+                snprintf(buf, sizeof(buf), "%s %s (%s)", gn, st->display_text, open);
             } else {
-                snprintf(buf, sizeof(buf), "%s: %s", gn, st->display_text);
+                snprintf(buf, sizeof(buf), "%s %s", gn, st->display_text);
             }
             measure(buf);
         }
