@@ -168,8 +168,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_POP_ICON_SIZE_MIN 8.0f
 #define COMPACT_POP_ICON_SIZE_MAX 256.0f
 #define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line
-#define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f
-#define COMPACT_STACK_SHARED_ICON_SIZE_MAX 256.0f
+#define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the pop icon it is drawn on (compact_pop_icon_size)
+#define DEFAULT_COMPACT_STACK_POP_ON_PROGRESS true // Counting goal types pop on every increment, not just completion
 
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
@@ -465,6 +465,10 @@ struct AppSettings {
     bool compact_stack_type[COMPACT_COUNTER_TYPE_COUNT]; // Which whole-section types may pop into the stack.
     CompactCycleItem compact_stack_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals allowed into the stack by name.
     int compact_stack_item_count; // Number of valid entries in compact_stack_items.
+    // Per-type pop trigger: true pops the type on every progress increment, false only on completion.
+    // Only meaningful for the counting types (stats, sub-stats, custom, multi-stage, counters); the
+    // rest have nothing but a done flag and always pop on completion.
+    bool compact_stack_pop_on_progress[COMPACT_COUNTER_TYPE_COUNT];
     int compact_stack_max_lines; // Line budget for the stack below the panel (a 2-line group uses 2).
     float compact_stack_hold_time; // Seconds a pop-out holds before it leaves the stack.
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.
@@ -634,6 +638,12 @@ MC_Version settings_get_version_from_string(const char *version_str);
 // stack can actually show) - pass the "Show Hidden Goals" setting for the latter.
 void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out,
                                    bool count_hidden);
+
+// True if a Compact goal type counts up toward its target rather than just flipping done, so the
+// pop-out stack can show it mid-progress and compact_stack_pop_on_progress applies to it. Advancements,
+// recipes, unlocks and criteria carry nothing but a done flag, so they always pop on completion only.
+// Shared by the settings UI (which types to list) and the overlay (which to gate) so the two can't drift.
+bool compact_type_has_progress(OverlayCompactCounterType kind);
 
 // Drops any selected Compact individual-goal items that no longer exist in `td`, so switching
 // templates (including via the template editor) doesn't leave stale selections in the dropdowns.

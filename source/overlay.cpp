@@ -1017,7 +1017,8 @@ static void compact_worst_count(char *buf, size_t buf_sz, int total, char wdigit
 // Format the count line an entry shows. The body is "completed/total" for targeted goals, or just
 // the running count for open-ended ones. Completion markers (ASCII only, so they render in any font):
 // manually-checkable goals show "[x] " manual / "[a] " auto-done / "[o] " not done; auto-only goals
-// show "[a] " when done and nothing otherwise.
+// show "[a] " when done and nothing otherwise. The marker is part of the line, which is centered as a
+// whole: centering the count alone and hanging the marker off its left reads far worse.
 static void compact_format_count(char *buf, size_t buf_sz, const CompactEntry *e) {
     const char *box = "";
     if (e->checkbox)
@@ -1099,6 +1100,19 @@ static unsigned long long compact_enc(long long progress, bool done) {
     return (done ? (1ULL << 40) : 0ULL) + p;
 }
 
+// The progress a goal contributes to its pop test (compact_enc), which is all the encoded value is
+// used for - the line's text is built separately, so it always shows the real numbers.
+//
+// A counting type whose "Pop On Progress" is off contributes nothing here, leaving the done bit as the
+// only thing that can raise its encoded value: it pops once, on completion, instead of on every
+// increment. Types that are only ever done-or-not have no progress to drop and are unaffected.
+// Multi-stage goals pass their in-stage stat progress through this and keep the stage index outside
+// it, so switching them to completion-only stops the per-tick pops but still pops each stage.
+static long long compact_pop_progress(const AppSettings *s, OverlayCompactCounterType kind, long long progress) {
+    if (compact_type_has_progress(kind) && !s->compact_stack_pop_on_progress[kind]) return 0;
+    return progress;
+}
+
 // Multi-stage goals: fold the stage index and the stat progress inside the active stage into one
 // rising value for compact_enc. A stat stage counts up on its own and restarts at every stage, so the
 // stage index has to outweigh it: the progress gets the low 31 bits (game stats are 32-bit ints, so it
@@ -1157,6 +1171,22 @@ static const char *compact_done_box(bool manual, bool done) {
     if (manual) return "[x] ";
     if (done) return "[a] ";
     return "[o] ";
+}
+
+// Draws one square icon of a stack line at full opacity (never alpha-blended - OBS chroma keying can't
+// respect partial alpha). Handles both a static .png and an animated .gif, from the overlay's caches.
+static void compact_draw_icon(Overlay *o, const char *path, float ix, float iy, float sz) {
+    if (!path || !path[0]) return;
+    SDL_Texture *tex = nullptr;
+    AnimatedTexture *anim = nullptr;
+    if (strstr(path, ".gif"))
+        anim = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                               &o->anim_cache_capacity, path, SDL_SCALEMODE_NEAREST);
+    else
+        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                     &o->texture_cache_capacity, path, SDL_SCALEMODE_NEAREST);
+    SDL_FRect d = {snap_px(ix), snap_px(iy), sz, sz};
+    if (tex || anim) render_texture_with_alpha(o->renderer, tex, anim, &d, 255);
 }
 
 // FNV-1a over every poppable goal's root_name(s), so the stack reseeds (and clears) only when the
@@ -1304,7 +1334,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 if (goal > 0) snprintf(itext, sizeof(itext), "%s%s (%d/%d)", box, sname, prog, goal);
                 else snprintf(itext, sizeof(itext), "%s%s (%d)", box, sname, prog);
                 snprintf(key, sizeof(key), "stat|%s", s->root_name);
-                consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key, prog, s->done, false,
+                consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key,
+                         compact_pop_progress(settings, COMPACT_COUNTER_STATS, prog), s->done, false,
                          nullptr, nullptr, s->icon_path, itext, false);
             } else {
                 // The category itself is manually checkable, so its parent line carries a box too.
@@ -1326,7 +1357,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                         snprintf(itext, sizeof(itext), "%s%s (%d)", subbox, subname, sub->progress);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
                     consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
-                             sub->progress, sub->done, true, s->icon_path, ptext, sub->icon_path, itext,
+                             compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, sub->progress),
+                             sub->done, true, s->icon_path, ptext, sub->icon_path, itext,
                              sub->is_shared);
                 }
             }
@@ -1354,7 +1386,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 snprintf(itext, sizeof(itext), "%s%s (%d)", box, cname, c->progress);
             }
             snprintf(key, sizeof(key), "cus|%s", c->root_name);
-            consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key, c->progress, c->done,
+            consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key,
+                     compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, c->progress), c->done,
                      false, nullptr, nullptr, c->icon_path, itext, false);
         }
         for (int i = 0; i < td->multi_stage_goal_count; i++) {
@@ -1385,8 +1418,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 }
             }
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
+            // Only the in-stage stat counts as this goal's progress; the stage index always moves the
+            // encoded value, so a completion-only multi-stage goal still pops on every stage it clears.
+            int enc_prog = (int) compact_pop_progress(settings, COMPACT_COUNTER_MULTISTAGE, stat_prog);
             consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name, key,
-                     compact_ms_pack(stage, stat_prog), done, false,
+                     compact_ms_pack(stage, enc_prog), done, false,
                      nullptr, nullptr, icon, itext, false);
         }
         for (int i = 0; i < td->counter_goal_count; i++) {
@@ -1397,11 +1433,20 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             snprintf(itext, sizeof(itext), "%s%s (%d/%d)", cbox,
                      compact_display_name(c->display_name, c->root_name), c->completed_count, c->linked_goal_count);
             snprintf(key, sizeof(key), "cnt|%s", c->root_name);
-            consider(COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name, key, c->completed_count,
+            consider(COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name, key,
+                     compact_pop_progress(settings, COMPACT_COUNTER_COUNTERS, c->completed_count),
                      c->done, false, nullptr, nullptr, c->icon_path, itext, false);
         }
     }
     eng.seeded = true; // baseline recorded; subsequent frames pop on increases
+
+    // A completed run hands the stack over to the completion showcase (compact_render_promo_line), so
+    // no goal group from the final moments lingers under the panel. The diff above still ran, so the
+    // baseline stays current and resetting the run doesn't dump the whole template into the stack.
+    if (td && td->run_completed) {
+        eng.groups.clear();
+        return;
+    }
 
     float icon_size = settings->compact_pop_icon_size;
     float line_h = icon_size + COMPACT_POP_LINE_GAP;
@@ -1455,24 +1500,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     if (clip.h < 0) clip.h = 0;
     SDL_SetRenderClipRect(o->renderer, &clip);
 
-    auto draw_icon = [&](const std::string &path, float ix, float iy, float sz) {
-        if (path.empty()) return;
-        SDL_Texture *tex = nullptr;
-        AnimatedTexture *anim = nullptr;
-        if (strstr(path.c_str(), ".gif"))
-            anim = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
-                                                   &o->anim_cache_capacity, path.c_str(), SDL_SCALEMODE_NEAREST);
-        else
-            tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                         &o->texture_cache_capacity, path.c_str(), SDL_SCALEMODE_NEAREST);
-        SDL_FRect d = {snap_px(ix), snap_px(iy), sz, sz};
-        if (tex || anim) render_texture_with_alpha(o->renderer, tex, anim, &d, 255);
-    };
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
                          const std::string &shared_icon) {
-        draw_icon(icon, stack_x, ly, icon_size);
+        compact_draw_icon(o, icon.c_str(), stack_x, ly, icon_size);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
-            draw_icon(shared_icon, stack_x, ly, settings->compact_stack_shared_icon_size);
+            compact_draw_icon(o, shared_icon.c_str(), stack_x, ly, settings->compact_stack_shared_icon_size);
         if (!text.empty()) {
             SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
             if (tt) {
@@ -1628,11 +1660,234 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     return cached_w;
 }
 
+// ---------------------------------------------------------------------------
+// Compact promo line + completed-run supporter showcase (Stage 5)
+//
+// The promo takes the stack's first slot (right under the panel) whenever no goal is popping: the
+// Advancely logo, then the same rotating promo line the other modes show. It is how the free tracker
+// gets promoted, so it is never toggleable, and it can't be cropped away in OBS without also cropping
+// the slot every goal pops into. A line that fits the window just sits there; only one too long to fit
+// moves, bouncing between its two ends so all of it can be read without ever widening the window (a
+// long URL must never stretch the narrow panel).
+//
+// A completed run pins the promo - the goal stack is cleared, so the slot is always free - and stacks
+// supporters below it: one pops in every COMPACT_SUPPORTER_GAP_MIN..MAX seconds at the second row and
+// pushes the older ones down, each holding for the stack's hold time. At the default timings a
+// supporter outlives the wait for the next one, so they overlap and at least one is always up; the
+// last one standing is never expired, which keeps that true whatever the hold time is set to.
+// ---------------------------------------------------------------------------
+
+#define COMPACT_PROMO_ICON "Advancely_Logo_NoText.png" // Drawn in front of the promo text
+#define COMPACT_PROMO_DONATE_TEXT "Donate (mentioning 'Advancely') to be featured!"
+#define COMPACT_PROMO_SCROLL_SPEED 60.0f // On-screen px per second an overlong promo line scrolls
+#define COMPACT_PROMO_BOUNCE_PAUSE 1.0f // Seconds an overlong line rests at each end before reversing
+#define COMPACT_SUPPORTER_GAP_MIN 0.5f // Shortest wait before the next supporter pops in
+#define COMPACT_SUPPORTER_GAP_MAX 8.0f // Longest wait before the next supporter pops in
+
+// One supporter currently up in the showcase.
+struct CompactSupporterPop {
+    int index; // into SUPPORTERS (and the run's fixed emote list)
+    float hold_left; // seconds until it leaves (the last one standing never does)
+};
+
+struct CompactPromoState {
+    Uint64 last_tick = 0;
+    // Bounce state for a promo line too long for the window: scroll_x runs from 0 (its left edge shown)
+    // down to -overflow (its right edge shown), and dir flips at each end after a short rest.
+    float scroll_x = 0.0f;
+    float dir = -1.0f;
+    float pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
+    char shown_text[256] = {0}; // the line the bounce state belongs to (a new line restarts it)
+    bool run_was_complete = false;
+    // Completed-run showcase. Each supporter's emote is drawn once, when the run completes, so a
+    // supporter always reappears with the same one - like the showcase in the other two modes.
+    const char *emotes[NUM_SUPPORTERS > 0 ? NUM_SUPPORTERS : 1] = {nullptr};
+    std::vector<int> order; // supporter indices, reshuffled once every one of them has popped in
+    int pos = 0; // how far through `order` this pass has got
+    float spawn_left = 0.0f; // seconds until the next supporter pops in
+    std::vector<CompactSupporterPop> pops; // newest first (index 0 = the row right under the promo)
+};
+
+static CompactPromoState s_compact_promo;
+
+// A random wait before the next supporter pops in, so the showcase never feels metronomic.
+static float compact_supporter_gap() {
+    float f = (float) rand() / (float) RAND_MAX;
+    return COMPACT_SUPPORTER_GAP_MIN + f * (COMPACT_SUPPORTER_GAP_MAX - COMPACT_SUPPORTER_GAP_MIN);
+}
+
+// How long a supporter stays up: the stack's hold time, except on an infinite hold, which would pile
+// every supporter up forever.
+static float compact_supporter_hold(const AppSettings *settings) {
+    return settings->compact_stack_hold_time > 0.0f
+               ? settings->compact_stack_hold_time
+               : DEFAULT_COMPACT_STACK_HOLD_TIME;
+}
+
+// Reshuffles the running order so every supporter pops in once per pass, in a fresh random order.
+// Their emotes are NOT re-drawn here: those stay fixed for the whole completed run.
+static void compact_promo_shuffle_order(CompactPromoState &p) {
+    p.order.clear();
+    for (int i = 0; i < NUM_SUPPORTERS; i++) p.order.push_back(i);
+    for (int i = (int) p.order.size() - 1; i > 0; i--) { // Fisher-Yates
+        int j = rand() % (i + 1);
+        int tmp = p.order[i];
+        p.order[i] = p.order[j];
+        p.order[j] = tmp;
+    }
+    p.pos = 0;
+}
+
+// Draws one line of showcase text, clipped to the band right of the icons so a long line is cut at the
+// window edge instead of widening it. `tx` may sit outside the band: an overlong promo line scrolls.
+static void compact_draw_band_text(Overlay *o, SDL_Texture *tex, float tx, float row_y, float band_x,
+                                   float band_w, float row_h) {
+    if (!tex) return;
+    float tw = 0.0f, th = 0.0f;
+    SDL_GetTextureSize(tex, &tw, &th);
+    float ty = snap_px(row_y + (row_h - th) / 2.0f);
+    // The band covers the icon's row and the text, whichever is taller.
+    float clip_top = fminf(ty, row_y);
+    float clip_bottom = fmaxf(row_y + row_h, ty + th);
+    SDL_Rect clip = {(int) band_x, (int) clip_top, (int) snap_px(band_w), (int) snap_px(clip_bottom - clip_top)};
+    SDL_SetRenderClipRect(o->renderer, &clip);
+    SDL_FRect d = {snap_px(tx), ty, tw, th};
+    SDL_RenderTexture(o->renderer, tex, nullptr, &d);
+    SDL_SetRenderClipRect(o->renderer, nullptr);
+}
+
+// Draws the promo line, plus the supporter showcase below it once the run is complete. Called every
+// frame from overlay_render_compact after the goal stack; the promo only shows when the stack is quiet.
+static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSettings *settings,
+                                      float stack_x, float stack_top, int window_w, SDL_Color text_color) {
+    CompactPromoState &p = s_compact_promo;
+    TTF_Font *font = o->compact_stack_font ? o->compact_stack_font : o->font;
+    const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
+    bool run_complete = td && td->run_completed;
+
+    Uint64 now = SDL_GetTicks();
+    float dt = (p.last_tick == 0) ? 0.0f : (float) (now - p.last_tick) / 1000.0f;
+    p.last_tick = now;
+    if (dt > 0.25f) dt = 0.25f; // clamp after a stall / first frame
+
+    // Completing a run fixes every supporter's emote for the rest of it and starts the showcase, with
+    // the first supporter popping in at once so the screen never sits there with none up. Resetting
+    // the run clears them back out.
+    if (run_complete != p.run_was_complete) {
+        p.run_was_complete = run_complete;
+        p.pops.clear();
+        if (run_complete) {
+            for (int i = 0; i < NUM_SUPPORTERS; i++)
+                p.emotes[i] = NUM_SUPPORTER_ICONS > 0 ? SUPPORTER_ICONS[rand() % NUM_SUPPORTER_ICONS] : "";
+            compact_promo_shuffle_order(p);
+            p.spawn_left = 0.0f;
+        }
+    }
+
+    float icon_size = settings->compact_pop_icon_size;
+    float line_h = icon_size + COMPACT_POP_LINE_GAP;
+    int supporter_rows = settings->compact_stack_max_lines - 1; // the promo itself owns the first row
+
+    if (run_complete && NUM_SUPPORTERS > 0 && supporter_rows > 0) {
+        // Pop the next supporter in above the others once its wait runs out, walking the shuffled
+        // order and reshuffling for the next pass once every supporter has had a turn.
+        p.spawn_left -= dt;
+        if (p.spawn_left <= 0.0f) {
+            if (p.pos >= (int) p.order.size()) compact_promo_shuffle_order(p);
+            if (!p.order.empty()) {
+                CompactSupporterPop pop;
+                pop.index = p.order[p.pos++];
+                pop.hold_left = compact_supporter_hold(settings);
+                p.pops.insert(p.pops.begin(), pop);
+            }
+            p.spawn_left = compact_supporter_gap();
+        }
+        // Expire by hold, oldest first - but never the last one standing, so at least one supporter is
+        // always up however the hold time and the random waits happen to line up.
+        for (int i = (int) p.pops.size() - 1; i >= 0 && p.pops.size() > 1; i--) {
+            p.pops[i].hold_left -= dt;
+            if (p.pops[i].hold_left <= 0.0f) p.pops.erase(p.pops.begin() + i);
+        }
+        while ((int) p.pops.size() > supporter_rows) p.pops.pop_back(); // overflow: cut the oldest
+    }
+
+    // A popping goal owns the promo's slot; the promo waits for the stack to drain. (A completed run
+    // has no goal groups at all - compact_render_stack clears them - so the showcase always shows.)
+    if (!s_compact_stack.groups.empty()) return;
+
+    float pad = settings->compact_panel_padding;
+    float band_x = snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP); // text band, right of the icons
+    float band_w = (float) window_w - pad - band_x;
+    if (band_w <= 0.0f) return;
+
+    // --- The promo row ---
+    char logo_path[MAX_PATH_LENGTH];
+    snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_application_dir(), COMPACT_PROMO_ICON);
+    compact_draw_icon(o, logo_path, stack_x, stack_top, icon_size);
+
+    // The rotating line is the shared one the other modes cycle through (advanced in overlay_update),
+    // so every mode promotes the same thing at the same time. A completed run pins the donation line.
+    const char *promo_text = run_complete ? COMPACT_PROMO_DONATE_TEXT : SOCIALS[o->current_social_index];
+    SDL_Texture *promo_tex = get_text_texture_from_cache(o, font, promo_text, text_color);
+    if (promo_tex) {
+        float tw = 0.0f;
+        SDL_GetTextureSize(promo_tex, &tw, nullptr); // only the width decides whether it has to move
+        if (strncmp(p.shown_text, promo_text, sizeof(p.shown_text) - 1) != 0) { // a new line starts over
+            strncpy(p.shown_text, promo_text, sizeof(p.shown_text) - 1);
+            p.shown_text[sizeof(p.shown_text) - 1] = '\0';
+            p.scroll_x = 0.0f;
+            p.dir = -1.0f;
+            p.pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
+        }
+        // Only a line too long for the band moves: it scrolls until its right edge shows, rests, comes
+        // back until its left edge shows, rests, and so on, so all of a long URL can be read.
+        float overflow = tw - band_w;
+        if (overflow <= 0.0f) {
+            p.scroll_x = 0.0f;
+            p.dir = -1.0f;
+            p.pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
+        } else if (p.pause_left > 0.0f) {
+            p.pause_left -= dt;
+        } else {
+            p.scroll_x += p.dir * COMPACT_PROMO_SCROLL_SPEED * dt;
+            if (p.scroll_x <= -overflow) {
+                p.scroll_x = -overflow;
+                p.dir = 1.0f;
+                p.pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
+            } else if (p.scroll_x >= 0.0f) {
+                p.scroll_x = 0.0f;
+                p.dir = -1.0f;
+                p.pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
+            }
+        }
+        compact_draw_band_text(o, promo_tex, band_x + p.scroll_x, stack_top, band_x, band_w, icon_size);
+    }
+
+    // --- The supporters, stacked below the promo, newest first ---
+    if (!run_complete) return;
+    for (size_t i = 0; i < p.pops.size(); i++) {
+        int si = p.pops[i].index;
+        if (si < 0 || si >= NUM_SUPPORTERS) continue;
+        float row_y = snap_px(stack_top + (float) (i + 1) * line_h);
+        char emote_path[MAX_PATH_LENGTH];
+        snprintf(emote_path, sizeof(emote_path), "%s/icons/%s", get_application_dir(),
+                 p.emotes[si] ? p.emotes[si] : "");
+        compact_draw_icon(o, emote_path, stack_x, row_y, icon_size);
+        char supporter_text[128];
+        snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
+                 SUPPORTERS[si].amount);
+        SDL_Texture *st = get_text_texture_from_cache(o, font, supporter_text, text_color);
+        compact_draw_band_text(o, st, band_x, row_y, band_x, band_w, icon_size);
+    }
+}
+
 // Compact render mode: a tall/narrow counter panel (Zesskyo-style). One big "label over count"
 // block that cycles through the user-selected entries (whole-section type counts and/or individual
 // goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
 // selected entries so the background stays fixed for the whole run. Completed/progressing goals then
-// slide out from under the panel and stack below it (compact_render_stack).
+// slide out from under the panel and stack below it (compact_render_stack), and the promo line fills
+// the stack's first slot while it is quiet (compact_render_promo_line). Once the run is complete the
+// panel freezes on "RUN COMPLETED!" over the final in-game time.
 static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettings *settings) {
     SDL_Color text_color = {
         settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
@@ -1642,19 +1897,56 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     TTF_Font *label_font = o->compact_label_font ? o->compact_label_font : o->font;
     TTF_Font *count_font = o->compact_count_font ? o->compact_count_font : o->font_top;
 
-    // Build the selected cycle, then pick the entry showing this frame. The shared page_index is
-    // advanced by the cycle-interval timer (overlay_update) and by SPACE (overlay_events), exactly
-    // like Page mode; static when there's only one entry.
-    CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
-    int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
-
-    int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;
-    CompactEntry *cur = &entries[cur_idx];
+    const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
+    // The latched completion flag synced from the tracker (honors the per-template thresholds), like
+    // the other modes use for their completion screen.
+    bool run_complete = td && td->run_completed;
 
     char label_buf[224];
-    snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
     char count_buf[64];
-    compact_format_count(count_buf, sizeof(count_buf), cur);
+    float content_w = 0.0f; // widest line the panel must fit, sizes the panel
+
+    if (run_complete) {
+        // The run is over: the panel stops cycling and freezes on the completion screen. The final
+        // time comes from the frozen tick count and honors the same IGT options as the other modes.
+        snprintf(label_buf, sizeof(label_buf), "RUN COMPLETED!");
+        format_time(td->frozen_play_time_ticks, count_buf, sizeof(count_buf), settings->igt_unit_spacing,
+                    settings->igt_always_show_ms);
+        int lwm = 0, cwm = 0;
+        TTF_MeasureString(label_font, label_buf, 0, 0, &lwm, nullptr);
+        TTF_MeasureString(count_font, count_buf, 0, 0, &cwm, nullptr);
+        content_w = fmaxf((float) lwm, (float) cwm);
+    } else {
+        // Build the selected cycle, then pick the entry showing this frame. The shared page_index is
+        // advanced by the cycle-interval timer (overlay_update) and by SPACE (overlay_events), exactly
+        // like Page mode; static when there's only one entry.
+        CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
+        int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
+
+        int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;
+        CompactEntry *cur = &entries[cur_idx];
+
+        snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
+        compact_format_count(count_buf, sizeof(count_buf), cur);
+
+        // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
+        // possible count each can display (widest digit repeated over the total, never the live count).
+        // Sizing the panel to this keeps the background a fixed size for the whole run, so it never
+        // jumps as the cycle rotates or the numerator grows and stays alignable in OBS.
+        char wdig = compact_widest_digit(count_font);
+        for (int i = 0; i < entry_count; i++) {
+            char lbl[224];
+            snprintf(lbl, sizeof(lbl), "%s:", entries[i].label);
+            int lwm = 0;
+            TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
+            char wc[64];
+            compact_worst_count_entry(wc, sizeof(wc), &entries[i], wdig);
+            int cwm = 0;
+            TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
+            float w = fmaxf((float) lwm, (float) cwm);
+            if (w > content_w) content_w = w;
+        }
+    }
 
     SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_buf, text_color);
     SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_buf, text_color);
@@ -1662,25 +1954,6 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float lw = 0.0f, lh = 0.0f, cw = 0.0f, ch = 0.0f;
     if (label_tex) SDL_GetTextureSize(label_tex, &lw, &lh);
     if (count_tex) SDL_GetTextureSize(count_tex, &cw, &ch);
-
-    // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
-    // possible count each can display (widest digit repeated over the total, never the live count).
-    // Sizing the panel to this keeps the background a fixed size for the whole run, so it never
-    // jumps as the cycle rotates or the numerator grows and stays alignable in OBS.
-    char wdig = compact_widest_digit(count_font);
-    float content_w = 0.0f;
-    for (int i = 0; i < entry_count; i++) {
-        char lbl[224];
-        snprintf(lbl, sizeof(lbl), "%s:", entries[i].label);
-        int lwm = 0;
-        TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
-        char wc[64];
-        compact_worst_count_entry(wc, sizeof(wc), &entries[i], wdig);
-        int cwm = 0;
-        TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
-        float w = fmaxf((float) lwm, (float) cwm);
-        if (w > content_w) content_w = w;
-    }
 
     const float line_gap = 4.0f;
     float pad = settings->compact_panel_padding;
@@ -1747,16 +2020,19 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         SDL_FRect d = {snap_px(panel_x + (panel_w - lw) / 2.0f), content_top, lw, lh};
         SDL_RenderTexture(o->renderer, label_tex, nullptr, &d);
     }
+    // The whole count line (completion marker included) is centered as one block.
     if (count_tex) {
         SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
     }
 
-    // Diff the template and draw the pop-out stack below the panel. The stack always left-aligns to
-    // the panel's left edge regardless of the panel alignment setting.
+    // Diff the template and draw the pop-out stack below the panel, then the promo line in the first
+    // slot if no goal is using it. Both always left-align to the panel's left edge regardless of the
+    // panel alignment setting.
     float panel_bottom = panel_y + panel_h;
     float stack_top = snap_px(panel_bottom + pad);
     compact_render_stack(o, t, settings, panel_x, panel_bottom, stack_top, want_h, text_color);
+    compact_render_promo_line(o, t, settings, panel_x, stack_top, want_w, text_color);
 }
 
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.

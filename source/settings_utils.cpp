@@ -638,6 +638,12 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
                         settings->overlay_show_hidden_goals);
 }
 
+bool compact_type_has_progress(OverlayCompactCounterType kind) {
+    return kind == COMPACT_COUNTER_STATS || kind == COMPACT_COUNTER_SUB_STATS ||
+           kind == COMPACT_COUNTER_CUSTOM || kind == COMPACT_COUNTER_MULTISTAGE ||
+           kind == COMPACT_COUNTER_COUNTERS;
+}
+
 void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
     prune_compact_items(td, settings->compact_stack_items, &settings->compact_stack_item_count,
@@ -746,6 +752,8 @@ void settings_set_defaults(AppSettings *settings) {
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
     settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancement completions pop by default
     settings->compact_stack_item_count = 0;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+        settings->compact_stack_pop_on_progress[i] = DEFAULT_COMPACT_STACK_POP_ON_PROGRESS;
     settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
     settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
     settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
@@ -1741,6 +1749,25 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             }
         }
 
+        // Which types pop on every progress increment (the rest only pop when a goal completes).
+        // Stored like compact_stack_types: the array lists the enabled type indices, so an absent key
+        // falls back to the default instead of reading as "none enabled".
+        const cJSON *compact_stack_progress = cJSON_GetObjectItem(visual_settings, "compact_stack_pop_on_progress");
+        if (compact_stack_progress && cJSON_IsArray(compact_stack_progress)) {
+            for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_pop_on_progress[i] = false;
+            const cJSON *progress_entry = nullptr;
+            cJSON_ArrayForEach(progress_entry, compact_stack_progress) {
+                if (cJSON_IsNumber(progress_entry) && progress_entry->valueint >= 0
+                    && progress_entry->valueint < COMPACT_COUNTER_TYPE_COUNT) {
+                    settings->compact_stack_pop_on_progress[progress_entry->valueint] = true;
+                }
+            }
+        } else {
+            for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+                settings->compact_stack_pop_on_progress[i] = DEFAULT_COMPACT_STACK_POP_ON_PROGRESS;
+            defaults_were_used = true;
+        }
+
         const cJSON *compact_stack_max = cJSON_GetObjectItem(visual_settings, "compact_stack_max_lines");
         if (compact_stack_max && cJSON_IsNumber(compact_stack_max)) {
             settings->compact_stack_max_lines = compact_stack_max->valueint;
@@ -1779,17 +1806,20 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MAX;
         } else { settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE; defaults_were_used = true; }
 
+        // Bounded above by the pop icon it is drawn on, which is loaded just above. Clamping here (and
+        // not only in the settings UI) keeps a hand-edited or older config from ever holding a shared
+        // icon bigger than its pop icon.
         const cJSON *compact_stack_shared = cJSON_GetObjectItem(visual_settings, "compact_stack_shared_icon_size");
         if (compact_stack_shared && cJSON_IsNumber(compact_stack_shared)) {
             settings->compact_stack_shared_icon_size = (float) compact_stack_shared->valuedouble;
             if (settings->compact_stack_shared_icon_size < COMPACT_STACK_SHARED_ICON_SIZE_MIN)
                 settings->compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MIN;
-            if (settings->compact_stack_shared_icon_size > COMPACT_STACK_SHARED_ICON_SIZE_MAX)
-                settings->compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MAX;
         } else {
             settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
             defaults_were_used = true;
         }
+        if (settings->compact_stack_shared_icon_size > settings->compact_pop_icon_size)
+            settings->compact_stack_shared_icon_size = settings->compact_pop_icon_size;
 
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
@@ -2190,6 +2220,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
         settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_stack_item_count = 0;
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+            settings->compact_stack_pop_on_progress[i] = DEFAULT_COMPACT_STACK_POP_ON_PROGRESS;
         settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
         settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
         settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
@@ -2927,6 +2959,14 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
             cJSON_AddItemToArray(compact_stack_items_array, item_obj);
         }
         cJSON_AddItemToObject(visuals_obj, "compact_stack_items", compact_stack_items_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_pop_on_progress");
+        cJSON *compact_stack_progress_array = cJSON_CreateArray();
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            if (settings->compact_stack_pop_on_progress[i])
+                cJSON_AddItemToArray(compact_stack_progress_array, cJSON_CreateNumber(i));
+        }
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_pop_on_progress", compact_stack_progress_array);
 
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_max_lines");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_max_lines",

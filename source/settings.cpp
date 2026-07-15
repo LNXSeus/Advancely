@@ -152,11 +152,12 @@ static bool compact_cycle_different(const AppSettings *a, const AppSettings *b) 
     return false;
 }
 
-// True if the two Compact pop-out-stack selections differ (which types may pop and which individual
-// goals are whitelisted, in order). Used by both settings-diff functions below.
+// True if the two Compact pop-out-stack selections differ (which types may pop, what makes each type
+// pop, and which individual goals are whitelisted, in order). Used by both settings-diff functions below.
 static bool compact_stack_different(const AppSettings *a, const AppSettings *b) {
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
         if (a->compact_stack_type[i] != b->compact_stack_type[i]) return true;
+        if (a->compact_stack_pop_on_progress[i] != b->compact_stack_pop_on_progress[i]) return true;
     }
     if (a->compact_stack_item_count != b->compact_stack_item_count) return true;
     for (int i = 0; i < a->compact_stack_item_count; i++) {
@@ -3500,9 +3501,34 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", show_hidden_tooltip_buffer);
                 }
 
+                // Timer formatting is not tied to a render mode: it drives the tracker's own timers, the
+                // belt/page top bar, and the Compact mode's final time on the run-completed panel. So it
+                // lives here, outside the mode-specific sections, and stays reachable in every mode.
+                ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);
+                if (ImGui::IsItemHovered()) {
+                    char igt_spacing_tooltip_buffer[256];
+                    snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
+                             "Adds a space between every number and its unit in the IGT\n"
+                             "and Update Timer display.\n"
+                             "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".\n"
+                             "Default: Off");
+                    ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("IGT Always Show ms", &temp_settings.igt_always_show_ms);
+                if (ImGui::IsItemHovered()) {
+                    char igt_ms_tooltip_buffer[256];
+                    snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
+                             "Always shows milliseconds in the IGT display,\n"
+                             "even when the time exceeds one minute.\n"
+                             "Example: \"02m 04.500s\" instead of \"02m 04s\".\n"
+                             "Default: Off");
+                    ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
+                }
+
                 // Content & Behavior drives the belt/page top info bar and 3-row layout (text sections,
-                // separator, IGT formatting, sub-stat cycling, clear animation). Compact mode uses none
-                // of these, so hide the whole section while it is active.
+                // separator, sub-stat cycling, clear animation). Compact mode uses none of these, so hide
+                // the whole section while it is active.
                 if (temp_settings.overlay_render_mode != OVERLAY_RENDER_MODE_COMPACT) {
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -3606,28 +3632,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Default: \"|\"",
                              sizeof(temp_settings.overlay_progress_separator) - 1);
                     ImGui::SetTooltip("%s", separator_tooltip_buffer);
-                }
-
-                ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);
-                if (ImGui::IsItemHovered()) {
-                    char igt_spacing_tooltip_buffer[256];
-                    snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
-                             "Adds a space between every number and its unit in the IGT\n"
-                             "and Update Timer display.\n"
-                             "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".\n"
-                             "Default: Off");
-                    ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("IGT Always Show ms", &temp_settings.igt_always_show_ms);
-                if (ImGui::IsItemHovered()) {
-                    char igt_ms_tooltip_buffer[256];
-                    snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
-                             "Always shows milliseconds in the IGT display,\n"
-                             "even when the time exceeds one minute.\n"
-                             "Example: \"02m 04.500s\" instead of \"02m 04s\".\n"
-                             "Default: Off");
-                    ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
                 }
 
                 ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
@@ -3947,6 +3951,68 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         compact_selection_ui("stack", sctd, scc, smodern, "Stack Goal Types", stack_tgt,
                                              &s_stack_type_anchor, s_stack_item_anchor, false,
                                              temp_settings.overlay_show_hidden_goals);
+
+                        // Per-type pop trigger. Only the counting types can pop mid-progress, so the
+                        // rest (advancements, recipes, unlocks, criteria) are left out: they have
+                        // nothing but a done flag and always pop on completion.
+                        auto progress_type_shown = [&](int i) -> bool {
+                            return scc[i].total > 0 && compact_type_has_progress((OverlayCompactCounterType) i);
+                        };
+                        int progress_sel_count = 0, progress_present = 0;
+                        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+                            if (!progress_type_shown(i)) continue;
+                            progress_present++;
+                            if (temp_settings.compact_stack_pop_on_progress[i]) progress_sel_count++;
+                        }
+                        if (progress_present > 0) {
+                            static int s_stack_progress_anchor = -1;
+                            char progress_preview[48];
+                            snprintf(progress_preview, sizeof(progress_preview), "%d selected", progress_sel_count);
+                            if (ImGui::BeginCombo("Pop On Progress", progress_preview)) {
+                                for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+                                    if (!progress_type_shown(i)) continue;
+                                    bool sel = temp_settings.compact_stack_pop_on_progress[i];
+                                    if (ImGui::Selectable(scc[i].label, sel, ImGuiSelectableFlags_NoAutoClosePopups)) {
+                                        bool new_state = !sel;
+                                        if (ImGui::GetIO().KeyShift && s_stack_progress_anchor >= 0 &&
+                                            s_stack_progress_anchor != i) {
+                                            int lo = s_stack_progress_anchor < i ? s_stack_progress_anchor : i;
+                                            int hi = s_stack_progress_anchor < i ? i : s_stack_progress_anchor;
+                                            for (int k = lo; k <= hi; k++)
+                                                if (progress_type_shown(k))
+                                                    temp_settings.compact_stack_pop_on_progress[k] = new_state;
+                                        } else {
+                                            temp_settings.compact_stack_pop_on_progress[i] = new_state;
+                                        }
+                                        s_stack_progress_anchor = i;
+                                    }
+                                }
+                                ImGui::EndCombo();
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char compact_pop_progress_tooltip_buffer[700];
+                                snprintf(compact_pop_progress_tooltip_buffer,
+                                         sizeof(compact_pop_progress_tooltip_buffer),
+                                         "Checked: the type pops every time it counts up, so the stack follows a\n"
+                                         "goal as it climbs. Unchecked: it only pops once the goal completes -\n"
+                                         "for a multi-stage goal, each time it clears a stage.\n"
+                                         "Only types that count toward a target are listed. Advancements, recipes,\n"
+                                         "unlocks and criteria are either done or not, so they always pop on\n"
+                                         "completion. Shift+Click to range-select.\n"
+                                         "Default: %s", DEFAULT_COMPACT_STACK_POP_ON_PROGRESS
+                                             ? "all types pop on progress"
+                                             : "completion only");
+                                ImGui::SetTooltip("%s", compact_pop_progress_tooltip_buffer);
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("All##stackprogall"))
+                                for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+                                    if (progress_type_shown(i)) temp_settings.compact_stack_pop_on_progress[i] = true;
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("None##stackprognone"))
+                                for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+                                    if (progress_type_shown(i)) temp_settings.compact_stack_pop_on_progress[i] = false;
+                        }
                     }
 
                     if (ImGui::DragInt("Max Stack Lines", &temp_settings.compact_stack_max_lines, 0.1f,
@@ -4025,19 +4091,27 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", compact_pop_icon_tooltip_buffer);
                     }
 
+                    // The shared icon is drawn on top of the pop-out icon, so it can never be bigger than
+                    // it: that is its upper bound, and shrinking Pop Icon Size above drags it down too.
+                    if (temp_settings.compact_stack_shared_icon_size > temp_settings.compact_pop_icon_size)
+                        temp_settings.compact_stack_shared_icon_size = temp_settings.compact_pop_icon_size;
                     if (ImGui::DragFloat("Shared Icon Size", &temp_settings.compact_stack_shared_icon_size, 0.5f,
-                                         COMPACT_STACK_SHARED_ICON_SIZE_MIN, COMPACT_STACK_SHARED_ICON_SIZE_MAX, "%.0f")) {
+                                         COMPACT_STACK_SHARED_ICON_SIZE_MIN, temp_settings.compact_pop_icon_size,
+                                         "%.0f")) {
                         if (temp_settings.compact_stack_shared_icon_size < COMPACT_STACK_SHARED_ICON_SIZE_MIN)
                             temp_settings.compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MIN;
-                        if (temp_settings.compact_stack_shared_icon_size > COMPACT_STACK_SHARED_ICON_SIZE_MAX)
-                            temp_settings.compact_stack_shared_icon_size = COMPACT_STACK_SHARED_ICON_SIZE_MAX;
+                        if (temp_settings.compact_stack_shared_icon_size > temp_settings.compact_pop_icon_size)
+                            temp_settings.compact_stack_shared_icon_size = temp_settings.compact_pop_icon_size;
                     }
                     if (ImGui::IsItemHovered()) {
                         char compact_stack_shared_tooltip_buffer[512];
                         snprintf(compact_stack_shared_tooltip_buffer, sizeof(compact_stack_shared_tooltip_buffer),
                                  "Size of the small parent icon overlaid on a shared criterion's pop-out\n"
                                  "line (a criterion belonging to more than one advancement). 0 hides it.\n"
-                                 "Default: %.0f", DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE);
+                                 "It sits on the pop-out icon, so Pop Icon Size (%.0f) is its upper bound\n"
+                                 "and lowering that lowers this with it.\n"
+                                 "Default: %.0f", temp_settings.compact_pop_icon_size,
+                                 DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE);
                         ImGui::SetTooltip("%s", compact_stack_shared_tooltip_buffer);
                     }
                 }
