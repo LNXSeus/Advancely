@@ -13,6 +13,7 @@
 #include "format_utils.h"
 #include "logger.h"
 #include "supporters.h"
+#include "skin_cache.h" // Co-op contributor faces in Compact mode
 
 #include <cstdio>
 #include <cstdlib>
@@ -1065,6 +1066,35 @@ static void compact_worst_count_entry(char *buf, size_t buf_sz, const CompactEnt
 
 #define COMPACT_POP_LINE_GAP 8.0f   // Vertical gap below each pop-out line (folded into the line height)
 #define COMPACT_POP_TEXT_GAP 10.0f  // Horizontal gap between a pop-out icon and its text
+#define COMPACT_POP_FACE_GAP 6.0f   // Horizontal gap flanking the co-op contributor face slot
+
+// Co-op stack contributor faces are active only in an active lobby's merged All-Players view with the
+// contributor-faces setting on - exactly when the main tracker draws them. In a specific-player/ghost
+// view the pinned panel face is used instead (drawn in overlay_render_compact), so no per-line faces.
+static bool overlay_coop_stack_faces_on(const Overlay *o, const AppSettings *s) {
+    return o && s && s->coop_show_contributor_faces && o->coop_lobby_active && o->coop_all_players_view;
+}
+
+// Resolve a contributor UUID to its account type from the lobby roster synced in the IPC header, so
+// offline accounts skip the Mojang fetch and fall straight to Notch (matches the tracker). Unknown
+// UUIDs (e.g. a spectated ghost not in the lobby) default to online, as the tracker's lookup does.
+static AccountType overlay_coop_account_type(const Overlay *o, const char *uuid) {
+    if (!o || !uuid || !uuid[0]) return ACCOUNT_ONLINE;
+    for (int i = 0; i < o->coop_lobby_count; i++)
+        if (strcmp(o->coop_lobby[i].uuid, uuid) == 0)
+            return o->coop_lobby[i].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+    return ACCOUNT_ONLINE;
+}
+
+// Draw an 8x8 player face texture (nearest-neighbour, full opacity) into a square slot.
+static void compact_draw_face(Overlay *o, const char *uuid, AccountType acc, float fx, float fy, float sz) {
+    if (!uuid || !uuid[0]) return;
+    SDL_Texture *tex = skin_cache_get_face(uuid, acc);
+    if (!tex) return;
+    SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+    SDL_FRect d = {snap_px(fx), snap_px(fy), sz, sz};
+    SDL_RenderTexture(o->renderer, tex, nullptr, &d);
+}
 
 // One active on-screen pop-out group. Criterion / sub-stat completions are 2-line groups (the parent
 // advancement/category on top, the criterion below); everything else is a single line.
@@ -1076,6 +1106,7 @@ struct CompactPopGroup {
     std::string item_icon;
     std::string item_text;
     bool item_shared;         // overlay the parent icon on the item icon (shared criterion)
+    std::string face_uuid;    // co-op contributor whose face rides this line (empty = none)
     float hold_left;          // seconds until it disappears
     float anim_y;             // current top Y (lerps toward the settled slot)
     bool placed;              // anim_y initialised
@@ -1233,6 +1264,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     CompactStackEngine &eng = s_compact_stack;
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
     TTF_Font *stack_font = o->compact_stack_font ? o->compact_stack_font : o->font;
+    // Co-op All-Players view: each pop-out line carries the face of whoever the main tracker credits.
+    // When on, a face-sized slot is reserved right of every line's icon so text stays left-aligned.
+    bool faces_on = overlay_coop_stack_faces_on(o, settings);
 
     // Reseed (and clear) when the template changes or on the first frame, so nothing pops on load.
     unsigned long long sig = compact_stack_signature(td);
@@ -1254,7 +1288,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     auto consider = [&](OverlayCompactCounterType type_kind, OverlayCompactCounterType indiv_kind,
                         const char *indiv_root, const char *key, long long progress, bool done, bool two_line,
                         const char *parent_icon, const char *parent_text, const char *item_icon,
-                        const char *item_text, bool item_shared) {
+                        const char *item_text, bool item_shared, const char *face_uuid) {
         unsigned long long enc = compact_enc(progress, done);
         std::string k(key);
         auto it = eng.prev.find(k);
@@ -1275,6 +1309,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             g.item_icon = item_icon ? item_icon : "";
             g.item_text = item_text ? item_text : "";
             g.item_shared = item_shared;
+            g.face_uuid = face_uuid ? face_uuid : "";
             if (enc > old) g.hold_left = settings->compact_stack_hold_time; // only a real increment refreshes the hold
             return;
         }
@@ -1288,6 +1323,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         g.item_icon = item_icon ? item_icon : "";
         g.item_text = item_text ? item_text : "";
         g.item_shared = item_shared;
+        g.face_uuid = face_uuid ? face_uuid : "";
         g.hold_left = settings->compact_stack_hold_time;
         g.anim_y = 0.0f;
         g.placed = false;
@@ -1296,6 +1332,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
 
     if (td) {
         char key[512], ptext[256], itext[256];
+        // faces_on (hoisted above) gates the per-type contributor UUID passed to consider() below.
         // Advancements / recipes: the whole goal (1 line) + each criterion (2-line group).
         for (int i = 0; i < td->advancement_count; i++) {
             TrackableCategory *a = td->advancements[i];
@@ -1304,9 +1341,12 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             OverlayCompactCounterType whole_kind = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
             OverlayCompactCounterType crit_kind = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
             const char *aname = compact_display_name(a->display_name, a->root_name);
+            // First completer (simple = who got it; complex-assigned = the current leader), like the
+            // tracker's advancement face and its right-of-icon criterion face.
+            const char *adv_face = (faces_on && a->first_contributor_uuid[0]) ? a->first_contributor_uuid : nullptr;
             snprintf(key, sizeof(key), "advw|%s", a->root_name);
             consider(whole_kind, whole_kind, nullptr, key, 0, a->done, false,
-                     nullptr, nullptr, a->icon_path, aname, false);
+                     nullptr, nullptr, a->icon_path, aname, false, adv_face);
             snprintf(ptext, sizeof(ptext), "%s (%d/%d)", aname, a->completed_criteria_count,
                      a->criteria_progress_total);
             for (int j = 0; j < a->criteria_count; j++) {
@@ -1315,7 +1355,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
                 consider(crit_kind, crit_kind, a->root_name, key, 0, c->done, true,
                          a->icon_path, ptext, c->icon_path,
-                         compact_display_name(c->display_name, c->root_name), c->is_shared);
+                         compact_display_name(c->display_name, c->root_name), c->is_shared, adv_face);
             }
         }
         // Stats: simple stats pop as a graded single line; multi-stat sub-stats pop as 2-line groups.
@@ -1334,9 +1374,18 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 if (goal > 0) snprintf(itext, sizeof(itext), "%s%s (%d/%d)", box, sname, prog, goal);
                 else snprintf(itext, sizeof(itext), "%s%s (%d)", box, sname, prog);
                 snprintf(key, sizeof(key), "stat|%s", s->root_name);
+                // A lone manual completer wins (tracker draws it under the checkbox); otherwise the
+                // highest contributor, only in HIGHEST merge mode, like the tracker's simple-stat face.
+                const char *stat_face = nullptr;
+                if (faces_on) {
+                    if (s->is_manually_completed && s->manual_completer_uuid[0]) stat_face = s->manual_completer_uuid;
+                    else if (settings->coop_stat_merge == COOP_STAT_HIGHEST &&
+                             s->criteria[0]->highest_contributor_uuid[0])
+                        stat_face = s->criteria[0]->highest_contributor_uuid;
+                }
                 consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key,
                          compact_pop_progress(settings, COMPACT_COUNTER_STATS, prog), s->done, false,
-                         nullptr, nullptr, s->icon_path, itext, false);
+                         nullptr, nullptr, s->icon_path, itext, false, stat_face);
             } else {
                 // The category itself is manually checkable, so its parent line carries a box too.
                 const char *catbox = compact_done_box(s->is_manually_completed, s->done);
@@ -1356,10 +1405,19 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     else
                         snprintf(itext, sizeof(itext), "%s%s (%d)", subbox, subname, sub->progress);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
+                    // Lone manual completer, else the highest contributor (HIGHEST merge only), matching
+                    // the tracker's sub-stat manual-checkbox face and right-of-icon contributor face.
+                    const char *sub_face = nullptr;
+                    if (faces_on) {
+                        if (sub->is_manually_completed && sub->manual_completer_uuid[0])
+                            sub_face = sub->manual_completer_uuid;
+                        else if (settings->coop_stat_merge == COOP_STAT_HIGHEST && sub->highest_contributor_uuid[0])
+                            sub_face = sub->highest_contributor_uuid;
+                    }
                     consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
                              compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, sub->progress),
                              sub->done, true, s->icon_path, ptext, sub->icon_path, itext,
-                             sub->is_shared);
+                             sub->is_shared, sub_face);
                 }
             }
         }
@@ -1367,8 +1425,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             TrackableItem *u = td->unlocks[i];
             if (!u || goal_is_hidden(u->is_hidden, settings)) continue;
             snprintf(key, sizeof(key), "unl|%s", u->root_name);
+            // Unlocks are AND-merged across players (no single contributor), so no face, like the tracker.
             consider(COMPACT_COUNTER_UNLOCKS, COMPACT_COUNTER_UNLOCKS, nullptr, key, 0, u->done, false,
-                     nullptr, nullptr, u->icon_path, compact_display_name(u->display_name, u->root_name), false);
+                     nullptr, nullptr, u->icon_path, compact_display_name(u->display_name, u->root_name), false,
+                     nullptr);
         }
         for (int i = 0; i < td->custom_goal_count; i++) {
             TrackableItem *c = td->custom_goals[i];
@@ -1386,9 +1446,15 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 snprintf(itext, sizeof(itext), "%s%s (%d)", box, cname, c->progress);
             }
             snprintf(key, sizeof(key), "cus|%s", c->root_name);
+            // Lone manual completer, else the lone counter-value contributor, matching the tracker.
+            const char *cus_face = nullptr;
+            if (faces_on) {
+                if (c->is_manually_completed && c->manual_completer_uuid[0]) cus_face = c->manual_completer_uuid;
+                else if (c->custom_contributor_uuid[0]) cus_face = c->custom_contributor_uuid;
+            }
             consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key,
                      compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, c->progress), c->done,
-                     false, nullptr, nullptr, c->icon_path, itext, false);
+                     false, nullptr, nullptr, c->icon_path, itext, false, cus_face);
         }
         for (int i = 0; i < td->multi_stage_goal_count; i++) {
             MultiStageGoal *g = td->multi_stage_goals[i];
@@ -1421,9 +1487,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             // Only the in-stage stat counts as this goal's progress; the stage index always moves the
             // encoded value, so a completion-only multi-stage goal still pops on every stage it clears.
             int enc_prog = (int) compact_pop_progress(settings, COMPACT_COUNTER_MULTISTAGE, stat_prog);
+            // Multi-stage goals have no per-player contributor stamp, so no face (as on the tracker).
             consider(COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name, key,
                      compact_ms_pack(stage, enc_prog), done, false,
-                     nullptr, nullptr, icon, itext, false);
+                     nullptr, nullptr, icon, itext, false, nullptr);
         }
         for (int i = 0; i < td->counter_goal_count; i++) {
             CounterGoal *c = td->counter_goals[i];
@@ -1433,9 +1500,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             snprintf(itext, sizeof(itext), "%s%s (%d/%d)", cbox,
                      compact_display_name(c->display_name, c->root_name), c->completed_count, c->linked_goal_count);
             snprintf(key, sizeof(key), "cnt|%s", c->root_name);
+            // Counters aggregate linked goals with no single contributor, so no face (as on the tracker).
             consider(COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name, key,
                      compact_pop_progress(settings, COMPACT_COUNTER_COUNTERS, c->completed_count),
-                     c->done, false, nullptr, nullptr, c->icon_path, itext, false);
+                     c->done, false, nullptr, nullptr, c->icon_path, itext, false, nullptr);
         }
     }
     eng.seeded = true; // baseline recorded; subsequent frames pop on increases
@@ -1500,17 +1568,24 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     if (clip.h < 0) clip.h = 0;
     SDL_SetRenderClipRect(o->renderer, &clip);
 
+    // Reserve a face-sized slot right of the icon on every line while co-op faces are active, so the
+    // text left edge stays aligned whether or not a given line credits a single player.
+    float face_slot = faces_on ? (icon_size + COMPACT_POP_FACE_GAP) : 0.0f;
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
-                         const std::string &shared_icon) {
+                         const std::string &shared_icon, const std::string &face_uuid) {
         compact_draw_icon(o, icon.c_str(), stack_x, ly, icon_size);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
             compact_draw_icon(o, shared_icon.c_str(), stack_x, ly, settings->compact_stack_shared_icon_size);
+        if (faces_on && !face_uuid.empty()) {
+            AccountType acc = overlay_coop_account_type(o, face_uuid.c_str());
+            compact_draw_face(o, face_uuid.c_str(), acc, stack_x + icon_size + COMPACT_POP_FACE_GAP, ly, icon_size);
+        }
         if (!text.empty()) {
             SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
             if (tt) {
                 float tw = 0.0f, th = 0.0f;
                 SDL_GetTextureSize(tt, &tw, &th);
-                SDL_FRect d = {snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP),
+                SDL_FRect d = {snap_px(stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP),
                                snap_px(ly + (icon_size - th) / 2.0f), tw, th};
                 SDL_RenderTexture(o->renderer, tt, nullptr, &d);
             }
@@ -1518,10 +1593,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     };
     for (auto &g : eng.groups) {
         if (g.two_line) {
-            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon);
-            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon);
+            // The face rides the item (completed) line; the parent line reserves the slot but shows none.
+            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, std::string());
+            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon, g.face_uuid);
         } else {
-            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon);
+            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon, g.face_uuid);
         }
     }
     SDL_SetRenderClipRect(o->renderer, nullptr);
@@ -1656,7 +1732,12 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         measure(buf);
     }
     cached_sig = sig;
-    cached_w = (max_text <= 0.0f) ? 0.0f : (settings->compact_pop_icon_size + COMPACT_POP_TEXT_GAP + max_text);
+    // Always reserve the co-op contributor face slot (icon-sized) in the worst-case width, even in
+    // singleplayer, so the auto-fitted window never has to grow when a co-op face appears.
+    float face_slot = settings->compact_pop_icon_size + COMPACT_POP_FACE_GAP;
+    cached_w = (max_text <= 0.0f)
+                   ? 0.0f
+                   : (settings->compact_pop_icon_size + face_slot + COMPACT_POP_TEXT_GAP + max_text);
     return cached_w;
 }
 
@@ -2024,6 +2105,17 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     if (count_tex) {
         SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
+    }
+
+    // Co-op specific-player/ghost view: pin the selected player's face at the panel's bottom-right,
+    // drawn over the panel (offsets inset its bottom-right corner from the panel's; size 0 hides it).
+    // The merged All-Players view uses per-line stack faces instead, so nothing is pinned there.
+    float pf_size = settings->compact_coop_panel_face_size;
+    if (o->coop_lobby_active && o->coop_selected_uuid[0] != '\0' && pf_size > 0.0f) {
+        AccountType pf_acc = o->coop_selected_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+        float pf_x = panel_x + panel_w - pf_size - settings->compact_coop_panel_face_offset_x;
+        float pf_y = (panel_y + panel_h) - pf_size - settings->compact_coop_panel_face_offset_y;
+        compact_draw_face(o, o->coop_selected_uuid, pf_acc, pf_x, pf_y, pf_size);
     }
 
     // Diff the template and draw the pop-out stack below the panel, then the promo line in the first

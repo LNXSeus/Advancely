@@ -759,6 +759,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
     settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
     settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
+    settings->compact_coop_panel_face_size = DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE;
+    settings->compact_coop_panel_face_offset_x = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X;
+    settings->compact_coop_panel_face_offset_y = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->overlay_row1_custom_scroll_speed_enabled = DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED;
     settings->overlay_row1_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -1821,6 +1824,39 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         if (settings->compact_stack_shared_icon_size > settings->compact_pop_icon_size)
             settings->compact_stack_shared_icon_size = settings->compact_pop_icon_size;
 
+        const cJSON *compact_coop_face = cJSON_GetObjectItem(visual_settings, "compact_coop_panel_face_size");
+        if (compact_coop_face && cJSON_IsNumber(compact_coop_face)) {
+            settings->compact_coop_panel_face_size = (float) compact_coop_face->valuedouble;
+            if (settings->compact_coop_panel_face_size < COMPACT_COOP_PANEL_FACE_SIZE_MIN)
+                settings->compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MIN;
+            if (settings->compact_coop_panel_face_size > COMPACT_COOP_PANEL_FACE_SIZE_MAX)
+                settings->compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MAX;
+        } else { settings->compact_coop_panel_face_size = DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE; defaults_were_used = true; }
+
+        const cJSON *compact_coop_face_x = cJSON_GetObjectItem(visual_settings, "compact_coop_panel_face_offset_x");
+        if (compact_coop_face_x && cJSON_IsNumber(compact_coop_face_x)) {
+            settings->compact_coop_panel_face_offset_x = (float) compact_coop_face_x->valuedouble;
+            if (settings->compact_coop_panel_face_offset_x < COMPACT_COOP_PANEL_FACE_OFFSET_MIN)
+                settings->compact_coop_panel_face_offset_x = COMPACT_COOP_PANEL_FACE_OFFSET_MIN;
+            if (settings->compact_coop_panel_face_offset_x > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
+                settings->compact_coop_panel_face_offset_x = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
+        } else {
+            settings->compact_coop_panel_face_offset_x = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_coop_face_y = cJSON_GetObjectItem(visual_settings, "compact_coop_panel_face_offset_y");
+        if (compact_coop_face_y && cJSON_IsNumber(compact_coop_face_y)) {
+            settings->compact_coop_panel_face_offset_y = (float) compact_coop_face_y->valuedouble;
+            if (settings->compact_coop_panel_face_offset_y < COMPACT_COOP_PANEL_FACE_OFFSET_MIN)
+                settings->compact_coop_panel_face_offset_y = COMPACT_COOP_PANEL_FACE_OFFSET_MIN;
+            if (settings->compact_coop_panel_face_offset_y > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
+                settings->compact_coop_panel_face_offset_y = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
+        } else {
+            settings->compact_coop_panel_face_offset_y = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y;
+            defaults_were_used = true;
+        }
+
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
             settings->overlay_row1_spacing = (float) row1_spacing_json->valuedouble;
@@ -2227,6 +2263,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
         settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
         settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
+        settings->compact_coop_panel_face_size = DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE;
+        settings->compact_coop_panel_face_offset_x = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X;
+        settings->compact_coop_panel_face_offset_y = DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y;
     }
 
     // Load Account Settings (new top-level section; falls back to coop.local_player for migration)
@@ -2983,6 +3022,15 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_shared_icon_size",
                               cJSON_CreateNumber(settings->compact_stack_shared_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_coop_panel_face_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_coop_panel_face_size",
+                              cJSON_CreateNumber(settings->compact_coop_panel_face_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_coop_panel_face_offset_x");
+        cJSON_AddItemToObject(visuals_obj, "compact_coop_panel_face_offset_x",
+                              cJSON_CreateNumber(settings->compact_coop_panel_face_offset_x));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_coop_panel_face_offset_y");
+        cJSON_AddItemToObject(visuals_obj, "compact_coop_panel_face_offset_y",
+                              cJSON_CreateNumber(settings->compact_coop_panel_face_offset_y));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));

@@ -170,6 +170,14 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line
 #define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the pop icon it is drawn on (compact_pop_icon_size)
 #define DEFAULT_COMPACT_STACK_POP_ON_PROGRESS true // Counting goal types pop on every increment, not just completion
+// Co-op pinned player face on the Compact panel (specific-player/ghost view). Size 0 hides it.
+#define DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE 28.0f
+#define COMPACT_COOP_PANEL_FACE_SIZE_MIN 0.0f
+#define COMPACT_COOP_PANEL_FACE_SIZE_MAX 256.0f
+#define DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X 6.0f // Inset of the face's bottom-right from the panel's
+#define DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y 6.0f
+#define COMPACT_COOP_PANEL_FACE_OFFSET_MIN (-256.0f) // Negative overhangs the panel edge
+#define COMPACT_COOP_PANEL_FACE_OFFSET_MAX 256.0f
 
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
@@ -474,6 +482,11 @@ struct AppSettings {
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.
     float compact_pop_icon_size; // Pop-out line icon size.
     float compact_stack_shared_icon_size; // Shared-parent overlay icon size on a pop-out line.
+    // Co-op: pinned player face for a specific-player/ghost view, drawn at the panel's bottom-right.
+    // Size 0 hides it; offsets inset the face's bottom-right corner from the panel's bottom-right.
+    float compact_coop_panel_face_size;
+    float compact_coop_panel_face_offset_x;
+    float compact_coop_panel_face_offset_y;
     float overlay_scroll_speed; // The global speed and direction of the scrolling animation in the overlay.
     bool overlay_row1_custom_scroll_speed_enabled; // If true, row 1 ignores the global speed and uses its own.
     float overlay_row1_scroll_speed; // Custom scroll speed and direction for row 1.

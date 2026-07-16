@@ -107,6 +107,20 @@ struct Overlay {
     float layout_row2_y; // Top of row 2 icons
     float layout_row3_y; // Top of row 3 icons
     int layout_height; // Total overlay window height
+
+    // Co-op view state received live from the tracker via the IPC header (the overlay process has no
+    // g_coop_ctx of its own). Drives Compact-mode contributor faces: per-line faces in the merged
+    // All-Players view, a pinned face for the selected player/ghost otherwise. coop_lobby resolves
+    // each face's account type (offline -> Notch) exactly like the tracker.
+    bool coop_lobby_active;
+    bool coop_all_players_view;
+    char coop_selected_uuid[48];
+    bool coop_selected_offline;
+    int coop_lobby_count;
+    struct {
+        char uuid[48];
+        bool is_offline;
+    } coop_lobby[COOP_MAX_LOBBY];
 };
 
 /**

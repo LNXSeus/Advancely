@@ -827,7 +827,9 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
   and individual goals cycle on the panel and how fast (`Cycle Interval`). `Stack Content` independently picks what may
   pop out below it, whether each type pops on every increment or only on completion (`Pop On Progress`), and how the
   stack behaves (`Max Stack Lines`, `Hold Time`, `Animation Time`, `Pop Icon Size`, `Shared Icon Size`). The label, the
-  count, and the stack each get their own font and text size.
+  count, and the stack each get their own font and text size. In co-op, the `Co-op Player Face` controls
+  (`Panel Face Size`, `Panel Face Offset X`, `Panel Face Offset Y`) size and position the pinned player face; see
+  **Co-op in Compact mode** below.
 * **Text Sizes**: Set the `Top Text Size` (top info bar) and `Row Text Size` (row 2 and 3 item text) independently. A
   larger size increases the overlay window height to fit the taller text.
 * **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed
@@ -1666,6 +1668,16 @@ How the Host combines multiple players' progress into the **All Players** view d
 The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these face indicators render. When enabled,
 the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
 are individually configurable per user. They're local visual preferences, not pushed to other lobby members.
+
+**Co-op in Compact mode:** The overlay's `Compact` render mode mirrors the same contributor logic. In the `All Players`
+view, each pop-out line in the stack shows a contributor face just right of its icon (same size as the pop-out icon),
+picking the same player the main tracker would: the first completer for advancements and their criteria, the highest
+contributor for stats/sub-stats (in `Highest` merge mode), and the lone manual completer or counter contributor for
+custom goals. This face slot is always reserved in the window's width (even in singleplayer) so the overlay never
+resizes when a face appears. When you instead view a single player (or a spectated ghost), the stack faces give way to
+one pinned face of that player at the panel's bottom-right, sized and positioned by the `Co-op Player Face` settings
+(`Panel Face Size`, `Panel Face Offset X/Y`; a size of `0` hides it). The stack faces still honor the `Show Contributor
+Faces` toggle, so turning it off hides them just like on the tracker.
 
 Note that the goal visibility mode still applies on top of this. In `Hide All Completed` mode,
 goals that have been finished are hidden from the tracker entirely, so their faces disappear with them. This is most

@@ -137,6 +137,21 @@ typedef struct {
     char version_str[64];
     char display_version_str[64];
     char category_display_name[MAX_PATH_LENGTH];
+    // Co-op view state, pushed live so Compact mode can show contributor faces without a
+    // restart (the overlay process has no g_coop_ctx of its own). coop_lobby_active mirrors
+    // coop_net_get_state() != IDLE; coop_all_players_view is the merged view (no specific
+    // player/ghost selected). coop_selected_uuid + coop_selected_offline pin one player's
+    // face when a specific view is chosen. The roster lets the overlay resolve each stack
+    // face's account type (offline -> Notch) exactly like the tracker does.
+    bool coop_lobby_active;
+    bool coop_all_players_view;
+    char coop_selected_uuid[48];
+    bool coop_selected_offline;
+    int coop_lobby_count;
+    struct {
+        char uuid[48];
+        bool is_offline;
+    } coop_lobby[COOP_MAX_LOBBY];
 } OverlayIPCHeader;
 
 // Fill the version/category labels the overlay shows in its top bar. Sent live in the
@@ -149,6 +164,57 @@ static void fill_overlay_ipc_labels(OverlayIPCHeader *header, const AppSettings 
     header->display_version_str[sizeof(header->display_version_str) - 1] = '\0';
     strncpy(header->category_display_name, settings->category_display_name, sizeof(header->category_display_name) - 1);
     header->category_display_name[sizeof(header->category_display_name) - 1] = '\0';
+}
+
+// Fill the co-op view state the Compact overlay needs to show contributor faces. Read live from
+// g_coop_ctx (the overlay process has none), so a view switch or lobby change reflects without a
+// restart. Call at every site that writes the IPC header, right after fill_overlay_ipc_labels.
+static void fill_overlay_coop_state(OverlayIPCHeader *header, const Tracker *t, const AppSettings *settings) {
+    header->coop_lobby_active = false;
+    header->coop_all_players_view = false;
+    header->coop_selected_uuid[0] = '\0';
+    header->coop_selected_offline = false;
+    header->coop_lobby_count = 0;
+
+    bool lobby_active = g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE;
+    header->coop_lobby_active = lobby_active;
+    if (!lobby_active || !t || !settings) return;
+
+    // Snapshot the lobby roster so the overlay can resolve each contributor face's account type
+    // (offline accounts skip the Mojang fetch and fall back to Notch), matching the tracker.
+    CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
+    int lc = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
+    if (lc > COOP_MAX_LOBBY) lc = COOP_MAX_LOBBY;
+    header->coop_lobby_count = lc;
+    for (int i = 0; i < lc; i++) {
+        strncpy(header->coop_lobby[i].uuid, lobby[i].uuid, sizeof(header->coop_lobby[i].uuid) - 1);
+        header->coop_lobby[i].uuid[sizeof(header->coop_lobby[i].uuid) - 1] = '\0';
+        header->coop_lobby[i].is_offline = lobby[i].is_offline;
+    }
+
+    // Merged All-Players view vs a specific player/ghost selection (a ghost is a save-folder UUID
+    // that may not be in the lobby, so its account type falls back to online, like the tracker).
+    bool all_players = (t->selected_coop_player_idx == -1 && t->selected_coop_ghost_idx == -1);
+    header->coop_all_players_view = all_players;
+    if (!all_players) {
+        const char *sel = nullptr;
+        if (t->selected_coop_ghost_idx >= 0 && t->selected_coop_ghost_uuid[0] != '\0') {
+            sel = t->selected_coop_ghost_uuid;
+        } else {
+            int idx = t->selected_coop_player_idx;
+            if (idx >= 0 && idx < settings->coop_player_count) sel = settings->coop_players[idx].uuid;
+        }
+        if (sel && sel[0] != '\0') {
+            strncpy(header->coop_selected_uuid, sel, sizeof(header->coop_selected_uuid) - 1);
+            header->coop_selected_uuid[sizeof(header->coop_selected_uuid) - 1] = '\0';
+            for (int i = 0; i < lc; i++) {
+                if (strcmp(lobby[i].uuid, sel) == 0) {
+                    header->coop_selected_offline = lobby[i].is_offline;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 
@@ -1530,6 +1596,10 @@ int main(int argc, char *argv[]) {
         Tracker proxy_tracker{};
         proxy_tracker.template_data = &live_template_data; // Point it to our local rebuilt data
 
+        // Co-op contributor faces (Compact mode) need the skin cache in this process too: the tracker
+        // and overlay run as separate processes, each with its own cache. Started only after IPC setup
+        // succeeded so the earlier error-exit paths don't have to join the worker thread.
+        skin_cache_init(overlay->renderer);
 
         bool is_running = true;
         Uint32 last_frame_time = SDL_GetTicks();
@@ -1592,6 +1662,25 @@ int main(int argc, char *argv[]) {
                                 sizeof(settings.category_display_name) - 1);
                         settings.category_display_name[sizeof(settings.category_display_name) - 1] = '\0';
 
+                        // Live co-op view state for Compact-mode contributor faces (the overlay has no
+                        // g_coop_ctx). Copied onto the Overlay so the render path can read it via `o`.
+                        overlay->coop_lobby_active = header.coop_lobby_active;
+                        overlay->coop_all_players_view = header.coop_all_players_view;
+                        strncpy(overlay->coop_selected_uuid, header.coop_selected_uuid,
+                                sizeof(overlay->coop_selected_uuid) - 1);
+                        overlay->coop_selected_uuid[sizeof(overlay->coop_selected_uuid) - 1] = '\0';
+                        overlay->coop_selected_offline = header.coop_selected_offline;
+                        int hdr_lc = header.coop_lobby_count;
+                        if (hdr_lc < 0) hdr_lc = 0;
+                        if (hdr_lc > COOP_MAX_LOBBY) hdr_lc = COOP_MAX_LOBBY;
+                        overlay->coop_lobby_count = hdr_lc;
+                        for (int i = 0; i < hdr_lc; i++) {
+                            strncpy(overlay->coop_lobby[i].uuid, header.coop_lobby[i].uuid,
+                                    sizeof(overlay->coop_lobby[i].uuid) - 1);
+                            overlay->coop_lobby[i].uuid[sizeof(overlay->coop_lobby[i].uuid) - 1] = '\0';
+                            overlay->coop_lobby[i].is_offline = header.coop_lobby[i].is_offline;
+                        }
+
                         // Only deserialize the heavy template data if it's actually there (size > header)
                         if (overlay->p_shared_data->data_size > sizeof(OverlayIPCHeader)) {
                             buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header.
@@ -1619,6 +1708,9 @@ int main(int argc, char *argv[]) {
 #endif
             }
 
+
+            // Promote any worker-decoded contributor faces into textures before rendering.
+            skin_cache_pump();
 
             // The update and render functions now receive live data!
             overlay_update(overlay, &deltaTime, &proxy_tracker, &settings);
@@ -1660,6 +1752,9 @@ int main(int argc, char *argv[]) {
             }
             settings_save(&settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM);
         }
+
+        // Join the skin-cache worker and free its textures before the renderer is destroyed.
+        skin_cache_shutdown();
 
         overlay_free(&overlay, &settings);
         TTF_Quit();
@@ -2694,6 +2789,7 @@ int main(int argc, char *argv[]) {
                             }
                             header.time_since_last_update = tracker->time_since_last_update;
                             fill_overlay_ipc_labels(&header, &app_settings);
+                            fill_overlay_coop_state(&header, tracker, &app_settings);
 
                             char *buffer_head = tracker->p_shared_data->buffer;
                             memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
@@ -3044,6 +3140,7 @@ int main(int argc, char *argv[]) {
                             }
                             header.time_since_last_update = tracker->time_since_last_update;
                             fill_overlay_ipc_labels(&header, &app_settings);
+                            fill_overlay_coop_state(&header, tracker, &app_settings);
                             char *buffer_head = tracker->p_shared_data->buffer;
                             memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
                             buffer_head += sizeof(OverlayIPCHeader);
@@ -3558,6 +3655,7 @@ int main(int argc, char *argv[]) {
                         }
                         header.time_since_last_update = tracker->time_since_last_update;
                         fill_overlay_ipc_labels(&header, &app_settings);
+                        fill_overlay_coop_state(&header, tracker, &app_settings);
 
                         // Get a pointer to the beginning of the shared buffer.
                         char *buffer_head = tracker->p_shared_data->buffer;
@@ -3663,6 +3761,7 @@ int main(int argc, char *argv[]) {
                         }
                         header.time_since_last_update = tracker->time_since_last_update;
                         fill_overlay_ipc_labels(&header, &app_settings);
+                        fill_overlay_coop_state(&header, tracker, &app_settings);
                         char *buffer_head = tracker->p_shared_data->buffer;
                         memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
                         buffer_head += sizeof(OverlayIPCHeader);
@@ -3694,6 +3793,7 @@ int main(int argc, char *argv[]) {
                     }
                     header.time_since_last_update = tracker->time_since_last_update;
                     fill_overlay_ipc_labels(&header, &app_settings);
+                    fill_overlay_coop_state(&header, tracker, &app_settings);
 
                     // Write header at the start of buffer
                     memcpy(tracker->p_shared_data->buffer, &header, sizeof(OverlayIPCHeader));

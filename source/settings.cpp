@@ -617,6 +617,9 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
         a->compact_pop_icon_size != b->compact_pop_icon_size ||
         a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
+        a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
+        a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
+        a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
@@ -812,6 +815,12 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
         a->compact_pop_icon_size != b->compact_pop_icon_size ||
         a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
+        a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
+        a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
+        a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
+        // Now read by the Compact overlay for contributor faces, so a change must restart the overlay.
+        a->coop_show_contributor_faces != b->coop_show_contributor_faces ||
+        a->coop_stat_merge != b->coop_stat_merge ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
         a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
@@ -4113,6 +4122,62 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Default: %.0f", temp_settings.compact_pop_icon_size,
                                  DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE);
                         ImGui::SetTooltip("%s", compact_stack_shared_tooltip_buffer);
+                    }
+
+                    ImGui::Spacing();
+                    ImGui::Text("Co-op Player Face");
+
+                    // Pinned face shown at the panel's bottom-right in a specific-player/ghost view. 0 hides.
+                    if (ImGui::DragFloat("Panel Face Size", &temp_settings.compact_coop_panel_face_size, 0.5f,
+                                         COMPACT_COOP_PANEL_FACE_SIZE_MIN, COMPACT_COOP_PANEL_FACE_SIZE_MAX, "%.0f")) {
+                        if (temp_settings.compact_coop_panel_face_size < COMPACT_COOP_PANEL_FACE_SIZE_MIN)
+                            temp_settings.compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MIN;
+                        if (temp_settings.compact_coop_panel_face_size > COMPACT_COOP_PANEL_FACE_SIZE_MAX)
+                            temp_settings.compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_coop_face_tooltip_buffer[512];
+                        snprintf(compact_coop_face_tooltip_buffer, sizeof(compact_coop_face_tooltip_buffer),
+                                 "Co-op only: the selected player's face, pinned at the panel's bottom-right\n"
+                                 "when you view a single player (or a spectated ghost) instead of All Players.\n"
+                                 "0 hides it. In the All Players view each pop-out line shows its own\n"
+                                 "contributor face instead (needs Show Contributor Faces on, under Co-op).\n"
+                                 "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE);
+                        ImGui::SetTooltip("%s", compact_coop_face_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Panel Face Offset X", &temp_settings.compact_coop_panel_face_offset_x, 0.5f,
+                                         COMPACT_COOP_PANEL_FACE_OFFSET_MIN, COMPACT_COOP_PANEL_FACE_OFFSET_MAX,
+                                         "%.0f")) {
+                        if (temp_settings.compact_coop_panel_face_offset_x < COMPACT_COOP_PANEL_FACE_OFFSET_MIN)
+                            temp_settings.compact_coop_panel_face_offset_x = COMPACT_COOP_PANEL_FACE_OFFSET_MIN;
+                        if (temp_settings.compact_coop_panel_face_offset_x > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
+                            temp_settings.compact_coop_panel_face_offset_x = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_coop_face_x_tooltip_buffer[512];
+                        snprintf(compact_coop_face_x_tooltip_buffer, sizeof(compact_coop_face_x_tooltip_buffer),
+                                 "Horizontal inset of the pinned face from the panel's right edge (pixels).\n"
+                                 "Higher moves it further inside; negative overhangs the edge.\n"
+                                 "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X);
+                        ImGui::SetTooltip("%s", compact_coop_face_x_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Panel Face Offset Y", &temp_settings.compact_coop_panel_face_offset_y, 0.5f,
+                                         COMPACT_COOP_PANEL_FACE_OFFSET_MIN, COMPACT_COOP_PANEL_FACE_OFFSET_MAX,
+                                         "%.0f")) {
+                        if (temp_settings.compact_coop_panel_face_offset_y < COMPACT_COOP_PANEL_FACE_OFFSET_MIN)
+                            temp_settings.compact_coop_panel_face_offset_y = COMPACT_COOP_PANEL_FACE_OFFSET_MIN;
+                        if (temp_settings.compact_coop_panel_face_offset_y > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
+                            temp_settings.compact_coop_panel_face_offset_y = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_coop_face_y_tooltip_buffer[512];
+                        snprintf(compact_coop_face_y_tooltip_buffer, sizeof(compact_coop_face_y_tooltip_buffer),
+                                 "Vertical inset of the pinned face from the panel's bottom edge (pixels).\n"
+                                 "Higher moves it further inside; negative overhangs the edge.\n"
+                                 "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y);
+                        ImGui::SetTooltip("%s", compact_coop_face_y_tooltip_buffer);
                     }
                 }
 
