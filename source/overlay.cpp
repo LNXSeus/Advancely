@@ -2115,6 +2115,15 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         AccountType pf_acc = o->coop_selected_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
         float pf_x = panel_x + panel_w - pf_size - settings->compact_coop_panel_face_offset_x;
         float pf_y = (panel_y + panel_h) - pf_size - settings->compact_coop_panel_face_offset_y;
+        // Keep the face fully inside the overlay window regardless of the offsets: clamp its
+        // top-left so the whole face stays within [0, want] on each axis (upper bound first so
+        // the 0 lower bound wins if the face is somehow larger than the window).
+        float pf_max_x = (float) want_w - pf_size;
+        float pf_max_y = (float) want_h - pf_size;
+        if (pf_x > pf_max_x) pf_x = pf_max_x;
+        if (pf_x < 0.0f) pf_x = 0.0f;
+        if (pf_y > pf_max_y) pf_y = pf_max_y;
+        if (pf_y < 0.0f) pf_y = 0.0f;
         compact_draw_face(o, o->coop_selected_uuid, pf_acc, pf_x, pf_y, pf_size);
     }
 
