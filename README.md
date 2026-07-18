@@ -823,11 +823,16 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
   `Compact` replaces the three-row layout entirely, so the belt/page-only sections are hidden and the Compact settings
   appear instead.
 * **Compact Mode**: Customize the panel's `Panel Texture` (any `.png` or `.gif` in `resources/gui`), its 9-slice
-  `Panel Border`, `Panel Pixel Scale`, `Panel Padding`, and `Panel Alignment`. `Panel Content` picks which goal types
+  `Panel Border`, `Panel Pixel Scale`, `Panel Padding`, and `Panel Alignment`. Setting `Panel Alignment` to `Right`
+  also mirrors the pop-out stack (and the promo/showcase line beneath it), so each line reads text, then player face,
+  then icon (icon flush to the panel's right edge) with its completion marker on the text's right side. `Panel Content` picks which goal types
   and individual goals cycle on the panel and how fast (`Cycle Interval`). `Stack Content` independently picks what may
   pop out below it, whether each type pops on every increment or only on completion (`Pop On Progress`), and how the
-  stack behaves (`Max Stack Lines`, `Hold Time`, `Animation Time`, `Pop Icon Size`, `Shared Icon Size`). The label, the
-  count, and the stack each get their own font and text size. In co-op, the `Compact Overlay Player Face` controls
+  stack behaves (`Show Completion Markers`, `Max Stack Lines`, `Hold Time`, `Animation Time`, `Pop Icon Size`,
+  `Shared Icon Size`). `Show Completion Markers` toggles the `[o]`/`[a]`/`[x]` markers (not done / auto-completed /
+  checked off by hand) on manually- and auto-completable goals, on both the panel count line and the stack; turning it
+  off also stops a bare completion from popping a line, while value changes still pop when `Pop On Progress` is on. The
+  label, the count, and the stack each get their own font and text size. In co-op, the `Compact Overlay Player Face` controls
   (`Panel Face Size`, `Panel Face Offset X`, `Panel Face Offset Y`) in the `Co-op` tab size and position the pinned
   player face; see **Co-op in Compact mode** below.
 * **Text Sizes**: Set the `Top Text Size` (top info bar) and `Row Text Size` (row 2 and 3 item text) independently. A

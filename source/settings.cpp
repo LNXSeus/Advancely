@@ -612,6 +612,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
         compact_stack_different(a, b) ||
+        a->compact_show_completion_markers != b->compact_show_completion_markers ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
         a->compact_stack_hold_time != b->compact_stack_hold_time ||
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
@@ -810,6 +811,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
         compact_stack_different(a, b) ||
+        a->compact_show_completion_markers != b->compact_show_completion_markers ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
         a->compact_stack_hold_time != b->compact_stack_hold_time ||
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
@@ -4022,6 +4024,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
                                     if (progress_type_shown(i)) temp_settings.compact_stack_pop_on_progress[i] = false;
                         }
+                    }
+
+                    ImGui::Checkbox("Show Completion Markers",
+                                    &temp_settings.compact_show_completion_markers);
+                    if (ImGui::IsItemHovered()) {
+                        char compact_show_markers_tooltip_buffer[700];
+                        snprintf(compact_show_markers_tooltip_buffer, sizeof(compact_show_markers_tooltip_buffer),
+                                 "Show the [o]/[a]/[x] completion markers on manually- and auto-completable\n"
+                                 "goals (stats, custom goals, counters), both on the panel's count line and\n"
+                                 "on the pop-out stack: [o] not done, [a] auto-completed, [x] checked off by hand.\n"
+                                 "Off also stops a bare completion from popping a line.\n"
+                                 "Default: %s", DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS ? "On" : "Off");
+                        ImGui::SetTooltip("%s", compact_show_markers_tooltip_buffer);
                     }
 
                     if (ImGui::DragInt("Max Stack Lines", &temp_settings.compact_stack_max_lines, 0.1f,

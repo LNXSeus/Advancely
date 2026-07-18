@@ -754,6 +754,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_stack_item_count = 0;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
         settings->compact_stack_pop_on_progress[i] = DEFAULT_COMPACT_STACK_POP_ON_PROGRESS;
+    settings->compact_show_completion_markers = DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS;
     settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
     settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
     settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
@@ -1771,6 +1772,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *compact_show_markers = cJSON_GetObjectItem(visual_settings, "compact_show_completion_markers");
+        if (compact_show_markers && cJSON_IsBool(compact_show_markers)) {
+            settings->compact_show_completion_markers = cJSON_IsTrue(compact_show_markers);
+        } else {
+            settings->compact_show_completion_markers = DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS;
+            defaults_were_used = true;
+        }
+
         const cJSON *compact_stack_max = cJSON_GetObjectItem(visual_settings, "compact_stack_max_lines");
         if (compact_stack_max && cJSON_IsNumber(compact_stack_max)) {
             settings->compact_stack_max_lines = compact_stack_max->valueint;
@@ -2258,6 +2267,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_stack_item_count = 0;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
             settings->compact_stack_pop_on_progress[i] = DEFAULT_COMPACT_STACK_POP_ON_PROGRESS;
+        settings->compact_show_completion_markers = DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS;
         settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
         settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
         settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
@@ -3006,6 +3016,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 cJSON_AddItemToArray(compact_stack_progress_array, cJSON_CreateNumber(i));
         }
         cJSON_AddItemToObject(visuals_obj, "compact_stack_pop_on_progress", compact_stack_progress_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_show_completion_markers");
+        cJSON_AddItemToObject(visuals_obj, "compact_show_completion_markers",
+                              cJSON_CreateBool(settings->compact_show_completion_markers));
 
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_max_lines");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_max_lines",

@@ -170,6 +170,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line
 #define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the pop icon it is drawn on (compact_pop_icon_size)
 #define DEFAULT_COMPACT_STACK_POP_ON_PROGRESS true // Counting goal types pop on every increment, not just completion
+#define DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS true // Show [o]/[a]/[x] completion markers on Compact lines
 // Co-op pinned player face on the Compact panel (specific-player/ghost view). Size 0 hides it.
 #define DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE 42.0f
 #define COMPACT_COOP_PANEL_FACE_SIZE_MIN 0.0f
@@ -477,6 +478,10 @@ struct AppSettings {
     // Only meaningful for the counting types (stats, sub-stats, custom, multi-stage, counters); the
     // rest have nothing but a done flag and always pop on completion.
     bool compact_stack_pop_on_progress[COMPACT_COUNTER_TYPE_COUNT];
+    // Draw the [o]/[a]/[x] completion markers on manually- and auto-completable goals (both the panel's
+    // count line and the pop-out stack). Off also stops a bare completion from popping a line, since with
+    // no marker the line looks identical before and after; value changes still pop when Pop On Progress is on.
+    bool compact_show_completion_markers;
     int compact_stack_max_lines; // Line budget for the stack below the panel (a 2-line group uses 2).
     float compact_stack_hold_time; // Seconds a pop-out holds before it leaves the stack.
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.

@@ -1020,12 +1020,14 @@ static void compact_worst_count(char *buf, size_t buf_sz, int total, char wdigit
 // manually-checkable goals show "[x] " manual / "[a] " auto-done / "[o] " not done; auto-only goals
 // show "[a] " when done and nothing otherwise. The marker is part of the line, which is centered as a
 // whole: centering the count alone and hanging the marker off its left reads far worse.
-static void compact_format_count(char *buf, size_t buf_sz, const CompactEntry *e) {
+static void compact_format_count(char *buf, size_t buf_sz, const AppSettings *s, const CompactEntry *e) {
     const char *box = "";
-    if (e->checkbox)
-        box = e->manual ? "[x] " : (e->done ? "[a] " : "[o] ");
-    else if (e->auto_mark && e->done)
-        box = "[a] ";
+    if (s->compact_show_completion_markers) {
+        if (e->checkbox)
+            box = e->manual ? "[x] " : (e->done ? "[a] " : "[o] ");
+        else if (e->auto_mark && e->done)
+            box = "[a] ";
+    }
     if (e->no_target)
         snprintf(buf, buf_sz, "%s%d", box, e->completed);
     else
@@ -1036,7 +1038,8 @@ static void compact_format_count(char *buf, size_t buf_sz, const CompactEntry *e
 // Open-ended goals: the widest digit repeated for the running count's current digit length (so the
 // panel only grows if the value gains a digit). A checkbox prefix is reserved for checkbox entries;
 // "[x]"/"[o]" are the same length so a manual-toggle never resizes the panel.
-static void compact_worst_count_entry(char *buf, size_t buf_sz, const CompactEntry *e, char wdigit) {
+static void compact_worst_count_entry(char *buf, size_t buf_sz, const AppSettings *s, const CompactEntry *e,
+                                      char wdigit) {
     char body[48];
     if (e->no_target) {
         int v = e->completed < 0 ? -e->completed : e->completed;
@@ -1048,8 +1051,8 @@ static void compact_worst_count_entry(char *buf, size_t buf_sz, const CompactEnt
     } else {
         compact_worst_count(body, sizeof(body), e->total, wdigit);
     }
-    if (e->checkbox || e->auto_mark) // reserve the marker width ([x]/[a]/[o] are all the same length)
-        snprintf(buf, buf_sz, "[x] %s", body);
+    if (s->compact_show_completion_markers && (e->checkbox || e->auto_mark))
+        snprintf(buf, buf_sz, "[x] %s", body); // reserve the marker width ([x]/[a]/[o] are all the same length)
     else
         snprintf(buf, buf_sz, "%s", body);
 }
@@ -1197,11 +1200,56 @@ static bool compact_stack_allows(const AppSettings *s, OverlayCompactCounterType
 // Completion marker for a manually-checkable stack line: "[x] " checked off manually, "[a] " auto-
 // completed (a linked goal, or the target/game), "[o] " not done. All markers are 4 chars wide so the
 // box never resizes the line. Goals that can't be checked off manually don't use this (they show
-// "[a] " when done and nothing otherwise, inline at the call site).
-static const char *compact_done_box(bool manual, bool done) {
+// "[a] " when done and nothing otherwise, inline at the call site). Returns "" when the user has hidden
+// the completion markers.
+static const char *compact_done_box(const AppSettings *s, bool manual, bool done) {
+    if (!s->compact_show_completion_markers) return "";
     if (manual) return "[x] ";
     if (done) return "[a] ";
     return "[o] ";
+}
+
+// The "[a] " auto-only marker for goals that can't be checked off manually (targeted custom goals,
+// counters): shown when done, hidden otherwise, and gone entirely when markers are turned off.
+static const char *compact_auto_box(const AppSettings *s, bool done) {
+    return (s->compact_show_completion_markers && done) ? "[a] " : "";
+}
+
+// Goal types whose Compact line carries an [o]/[a]/[x] completion marker (manually checkable or auto-
+// completable). Advancements, recipes, unlocks, criteria and multi-stage stage changes have no marker.
+static bool compact_type_has_marker(OverlayCompactCounterType k) {
+    return k == COMPACT_COUNTER_STATS || k == COMPACT_COUNTER_SUB_STATS ||
+           k == COMPACT_COUNTER_CUSTOM || k == COMPACT_COUNTER_COUNTERS;
+}
+
+// The done flag a marker-bearing goal contributes to its pop test. With the markers hidden a bare
+// completion no longer changes the line's look, so it must not pop on its own: the done bit is dropped
+// and only a real value change (via compact_pop_progress) can still pop the line. Types without a
+// marker keep their done flag and always pop on completion.
+static bool compact_pop_done(const AppSettings *s, OverlayCompactCounterType kind, bool done) {
+    if (!s->compact_show_completion_markers && compact_type_has_marker(kind)) return false;
+    return done;
+}
+
+// Assembles a stack line's text with its completion marker on the side that keeps it on the text's
+// outer edge once the whole line is mirrored for a right-aligned panel: prefixed for a left-aligned
+// stack ("[x] Name (1/2)"), suffixed for a right-aligned one ("Name (1/2) [x]"). `box` is the "[x] "
+// form (trailing space) or "" when there is no marker.
+static void compact_marked_line(char *buf, size_t buf_sz, const char *box, bool right_align,
+                                const char *body) {
+    if (!box || !box[0]) {
+        snprintf(buf, buf_sz, "%s", body);
+        return;
+    }
+    if (right_align) {
+        char b[8];
+        snprintf(b, sizeof(b), "%s", box);
+        size_t n = strlen(b);
+        while (n > 0 && b[n - 1] == ' ') b[--n] = '\0'; // drop the prefix's trailing space
+        snprintf(buf, buf_sz, "%s %s", body, b);
+    } else {
+        snprintf(buf, buf_sz, "%s%s", box, body);
+    }
 }
 
 // Draws one square icon of a stack line at full opacity (never alpha-blended - OBS chroma keying can't
@@ -1257,16 +1305,20 @@ static unsigned long long compact_stack_signature(const TemplateData *td) {
 // Diffs the template against the previous snapshot and updates the pop-out stack (seed on load /
 // template change, enqueue or coalesce on any increase, expire on hold, cut on overflow), then lays
 // out and draws the stack below the panel. Called every frame from overlay_render_compact once the
-// panel geometry is known. `stack_x` is the panel's left edge (the stack always left-aligns there).
+// panel geometry is known. `stack_x` is the panel's left edge and `panel_w` its width; the stack
+// left-aligns at stack_x, or (for a right-aligned panel) mirrors to right-align at stack_x + panel_w.
 static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings *settings,
-                                 float stack_x, float panel_bottom, float stack_top, int window_bottom,
-                                 SDL_Color text_color) {
+                                 float stack_x, float panel_w, float panel_bottom, float stack_top,
+                                 int window_bottom, SDL_Color text_color) {
     CompactStackEngine &eng = s_compact_stack;
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
     TTF_Font *stack_font = o->compact_stack_font ? o->compact_stack_font : o->font;
     // Co-op All-Players view: each pop-out line carries the face of whoever the main tracker credits.
     // When on, a face-sized slot is reserved right of every line's icon so text stays left-aligned.
     bool faces_on = overlay_coop_stack_faces_on(o, settings);
+    // A right-aligned panel mirrors the whole stack: text, then face, then icon (icon flush to the
+    // panel's right edge), with each line's completion marker moved to the text's right side.
+    bool right_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
 
     // Reseed (and clear) when the template changes or on the first frame, so nothing pops on load.
     unsigned long long sig = compact_stack_signature(td);
@@ -1370,9 +1422,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 int prog = s->criteria[0]->progress;
                 // Completion box (the stack has no done-background like the item rows): [x] manually
                 // checked off, [a] auto-completed (a linked goal or the target reached), [o] not done.
-                const char *box = compact_done_box(s->is_manually_completed, s->done);
-                if (goal > 0) snprintf(itext, sizeof(itext), "%s%s (%d/%d)", box, sname, prog, goal);
-                else snprintf(itext, sizeof(itext), "%s%s (%d)", box, sname, prog);
+                const char *box = compact_done_box(settings, s->is_manually_completed, s->done);
+                char sbody[240];
+                if (goal > 0) snprintf(sbody, sizeof(sbody), "%s (%d/%d)", sname, prog, goal);
+                else snprintf(sbody, sizeof(sbody), "%s (%d)", sname, prog);
+                compact_marked_line(itext, sizeof(itext), box, right_align, sbody);
                 snprintf(key, sizeof(key), "stat|%s", s->root_name);
                 // A lone manual completer wins (tracker draws it under the checkbox); otherwise the
                 // highest contributor, only in HIGHEST merge mode, like the tracker's simple-stat face.
@@ -1384,26 +1438,30 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                         stat_face = s->criteria[0]->highest_contributor_uuid;
                 }
                 consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key,
-                         compact_pop_progress(settings, COMPACT_COUNTER_STATS, prog), s->done, false,
+                         compact_pop_progress(settings, COMPACT_COUNTER_STATS, prog),
+                         compact_pop_done(settings, COMPACT_COUNTER_STATS, s->done), false,
                          nullptr, nullptr, s->icon_path, itext, false, stat_face);
             } else {
                 // The category itself is manually checkable, so its parent line carries a box too.
-                const char *catbox = compact_done_box(s->is_manually_completed, s->done);
-                snprintf(ptext, sizeof(ptext), "%s%s (%d/%d)", catbox, sname, s->completed_criteria_count,
+                const char *catbox = compact_done_box(settings, s->is_manually_completed, s->done);
+                char pbody[240];
+                snprintf(pbody, sizeof(pbody), "%s (%d/%d)", sname, s->completed_criteria_count,
                          s->criteria_count);
+                compact_marked_line(ptext, sizeof(ptext), catbox, right_align, pbody);
                 for (int j = 0; j < s->criteria_count; j++) {
                     TrackableItem *sub = s->criteria[j];
                     if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
                     // [x] manually checked off, [a] auto-completed (linked goal), [o] not done. A
                     // sub-stat counts up, so it shows its value and pops on every increment (goal > 0
                     // shows value / target, an open-ended one just the value).
-                    const char *subbox = compact_done_box(sub->is_manually_completed, sub->done);
+                    const char *subbox = compact_done_box(settings, sub->is_manually_completed, sub->done);
                     const char *subname = compact_display_name(sub->display_name, sub->root_name);
+                    char subbody[240];
                     if (sub->goal > 0)
-                        snprintf(itext, sizeof(itext), "%s%s (%d/%d)", subbox, subname, sub->progress,
-                                 sub->goal);
+                        snprintf(subbody, sizeof(subbody), "%s (%d/%d)", subname, sub->progress, sub->goal);
                     else
-                        snprintf(itext, sizeof(itext), "%s%s (%d)", subbox, subname, sub->progress);
+                        snprintf(subbody, sizeof(subbody), "%s (%d)", subname, sub->progress);
+                    compact_marked_line(itext, sizeof(itext), subbox, right_align, subbody);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
                     // Lone manual completer, else the highest contributor (HIGHEST merge only), matching
                     // the tracker's sub-stat manual-checkbox face and right-of-icon contributor face.
@@ -1416,8 +1474,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     }
                     consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
                              compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, sub->progress),
-                             sub->done, true, s->icon_path, ptext, sub->icon_path, itext,
-                             sub->is_shared, sub_face);
+                             compact_pop_done(settings, COMPACT_COUNTER_SUB_STATS, sub->done), true,
+                             s->icon_path, ptext, sub->icon_path, itext, sub->is_shared, sub_face);
                 }
             }
         }
@@ -1438,12 +1496,16 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // Targeted custom goals are counter-driven, not manually checkable; the count usually
                 // shows completion, but a linked goal can complete one early (count < goal), so mark
                 // [a] (auto) when done, nothing otherwise.
-                const char *box = c->done ? "[a] " : "";
-                snprintf(itext, sizeof(itext), "%s%s (%d/%d)", box, cname, c->progress, c->goal);
+                const char *box = compact_auto_box(settings, c->done);
+                char cbody[240];
+                snprintf(cbody, sizeof(cbody), "%s (%d/%d)", cname, c->progress, c->goal);
+                compact_marked_line(itext, sizeof(itext), box, right_align, cbody);
             } else {
                 // Open-ended custom goals show the box: [x] manual, [a] auto (linked goal), [o] not done.
-                const char *box = compact_done_box(c->is_manually_completed, c->done);
-                snprintf(itext, sizeof(itext), "%s%s (%d)", box, cname, c->progress);
+                const char *box = compact_done_box(settings, c->is_manually_completed, c->done);
+                char cbody[240];
+                snprintf(cbody, sizeof(cbody), "%s (%d)", cname, c->progress);
+                compact_marked_line(itext, sizeof(itext), box, right_align, cbody);
             }
             snprintf(key, sizeof(key), "cus|%s", c->root_name);
             // Lone manual completer, else the lone counter-value contributor, matching the tracker.
@@ -1453,8 +1515,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 else if (c->custom_contributor_uuid[0]) cus_face = c->custom_contributor_uuid;
             }
             consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key,
-                     compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, c->progress), c->done,
-                     false, nullptr, nullptr, c->icon_path, itext, false, cus_face);
+                     compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, c->progress),
+                     compact_pop_done(settings, COMPACT_COUNTER_CUSTOM, c->done), false,
+                     nullptr, nullptr, c->icon_path, itext, false, cus_face);
         }
         for (int i = 0; i < td->multi_stage_goal_count; i++) {
             MultiStageGoal *g = td->multi_stage_goals[i];
@@ -1496,14 +1559,17 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             CounterGoal *c = td->counter_goals[i];
             if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
             // Counters aren't manually checkable; mark [a] (auto) when done, nothing otherwise.
-            const char *cbox = c->done ? "[a] " : "";
-            snprintf(itext, sizeof(itext), "%s%s (%d/%d)", cbox,
+            const char *cbox = compact_auto_box(settings, c->done);
+            char cntbody[240];
+            snprintf(cntbody, sizeof(cntbody), "%s (%d/%d)",
                      compact_display_name(c->display_name, c->root_name), c->completed_count, c->linked_goal_count);
+            compact_marked_line(itext, sizeof(itext), cbox, right_align, cntbody);
             snprintf(key, sizeof(key), "cnt|%s", c->root_name);
             // Counters aggregate linked goals with no single contributor, so no face (as on the tracker).
             consider(COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name, key,
                      compact_pop_progress(settings, COMPACT_COUNTER_COUNTERS, c->completed_count),
-                     c->done, false, nullptr, nullptr, c->icon_path, itext, false, nullptr);
+                     compact_pop_done(settings, COMPACT_COUNTER_COUNTERS, c->done), false,
+                     nullptr, nullptr, c->icon_path, itext, false, nullptr);
         }
     }
     eng.seeded = true; // baseline recorded; subsequent frames pop on increases
@@ -1571,22 +1637,31 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     // Reserve a face-sized slot right of the icon on every line while co-op faces are active, so the
     // text left edge stays aligned whether or not a given line credits a single player.
     float face_slot = faces_on ? (icon_size + COMPACT_POP_FACE_GAP) : 0.0f;
+    // Left-aligned: icon at stack_x, then the face slot, then the text. Right-aligned mirrors the row
+    // about the panel's right edge (stack_x + panel_w): the icon sits flush to that edge, the face to
+    // its left, and the text is right-aligned to the face slot's left.
+    float stack_right = stack_x + panel_w;
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
                          const std::string &shared_icon, const std::string &face_uuid) {
-        compact_draw_icon(o, icon.c_str(), stack_x, ly, icon_size);
+        float icon_x = right_align ? (stack_right - icon_size) : stack_x;
+        float face_x = right_align ? (stack_right - icon_size - face_slot)
+                                   : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
+        compact_draw_icon(o, icon.c_str(), icon_x, ly, icon_size);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
-            compact_draw_icon(o, shared_icon.c_str(), stack_x, ly, settings->compact_stack_shared_icon_size);
+            compact_draw_icon(o, shared_icon.c_str(), icon_x, ly, settings->compact_stack_shared_icon_size);
         if (faces_on && !face_uuid.empty()) {
             AccountType acc = overlay_coop_account_type(o, face_uuid.c_str());
-            compact_draw_face(o, face_uuid.c_str(), acc, stack_x + icon_size + COMPACT_POP_FACE_GAP, ly, icon_size);
+            compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly, icon_size);
         }
         if (!text.empty()) {
             SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
             if (tt) {
                 float tw = 0.0f, th = 0.0f;
                 SDL_GetTextureSize(tt, &tw, &th);
-                SDL_FRect d = {snap_px(stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP),
-                               snap_px(ly + (icon_size - th) / 2.0f), tw, th};
+                float text_x = right_align
+                                   ? (stack_right - icon_size - face_slot - COMPACT_POP_TEXT_GAP - tw)
+                                   : (stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP);
+                SDL_FRect d = {snap_px(text_x), snap_px(ly + (icon_size - th) / 2.0f), tw, th};
                 SDL_RenderTexture(o->renderer, tt, nullptr, &d);
             }
         }
@@ -1840,7 +1915,8 @@ static void compact_draw_band_text(Overlay *o, SDL_Texture *tex, float tx, float
 // Draws the promo line, plus the supporter showcase below it once the run is complete. Called every
 // frame from overlay_render_compact after the goal stack; the promo only shows when the stack is quiet.
 static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSettings *settings,
-                                      float stack_x, float stack_top, int window_w, SDL_Color text_color) {
+                                      float stack_x, float panel_w, float stack_top, int window_w,
+                                      SDL_Color text_color) {
     CompactPromoState &p = s_compact_promo;
     TTF_Font *font = o->compact_stack_font ? o->compact_stack_font : o->font;
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
@@ -1896,15 +1972,26 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     // has no goal groups at all - compact_render_stack clears them - so the showcase always shows.)
     if (!s_compact_stack.groups.empty()) return;
 
+    // A right-aligned panel mirrors the promo/showcase like the goal stack: the icon sits flush to the
+    // panel's right edge and the text band runs to its left, out to the window's far padding.
+    bool right_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
     float pad = settings->compact_panel_padding;
-    float band_x = snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP); // text band, right of the icons
-    float band_w = (float) window_w - pad - band_x;
+    float stack_right = stack_x + panel_w;
+    float icon_x = right_align ? snap_px(stack_right - icon_size) : stack_x;
+    float band_x, band_w;
+    if (right_align) {
+        band_x = snap_px(pad);
+        band_w = snap_px(stack_right - icon_size - COMPACT_POP_TEXT_GAP) - band_x; // band left of the icons
+    } else {
+        band_x = snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP); // text band, right of the icons
+        band_w = (float) window_w - pad - band_x;
+    }
     if (band_w <= 0.0f) return;
 
     // --- The promo row ---
     char logo_path[MAX_PATH_LENGTH];
     snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_application_dir(), COMPACT_PROMO_ICON);
-    compact_draw_icon(o, logo_path, stack_x, stack_top, icon_size);
+    compact_draw_icon(o, logo_path, icon_x, stack_top, icon_size);
 
     // The rotating line is the shared one the other modes cycle through (advanced in overlay_update),
     // so every mode promotes the same thing at the same time. A completed run pins the donation line.
@@ -1941,7 +2028,10 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
                 p.pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
             }
         }
-        compact_draw_band_text(o, promo_tex, band_x + p.scroll_x, stack_top, band_x, band_w, icon_size);
+        // Left-aligned rests at the band's left and scrolls left to reveal its end; right-aligned rests
+        // flush to the band's right (against the icon) and mirrors the same bounce to reveal its start.
+        float promo_tx = right_align ? (band_x + band_w - tw - p.scroll_x) : (band_x + p.scroll_x);
+        compact_draw_band_text(o, promo_tex, promo_tx, stack_top, band_x, band_w, icon_size);
     }
 
     // --- The supporters, stacked below the promo, newest first ---
@@ -1953,12 +2043,19 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         char emote_path[MAX_PATH_LENGTH];
         snprintf(emote_path, sizeof(emote_path), "%s/icons/%s", get_application_dir(),
                  p.emotes[si] ? p.emotes[si] : "");
-        compact_draw_icon(o, emote_path, stack_x, row_y, icon_size);
+        compact_draw_icon(o, emote_path, icon_x, row_y, icon_size);
         char supporter_text[128];
         snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
                  SUPPORTERS[si].amount);
         SDL_Texture *st = get_text_texture_from_cache(o, font, supporter_text, text_color);
-        compact_draw_band_text(o, st, band_x, row_y, band_x, band_w, icon_size);
+        // Right-aligned hugs the band's right edge (against the icon); left-aligned starts at its left.
+        float stx = band_x;
+        if (right_align && st) {
+            float stw = 0.0f;
+            SDL_GetTextureSize(st, &stw, nullptr);
+            stx = band_x + band_w - stw;
+        }
+        compact_draw_band_text(o, st, stx, row_y, band_x, band_w, icon_size);
     }
 }
 
@@ -2008,7 +2105,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         CompactEntry *cur = &entries[cur_idx];
 
         snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
-        compact_format_count(count_buf, sizeof(count_buf), cur);
+        compact_format_count(count_buf, sizeof(count_buf), settings, cur);
 
         // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
         // possible count each can display (widest digit repeated over the total, never the live count).
@@ -2021,7 +2118,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
             int lwm = 0;
             TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
             char wc[64];
-            compact_worst_count_entry(wc, sizeof(wc), &entries[i], wdig);
+            compact_worst_count_entry(wc, sizeof(wc), settings, &entries[i], wdig);
             int cwm = 0;
             TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
             float w = fmaxf((float) lwm, (float) cwm);
@@ -2132,8 +2229,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // panel alignment setting.
     float panel_bottom = panel_y + panel_h;
     float stack_top = snap_px(panel_bottom + pad);
-    compact_render_stack(o, t, settings, panel_x, panel_bottom, stack_top, want_h, text_color);
-    compact_render_promo_line(o, t, settings, panel_x, stack_top, want_w, text_color);
+    compact_render_stack(o, t, settings, panel_x, panel_w, panel_bottom, stack_top, want_h, text_color);
+    compact_render_promo_line(o, t, settings, panel_x, panel_w, stack_top, want_w, text_color);
 }
 
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.
