@@ -1855,6 +1855,11 @@ struct CompactPromoState {
     float pause_left = COMPACT_PROMO_BOUNCE_PAUSE;
     char shown_text[256] = {0}; // the line the bounce state belongs to (a new line restarts it)
     bool run_was_complete = false;
+    // Entrance slide: the promo (and the showcase under it) emerge from under the panel like a goal
+    // pop-out every time the stack drains. appear_y is the animated top of the promo row; appear_placed
+    // is cleared whenever a goal takes the slot back, so the slide replays on the next drain.
+    float appear_y = 0.0f;
+    bool appear_placed = false;
     // Completed-run showcase. Each supporter's emote is drawn once, when the run completes, so a
     // supporter always reappears with the same one - like the showcase in the other two modes.
     const char *emotes[NUM_SUPPORTERS > 0 ? NUM_SUPPORTERS : 1] = {nullptr};
@@ -1896,15 +1901,18 @@ static void compact_promo_shuffle_order(CompactPromoState &p) {
 
 // Draws one line of showcase text, clipped to the band right of the icons so a long line is cut at the
 // window edge instead of widening it. `tx` may sit outside the band: an overlong promo line scrolls.
+// `top_limit` is the highest y the text may show at (the panel's bottom), so a row still sliding in
+// from under the panel stays hidden until it clears that edge - matching the goal stack's reveal.
 static void compact_draw_band_text(Overlay *o, SDL_Texture *tex, float tx, float row_y, float band_x,
-                                   float band_w, float row_h) {
+                                   float band_w, float row_h, float top_limit) {
     if (!tex) return;
     float tw = 0.0f, th = 0.0f;
     SDL_GetTextureSize(tex, &tw, &th);
     float ty = snap_px(row_y + (row_h - th) / 2.0f);
-    // The band covers the icon's row and the text, whichever is taller.
-    float clip_top = fminf(ty, row_y);
+    // The band covers the icon's row and the text, whichever is taller, but never rises above the panel.
+    float clip_top = fmaxf(fminf(ty, row_y), top_limit);
     float clip_bottom = fmaxf(row_y + row_h, ty + th);
+    if (clip_bottom <= clip_top) return; // still entirely tucked under the panel: nothing shows yet
     SDL_Rect clip = {(int) band_x, (int) clip_top, (int) snap_px(band_w), (int) snap_px(clip_bottom - clip_top)};
     SDL_SetRenderClipRect(o->renderer, &clip);
     SDL_FRect d = {snap_px(tx), ty, tw, th};
@@ -1915,8 +1923,8 @@ static void compact_draw_band_text(Overlay *o, SDL_Texture *tex, float tx, float
 // Draws the promo line, plus the supporter showcase below it once the run is complete. Called every
 // frame from overlay_render_compact after the goal stack; the promo only shows when the stack is quiet.
 static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSettings *settings,
-                                      float stack_x, float panel_w, float stack_top, int window_w,
-                                      SDL_Color text_color) {
+                                      float stack_x, float panel_w, float panel_bottom, float stack_top,
+                                      int window_w, SDL_Color text_color) {
     CompactPromoState &p = s_compact_promo;
     TTF_Font *font = o->compact_stack_font ? o->compact_stack_font : o->font;
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
@@ -1968,9 +1976,14 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         while ((int) p.pops.size() > supporter_rows) p.pops.pop_back(); // overflow: cut the oldest
     }
 
-    // A popping goal owns the promo's slot; the promo waits for the stack to drain. (A completed run
-    // has no goal groups at all - compact_render_stack clears them - so the showcase always shows.)
-    if (!s_compact_stack.groups.empty()) return;
+    // A popping goal owns the promo's slot; the promo waits for the stack to drain, then slides in.
+    // While a goal is up the promo hides at once and its entrance re-arms, so it slides in fresh the
+    // next time the stack drains. (A completed run has no goal groups - compact_render_stack clears
+    // them - so the showcase always shows.)
+    if (!s_compact_stack.groups.empty()) {
+        p.appear_placed = false;
+        return;
+    }
 
     // A right-aligned panel mirrors the promo/showcase like the goal stack: the icon sits flush to the
     // panel's right edge and the text band runs to its left, out to the window's far padding.
@@ -1988,10 +2001,30 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     }
     if (band_w <= 0.0f) return;
 
-    // --- The promo row ---
+    // Entrance slide: emerge from under the panel bottom and settle into the first stack slot at
+    // stack_top, exactly like a goal pop-out. `promo_y` drives the promo row; `slide` shifts the
+    // supporters below it so the whole showcase moves as one. A clip below the panel hides whatever is
+    // still tucked under it (positional reveal, no alpha, so OBS chroma keying stays clean).
+    float rise = settings->compact_stack_rise_time;
+    if (!p.appear_placed) {
+        p.appear_y = panel_bottom - line_h; // start hidden under the panel
+        p.appear_placed = true;
+    }
+    float rise_f = (rise <= 0.0f) ? 1.0f : fminf(1.0f, dt / rise);
+    p.appear_y += (stack_top - p.appear_y) * rise_f;
+    float promo_y = snap_px(p.appear_y);
+    float slide = promo_y - stack_top; // <= 0 while sliding in, 0 once settled
+    int reveal_w = 0, reveal_h = 0;
+    SDL_GetWindowSizeInPixels(o->window, &reveal_w, &reveal_h);
+    SDL_Rect reveal_clip = {0, (int) snap_px(panel_bottom), reveal_w, reveal_h - (int) snap_px(panel_bottom)};
+    if (reveal_clip.h < 0) reveal_clip.h = 0;
+
+    // --- The promo row (slides in with promo_y, clipped to below the panel) ---
     char logo_path[MAX_PATH_LENGTH];
     snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_application_dir(), COMPACT_PROMO_ICON);
-    compact_draw_icon(o, logo_path, icon_x, stack_top, icon_size);
+    SDL_SetRenderClipRect(o->renderer, &reveal_clip);
+    compact_draw_icon(o, logo_path, icon_x, promo_y, icon_size);
+    SDL_SetRenderClipRect(o->renderer, nullptr);
 
     // The rotating line is the shared one the other modes cycle through (advanced in overlay_update),
     // so every mode promotes the same thing at the same time. A completed run pins the donation line.
@@ -2031,7 +2064,7 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         // Left-aligned rests at the band's left and scrolls left to reveal its end; right-aligned rests
         // flush to the band's right (against the icon) and mirrors the same bounce to reveal its start.
         float promo_tx = right_align ? (band_x + band_w - tw - p.scroll_x) : (band_x + p.scroll_x);
-        compact_draw_band_text(o, promo_tex, promo_tx, stack_top, band_x, band_w, icon_size);
+        compact_draw_band_text(o, promo_tex, promo_tx, promo_y, band_x, band_w, icon_size, panel_bottom);
     }
 
     // --- The supporters, stacked below the promo, newest first ---
@@ -2039,11 +2072,15 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     for (size_t i = 0; i < p.pops.size(); i++) {
         int si = p.pops[i].index;
         if (si < 0 || si >= NUM_SUPPORTERS) continue;
-        float row_y = snap_px(stack_top + (float) (i + 1) * line_h);
+        // Ride the promo's entrance slide so the whole showcase moves in as one, and clip to below the
+        // panel like the promo row.
+        float row_y = snap_px(stack_top + (float) (i + 1) * line_h + slide);
         char emote_path[MAX_PATH_LENGTH];
         snprintf(emote_path, sizeof(emote_path), "%s/icons/%s", get_application_dir(),
                  p.emotes[si] ? p.emotes[si] : "");
+        SDL_SetRenderClipRect(o->renderer, &reveal_clip);
         compact_draw_icon(o, emote_path, icon_x, row_y, icon_size);
+        SDL_SetRenderClipRect(o->renderer, nullptr);
         char supporter_text[128];
         snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
                  SUPPORTERS[si].amount);
@@ -2055,7 +2092,7 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
             SDL_GetTextureSize(st, &stw, nullptr);
             stx = band_x + band_w - stw;
         }
-        compact_draw_band_text(o, st, stx, row_y, band_x, band_w, icon_size);
+        compact_draw_band_text(o, st, stx, row_y, band_x, band_w, icon_size, panel_bottom);
     }
 }
 
@@ -2230,7 +2267,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float panel_bottom = panel_y + panel_h;
     float stack_top = snap_px(panel_bottom + pad);
     compact_render_stack(o, t, settings, panel_x, panel_w, panel_bottom, stack_top, want_h, text_color);
-    compact_render_promo_line(o, t, settings, panel_x, panel_w, stack_top, want_w, text_color);
+    compact_render_promo_line(o, t, settings, panel_x, panel_w, panel_bottom, stack_top, want_w, text_color);
 }
 
 // Compute the vertical layout (row anchors + window height) from the loaded fonts.
