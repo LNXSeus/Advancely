@@ -1357,7 +1357,12 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             CompactPopGroup &g = eng.groups[gi];
             g.two_line = two_line;
             g.parent_icon = parent_icon ? parent_icon : "";
-            g.parent_text = parent_text ? parent_text : "";
+            // parent_text is the parent's aggregate count ("(2/39)") on a two-line group, which counts
+            // OTHER goals (sibling criteria / sub-stats), not this line. It is frozen at pop time so an
+            // already-shown group keeps the count it popped with: two criteria of the same advancement
+            // pop as separate groups reading (1/39) then (2/39), and the earlier one is not bumped to
+            // the newer total when a sibling completes. The item line below still refreshes, so a goal
+            // that updates in place (a stat counting up without a fresh pop) keeps rising live.
             g.item_icon = item_icon ? item_icon : "";
             g.item_text = item_text ? item_text : "";
             g.item_shared = item_shared;
