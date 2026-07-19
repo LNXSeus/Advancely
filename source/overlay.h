@@ -92,6 +92,10 @@ struct Overlay {
     // Advanced by the interval timer in overlay_update or instantly by pressing SPACE.
     int page_index; // Current page number
     float page_timer; // Seconds accumulated toward the next automatic page flip
+
+    // Compact mode's row-1 icon strip pages on its own independent timer (separate from the panel cycle).
+    int compact_icon_page_index; // Current icon-strip page number
+    float compact_icon_page_timer; // Seconds accumulated toward the next automatic icon-strip flip
     int start_index_row1;
     int start_index_row2;
     int start_index_row3;

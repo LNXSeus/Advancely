@@ -726,7 +726,6 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_render_mode = DEFAULT_OVERLAY_RENDER_MODE;
     settings->overlay_page_interval = DEFAULT_OVERLAY_PAGE_INTERVAL;
     settings->overlay_page_align = DEFAULT_OVERLAY_PAGE_ALIGN;
-    settings->overlay_page_repeat = DEFAULT_OVERLAY_PAGE_REPEAT;
     strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
     settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
     settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET;
@@ -749,6 +748,10 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
     settings->compact_cycle_item_count = 0;
     settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+    settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
+    settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
+    settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
+    settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
     settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancement completions pop by default
     settings->compact_stack_item_count = 0;
@@ -783,6 +786,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Overlay Defaults
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
+    settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
     settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
     settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -1245,13 +1249,6 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
-        const cJSON *page_repeat = cJSON_GetObjectItem(general_settings, "overlay_page_repeat");
-        if (page_repeat && cJSON_IsBool(page_repeat))
-            settings->overlay_page_repeat = cJSON_IsTrue(page_repeat);
-        else {
-            settings->overlay_page_repeat = DEFAULT_OVERLAY_PAGE_REPEAT;
-            defaults_were_used = true;
-        }
 
         const cJSON *scroll_speed = cJSON_GetObjectItem(general_settings, "overlay_scroll_speed");
         if (scroll_speed && cJSON_IsNumber(scroll_speed)) // Scroll speed CAN be negative (right to left)
@@ -1718,6 +1715,39 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
         } else { settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL; defaults_were_used = true; }
 
+        // Row-1 icon strip above the panel.
+        const cJSON *compact_show_icons = cJSON_GetObjectItem(visual_settings, "compact_show_row1_icons");
+        if (compact_show_icons && cJSON_IsBool(compact_show_icons))
+            settings->compact_show_row1_icons = cJSON_IsTrue(compact_show_icons);
+        else { settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS; defaults_were_used = true; }
+
+        const cJSON *compact_icon_cycle = cJSON_GetObjectItem(visual_settings, "compact_icon_cycle_interval");
+        if (compact_icon_cycle && cJSON_IsNumber(compact_icon_cycle)) {
+            settings->compact_icon_cycle_interval = (float) compact_icon_cycle->valuedouble;
+            if (settings->compact_icon_cycle_interval < COMPACT_ICON_CYCLE_INTERVAL_MIN)
+                settings->compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MIN;
+            if (settings->compact_icon_cycle_interval > COMPACT_ICON_CYCLE_INTERVAL_MAX)
+                settings->compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MAX;
+        } else { settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL; defaults_were_used = true; }
+
+        const cJSON *compact_icon_gap = cJSON_GetObjectItem(visual_settings, "compact_icon_row_gap");
+        if (compact_icon_gap && cJSON_IsNumber(compact_icon_gap)) {
+            settings->compact_icon_row_gap = (float) compact_icon_gap->valuedouble;
+            if (settings->compact_icon_row_gap < COMPACT_ICON_ROW_GAP_MIN)
+                settings->compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MIN;
+            if (settings->compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
+                settings->compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
+        } else { settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP; defaults_were_used = true; }
+
+        // Shared-parent overlay size on a strip icon. The upper cap against overlay_row1_icon_size is
+        // applied later, once that value has been read (it loads after this compact block).
+        const cJSON *compact_icon_shared = cJSON_GetObjectItem(visual_settings, "compact_icon_shared_size");
+        if (compact_icon_shared && cJSON_IsNumber(compact_icon_shared)) {
+            settings->compact_icon_shared_size = (float) compact_icon_shared->valuedouble;
+            if (settings->compact_icon_shared_size < COMPACT_ICON_SHARED_SIZE_MIN)
+                settings->compact_icon_shared_size = COMPACT_ICON_SHARED_SIZE_MIN;
+        } else { settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE; defaults_were_used = true; }
+
         // Pop-out stack selection (independent of the panel cycle) + its motion/layout settings.
         const cJSON *compact_stack_types = cJSON_GetObjectItem(visual_settings, "compact_stack_types");
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
@@ -1873,6 +1903,24 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
             defaults_were_used = true;
         }
+
+        const cJSON *row1_icon_size_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_icon_size");
+        if (row1_icon_size_json && cJSON_IsNumber(row1_icon_size_json)) {
+            settings->overlay_row1_icon_size = (float) row1_icon_size_json->valuedouble;
+            if (settings->overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
+                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
+            if (settings->overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
+                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+        } else {
+            settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+            defaults_were_used = true;
+        }
+
+        // Now that the strip icon size is known, cap the strip's shared-parent overlay to it (it is
+        // drawn ON that icon). Done here, after the if/else, so it also covers the default-fallback path
+        // and a hand-edited config can't trip the Unsaved-Changes flag when the settings window opens.
+        if (settings->compact_icon_shared_size > settings->overlay_row1_icon_size)
+            settings->compact_icon_shared_size = settings->overlay_row1_icon_size;
 
         const cJSON *row1_shared_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_shared_icon_size");
         if (row1_shared_json && cJSON_IsNumber(row1_shared_json)) {
@@ -2187,6 +2235,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
+        settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
         settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
         settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -2262,6 +2311,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_cycle_item_count = 0;
         settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+        settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
+        settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
+        settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
+        settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
         settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_stack_item_count = 0;
@@ -2743,8 +2796,6 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateNumber(settings->overlay_page_interval));
         cJSON_DeleteItemFromObject(general_obj, "overlay_page_align");
         cJSON_AddItemToObject(general_obj, "overlay_page_align", cJSON_CreateNumber(settings->overlay_page_align));
-        cJSON_DeleteItemFromObject(general_obj, "overlay_page_repeat");
-        cJSON_AddItemToObject(general_obj, "overlay_page_repeat", cJSON_CreateBool(settings->overlay_page_repeat));
         cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
         cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
         cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
@@ -2990,6 +3041,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_interval",
                               cJSON_CreateNumber(settings->compact_cycle_interval));
 
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_show_row1_icons");
+        cJSON_AddItemToObject(visuals_obj, "compact_show_row1_icons",
+                              cJSON_CreateBool(settings->compact_show_row1_icons));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_cycle_interval");
+        cJSON_AddItemToObject(visuals_obj, "compact_icon_cycle_interval",
+                              cJSON_CreateNumber(settings->compact_icon_cycle_interval));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_row_gap");
+        cJSON_AddItemToObject(visuals_obj, "compact_icon_row_gap",
+                              cJSON_CreateNumber(settings->compact_icon_row_gap));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_shared_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_icon_shared_size",
+                              cJSON_CreateNumber(settings->compact_icon_shared_size));
+
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_types");
         cJSON *compact_stack_types_array = cJSON_CreateArray();
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
@@ -3048,6 +3112,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_icon_size",
+                              cJSON_CreateNumber(settings->overlay_row1_icon_size));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size",
                               cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));

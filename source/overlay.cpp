@@ -552,7 +552,12 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
 // the interval timer or by SPACE); the page flips whenever it changes. A cleared
 // item keeps its slot (cropping over `duration` seconds) before turning into a gap;
 // duration <= 0 clears instantly.
-static void page_update(PageView &p, int page_index, OverlayProgressTextAlignment align, bool repeat,
+//
+// Repeat is automatic: while more items remain than fit one page, pages repeat so each
+// is full (no empty space); once every remaining item fits a single page they stop
+// repeating and simply clear away as they complete (aligned per `align`). This removes
+// the old manual "repeat to fill" toggle.
+static void page_update(PageView &p, int page_index, OverlayProgressTextAlignment align,
                         int window_w, float iw, float cell,
                         int F, const std::vector<char> &removed, float duration,
                         unsigned long long signature, std::vector<BeltTile> &out) {
@@ -565,6 +570,12 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
 
     int per_page = page_capacity(window_w, iw, cell);
     Uint32 now = SDL_GetTicks();
+
+    // Full pages while there is more than one page of items left; once they all fit one
+    // page, stop repeating so the last page is partial and its items clear in place.
+    int active_count = 0;
+    for (int i = 0; i < F; i++) if (!removed[i]) active_count++;
+    bool repeat = active_count > per_page;
 
     // Reset on first use, template change or item-count change.
     if (!p.init || p.signature != signature || (int) p.clear_elapsed.size() != F) {
@@ -2101,6 +2112,84 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     }
 }
 
+// One row-1 entry: the trackable (a criterion or sub-stat) paired with its parent category (used for
+// the shared-parent icon overlay). The same list feeds the belt/page Row 1 and the Compact icon strip.
+typedef std::pair<TrackableItem *, TrackableCategory *> Row1Item;
+
+// Gather the row-1 items (advancement criteria + multi-stat sub-stats) in template order, then build
+// the parallel removal mask (a done or hidden item becomes a gap) and an FNV signature over the item
+// root names so a consumer can reset only when the template itself changes. Hidden items follow the
+// same "Show Hidden Goals" override every other overlay row uses (goal_is_hidden).
+static void build_row1_items(const Tracker *t, const AppSettings *settings,
+                             std::vector<Row1Item> &items, std::vector<char> &removed,
+                             unsigned long long &signature) {
+    items.clear();
+    if (!t || !t->template_data) { removed.clear(); signature = 1469598103934665603ULL; return; }
+
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *cat = t->template_data->advancements[i];
+        for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
+    }
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *cat = t->template_data->stats[i];
+        if (cat->is_single_stat_category) continue;
+        for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
+    }
+
+    int F = (int) items.size();
+    removed.assign((size_t) F, 0);
+    signature = 1469598103934665603ULL;
+    for (int i = 0; i < F; i++) {
+        TrackableItem *item = items[i].first;
+        TrackableCategory *parent = items[i].second;
+        removed[i] = (item->done || goal_is_hidden(parent->is_hidden, settings) ||
+                      goal_is_hidden(item->is_hidden, settings))
+                         ? 1
+                         : 0;
+        for (const char *s = item->root_name; *s; s++) signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
+    }
+}
+
+// Draws one row-1 icon (with the shared-parent overlay when applicable) into `dest`, matching the
+// belt/page Row 1 look. Used by the Compact icon strip. A missing texture draws a magenta placeholder.
+static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRect *dest,
+                                   float shared_icon_size) {
+    TrackableItem *item = it.first;
+    TrackableCategory *parent = it.second;
+
+    SDL_Texture *tex = nullptr;
+    AnimatedTexture *anim_tex = nullptr;
+    if (strstr(item->icon_path, ".gif")) {
+        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                   &o->anim_cache_capacity, item->icon_path, SDL_SCALEMODE_NEAREST);
+    } else {
+        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                     &o->texture_cache_capacity, item->icon_path, SDL_SCALEMODE_NEAREST);
+    }
+
+    if (!tex && !anim_tex) {
+        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
+        SDL_RenderFillRect(o->renderer, dest);
+    } else {
+        render_texture_with_alpha(o->renderer, tex, anim_tex, dest, 255);
+    }
+
+    if (item->is_shared && parent && shared_icon_size > 0.0f) {
+        SDL_Texture *parent_tex = nullptr;
+        AnimatedTexture *parent_anim_tex = nullptr;
+        if (strstr(parent->icon_path, ".gif")) {
+            parent_anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                              &o->anim_cache_capacity, parent->icon_path,
+                                                              SDL_SCALEMODE_NEAREST);
+        } else {
+            parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                &o->texture_cache_capacity, parent->icon_path, SDL_SCALEMODE_NEAREST);
+        }
+        SDL_FRect shared_dest = {dest->x, dest->y, shared_icon_size, shared_icon_size};
+        render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest, 255);
+    }
+}
+
 // Compact render mode: a tall/narrow counter panel (Zesskyo-style). One big "label over count"
 // block that cycles through the user-selected entries (whole-section type counts and/or individual
 // goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
@@ -2198,9 +2287,26 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
     float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
 
-    // Auto-fit the overlay window to the panel plus a pad-sized margin all around (and the reserved
-    // stack area). Only resizes when the needed size actually changes (a new template with more
-    // digits, or a settings tweak), so it stays put during a run. The panel is placed by alignment.
+    // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged
+    // to fit the panel width and flipped on their own timer. Built here so its height feeds the window
+    // size and the panel's vertical offset. Hidden while the run is complete (the panel shows the final
+    // time) and when the template has no row-1 items to show.
+    std::vector<Row1Item> icon_items;
+    std::vector<char> icon_removed;
+    unsigned long long icon_sig = 0;
+    float icon_size = settings->overlay_row1_icon_size;
+    float icon_full_w = snap_px(icon_size + settings->overlay_row1_spacing);
+    bool have_icons = false;
+    if (settings->compact_show_row1_icons && !run_complete) {
+        build_row1_items(t, settings, icon_items, icon_removed, icon_sig);
+        have_icons = !icon_items.empty();
+    }
+    // Space consumed above the panel: the icon strip plus the gap between it and the panel.
+    float icon_reserve = have_icons ? (icon_size + settings->compact_icon_row_gap) : 0.0f;
+
+    // Auto-fit the overlay window to the panel plus a pad-sized margin all around (the reserved icon
+    // strip above and stack area below). Only resizes when the needed size actually changes (a new
+    // template with more digits, or a settings tweak), so it stays put during a run. Panel by alignment.
     int want_w = (int) snap_px(panel_w + 2.0f * pad);
     // Also widen to fit the worst-case pop-out line so long stack text isn't clipped. The stack
     // left-aligns at the panel's left edge (pad for Left alignment), so it needs stack_w + 2*pad.
@@ -2210,7 +2316,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         if (stack_want_w > want_w) want_w = stack_want_w;
     }
     if (want_w < COMPACT_MIN_WINDOW_WIDTH) want_w = COMPACT_MIN_WINDOW_WIDTH;
-    int want_h = (int) snap_px(panel_h + 2.0f * pad + stack_reserve);
+    int want_h = (int) snap_px(icon_reserve + panel_h + 2.0f * pad + stack_reserve);
     int cur_w = 0, cur_h = 0;
     SDL_GetWindowSize(o->window, &cur_w, &cur_h);
     if (cur_w != want_w || cur_h != want_h) SDL_SetWindowSize(o->window, want_w, want_h);
@@ -2225,7 +2331,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         panel_x = snap_px((float) want_w - panel_w - pad);
     else
         panel_x = snap_px(((float) want_w - panel_w) / 2.0f);
-    float panel_y = snap_px(pad);
+    float panel_y = snap_px(pad + icon_reserve);
 
     SDL_Texture *panel_tex = o->compact_panel ? o->compact_panel : anim_current_frame(o->compact_panel_anim);
     SDL_FRect panel_dest = {panel_x, panel_y, panel_w, panel_h};
@@ -2244,6 +2350,25 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     if (count_tex) {
         SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
+    }
+
+    // Row-1 icon strip above the panel. Uses the shared Page layout (page_update), which pages the
+    // icons across the panel width and, once they all fit one page, stops repeating and lets completed
+    // icons clear away in place. It flips on compact_icon_page_index (its own timer) and centers a full
+    // page within the panel span (drawn at panel_x + tile.x), matching the other Page-mode rows.
+    if (have_icons) {
+        static PageView page_compact_icons;
+        std::vector<BeltTile> icon_tiles;
+        int icon_F = (int) icon_items.size();
+        page_update(page_compact_icons, o->compact_icon_page_index, settings->compact_panel_align,
+                    (int) panel_w, icon_full_w, icon_size,
+                    icon_F, icon_removed, 0.0f, icon_sig, icon_tiles);
+        float icon_y = snap_px(pad);
+        for (const auto &tile: icon_tiles) {
+            if (tile.idx < 0) continue; // gap (item completed mid-page)
+            SDL_FRect dest = {snap_px(panel_x + tile.x), icon_y, icon_size, icon_size};
+            compact_draw_row1_icon(o, icon_items[tile.idx], &dest, settings->compact_icon_shared_size);
+        }
     }
 
     // Co-op specific-player/ghost view: pin the selected player's face at the panel's bottom-right,
@@ -2319,10 +2444,16 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
         float panel_h = label_lh + line_gap + count_lh - (float) count_descent + 2.0f * pad + border_y;
         float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
         float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
+        // Reserve the row-1 icon strip above the panel when it is enabled. No template is loaded yet
+        // here, so this assumes there will be icons to show; overlay_render_compact shrinks the window
+        // if the loaded template has none. Matches the reserve math there (icon size + gap below).
+        float icon_reserve = settings->compact_show_row1_icons
+                                 ? (settings->overlay_row1_icon_size + settings->compact_icon_row_gap)
+                                 : 0.0f;
         o->layout_row1_y = 0.0f;
         o->layout_row2_y = 0.0f;
         o->layout_row3_y = 0.0f;
-        o->layout_height = (int) snap_px(pad + panel_h + pad + stack_reserve);
+        o->layout_height = (int) snap_px(pad + icon_reserve + panel_h + pad + stack_reserve);
         return;
     }
 
@@ -2835,6 +2966,20 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     } else {
         o->page_timer = 0.0f;
     }
+
+    // Compact mode's row-1 icon strip flips on its own independent interval.
+    if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT && settings->compact_show_row1_icons) {
+        float icon_iv = settings->compact_icon_cycle_interval < COMPACT_ICON_CYCLE_INTERVAL_MIN
+                            ? COMPACT_ICON_CYCLE_INTERVAL_MIN
+                            : settings->compact_icon_cycle_interval;
+        o->compact_icon_page_timer += *deltaTime;
+        while (o->compact_icon_page_timer >= icon_iv) {
+            o->compact_icon_page_timer -= icon_iv;
+            o->compact_icon_page_index++;
+        }
+    } else {
+        o->compact_icon_page_timer = 0.0f;
+    }
 }
 
 void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
@@ -3001,37 +3146,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float ROW1_SHARED_ICON_SIZE = settings->overlay_row1_shared_icon_size; // Originally 30.0f
         const float item_full_width = snap_px(ROW1_ICON_SIZE + settings->overlay_row1_spacing);
 
-        // Gather items
-        std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
-        for (int i = 0; i < t->template_data->advancement_count; i++) {
-            TrackableCategory *cat = t->template_data->advancements[i];
-            for (int j = 0; j < cat->criteria_count; j++) {
-                row1_items.push_back({cat->criteria[j], cat});
-            }
-        }
-
-        for (int i = 0; i < t->template_data->stat_count; i++) {
-            TrackableCategory *cat = t->template_data->stats[i];
-            if (cat->is_single_stat_category) continue;
-            for (int j = 0; j < cat->criteria_count; j++) {
-                row1_items.push_back({cat->criteria[j], cat});
-            }
-        }
-
-        // Build the removal mask (cleared items become gaps) and a signature so
-        // the belt resets only when the template itself changes.
+        // Gather items, then build the removal mask (cleared items become gaps) and a
+        // signature so the belt resets only when the template itself changes.
+        std::vector<Row1Item> row1_items;
+        std::vector<char> removed;
+        unsigned long long signature = 0;
+        build_row1_items(t, settings, row1_items, removed, signature);
         int F = (int) row1_items.size();
-        std::vector<char> removed((size_t) F);
-        unsigned long long signature = 1469598103934665603ULL;
-        for (int i = 0; i < F; i++) {
-            TrackableItem *item = row1_items[i].first;
-            TrackableCategory *parent = row1_items[i].second;
-            removed[i] = (item->done || goal_is_hidden(parent->is_hidden, settings) ||
-                          goal_is_hidden(item->is_hidden, settings))
-                             ? 1
-                             : 0;
-            for (const char *s = item->root_name; *s; s++) signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
-        }
 
         if (F > 0 && item_full_width > 0) {
             static ScrollBelt belt_row1;
@@ -3039,7 +3160,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row1, o->page_index, settings->overlay_page_align,
-                            settings->overlay_page_repeat, window_w, item_full_width, ROW1_ICON_SIZE,
+                            window_w, item_full_width, ROW1_ICON_SIZE,
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
@@ -3486,7 +3607,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 std::vector<BeltTile> tiles;
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                     page_update(page_row2, o->page_index, settings->overlay_page_align,
-                                settings->overlay_page_repeat, window_w, item_full_width_row2, cell_width_row2,
+                                window_w, item_full_width_row2, cell_width_row2,
                                 F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                 } else if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
@@ -3982,7 +4103,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row3, o->page_index, settings->overlay_page_align,
-                            settings->overlay_page_repeat, window_w, item_full_width_row3, cell_width_row3,
+                            window_w, item_full_width_row3, cell_width_row3,
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,

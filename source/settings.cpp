@@ -594,7 +594,6 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_render_mode != b->overlay_render_mode ||
         a->overlay_page_interval != b->overlay_page_interval ||
         a->overlay_page_align != b->overlay_page_align ||
-        a->overlay_page_repeat != b->overlay_page_repeat ||
         strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
         a->compact_panel_inset_left != b->compact_panel_inset_left ||
         a->compact_panel_inset_right != b->compact_panel_inset_right ||
@@ -611,6 +610,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_stack_font_size != b->compact_stack_font_size ||
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
+        a->compact_show_row1_icons != b->compact_show_row1_icons ||
+        a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
+        a->compact_icon_row_gap != b->compact_icon_row_gap ||
+        a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
@@ -624,6 +627,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
+        a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -793,7 +797,6 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->overlay_render_mode != b->overlay_render_mode ||
         a->overlay_page_interval != b->overlay_page_interval ||
         a->overlay_page_align != b->overlay_page_align ||
-        a->overlay_page_repeat != b->overlay_page_repeat ||
         strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
         a->compact_panel_inset_left != b->compact_panel_inset_left ||
         a->compact_panel_inset_right != b->compact_panel_inset_right ||
@@ -810,6 +813,10 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_stack_font_size != b->compact_stack_font_size ||
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
+        a->compact_show_row1_icons != b->compact_show_row1_icons ||
+        a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
+        a->compact_icon_row_gap != b->compact_icon_row_gap ||
+        a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
@@ -841,6 +848,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
 
         // Row spacing / sizing.
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
+        a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -3710,39 +3718,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", page_interval_tooltip_buffer);
                     }
 
-                    ImGui::Checkbox("Repeat To Fill Page", &temp_settings.overlay_page_repeat);
-                    if (ImGui::IsItemHovered()) {
-                        char page_repeat_tooltip_buffer[512];
-                        snprintf(page_repeat_tooltip_buffer, sizeof(page_repeat_tooltip_buffer),
-                                 "Repeat the remaining items so every page is completely full.\n"
-                                 "With this on there is never any empty space, so the page alignment\n"
-                                 "option below does not apply.\n"
-                                 "Default: Off");
-                        ImGui::SetTooltip("%s", page_repeat_tooltip_buffer);
-                    }
-
-                    // Alignment only matters when a page can be partially empty, which never
-                    // happens while Repeat To Fill is on, so disable (grey out) the dropdown then.
-                    ImGui::BeginDisabled(temp_settings.overlay_page_repeat);
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Page Alignment", (int *) &temp_settings.overlay_page_align, "Left\0Center\0Right\0");
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (ImGui::IsItemHovered()) {
                         char page_align_tooltip_buffer[640];
-                        if (temp_settings.overlay_page_repeat) {
-                            snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
-                                     "Unavailable while 'Repeat To Fill Page' is enabled:\n"
-                                     "a repeated page is always full, so there is nothing to align.");
-                        } else {
-                            snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
-                                     "How to align a page that is not full (fewer items than fit the width).\n"
-                                     "Left keeps the same left padding a full, centered page would have, so items\n"
-                                     "stay put as the page empties. Center centers the remaining items. Right\n"
-                                     "pushes them to where a full page's right edge would be.\n"
-                                     "Default: Left");
-                        }
+                        snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
+                                 "While more items remain than fit one page, pages repeat so each is full\n"
+                                 "(no empty space). Once every remaining item fits a single page they stop\n"
+                                 "repeating and clear as they complete; this sets how that not-full page is\n"
+                                 "aligned. Left keeps the same left padding a full, centered page would have,\n"
+                                 "so items stay put as the page empties. Center centers the remaining items.\n"
+                                 "Right pushes them to where a full page's right edge would be.\n"
+                                 "Default: Left");
                         ImGui::SetTooltip("%s", page_align_tooltip_buffer);
                     }
-                    ImGui::EndDisabled();
                 }
 
                 // Compact mode: the counter panel's 9-slice texture and geometry. Only relevant to
@@ -3751,6 +3740,100 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Separator();
                     ImGui::Spacing();
                     ImGui::Text("Compact Mode Settings");
+
+                    // Row-1 icon strip above the panel. Listed first to mirror the on-screen order
+                    // (icons, then panel, then stack). Alignment follows the panel alignment below;
+                    // horizontal spacing reuses the belt/page Row 1 spacing.
+                    ImGui::Text("Row 1 Icons");
+                    ImGui::Checkbox("Show Row 1 Icons", &temp_settings.compact_show_row1_icons);
+                    if (ImGui::IsItemHovered()) {
+                        char compact_show_icons_tooltip_buffer[512];
+                        snprintf(compact_show_icons_tooltip_buffer, sizeof(compact_show_icons_tooltip_buffer),
+                                 "Shows the first-row icons (advancement criteria and sub-stats) in a\n"
+                                 "strip above the panel, paged to fit the panel width and flipped on\n"
+                                 "the interval below. Icons align with the panel and respect hidden\n"
+                                 "goals (including the 'Show Hidden Goals' override). Horizontal spacing\n"
+                                 "reuses the Row 1 Icon Spacing from the Belt/Page layout section.");
+                        ImGui::SetTooltip("%s", compact_show_icons_tooltip_buffer);
+                    }
+
+                    if (temp_settings.compact_show_row1_icons) {
+                        if (ImGui::DragFloat("Icon Size##CompactRow1Icons", &temp_settings.overlay_row1_icon_size,
+                                             1.0f, OVERLAY_ROW1_ICON_SIZE_MIN, OVERLAY_ROW1_ICON_SIZE_MAX, "%.0f px")) {
+                            if (temp_settings.overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
+                                temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
+                            if (temp_settings.overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
+                                temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_icon_size_tooltip_buffer[384];
+                            snprintf(compact_icon_size_tooltip_buffer, sizeof(compact_icon_size_tooltip_buffer),
+                                     "Size in on-screen pixels of each icon in the strip above the panel.\n"
+                                     "Defaults to the pop-out stack icon size so the two match.\n"
+                                     "Default: %.0f px", DEFAULT_OVERLAY_ROW1_ICON_SIZE);
+                            ImGui::SetTooltip("%s", compact_icon_size_tooltip_buffer);
+                        }
+
+                        // The shared icon is drawn on top of the strip icon, so it can never be bigger
+                        // than it: that is its upper bound, and shrinking Icon Size above drags it down too.
+                        if (temp_settings.compact_icon_shared_size > temp_settings.overlay_row1_icon_size)
+                            temp_settings.compact_icon_shared_size = temp_settings.overlay_row1_icon_size;
+                        if (ImGui::DragFloat("Shared Icon Size##CompactRow1Icons", &temp_settings.compact_icon_shared_size,
+                                             0.5f, COMPACT_ICON_SHARED_SIZE_MIN, temp_settings.overlay_row1_icon_size,
+                                             "%.0f")) {
+                            if (temp_settings.compact_icon_shared_size < COMPACT_ICON_SHARED_SIZE_MIN)
+                                temp_settings.compact_icon_shared_size = COMPACT_ICON_SHARED_SIZE_MIN;
+                            if (temp_settings.compact_icon_shared_size > temp_settings.overlay_row1_icon_size)
+                                temp_settings.compact_icon_shared_size = temp_settings.overlay_row1_icon_size;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_icon_shared_tooltip_buffer[512];
+                            snprintf(compact_icon_shared_tooltip_buffer, sizeof(compact_icon_shared_tooltip_buffer),
+                                     "Size of the small parent icon overlaid on a shared criterion in the\n"
+                                     "strip (a criterion belonging to more than one advancement). 0 hides it.\n"
+                                     "It sits on the strip icon, so Icon Size (%.0f) is its upper bound and\n"
+                                     "lowering that lowers this with it.\n"
+                                     "Default: %.0f", temp_settings.overlay_row1_icon_size,
+                                     DEFAULT_COMPACT_ICON_SHARED_SIZE);
+                            ImGui::SetTooltip("%s", compact_icon_shared_tooltip_buffer);
+                        }
+
+                        if (ImGui::DragFloat("Icon Cycle Interval", &temp_settings.compact_icon_cycle_interval, 0.1f,
+                                             COMPACT_ICON_CYCLE_INTERVAL_MIN, COMPACT_ICON_CYCLE_INTERVAL_MAX,
+                                             "%.1f s")) {
+                            if (temp_settings.compact_icon_cycle_interval < COMPACT_ICON_CYCLE_INTERVAL_MIN)
+                                temp_settings.compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MIN;
+                            if (temp_settings.compact_icon_cycle_interval > COMPACT_ICON_CYCLE_INTERVAL_MAX)
+                                temp_settings.compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_icon_cycle_tooltip_buffer[384];
+                            snprintf(compact_icon_cycle_tooltip_buffer, sizeof(compact_icon_cycle_tooltip_buffer),
+                                     "How long each page of icons stays before flipping to the next set.\n"
+                                     "Independent of the panel's Cycle Interval.\n"
+                                     "Default: %.1f s", DEFAULT_COMPACT_ICON_CYCLE_INTERVAL);
+                            ImGui::SetTooltip("%s", compact_icon_cycle_tooltip_buffer);
+                        }
+
+                        if (ImGui::DragFloat("Icon Gap Below", &temp_settings.compact_icon_row_gap, 0.5f,
+                                             COMPACT_ICON_ROW_GAP_MIN, COMPACT_ICON_ROW_GAP_MAX, "%.0f px")) {
+                            if (temp_settings.compact_icon_row_gap < COMPACT_ICON_ROW_GAP_MIN)
+                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MIN;
+                            if (temp_settings.compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
+                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_icon_gap_tooltip_buffer[384];
+                            snprintf(compact_icon_gap_tooltip_buffer, sizeof(compact_icon_gap_tooltip_buffer),
+                                     "Vertical space in on-screen pixels between the icon strip and the\n"
+                                     "panel below it. The overlay window grows to fit the icons.\n"
+                                     "Default: %.0f px", DEFAULT_COMPACT_ICON_ROW_GAP);
+                            ImGui::SetTooltip("%s", compact_icon_gap_tooltip_buffer);
+                        }
+                    }
+
+                    ImGui::Separator();
+                    ImGui::Spacing();
 
                     ImGui::Text("Panel Texture:");
                     ImGui::SameLine();
@@ -4367,6 +4450,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "in the top row (Row 1) of the overlay.\n"
                              "The horizontal spacing of the 2nd and 3rd row\n"
                              "depends on the length of the display text.\n"
+                             "Also used by the Compact mode icon strip above the panel.\n"
                              "Default: %.0f px",
                              DEFAULT_OVERLAY_ROW1_SPACING);
                     ImGui::SetTooltip("%s", tooltip_buffer);

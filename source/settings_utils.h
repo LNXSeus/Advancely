@@ -112,7 +112,6 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_RENDER_MODE OVERLAY_RENDER_MODE_BELT // Classic scrolling belt by default
 #define DEFAULT_OVERLAY_PAGE_INTERVAL 8.0f // Seconds each static page is shown before flipping (Page mode)
 #define DEFAULT_OVERLAY_PAGE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Partial (not-full) pages left-align by default
-#define DEFAULT_OVERLAY_PAGE_REPEAT true // Repeat items so every page is full, on by default
 #define DEFAULT_OVERLAY_ROW_CUSTOM_SCROLL_SPEED_ENABLED false // Per-row custom scroll speed off by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ENABLED true // Per-row freeze-when-items-fit on by default
 #define DEFAULT_OVERLAY_ROW_FREEZE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Frozen items left-aligned by default
@@ -123,6 +122,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // Overlay Settings
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 #define DEFAULT_OVERLAY_ROW1_SPACING 8.0f // Default spacing in pixels between row 1 icons
+// Compact-mode row-1 icon strip size. Defaults to the same size as the pop-out stack icons
+// (DEFAULT_COMPACT_POP_ICON_SIZE) so the strip and the stack match out of the box.
+#define DEFAULT_OVERLAY_ROW1_ICON_SIZE DEFAULT_COMPACT_POP_ICON_SIZE
+#define OVERLAY_ROW1_ICON_SIZE_MIN 8.0f
+#define OVERLAY_ROW1_ICON_SIZE_MAX 96.0f
 #define DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE 32.0f // Default shared icon size in pixels for row 1
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED false
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING 192.0f // 96px icon + more (took spacing from 1.16 AA template)
@@ -153,6 +157,17 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_CYCLE_INTERVAL_MIN 0.5f
 #define COMPACT_CYCLE_INTERVAL_MAX 60.0f
 
+// Compact row-1 icon strip (first-row icons shown above the panel, paged like Page mode).
+#define DEFAULT_COMPACT_SHOW_ROW1_ICONS false // Off by default so existing compact layouts are unchanged
+#define DEFAULT_COMPACT_ICON_CYCLE_INTERVAL 2.0f // Seconds each page of icons shows before flipping to the next
+#define COMPACT_ICON_CYCLE_INTERVAL_MIN 0.5f
+#define COMPACT_ICON_CYCLE_INTERVAL_MAX 60.0f
+#define DEFAULT_COMPACT_ICON_ROW_GAP 6.0f // On-screen px between the icon strip and the panel below it
+#define COMPACT_ICON_ROW_GAP_MIN 0.0f
+#define COMPACT_ICON_ROW_GAP_MAX 512.0f
+#define DEFAULT_COMPACT_ICON_SHARED_SIZE 24.0f // Shared-parent overlay icon size on a strip icon (matches the stack default)
+#define COMPACT_ICON_SHARED_SIZE_MIN 0.0f // Upper bound is the strip icon it is drawn on (overlay_row1_icon_size)
+
 // Compact pop-out stack (goals slide out from under the panel as they progress/complete).
 #define DEFAULT_COMPACT_STACK_MAX_LINES 6 // Line budget below the panel; a 2-line group uses 2 lines
 #define COMPACT_STACK_MAX_LINES_MIN 1
@@ -166,7 +181,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_STACK_RISE_TIME_MAX 5.0f
 #define DEFAULT_COMPACT_POP_ICON_SIZE 48.0f // Pop-out line icon size (matches the row-1 icon size)
 #define COMPACT_POP_ICON_SIZE_MIN 8.0f
-#define COMPACT_POP_ICON_SIZE_MAX 256.0f
+#define COMPACT_POP_ICON_SIZE_MAX 96.0f
 #define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line
 #define COMPACT_STACK_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the pop icon it is drawn on (compact_pop_icon_size)
 #define DEFAULT_COMPACT_STACK_POP_ON_PROGRESS true // Counting goal types pop on every increment, not just completion
@@ -448,7 +463,6 @@ struct AppSettings {
     OverlayRenderMode overlay_render_mode; // How the overlay lays out item rows (scrolling belt vs static pages).
     float overlay_page_interval; // Seconds each static page is shown before flipping (Page mode only).
     OverlayProgressTextAlignment overlay_page_align; // How a not-full page is aligned within the window (Page mode).
-    bool overlay_page_repeat; // If true, items repeat so every page is full (Page mode); disables page alignment.
 
     // --- Compact mode (Zesskyo-style counter panel + pop-outs) ---
     char compact_panel_path[MAX_PATH_LENGTH]; // 9-slice panel texture in resources/gui/ (Compact mode).
@@ -469,6 +483,13 @@ struct AppSettings {
     CompactCycleItem compact_cycle_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals selected into the cycle by name.
     int compact_cycle_item_count; // Number of valid entries in compact_cycle_items.
     float compact_cycle_interval; // Seconds each selected entry shows before the cycle advances.
+
+    // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged
+    // to fit the panel width and flipped on their own interval. Aligned with compact_panel_align.
+    bool compact_show_row1_icons; // Master toggle for the icon strip above the panel.
+    float compact_icon_cycle_interval; // Seconds each page of icons shows before flipping to the next.
+    float compact_icon_row_gap; // On-screen px between the icon strip and the panel below it.
+    float compact_icon_shared_size; // Shared-parent overlay icon size on a strip icon (capped by the strip icon size).
     // Pop-out stack selection (independent of the panel cycle): which goals may slide out below the
     // panel as they progress or complete. Same additive model as the cycle (type OR individual goal).
     bool compact_stack_type[COMPACT_COUNTER_TYPE_COUNT]; // Which whole-section types may pop into the stack.
@@ -509,6 +530,7 @@ struct AppSettings {
     bool invert_hiding_mode; // Inverts each hiding mode: hide/fade incomplete instead of completed
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
+    float overlay_row1_icon_size; // Icon size for Row 1 (shared by belt/page and the compact icon strip).
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1
     bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
     float overlay_row2_custom_spacing; // The custom spacing value for row 2
