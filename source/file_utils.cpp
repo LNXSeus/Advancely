@@ -67,17 +67,6 @@ cJSON *cJSON_from_file(const char *filename) {
 
     buffer[length] = '\0';
 
-    // ==================== DEBUG LOGGING BLOCK ====================
-    // This will write the raw buffer content to a separate log file for inspection.
-    // It always overwrites the file to keep it small and relevant to the last read operation.
-    FILE *debug_log = fopen("_last_read_content.log", "w");
-    if (debug_log) {
-        // log_message(LOG_ERROR, "File size: %ld bytes\n", length);
-        fwrite(buffer, 1, bytes_read, debug_log);
-        fclose(debug_log);
-    }
-    // ===============================================================
-
     // Directly parse the buffer without manual pre-processing.
     // Use ParseWithLength for maximum safety against malformed strings.
     cJSON *json = cJSON_ParseWithLength(buffer, bytes_read);
