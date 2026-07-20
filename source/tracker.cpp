@@ -7455,7 +7455,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // --- Start Icon Scaling and Centering Logic (Main Icon 64x64 box) ---
                     float tex_w = 0.0f, tex_h = 0.0f;
                     SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-                    ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                    ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
+                                                settings->adv_icon_size * t->zoom_level);
                     // Target box size on screen
                     float scale_factor = 1.0f;
                     if (tex_w > 0 && tex_h > 0) {
@@ -7463,8 +7464,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                     }
                     ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                    ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, // 16.0f to CENTER the icons
-                                              screen_pos.y + 16.0f * t->zoom_level); // Top-left of 64x64 box on screen
+                    ImVec2 box_p_min = ImVec2(screen_pos.x + settings->adv_icon_offset_x * t->zoom_level,
+                                              screen_pos.y + settings->adv_icon_offset_y * t->zoom_level);
                     ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                                  (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
                     ImVec2 p_min = ImVec2(box_p_min.x + icon_padding.x, box_p_min.y + icon_padding.y);
@@ -8823,7 +8824,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 // --- Start Icon Scaling and Centering Logic (64x64 box) ---
                 float tex_w = 0.0f, tex_h = 0.0f;
                 SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
+                                                settings->adv_icon_size * t->zoom_level);
                 // Target box size on screen
                 float scale_factor = 1.0f;
                 if (tex_w > 0 && tex_h > 0) {
@@ -8831,7 +8833,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + settings->adv_icon_offset_x * t->zoom_level,
+                                          screen_pos.y + settings->adv_icon_offset_y * t->zoom_level);
                 // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
@@ -9266,7 +9269,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // --- Start Icon Scaling and Centering Logic (64x64 box) ---
                 float tex_w = 0.0f, tex_h = 0.0f;
                 SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
+                                                settings->adv_icon_size * t->zoom_level);
                 // Target box size on screen
                 float scale_factor = 1.0f;
                 if (tex_w > 0 && tex_h > 0) {
@@ -9274,7 +9278,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + settings->adv_icon_offset_x * t->zoom_level,
+                                          screen_pos.y + settings->adv_icon_offset_y * t->zoom_level);
                 // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
@@ -9834,13 +9839,15 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             if (icon_texture) {
                 float tex_w = 0.0f, tex_h = 0.0f;
                 SDL_GetTextureSize(icon_texture, &tex_w, &tex_h);
-                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
+                                                settings->adv_icon_size * t->zoom_level);
                 float scale_factor = 1.0f;
                 if (tex_w > 0 && tex_h > 0) {
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + settings->adv_icon_offset_x * t->zoom_level,
+                                          screen_pos.y + settings->adv_icon_offset_y * t->zoom_level);
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f);
                 ImVec2 p_min = ImVec2(box_p_min.x + icon_padding.x, box_p_min.y + icon_padding.y);
@@ -10336,7 +10343,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 // --- Start Icon Scaling and Centering Logic (64x64 box) ---
                 float tex_w = 0.0f, tex_h = 0.0f;
                 SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
+                                                settings->adv_icon_size * t->zoom_level);
                 // Target box size on screen
                 float scale_factor = 1.0f;
                 if (tex_w > 0 && tex_h > 0) {
@@ -10344,7 +10352,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + settings->adv_icon_offset_x * t->zoom_level,
+                                          screen_pos.y + settings->adv_icon_offset_y * t->zoom_level);
                 // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,

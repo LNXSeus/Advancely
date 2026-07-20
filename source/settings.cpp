@@ -650,6 +650,9 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
+        a->adv_icon_size != b->adv_icon_size ||
+        a->adv_icon_offset_x != b->adv_icon_offset_x ||
+        a->adv_icon_offset_y != b->adv_icon_offset_y ||
 
         // LOD Settings
         a->lod_text_sub_threshold != b->lod_text_sub_threshold ||
@@ -872,7 +875,10 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
         strcmp(a->adv_bg_path, b->adv_bg_path) != 0 ||
         strcmp(a->adv_bg_half_done_path, b->adv_bg_half_done_path) != 0 ||
-        strcmp(a->adv_bg_done_path, b->adv_bg_done_path) != 0;
+        strcmp(a->adv_bg_done_path, b->adv_bg_done_path) != 0 ||
+        a->adv_icon_size != b->adv_icon_size ||
+        a->adv_icon_offset_x != b->adv_icon_offset_x ||
+        a->adv_icon_offset_y != b->adv_icon_offset_y;
 }
 
 // Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
@@ -3197,6 +3203,64 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::TextWrapped(
                     "Warning: Using the same texture for multiple states makes it harder to distinguish completion status.");
                 ImGui::PopStyleColor();
+            }
+
+            // --- Icon Size & Position (within the 96x96 background texture) ---
+            ImGui::Separator();
+            ImGui::Text("Icon Size & Position");
+
+            // Icon Size
+            if (ImGui::DragFloat("Icon Size", &temp_settings.adv_icon_size, 0.5f, ADV_ICON_MIN_SIZE, ADV_ICON_BG_SIZE,
+                                 "%.0f px")) {
+                if (temp_settings.adv_icon_size < ADV_ICON_MIN_SIZE) temp_settings.adv_icon_size = ADV_ICON_MIN_SIZE;
+                if (temp_settings.adv_icon_size > ADV_ICON_BG_SIZE) temp_settings.adv_icon_size = ADV_ICON_BG_SIZE;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Edge length of the icon inside the %.0fx%.0f background texture.\n"
+                         "Applies to the tracker and overlay (not compact mode).\n"
+                         "Cannot exceed the background size.\n"
+                         "Default: %.0f px.",
+                         ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, DEFAULT_ADV_ICON_SIZE);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            // Keep offsets within bounds after a size change (icon box must stay inside the background).
+            const float icon_max_off = ADV_ICON_BG_SIZE - temp_settings.adv_icon_size;
+            if (temp_settings.adv_icon_offset_x > icon_max_off) temp_settings.adv_icon_offset_x = icon_max_off;
+            if (temp_settings.adv_icon_offset_y > icon_max_off) temp_settings.adv_icon_offset_y = icon_max_off;
+
+            // Icon X Position
+            if (ImGui::DragFloat("Icon X Position", &temp_settings.adv_icon_offset_x, 0.5f, 0.0f, icon_max_off,
+                                 "%.0f px")) {
+                if (temp_settings.adv_icon_offset_x < 0.0f) temp_settings.adv_icon_offset_x = 0.0f;
+                if (temp_settings.adv_icon_offset_x > icon_max_off) temp_settings.adv_icon_offset_x = icon_max_off;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Horizontal offset of the icon from the background's left edge.\n"
+                         "The icon always stays inside the %.0fx%.0f background.\n"
+                         "Range: 0 - %.0f px (depends on Icon Size). Default: %.0f px.",
+                         ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, icon_max_off, DEFAULT_ADV_ICON_OFFSET_X);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            // Icon Y Position
+            if (ImGui::DragFloat("Icon Y Position", &temp_settings.adv_icon_offset_y, 0.5f, 0.0f, icon_max_off,
+                                 "%.0f px")) {
+                if (temp_settings.adv_icon_offset_y < 0.0f) temp_settings.adv_icon_offset_y = 0.0f;
+                if (temp_settings.adv_icon_offset_y > icon_max_off) temp_settings.adv_icon_offset_y = icon_max_off;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Vertical offset of the icon from the background's top edge.\n"
+                         "The icon always stays inside the %.0fx%.0f background.\n"
+                         "Range: 0 - %.0f px (depends on Icon Size). Default: %.0f px.",
+                         ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, icon_max_off, DEFAULT_ADV_ICON_OFFSET_Y);
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
 

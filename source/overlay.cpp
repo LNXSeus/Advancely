@@ -3327,7 +3327,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                               &bg_rect, 255);
 
                     // Render icon
-                    SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+                    SDL_FRect icon_rect = {
+                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
+                        settings->adv_icon_size, settings->adv_icon_size
+                    };
 
                     // Also support .gif icons
                     SDL_Texture *tex = nullptr;
@@ -3822,7 +3825,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
                         render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
-                        SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+                        SDL_FRect icon_rect = {
+                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
+                        settings->adv_icon_size, settings->adv_icon_size
+                    };
                         SDL_Texture *tex = nullptr;
                         AnimatedTexture *anim_tex = nullptr;
                         if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
@@ -4332,7 +4338,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW3_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
                     render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
-                    SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+                    SDL_FRect icon_rect = {
+                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
+                        settings->adv_icon_size, settings->adv_icon_size
+                    };
                     SDL_Texture *tex = nullptr;
                     AnimatedTexture *anim_tex = nullptr;
                     if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {

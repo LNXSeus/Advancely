@@ -861,6 +861,11 @@ void settings_set_defaults(AppSettings *settings) {
     strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
     settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
 
+    // Icon size and position within the background texture
+    settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE;
+    settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
+    settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
+
     // UI Theme Colors
     settings->ui_text_color = DEFAULT_UI_TEXT_COLOR;
     settings->ui_window_bg_color = DEFAULT_UI_WINDOW_BG_COLOR;
@@ -1577,6 +1582,28 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        // --- Icon size and position within the background texture ---
+        const cJSON *icon_size_json = cJSON_GetObjectItem(visual_settings, "adv_icon_size");
+        if (icon_size_json && cJSON_IsNumber(icon_size_json)) settings->adv_icon_size = (float) icon_size_json->valuedouble;
+        else { settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE; defaults_were_used = true; }
+
+        const cJSON *icon_off_x_json = cJSON_GetObjectItem(visual_settings, "adv_icon_offset_x");
+        if (icon_off_x_json && cJSON_IsNumber(icon_off_x_json)) settings->adv_icon_offset_x = (float) icon_off_x_json->valuedouble;
+        else { settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X; defaults_were_used = true; }
+
+        const cJSON *icon_off_y_json = cJSON_GetObjectItem(visual_settings, "adv_icon_offset_y");
+        if (icon_off_y_json && cJSON_IsNumber(icon_off_y_json)) settings->adv_icon_offset_y = (float) icon_off_y_json->valuedouble;
+        else { settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y; defaults_were_used = true; }
+
+        // Clamp to valid bounds so the icon box always stays inside the 96x96 background.
+        if (settings->adv_icon_size < ADV_ICON_MIN_SIZE) settings->adv_icon_size = ADV_ICON_MIN_SIZE;
+        if (settings->adv_icon_size > ADV_ICON_BG_SIZE) settings->adv_icon_size = ADV_ICON_BG_SIZE;
+        const float icon_max_off = ADV_ICON_BG_SIZE - settings->adv_icon_size;
+        if (settings->adv_icon_offset_x < 0.0f) settings->adv_icon_offset_x = 0.0f;
+        if (settings->adv_icon_offset_x > icon_max_off) settings->adv_icon_offset_x = icon_max_off;
+        if (settings->adv_icon_offset_y < 0.0f) settings->adv_icon_offset_y = 0.0f;
+        if (settings->adv_icon_offset_y > icon_max_off) settings->adv_icon_offset_y = icon_max_off;
+
         // --- Compact mode panel ---
         const cJSON *compact_path_json = cJSON_GetObjectItem(visual_settings, "compact_panel_path");
         if (compact_path_json && cJSON_IsString(compact_path_json)) {
@@ -2286,6 +2313,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
         settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
 
+        settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE;
+        settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
+        settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
+
         strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
         settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
         settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET;
@@ -2975,6 +3006,14 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateString(settings->adv_bg_half_done_path));
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_done_path");
         cJSON_AddItemToObject(visuals_obj, "adv_bg_done_path", cJSON_CreateString(settings->adv_bg_done_path));
+
+        // --- Save Icon size and position within the background texture ---
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "adv_icon_size", cJSON_CreateNumber(settings->adv_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_icon_offset_x");
+        cJSON_AddItemToObject(visuals_obj, "adv_icon_offset_x", cJSON_CreateNumber(settings->adv_icon_offset_x));
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_icon_offset_y");
+        cJSON_AddItemToObject(visuals_obj, "adv_icon_offset_y", cJSON_CreateNumber(settings->adv_icon_offset_y));
 
         // --- Save Compact mode panel ---
         cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_path");

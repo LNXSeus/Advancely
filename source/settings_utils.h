@@ -254,6 +254,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_ADV_BG_HALF_DONE_PATH "advancement_background_half_done.png"
 #define DEFAULT_ADV_BG_DONE_PATH "advancement_background_done.png"
 
+// Icon size and position within the 96x96 background texture (tracker + overlay, not compact mode).
+#define DEFAULT_ADV_ICON_SIZE 64.0f
+#define DEFAULT_ADV_ICON_OFFSET_X 16.0f
+#define DEFAULT_ADV_ICON_OFFSET_Y 16.0f
+#define ADV_ICON_MIN_SIZE 8.0f
+#define ADV_ICON_BG_SIZE 96.0f
+
 // Compact mode 9-slice counter panel texture (inset / pixel scale / padding live in the
 // "Overlay Compact Mode Settings" block above).
 #define DEFAULT_COMPACT_PANEL_PATH "compact_panel_default.png" // 9-slice panel texture in resources/gui/
@@ -590,6 +597,11 @@ struct AppSettings {
     char adv_bg_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
     char adv_bg_half_done_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
     char adv_bg_done_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
+
+    // --- Icon Size & Position within the 96x96 background (tracker + overlay, excludes compact mode) ---
+    float adv_icon_size; // Icon box edge length in 96x96 background space (ADV_ICON_MIN_SIZE..ADV_ICON_BG_SIZE)
+    float adv_icon_offset_x; // Icon box left offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
+    float adv_icon_offset_y; // Icon box top offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
 
     // --- UI Theme Colors (collapsible section) ---
     ColorRGBA ui_text_color; // Text color for the UI elements.
