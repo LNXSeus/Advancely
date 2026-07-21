@@ -3372,77 +3372,99 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             const float cell_width = snap_px(fmaxf(ITEM_WIDTH, max_text_width));
             const float item_full_width = cell_width + ITEM_SPACING;
 
-            float total_row_width = NUM_SUPPORTERS * item_full_width;
-            float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width)); // Sync with row 2's speed
-            int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
+            // Draws one supporter cell (background, icon, name, amount) with its left edge at current_x.
+            auto draw_supporter = [&](size_t i, float current_x) {
+                const auto &render_info = static_supporter_render_list[i];
 
-            for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
-                float block_offset = start_pos + (block * total_row_width);
-                for (size_t i = 0; i < static_supporter_render_list.size(); ++i) {
-                    float current_x = snap_px(block_offset + (i * item_full_width));
-                    if (current_x + item_full_width < 0 || current_x > window_w) continue;
+                // Render background
+                float bg_x_offset = snap_px((cell_width - ITEM_WIDTH) / 2.0f);
+                SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
+                render_texture_with_alpha(o->renderer, render_info.background_static, render_info.background_anim,
+                                          &bg_rect, 255);
 
-                    const auto &render_info = static_supporter_render_list[i];
+                // Render icon
+                SDL_FRect icon_rect = {
+                    bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
+                    settings->adv_icon_size, settings->adv_icon_size
+                };
 
-                    // Render background
-                    float bg_x_offset = snap_px((cell_width - ITEM_WIDTH) / 2.0f);
-                    SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    render_texture_with_alpha(o->renderer, render_info.background_static, render_info.background_anim,
-                                              &bg_rect, 255);
+                // Also support .gif icons
+                SDL_Texture *tex = nullptr;
+                AnimatedTexture *anim_tex = nullptr;
+                char full_icon_path[MAX_PATH_LENGTH];
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
+                         render_info.icon_path);
 
-                    // Render icon
-                    SDL_FRect icon_rect = {
-                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
-                        settings->adv_icon_size, settings->adv_icon_size
-                    };
+                // Check the file extension to decide which cache function to use
+                if (strstr(full_icon_path, ".gif")) {
+                    anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                               &o->anim_cache_capacity, full_icon_path,
+                                                               SDL_SCALEMODE_NEAREST);
+                } else {
+                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                 &o->texture_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                }
 
-                    // Also support .gif icons
-                    SDL_Texture *tex = nullptr;
-                    AnimatedTexture *anim_tex = nullptr;
-                    char full_icon_path[MAX_PATH_LENGTH];
-                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
-                             render_info.icon_path);
+                if (tex || anim_tex) {
+                    // Pass both pointers; the function will correctly choose which one to use
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+                } else {
+                    // If texture loading fails for any reason, draw a placeholder
+                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 255); // Bright Pink
+                    SDL_RenderFillRect(o->renderer, &icon_rect);
+                }
 
-                    // Check the file extension to decide which cache function to use
-                    if (strstr(full_icon_path, ".gif")) {
-                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
-                                                                   &o->anim_cache_capacity, full_icon_path,
-                                                                   SDL_SCALEMODE_NEAREST);
-                    } else {
-                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                     &o->texture_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                // Render name
+                SDL_Texture *name_tex = get_text_texture_from_cache(o, o->font, render_info.supporter->name,
+                                                                    text_color);
+                if (name_tex) {
+                    float w, h;
+                    SDL_GetTextureSize(name_tex, &w, &h);
+                    float text_x = current_x + snap_px((cell_width - w) / 2.0f);
+                    SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                    SDL_RenderTexture(o->renderer, name_tex, nullptr, &dest_rect);
+
+                    // Render amount
+                    char amount_buf[64];
+                    snprintf(amount_buf, sizeof(amount_buf), "$%.2f", render_info.supporter->amount);
+                    SDL_Texture *amount_tex = get_text_texture_from_cache(o, o->font, amount_buf, text_color);
+                    if (amount_tex) {
+                        float pw, ph;
+                        SDL_GetTextureSize(amount_tex, &pw, &ph);
+                        float p_text_x = current_x + snap_px((cell_width - pw) / 2.0f);
+                        SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
+                        SDL_RenderTexture(o->renderer, amount_tex, nullptr, &p_dest_rect);
                     }
+                }
+            };
 
-                    if (tex || anim_tex) {
-                        // Pass both pointers; the function will correctly choose which one to use
-                        render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
-                    } else {
-                        // If texture loading fails for any reason, draw a placeholder
-                        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 255); // Bright Pink
-                        SDL_RenderFillRect(o->renderer, &icon_rect);
-                    }
+            if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
+                // Page mode: flip through the supporters in centered pages (sharp cut) on the shared
+                // page index, just like the goal rows. Supporters never "complete", so nothing is
+                // removed and the pages repeat forever once there are more than fit a single page;
+                // if they all fit one page it simply shows them statically. Fixed signature since the
+                // showcase list stays constant for the whole run.
+                static PageView page_supporters;
+                std::vector<char> removed((size_t) NUM_SUPPORTERS, 0);
+                std::vector<BeltTile> tiles;
+                page_update(page_supporters, o->page_index, settings->overlay_page_align,
+                            window_w, item_full_width, cell_width,
+                            NUM_SUPPORTERS, removed, 0.0f, 0x5507702EULL /* "supporters" */, tiles);
+                for (size_t ti = 0; ti < tiles.size(); ++ti) {
+                    if (tiles[ti].idx < 0) continue; // gap (never happens for supporters, but be safe)
+                    draw_supporter((size_t) tiles[ti].idx, snap_px(tiles[ti].x));
+                }
+            } else {
+                float total_row_width = NUM_SUPPORTERS * item_full_width;
+                float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width)); // Sync with row 2's speed
+                int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
-                    // Render name
-                    SDL_Texture *name_tex = get_text_texture_from_cache(o, o->font, render_info.supporter->name,
-                                                                        text_color);
-                    if (name_tex) {
-                        float w, h;
-                        SDL_GetTextureSize(name_tex, &w, &h);
-                        float text_x = current_x + snap_px((cell_width - w) / 2.0f);
-                        SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
-                        SDL_RenderTexture(o->renderer, name_tex, nullptr, &dest_rect);
-
-                        // Render amount
-                        char amount_buf[64];
-                        snprintf(amount_buf, sizeof(amount_buf), "$%.2f", render_info.supporter->amount);
-                        SDL_Texture *amount_tex = get_text_texture_from_cache(o, o->font, amount_buf, text_color);
-                        if (amount_tex) {
-                            float pw, ph;
-                            SDL_GetTextureSize(amount_tex, &pw, &ph);
-                            float p_text_x = current_x + snap_px((cell_width - pw) / 2.0f);
-                            SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
-                            SDL_RenderTexture(o->renderer, amount_tex, nullptr, &p_dest_rect);
-                        }
+                for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
+                    float block_offset = start_pos + (block * total_row_width);
+                    for (size_t i = 0; i < static_supporter_render_list.size(); ++i) {
+                        float current_x = snap_px(block_offset + (i * item_full_width));
+                        if (current_x + item_full_width < 0 || current_x > window_w) continue;
+                        draw_supporter(i, current_x);
                     }
                 }
             }
