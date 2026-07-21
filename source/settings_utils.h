@@ -181,7 +181,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_STACK_RISE_TIME 0.25f // Seconds a pop-out takes to slide into place
 #define COMPACT_STACK_RISE_TIME_MIN 0.0f
 #define COMPACT_STACK_RISE_TIME_MAX 5.0f
-#define DEFAULT_COMPACT_POP_ICON_SIZE 48.0f // Pop-out line icon size (matches the row-1 icon size)
+#define DEFAULT_COMPACT_POP_ICON_SIZE 36.0f // Pop-out line icon size
 #define COMPACT_POP_ICON_SIZE_MIN 8.0f
 #define COMPACT_POP_ICON_SIZE_MAX 96.0f
 #define DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE 24.0f // Shared-parent overlay icon size on a pop-out line

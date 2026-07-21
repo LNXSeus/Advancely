@@ -196,7 +196,7 @@
 		"compact_stack_max_lines":	6,
 		"compact_stack_hold_time":	8,
 		"compact_stack_rise_time":	0.25,
-		"compact_pop_icon_size":	48,
+		"compact_pop_icon_size":	36,
 		"compact_stack_shared_icon_size":	24,
 		"compact_coop_panel_face_size":	42,
 		"compact_coop_panel_face_offset_x":	-10,
