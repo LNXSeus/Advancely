@@ -751,6 +751,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
     settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
     settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
+    settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING;
+    settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
     settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
     settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancement completions pop by default
@@ -1766,6 +1768,20 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
         } else { settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP; defaults_were_used = true; }
 
+        const cJSON *compact_row1_spacing_json = cJSON_GetObjectItem(visual_settings, "compact_row1_spacing");
+        if (compact_row1_spacing_json && cJSON_IsNumber(compact_row1_spacing_json)) {
+            settings->compact_row1_spacing = (float) compact_row1_spacing_json->valuedouble;
+            if (settings->compact_row1_spacing < 0.0f) settings->compact_row1_spacing = 0.0f;
+            if (settings->compact_row1_spacing > 7680.0f) settings->compact_row1_spacing = 7680.0f;
+        } else { settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING; defaults_were_used = true; }
+
+        const cJSON *compact_row1_clear_json = cJSON_GetObjectItem(visual_settings, "compact_row1_clear_animation");
+        if (compact_row1_clear_json && cJSON_IsNumber(compact_row1_clear_json)) {
+            settings->compact_row1_clear_animation = (float) compact_row1_clear_json->valuedouble;
+            if (settings->compact_row1_clear_animation < -10.0f) settings->compact_row1_clear_animation = -10.0f;
+            if (settings->compact_row1_clear_animation > 10.0f) settings->compact_row1_clear_animation = 10.0f;
+        } else { settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION; defaults_were_used = true; }
+
         // Shared-parent overlay size on a strip icon. The upper cap against overlay_row1_icon_size is
         // applied later, once that value has been read (it loads after this compact block).
         const cJSON *compact_icon_shared = cJSON_GetObjectItem(visual_settings, "compact_icon_shared_size");
@@ -2345,6 +2361,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
         settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
         settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
+        settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING;
+        settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
         settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
         settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
@@ -3089,6 +3107,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_row_gap");
         cJSON_AddItemToObject(visuals_obj, "compact_icon_row_gap",
                               cJSON_CreateNumber(settings->compact_icon_row_gap));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_spacing");
+        cJSON_AddItemToObject(visuals_obj, "compact_row1_spacing",
+                              cJSON_CreateNumber(settings->compact_row1_spacing));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_clear_animation");
+        cJSON_AddItemToObject(visuals_obj, "compact_row1_clear_animation",
+                              cJSON_CreateNumber(settings->compact_row1_clear_animation));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_shared_size");
         cJSON_AddItemToObject(visuals_obj, "compact_icon_shared_size",
                               cJSON_CreateNumber(settings->compact_icon_shared_size));

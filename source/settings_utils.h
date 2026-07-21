@@ -167,6 +167,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_ICON_ROW_GAP_MAX 512.0f
 #define DEFAULT_COMPACT_ICON_SHARED_SIZE 24.0f // Shared-parent overlay icon size on a strip icon (matches the stack default)
 #define COMPACT_ICON_SHARED_SIZE_MIN 0.0f // Upper bound is the strip icon it is drawn on (overlay_row1_icon_size)
+#define DEFAULT_COMPACT_ROW1_SPACING 8.0f // Horizontal px between icons in the compact-mode row-1 strip
+#define DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION (-1.2f) // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction
 
 // Compact pop-out stack (goals slide out from under the panel as they progress/complete).
 #define DEFAULT_COMPACT_STACK_MAX_LINES 6 // Line budget below the panel; a 2-line group uses 2 lines
@@ -496,6 +498,8 @@ struct AppSettings {
     bool compact_show_row1_icons; // Master toggle for the icon strip above the panel.
     float compact_icon_cycle_interval; // Seconds each page of icons shows before flipping to the next.
     float compact_icon_row_gap; // On-screen px between the icon strip and the panel below it.
+    float compact_row1_spacing; // Horizontal px between icons in the compact-mode row-1 strip.
+    float compact_row1_clear_animation; // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction.
     float compact_icon_shared_size; // Shared-parent overlay icon size on a strip icon (capped by the strip icon size).
     // Pop-out stack selection (independent of the panel cycle): which goals may slide out below the
     // panel as they progress or complete. Same additive model as the cycle (type OR individual goal).

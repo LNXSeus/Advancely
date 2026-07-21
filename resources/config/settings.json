@@ -186,6 +186,8 @@
 		"compact_show_row1_icons":	false,
 		"compact_icon_cycle_interval":	2,
 		"compact_icon_row_gap":	8,
+		"compact_row1_spacing":	8,
+		"compact_row1_clear_animation":	-1.2,
 		"compact_icon_shared_size":	24,
 		"compact_stack_types":	[0],
 		"compact_stack_items":	[],

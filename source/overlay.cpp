@@ -2295,7 +2295,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     std::vector<char> icon_removed;
     unsigned long long icon_sig = 0;
     float icon_size = settings->overlay_row1_icon_size;
-    float icon_full_w = snap_px(icon_size + settings->overlay_row1_spacing);
+    float icon_full_w = snap_px(icon_size + settings->compact_row1_spacing);
     bool have_icons = false;
     if (settings->compact_show_row1_icons && !run_complete) {
         build_row1_items(t, settings, icon_items, icon_removed, icon_sig);
@@ -2355,19 +2355,24 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // Row-1 icon strip above the panel. Uses the shared Page layout (page_update), which pages the
     // icons across the panel width and, once they all fit one page, stops repeating and lets completed
     // icons clear away in place. It flips on compact_icon_page_index (its own timer) and centers a full
-    // page within the panel span (drawn at panel_x + tile.x), matching the other Page-mode rows.
+    // page within the panel span (drawn at panel_x + tile.x), matching the other Page-mode rows. Each
+    // completing icon crops away over its own Clear Animation setting (0 = instant, sign = direction).
     if (have_icons) {
         static PageView page_compact_icons;
         std::vector<BeltTile> icon_tiles;
         int icon_F = (int) icon_items.size();
         page_update(page_compact_icons, o->compact_icon_page_index, settings->compact_panel_align,
                     (int) panel_w, icon_full_w, icon_size,
-                    icon_F, icon_removed, 0.0f, icon_sig, icon_tiles);
+                    icon_F, icon_removed, fabsf(settings->compact_row1_clear_animation), icon_sig, icon_tiles);
         float icon_y = snap_px(pad);
         for (const auto &tile: icon_tiles) {
             if (tile.idx < 0) continue; // gap (item completed mid-page)
             SDL_FRect dest = {snap_px(panel_x + tile.x), icon_y, icon_size, icon_size};
+            bool clipped = belt_set_clear_clip(o->renderer, want_w, tile.clear,
+                                               icon_y, icon_y + icon_size,
+                                               settings->compact_row1_clear_animation);
             compact_draw_row1_icon(o, icon_items[tile.idx], &dest, settings->compact_icon_shared_size);
+            if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
         }
     }
 

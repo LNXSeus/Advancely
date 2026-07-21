@@ -613,6 +613,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_show_row1_icons != b->compact_show_row1_icons ||
         a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
         a->compact_icon_row_gap != b->compact_icon_row_gap ||
+        a->compact_row1_spacing != b->compact_row1_spacing ||
+        a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -819,6 +821,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_show_row1_icons != b->compact_show_row1_icons ||
         a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
         a->compact_icon_row_gap != b->compact_icon_row_gap ||
+        a->compact_row1_spacing != b->compact_row1_spacing ||
+        a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -3807,7 +3811,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                     // Row-1 icon strip above the panel. Listed first to mirror the on-screen order
                     // (icons, then panel, then stack). Alignment follows the panel alignment below;
-                    // horizontal spacing reuses the belt/page Row 1 spacing.
+                    // horizontal spacing uses the compact Row 1 Icon Spacing control below.
                     ImGui::Text("Row 1 Icons");
                     ImGui::Checkbox("Show Row 1 Icons", &temp_settings.compact_show_row1_icons);
                     if (ImGui::IsItemHovered()) {
@@ -3817,7 +3821,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "strip above the panel, paged to fit the panel width and flipped on\n"
                                  "the interval below. Icons align with the panel and respect hidden\n"
                                  "goals (including the 'Show Hidden Goals' override). Horizontal spacing\n"
-                                 "reuses the Row 1 Icon Spacing from the Belt/Page layout section.");
+                                 "is set by the Row 1 Icon Spacing control below.");
                         ImGui::SetTooltip("%s", compact_show_icons_tooltip_buffer);
                     }
 
@@ -3862,6 +3866,36 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::SetTooltip("%s", compact_icon_shared_tooltip_buffer);
                         }
 
+                        if (ImGui::DragFloat("Horizontal Icon Spacing##CompactRow1Icons",
+                                             &temp_settings.compact_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px")) {
+                            if (temp_settings.compact_row1_spacing < 0.0f) temp_settings.compact_row1_spacing = 0.0f;
+                            if (temp_settings.compact_row1_spacing > 7680.0f) temp_settings.compact_row1_spacing = 7680.0f;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_row1_spacing_tooltip_buffer[256];
+                            snprintf(compact_row1_spacing_tooltip_buffer, sizeof(compact_row1_spacing_tooltip_buffer),
+                                     "Adjusts the horizontal gap (in pixels) between icons in the\n"
+                                     "strip above the panel.\n"
+                                     "Default: %.0f px", DEFAULT_COMPACT_ROW1_SPACING);
+                            ImGui::SetTooltip("%s", compact_row1_spacing_tooltip_buffer);
+                        }
+
+                        if (ImGui::DragFloat("Icon Gap Below", &temp_settings.compact_icon_row_gap, 0.5f,
+                                             COMPACT_ICON_ROW_GAP_MIN, COMPACT_ICON_ROW_GAP_MAX, "%.0f px")) {
+                            if (temp_settings.compact_icon_row_gap < COMPACT_ICON_ROW_GAP_MIN)
+                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MIN;
+                            if (temp_settings.compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
+                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_icon_gap_tooltip_buffer[384];
+                            snprintf(compact_icon_gap_tooltip_buffer, sizeof(compact_icon_gap_tooltip_buffer),
+                                     "Vertical space in on-screen pixels between the icon strip and the\n"
+                                     "panel below it. The overlay window grows to fit the icons.\n"
+                                     "Default: %.0f px", DEFAULT_COMPACT_ICON_ROW_GAP);
+                            ImGui::SetTooltip("%s", compact_icon_gap_tooltip_buffer);
+                        }
+
                         if (ImGui::DragFloat("Icon Cycle Interval", &temp_settings.compact_icon_cycle_interval, 0.1f,
                                              COMPACT_ICON_CYCLE_INTERVAL_MIN, COMPACT_ICON_CYCLE_INTERVAL_MAX,
                                              "%.1f s")) {
@@ -3879,20 +3913,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::SetTooltip("%s", compact_icon_cycle_tooltip_buffer);
                         }
 
-                        if (ImGui::DragFloat("Icon Gap Below", &temp_settings.compact_icon_row_gap, 0.5f,
-                                             COMPACT_ICON_ROW_GAP_MIN, COMPACT_ICON_ROW_GAP_MAX, "%.0f px")) {
-                            if (temp_settings.compact_icon_row_gap < COMPACT_ICON_ROW_GAP_MIN)
-                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MIN;
-                            if (temp_settings.compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
-                                temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
+                        if (ImGui::DragFloat("Clear Animation (s)##CompactRow1Icons",
+                                             &temp_settings.compact_row1_clear_animation, 0.01f, -10.0f, 10.0f,
+                                             "%.2f s")) {
+                            if (temp_settings.compact_row1_clear_animation < -10.0f)
+                                temp_settings.compact_row1_clear_animation = -10.0f;
+                            if (temp_settings.compact_row1_clear_animation > 10.0f)
+                                temp_settings.compact_row1_clear_animation = 10.0f;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char compact_icon_gap_tooltip_buffer[384];
-                            snprintf(compact_icon_gap_tooltip_buffer, sizeof(compact_icon_gap_tooltip_buffer),
-                                     "Vertical space in on-screen pixels between the icon strip and the\n"
-                                     "panel below it. The overlay window grows to fit the icons.\n"
-                                     "Default: %.0f px", DEFAULT_COMPACT_ICON_ROW_GAP);
-                            ImGui::SetTooltip("%s", compact_icon_gap_tooltip_buffer);
+                            char compact_clear_anim_tooltip_buffer[512];
+                            snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
+                                     "How long a strip icon takes to crop away when its goal is cleared,\n"
+                                     "instead of vanishing instantly. 0.0 is instant. Positive values clear\n"
+                                     "the icon upwards, negative values clear it downwards. Independent of\n"
+                                     "the Belt/Page Clear Animation.\n"
+                                     "Default: %.2f s", DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION);
+                            ImGui::SetTooltip("%s", compact_clear_anim_tooltip_buffer);
                         }
                     }
 
@@ -4514,7 +4551,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "in the top row (Row 1) of the overlay.\n"
                              "The horizontal spacing of the 2nd and 3rd row\n"
                              "depends on the length of the display text.\n"
-                             "Also used by the Compact mode icon strip above the panel.\n"
                              "Default: %.0f px",
                              DEFAULT_OVERLAY_ROW1_SPACING);
                     ImGui::SetTooltip("%s", tooltip_buffer);
