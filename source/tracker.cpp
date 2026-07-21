@@ -12962,6 +12962,19 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
             // Re-collapse groups so siblings of the just-completed criterion get marked
             // done (and the unit count is correct, not raw-incremented).
             adv->completed_criteria_count = tracker_collapse_advancement_groups(adv);
+
+            // Coop: stamp the completing player's face the instant a criterion lands, so the
+            // contributor face shows during live Hermes tracking instead of only after the next disk
+            // save reseeds it via coop_merge_advancements_modern. Skip if the advancement is assigned
+            // to another player, and never override a face already claimed. Harmless in singleplayer
+            // (player_uuid is empty); the merged-snapshot path passes no uuid, so its "best player"
+            // scan still owns the face there.
+            if (player_uuid && player_uuid[0] != '\0' && adv->first_contributor_uuid[0] == '\0' &&
+                coop_assignment_role(adv, player_uuid) != ASSIGN_SKIP) {
+                strncpy(adv->first_contributor_uuid, player_uuid,
+                        sizeof(adv->first_contributor_uuid) - 1);
+                adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+            }
         }
 
         // If Hermes says the whole advancement is now complete, mark it so.

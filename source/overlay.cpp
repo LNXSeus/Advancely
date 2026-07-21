@@ -1415,12 +1415,35 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             snprintf(key, sizeof(key), "advw|%s", a->root_name);
             consider(whole_kind, whole_kind, nullptr, key, 0, a->done, false,
                      nullptr, nullptr, a->icon_path, aname, false, adv_face);
-            snprintf(ptext, sizeof(ptext), "%s (%d/%d)", aname, a->completed_criteria_count,
-                     a->criteria_progress_total);
+            // Freeze each criterion's parent count at the moment it completes: several criteria of the
+            // same advancement landing in one frame (e.g. right after a world switch) must read
+            // (1/42), (2/42), ... in pop order rather than all jumping to the final total. Count how
+            // many are newly completing this frame and number up from the pre-frame total; grouped
+            // criteria (many raw -> one unit) clamp so a shown count never drops below 1.
+            int adv_newly_done = 0;
+            for (int j = 0; j < a->criteria_count; j++) {
+                TrackableItem *c = a->criteria[j];
+                if (!c || goal_is_hidden(c->is_hidden, settings) || !c->done) continue;
+                snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
+                auto it = eng.prev.find(key);
+                unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
+                if (compact_enc(0, true) > penc) adv_newly_done++;
+            }
+            int adv_shown = a->completed_criteria_count - adv_newly_done; // completed before this batch
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
                 if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
+                int shown = a->completed_criteria_count;
+                if (c->done) {
+                    auto it = eng.prev.find(key);
+                    unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
+                    if (compact_enc(0, true) > penc) {
+                        shown = ++adv_shown; // newly completing this frame -> next number in the batch
+                        if (shown < 1) shown = 1; // grouped criteria collapse to fewer units
+                    }
+                }
+                snprintf(ptext, sizeof(ptext), "%s (%d/%d)", aname, shown, a->criteria_progress_total);
                 consider(crit_kind, crit_kind, a->root_name, key, 0, c->done, true,
                          a->icon_path, ptext, c->icon_path,
                          compact_display_name(c->display_name, c->root_name), c->is_shared, adv_face);
@@ -1461,9 +1484,20 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // The category itself is manually checkable, so its parent line carries a box too.
                 const char *catbox = compact_done_box(settings, s->is_manually_completed, s->done);
                 char pbody[240];
-                snprintf(pbody, sizeof(pbody), "%s (%d/%d)", sname, s->completed_criteria_count,
-                         s->criteria_count);
-                compact_marked_line(ptext, sizeof(ptext), catbox, right_align, pbody);
+                // Freeze each sub-stat's parent count at the moment it completes (like the advancement
+                // criteria above): sub-stats finishing together in one frame read (1/N), (2/N), ... in
+                // pop order instead of all jumping to the final total. A sub-stat's encoded value also
+                // carries its progress, so "newly done" is the done bit (>= 1<<40) not yet recorded.
+                int sub_newly_done = 0;
+                for (int j = 0; j < s->criteria_count; j++) {
+                    TrackableItem *sub = s->criteria[j];
+                    if (!sub || goal_is_hidden(sub->is_hidden, settings) || !sub->done) continue;
+                    snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
+                    auto it = eng.prev.find(key);
+                    unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
+                    if (penc < (1ULL << 40)) sub_newly_done++;
+                }
+                int sub_shown = s->completed_criteria_count - sub_newly_done; // done before this batch
                 for (int j = 0; j < s->criteria_count; j++) {
                     TrackableItem *sub = s->criteria[j];
                     if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
@@ -1479,6 +1513,18 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                         snprintf(subbody, sizeof(subbody), "%s (%d)", subname, sub->progress);
                     compact_marked_line(itext, sizeof(itext), subbox, right_align, subbody);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
+                    // Parent count frozen at this sub-stat's completion moment (incremental in a batch).
+                    int pshown = s->completed_criteria_count;
+                    if (sub->done) {
+                        auto it = eng.prev.find(key);
+                        unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
+                        if (penc < (1ULL << 40)) { // newly completing this frame
+                            pshown = ++sub_shown;
+                            if (pshown < 1) pshown = 1; // grouped/edge safety
+                        }
+                    }
+                    snprintf(pbody, sizeof(pbody), "%s (%d/%d)", sname, pshown, s->criteria_count);
+                    compact_marked_line(ptext, sizeof(ptext), catbox, right_align, pbody);
                     // Lone manual completer, else the highest contributor (HIGHEST merge only), matching
                     // the tracker's sub-stat manual-checkbox face and right-of-icon contributor face.
                     const char *sub_face = nullptr;
@@ -1599,7 +1645,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     }
 
     float icon_size = settings->compact_pop_icon_size;
-    float line_h = icon_size + COMPACT_POP_LINE_GAP;
+    float face_size = settings->compact_stack_face_size;
+    // A stack face taller than the pop icon grows the whole line box (and, via the matching reserve in
+    // overlay_render_compact, the window height) so a bigger face never overflows its row or the window.
+    float line_box = fmaxf(icon_size, face_size);
+    float line_h = line_box + COMPACT_POP_LINE_GAP;
     int max_lines = settings->compact_stack_max_lines;
 
     // Expire by hold: a group whose hold has run out just disappears (no slide-off). Iterate back to
@@ -1650,24 +1700,30 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     if (clip.h < 0) clip.h = 0;
     SDL_SetRenderClipRect(o->renderer, &clip);
 
-    // Reserve a face-sized slot right of the icon on every line while co-op faces are active, so the
-    // text left edge stays aligned whether or not a given line credits a single player.
-    float face_slot = faces_on ? (icon_size + COMPACT_POP_FACE_GAP) : 0.0f;
+    // A co-op contributor face rides a line only when that line actually draws it: the slot (and the
+    // text shift it causes) is reserved per line, so lines with no face - including a two-line group's
+    // parent line - keep their text flush against the icon. Face size is independent of the pop icon
+    // size, and a face taller than the icon is centered within the (grown) line box.
     // Left-aligned: icon at stack_x, then the face slot, then the text. Right-aligned mirrors the row
     // about the panel's right edge (stack_x + panel_w): the icon sits flush to that edge, the face to
     // its left, and the text is right-aligned to the face slot's left.
     float stack_right = stack_x + panel_w;
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
-                         const std::string &shared_icon, const std::string &face_uuid) {
+                         const std::string &shared_icon, const std::string &face_uuid, bool draw_face) {
+        // Only the line that draws the face reserves its slot, so the text shifts only when a head
+        // actually displays (a two-line group's parent passes draw_face = false and stays flush).
+        bool show_face = faces_on && draw_face && !face_uuid.empty();
+        float face_slot = show_face ? (face_size + COMPACT_POP_FACE_GAP) : 0.0f;
         float icon_x = right_align ? (stack_right - icon_size) : stack_x;
         float face_x = right_align ? (stack_right - icon_size - face_slot)
                                    : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
-        compact_draw_icon(o, icon.c_str(), icon_x, ly, icon_size);
+        float icon_y = ly + (line_box - icon_size) / 2.0f;
+        compact_draw_icon(o, icon.c_str(), icon_x, icon_y, icon_size);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
-            compact_draw_icon(o, shared_icon.c_str(), icon_x, ly, settings->compact_stack_shared_icon_size);
-        if (faces_on && !face_uuid.empty()) {
+            compact_draw_icon(o, shared_icon.c_str(), icon_x, icon_y, settings->compact_stack_shared_icon_size);
+        if (show_face) {
             AccountType acc = overlay_coop_account_type(o, face_uuid.c_str());
-            compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly, icon_size);
+            compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly + (line_box - face_size) / 2.0f, face_size);
         }
         if (!text.empty()) {
             SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
@@ -1677,7 +1733,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 float text_x = right_align
                                    ? (stack_right - icon_size - face_slot - COMPACT_POP_TEXT_GAP - tw)
                                    : (stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP);
-                SDL_FRect d = {snap_px(text_x), snap_px(ly + (icon_size - th) / 2.0f), tw, th};
+                SDL_FRect d = {snap_px(text_x), snap_px(ly + (line_box - th) / 2.0f), tw, th};
                 SDL_RenderTexture(o->renderer, tt, nullptr, &d);
             }
         }
@@ -1685,10 +1741,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     for (auto &g : eng.groups) {
         if (g.two_line) {
             // The face rides the item (completed) line; the parent line reserves the slot but shows none.
-            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, std::string());
-            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon, g.face_uuid);
+            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, g.face_uuid, false);
+            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon, g.face_uuid, true);
         } else {
-            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon, g.face_uuid);
+            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon, g.face_uuid, true);
         }
     }
     SDL_SetRenderClipRect(o->renderer, nullptr);
@@ -1823,9 +1879,9 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         measure(buf);
     }
     cached_sig = sig;
-    // Always reserve the co-op contributor face slot (icon-sized) in the worst-case width, even in
-    // singleplayer, so the auto-fitted window never has to grow when a co-op face appears.
-    float face_slot = settings->compact_pop_icon_size + COMPACT_POP_FACE_GAP;
+    // Always reserve the co-op contributor face slot in the worst-case width, even in singleplayer, so
+    // the auto-fitted window never has to grow when a co-op face appears.
+    float face_slot = settings->compact_stack_face_size + COMPACT_POP_FACE_GAP;
     cached_w = (max_text <= 0.0f)
                    ? 0.0f
                    : (settings->compact_pop_icon_size + face_slot + COMPACT_POP_TEXT_GAP + max_text);
@@ -2284,7 +2340,10 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // Reserve room below the panel for the pop-out stack: a pad-sized gap then the full line budget
     // (a 2-line group uses 2 lines). The window height is thus fixed for the whole run (inputs are
     // settings), so the stack always has space and the empty area below is transparent / keyed out.
-    float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
+    // Match compact_render_stack's line box: a stack face bigger than the pop icon grows each line so
+    // the reserved height (and the window) always fits the taller face.
+    float stack_line_h = fmaxf(settings->compact_pop_icon_size, settings->compact_stack_face_size) +
+                         COMPACT_POP_LINE_GAP;
     float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
 
     // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged

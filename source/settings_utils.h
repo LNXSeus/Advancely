@@ -177,7 +177,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_STACK_HOLD_TIME 8.0f // Seconds a pop-out holds before it leaves the stack
 #define COMPACT_STACK_HOLD_TIME_INFINITE (-1.0f) // -1 = infinite: a pop-out only leaves on overflow
 #define COMPACT_STACK_HOLD_TIME_MIN 0.5f
-#define COMPACT_STACK_HOLD_TIME_MAX 120.0f
+#define COMPACT_STACK_HOLD_TIME_MAX 240.0f
 #define DEFAULT_COMPACT_STACK_RISE_TIME 0.25f // Seconds a pop-out takes to slide into place
 #define COMPACT_STACK_RISE_TIME_MIN 0.0f
 #define COMPACT_STACK_RISE_TIME_MAX 5.0f
@@ -274,6 +274,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_LABEL_FONT_SIZE 24.0f
 #define DEFAULT_COMPACT_COUNT_FONT_SIZE 48.0f
 #define DEFAULT_COMPACT_STACK_FONT_SIZE 20.0f
+// Co-op contributor face size on a pop-out stack line. Independent of the pop icon size; defaults to
+// the stack text size so a face matches the line's text out of the box.
+#define DEFAULT_COMPACT_STACK_FACE_SIZE DEFAULT_COMPACT_STACK_FONT_SIZE
+#define COMPACT_STACK_FACE_SIZE_MIN 8.0f
+#define COMPACT_STACK_FACE_SIZE_MAX 96.0f
 
 #define DEFAULT_OVERLAY_FONT_SIZE 24.0f // Default point size for both overlay text sizes (top bar and rows)
 #define OVERLAY_FONT_SIZE_MIN 8.0f
@@ -519,6 +524,7 @@ struct AppSettings {
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.
     float compact_pop_icon_size; // Pop-out line icon size.
     float compact_stack_shared_icon_size; // Shared-parent overlay icon size on a pop-out line.
+    float compact_stack_face_size; // Co-op contributor face size on a pop-out line.
     // Co-op: pinned player face for a specific-player/ghost view, drawn at the panel's bottom-right.
     // Size 0 hides it; offsets inset the face's bottom-right corner from the panel's bottom-right.
     float compact_coop_panel_face_size;

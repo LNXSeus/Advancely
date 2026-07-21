@@ -623,6 +623,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
         a->compact_pop_icon_size != b->compact_pop_icon_size ||
         a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
+        a->compact_stack_face_size != b->compact_stack_face_size ||
         a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
         a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
         a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
@@ -831,6 +832,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
         a->compact_pop_icon_size != b->compact_pop_icon_size ||
         a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
+        a->compact_stack_face_size != b->compact_stack_face_size ||
         a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
         a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
         a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
@@ -5903,6 +5905,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "always kept fully inside the overlay window.\n"
                                          "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y);
                                 ImGui::SetTooltip("%s", compact_coop_face_y_tooltip_buffer);
+                            }
+
+                            // Per-line contributor face shown on each pop-out stack line in the All Players view.
+                            if (ImGui::DragFloat("Stack Face Size", &temp_settings.compact_stack_face_size, 0.5f,
+                                                 COMPACT_STACK_FACE_SIZE_MIN, COMPACT_STACK_FACE_SIZE_MAX, "%.0f")) {
+                                if (temp_settings.compact_stack_face_size < COMPACT_STACK_FACE_SIZE_MIN)
+                                    temp_settings.compact_stack_face_size = COMPACT_STACK_FACE_SIZE_MIN;
+                                if (temp_settings.compact_stack_face_size > COMPACT_STACK_FACE_SIZE_MAX)
+                                    temp_settings.compact_stack_face_size = COMPACT_STACK_FACE_SIZE_MAX;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char compact_stack_face_tooltip_buffer[512];
+                                snprintf(compact_stack_face_tooltip_buffer, sizeof(compact_stack_face_tooltip_buffer),
+                                         "Compact overlay only: the size of the contributor face that rides each\n"
+                                         "pop-out stack line in the All Players view (needs Show Contributor Faces\n"
+                                         "on, above). Independent of the pop-out icon size; a line reserves room for\n"
+                                         "the face only when it credits a single player.\n"
+                                         "Default: %.0f", DEFAULT_COMPACT_STACK_FACE_SIZE);
+                                ImGui::SetTooltip("%s", compact_stack_face_tooltip_buffer);
                             }
                         }
 
