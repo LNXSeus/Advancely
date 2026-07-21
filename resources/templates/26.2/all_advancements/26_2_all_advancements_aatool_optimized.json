@@ -197,7 +197,7 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:nether_wastes":	{
-					"icon":	"neBiomes/nether_wastes.png"
+					"icon":	"neBiomes/26.2+/nether_wastes.png"
 				},
 				"minecraft:crimson_forest":	{
 					"icon":	"neBiomes/crimson_forest.png"

@@ -565,7 +565,7 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"minecraft:nether_wastes":	{
-					"icon":	"neBiomes/nether_wastes.png"
+					"icon":	"neBiomes/26.2+/nether_wastes.png"
 				},
 				"minecraft:warped_forest":	{
 					"icon":	"neBiomes/warped_forest.png"
