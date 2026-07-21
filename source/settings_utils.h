@@ -171,6 +171,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION (-1.2f) // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction
 
 // Compact pop-out stack (goals slide out from under the panel as they progress/complete).
+#define DEFAULT_COMPACT_STACK_ROW_GAP 8.0f // On-screen px between the panel and the pop-out stack below it
+#define COMPACT_STACK_ROW_GAP_MIN 0.0f
+#define COMPACT_STACK_ROW_GAP_MAX 512.0f
 #define DEFAULT_COMPACT_STACK_MAX_LINES 6 // Line budget below the panel; a 2-line group uses 2 lines
 #define COMPACT_STACK_MAX_LINES_MIN 1
 #define COMPACT_STACK_MAX_LINES_MAX 64
@@ -519,6 +522,7 @@ struct AppSettings {
     // count line and the pop-out stack). Off also stops a bare completion from popping a line, since with
     // no marker the line looks identical before and after; value changes still pop when Pop On Progress is on.
     bool compact_show_completion_markers;
+    float compact_stack_row_gap; // On-screen px between the panel and the pop-out stack below it.
     int compact_stack_max_lines; // Line budget for the stack below the panel (a 2-line group uses 2).
     float compact_stack_hold_time; // Seconds a pop-out holds before it leaves the stack.
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.

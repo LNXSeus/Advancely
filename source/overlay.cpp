@@ -2344,7 +2344,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // the reserved height (and the window) always fits the taller face.
     float stack_line_h = fmaxf(settings->compact_pop_icon_size, settings->compact_stack_face_size) +
                          COMPACT_POP_LINE_GAP;
-    float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
+    float stack_reserve = settings->compact_stack_row_gap +
+                          (float) settings->compact_stack_max_lines * stack_line_h;
 
     // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged
     // to fit the panel width and flipped on their own timer. Built here so its height feeds the window
@@ -2459,7 +2460,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // slot if no goal is using it. Both always left-align to the panel's left edge regardless of the
     // panel alignment setting.
     float panel_bottom = panel_y + panel_h;
-    float stack_top = snap_px(panel_bottom + pad);
+    float stack_top = snap_px(panel_bottom + settings->compact_stack_row_gap);
     compact_render_stack(o, t, settings, panel_x, panel_w, panel_bottom, stack_top, want_h, text_color);
     compact_render_promo_line(o, t, settings, panel_x, panel_w, panel_bottom, stack_top, want_w, text_color);
 }
@@ -2507,7 +2508,8 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
                                   settings->compact_panel_pixel_scale);
         float panel_h = label_lh + line_gap + count_lh - (float) count_descent + 2.0f * pad + border_y;
         float stack_line_h = settings->compact_pop_icon_size + COMPACT_POP_LINE_GAP;
-        float stack_reserve = pad + (float) settings->compact_stack_max_lines * stack_line_h;
+        float stack_reserve = settings->compact_stack_row_gap +
+                              (float) settings->compact_stack_max_lines * stack_line_h;
         // Reserve the row-1 icon strip above the panel when it is enabled. No template is loaded yet
         // here, so this assumes there will be icons to show; overlay_render_compact shrinks the window
         // if the loaded template has none. Matches the reserve math there (icon size + gap below).

@@ -618,6 +618,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
+        a->compact_stack_row_gap != b->compact_stack_row_gap ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
         a->compact_stack_hold_time != b->compact_stack_hold_time ||
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
@@ -827,6 +828,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
+        a->compact_stack_row_gap != b->compact_stack_row_gap ||
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
         a->compact_stack_hold_time != b->compact_stack_hold_time ||
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
@@ -4223,6 +4225,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Off also stops a bare completion from popping a line.\n"
                                  "Default: %s", DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS ? "On" : "Off");
                         ImGui::SetTooltip("%s", compact_show_markers_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Stack Gap Below", &temp_settings.compact_stack_row_gap, 0.5f,
+                                         COMPACT_STACK_ROW_GAP_MIN, COMPACT_STACK_ROW_GAP_MAX, "%.0f px")) {
+                        if (temp_settings.compact_stack_row_gap < COMPACT_STACK_ROW_GAP_MIN)
+                            temp_settings.compact_stack_row_gap = COMPACT_STACK_ROW_GAP_MIN;
+                        if (temp_settings.compact_stack_row_gap > COMPACT_STACK_ROW_GAP_MAX)
+                            temp_settings.compact_stack_row_gap = COMPACT_STACK_ROW_GAP_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_stack_gap_tooltip_buffer[384];
+                        snprintf(compact_stack_gap_tooltip_buffer, sizeof(compact_stack_gap_tooltip_buffer),
+                                 "Vertical space in on-screen pixels between the panel and\n"
+                                 "the pop-out stack below it.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_STACK_ROW_GAP);
+                        ImGui::SetTooltip("%s", compact_stack_gap_tooltip_buffer);
                     }
 
                     if (ImGui::DragInt("Max Stack Lines", &temp_settings.compact_stack_max_lines, 0.1f,
