@@ -280,7 +280,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
-        char tip[700];
+        char tip[800];
         if (is_cycle)
             snprintf(tip, sizeof(tip),
                      "Each checked goal type adds one big \"label over count\" entry to the panel's\n"
@@ -291,11 +291,13 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         else
             snprintf(tip, sizeof(tip),
                      "Whole-goal types that pop into the stack when they complete. Only kinds without their\n"
-                     "own dropdown are listed here (advancements, recipes, unlocks). Criteria, stats, custom\n"
-                     "goals, multi-stage goals and counters are chosen per goal in the dropdowns below instead.\n"
+                     "own dropdown are listed here (simple advancements, simple recipes, unlocks). A SIMPLE\n"
+                     "advancement / recipe has no trackable criteria; complex ones are chosen per goal in the\n"
+                     "dropdowns below (so they pop once, via their criteria, instead of twice). Criteria,\n"
+                     "stats, custom goals, multi-stage goals and counters are likewise chosen there.\n"
                      "The totals count only goals that can actually pop: goals hidden in the template are\n"
                      "left out unless \"Show Hidden Goals\" is on, and a type with none left is not listed.\n"
-                     "Shift+Click to range-select. Default: Advancements.");
+                     "Shift+Click to range-select. Default: Simple Advancements.");
         ImGui::SetTooltip("%s", tip);
     }
     // Select All / Deselect All for the type list (only affects the types actually shown).
@@ -4135,6 +4137,35 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // counts leave hidden goals out: an optimized template shows how many
                         // advancements can really appear, and "Show Hidden Goals" brings the rest back.
                         compact_compute_type_counters(sctd, sver, scc, temp_settings.overlay_show_hidden_goals);
+
+                        // In the stack, a whole advancement / recipe only pops when it is SIMPLE (no
+                        // trackable criteria); complex ones pop through their own criteria dropdown below.
+                        // So recompute these two type rows to count only simple goals and relabel them,
+                        // instead of the real totals the cycle uses. Mirrors the counter's hidden rule
+                        // (a hidden goal counts only when "Show Hidden Goals" is on).
+                        {
+                            bool count_hidden = temp_settings.overlay_show_hidden_goals;
+                            int simple_adv_done = 0, simple_adv_total = 0;
+                            int simple_rec_done = 0, simple_rec_total = 0;
+                            for (int i = 0; i < sctd->advancement_count; i++) {
+                                const TrackableCategory *a = sctd->advancements[i];
+                                if (!a || a->criteria_count > 0) continue; // complex -> chosen in the dropdown below
+                                if (!count_hidden && a->is_hidden) continue;
+                                if (a->is_recipe) { simple_rec_total++; if (a->done) simple_rec_done++; }
+                                else { simple_adv_total++; if (a->done) simple_adv_done++; }
+                            }
+                            CompactCounter *sadv = &scc[COMPACT_COUNTER_ADVANCEMENTS];
+                            sadv->completed = simple_adv_done;
+                            sadv->total = simple_adv_total;
+                            snprintf(sadv->label, sizeof(sadv->label), "Simple %s",
+                                     smodern ? "Advancements" : "Achievements");
+                            if (smodern) {
+                                CompactCounter *srec = &scc[COMPACT_COUNTER_RECIPES];
+                                srec->completed = simple_rec_done;
+                                srec->total = simple_rec_total;
+                                snprintf(srec->label, sizeof(srec->label), "Simple Recipes");
+                            }
+                        }
 
                         static int s_stack_type_anchor = -1;
                         static int s_stack_item_anchor[COMPACT_COUNTER_TYPE_COUNT];

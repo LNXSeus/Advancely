@@ -1185,9 +1185,11 @@ static void compact_ms_label(char *buf, size_t buf_sz, const char *name) {
     buf[n] = '\0';
 }
 
-// Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): regular
-// advancements, recipes and unlocks pop as whole completions. Every other kind is chosen per-goal in
-// its own dropdown, so its type toggle is ignored (avoids the confusing overlap).
+// Goal-type kinds that have NO individual-goal dropdown (only a whole-type toggle): simple
+// advancements, simple recipes and unlocks pop as whole completions. Complex advancements / recipes
+// (those with trackable criteria) are the exception: they are chosen per-goal in the criteria
+// dropdown instead, so the whole-type toggle covers only the simple ones (see the pop diff walk).
+// Every other kind is chosen per-goal in its own dropdown, so its type toggle is ignored.
 static bool compact_type_is_pickerless(OverlayCompactCounterType k) {
     return k == COMPACT_COUNTER_ADVANCEMENTS || k == COMPACT_COUNTER_RECIPES ||
            k == COMPACT_COUNTER_UNLOCKS;
@@ -1412,9 +1414,14 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             // First completer (simple = who got it; complex-assigned = the current leader), like the
             // tracker's advancement face and its right-of-icon criterion face.
             const char *adv_face = (faces_on && a->first_contributor_uuid[0]) ? a->first_contributor_uuid : nullptr;
-            snprintf(key, sizeof(key), "advw|%s", a->root_name);
-            consider(whole_kind, whole_kind, nullptr, key, 0, a->done, false,
-                     nullptr, nullptr, a->icon_path, aname, false, adv_face);
+            // Only SIMPLE advancements / recipes (no trackable criteria) pop as a whole-goal line via their
+            // type toggle ("Simple Advancements"). A complex one pops only through its own criteria, chosen
+            // in the dropdown below, so popping the whole line too would double up when it completes.
+            if (a->criteria_count == 0) {
+                snprintf(key, sizeof(key), "advw|%s", a->root_name);
+                consider(whole_kind, whole_kind, nullptr, key, 0, a->done, false,
+                         nullptr, nullptr, a->icon_path, aname, false, adv_face);
+            }
             // Freeze each criterion's parent count at the moment it completes: several criteria of the
             // same advancement landing in one frame (e.g. right after a world switch) must read
             // (1/42), (2/42), ... in pop order rather than all jumping to the final total. Count how
@@ -1783,7 +1790,9 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         OverlayCompactCounterType wk = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
         OverlayCompactCounterType ck = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
         const char *an = compact_display_name(a->display_name, a->root_name);
-        if (compact_stack_allows(settings, wk, wk, nullptr)) measure(an);
+        // Only simple goals pop as a whole-goal line (complex ones pop via their criteria), so only
+        // they contribute the bare-name width here.
+        if (a->criteria_count == 0 && compact_stack_allows(settings, wk, wk, nullptr)) measure(an);
         if (compact_stack_allows(settings, ck, ck, a->root_name)) {
             compact_worst_count(cnt, sizeof(cnt), a->criteria_progress_total, wdig);
             snprintf(buf, sizeof(buf), "%s (%s)", an, cnt);
