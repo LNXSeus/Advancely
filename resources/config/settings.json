@@ -194,7 +194,7 @@
 		"compact_stack_pop_on_progress":	[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
 		"compact_show_completion_markers":	true,
 		"compact_stack_max_lines":	6,
-		"compact_stack_hold_time":	8,
+		"compact_stack_hold_time":	60,
 		"compact_stack_rise_time":	0.25,
 		"compact_pop_icon_size":	36,
 		"compact_stack_shared_icon_size":	24,
