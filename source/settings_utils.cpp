@@ -790,7 +790,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Overlay Defaults
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
-    settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+    settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
     settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
     settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -1784,7 +1784,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             if (settings->compact_row1_clear_animation > 10.0f) settings->compact_row1_clear_animation = 10.0f;
         } else { settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION; defaults_were_used = true; }
 
-        // Shared-parent overlay size on a strip icon. The upper cap against overlay_row1_icon_size is
+        // Shared-parent overlay size on a strip icon. The upper cap against compact_row1_icon_size is
         // applied later, once that value has been read (it loads after this compact block).
         const cJSON *compact_icon_shared = cJSON_GetObjectItem(visual_settings, "compact_icon_shared_size");
         if (compact_icon_shared && cJSON_IsNumber(compact_icon_shared)) {
@@ -1970,23 +1970,23 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
-        const cJSON *row1_icon_size_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_icon_size");
+        const cJSON *row1_icon_size_json = cJSON_GetObjectItem(visual_settings, "compact_row1_icon_size");
         if (row1_icon_size_json && cJSON_IsNumber(row1_icon_size_json)) {
-            settings->overlay_row1_icon_size = (float) row1_icon_size_json->valuedouble;
-            if (settings->overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
-                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
-            if (settings->overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
-                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+            settings->compact_row1_icon_size = (float) row1_icon_size_json->valuedouble;
+            if (settings->compact_row1_icon_size < COMPACT_ROW1_ICON_SIZE_MIN)
+                settings->compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MIN;
+            if (settings->compact_row1_icon_size > COMPACT_ROW1_ICON_SIZE_MAX)
+                settings->compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MAX;
         } else {
-            settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+            settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
             defaults_were_used = true;
         }
 
         // Now that the strip icon size is known, cap the strip's shared-parent overlay to it (it is
         // drawn ON that icon). Done here, after the if/else, so it also covers the default-fallback path
         // and a hand-edited config can't trip the Unsaved-Changes flag when the settings window opens.
-        if (settings->compact_icon_shared_size > settings->overlay_row1_icon_size)
-            settings->compact_icon_shared_size = settings->overlay_row1_icon_size;
+        if (settings->compact_icon_shared_size > settings->compact_row1_icon_size)
+            settings->compact_icon_shared_size = settings->compact_row1_icon_size;
 
         const cJSON *row1_shared_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_shared_icon_size");
         if (row1_shared_json && cJSON_IsNumber(row1_shared_json)) {
@@ -2301,7 +2301,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
-        settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+        settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
         settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
         settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -3206,9 +3206,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
-        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_icon_size");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row1_icon_size",
-                              cJSON_CreateNumber(settings->overlay_row1_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "compact_row1_icon_size",
+                              cJSON_CreateNumber(settings->compact_row1_icon_size));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size",
                               cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));

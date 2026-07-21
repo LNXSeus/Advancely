@@ -204,7 +204,7 @@
 		"compact_coop_panel_face_offset_x":	-10,
 		"compact_coop_panel_face_offset_y":	-10,
 		"overlay_row1_spacing":	8,
-		"overlay_row1_icon_size":	48,
+		"compact_row1_icon_size":	36,
 		"overlay_row1_shared_icon_size":	32,
 		"overlay_row2_custom_spacing_enabled":	false,
 		"overlay_row2_custom_spacing":	192,

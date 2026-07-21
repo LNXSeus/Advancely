@@ -124,9 +124,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW1_SPACING 8.0f // Default spacing in pixels between row 1 icons
 // Compact-mode row-1 icon strip size. Defaults to the same size as the pop-out stack icons
 // (DEFAULT_COMPACT_POP_ICON_SIZE) so the strip and the stack match out of the box.
-#define DEFAULT_OVERLAY_ROW1_ICON_SIZE DEFAULT_COMPACT_POP_ICON_SIZE
-#define OVERLAY_ROW1_ICON_SIZE_MIN 8.0f
-#define OVERLAY_ROW1_ICON_SIZE_MAX 96.0f
+#define DEFAULT_COMPACT_ROW1_ICON_SIZE DEFAULT_COMPACT_POP_ICON_SIZE
+#define COMPACT_ROW1_ICON_SIZE_MIN 8.0f
+#define COMPACT_ROW1_ICON_SIZE_MAX 96.0f
 #define DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE 32.0f // Default shared icon size in pixels for row 1
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED false
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING 192.0f // 96px icon + more (took spacing from 1.16 AA template)
@@ -166,7 +166,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_ICON_ROW_GAP_MIN 0.0f
 #define COMPACT_ICON_ROW_GAP_MAX 512.0f
 #define DEFAULT_COMPACT_ICON_SHARED_SIZE 24.0f // Shared-parent overlay icon size on a strip icon (matches the stack default)
-#define COMPACT_ICON_SHARED_SIZE_MIN 0.0f // Upper bound is the strip icon it is drawn on (overlay_row1_icon_size)
+#define COMPACT_ICON_SHARED_SIZE_MIN 0.0f // Upper bound is the strip icon it is drawn on (compact_row1_icon_size)
 #define DEFAULT_COMPACT_ROW1_SPACING 8.0f // Horizontal px between icons in the compact-mode row-1 strip
 #define DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION (-1.2f) // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction
 
@@ -551,7 +551,7 @@ struct AppSettings {
     bool invert_hiding_mode; // Inverts each hiding mode: hide/fade incomplete instead of completed
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
-    float overlay_row1_icon_size; // Icon size for Row 1 (shared by belt/page and the compact icon strip).
+    float compact_row1_icon_size; // Icon size for the compact-mode row-1 icon strip.
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1
     bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
     float overlay_row2_custom_spacing; // The custom spacing value for row 2

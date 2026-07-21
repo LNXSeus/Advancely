@@ -633,7 +633,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
-        a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
+        a->compact_row1_icon_size != b->compact_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -861,7 +861,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
 
         // Row spacing / sizing.
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
-        a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
+        a->compact_row1_icon_size != b->compact_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -3832,33 +3832,33 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     if (temp_settings.compact_show_row1_icons) {
-                        if (ImGui::DragFloat("Icon Size##CompactRow1Icons", &temp_settings.overlay_row1_icon_size,
-                                             1.0f, OVERLAY_ROW1_ICON_SIZE_MIN, OVERLAY_ROW1_ICON_SIZE_MAX, "%.0f px")) {
-                            if (temp_settings.overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
-                                temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
-                            if (temp_settings.overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
-                                temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+                        if (ImGui::DragFloat("Icon Size##CompactRow1Icons", &temp_settings.compact_row1_icon_size,
+                                             1.0f, COMPACT_ROW1_ICON_SIZE_MIN, COMPACT_ROW1_ICON_SIZE_MAX, "%.0f px")) {
+                            if (temp_settings.compact_row1_icon_size < COMPACT_ROW1_ICON_SIZE_MIN)
+                                temp_settings.compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MIN;
+                            if (temp_settings.compact_row1_icon_size > COMPACT_ROW1_ICON_SIZE_MAX)
+                                temp_settings.compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MAX;
                         }
                         if (ImGui::IsItemHovered()) {
                             char compact_icon_size_tooltip_buffer[384];
                             snprintf(compact_icon_size_tooltip_buffer, sizeof(compact_icon_size_tooltip_buffer),
                                      "Size in on-screen pixels of each icon in the strip above the panel.\n"
                                      "Defaults to the pop-out stack icon size so the two match.\n"
-                                     "Default: %.0f px", DEFAULT_OVERLAY_ROW1_ICON_SIZE);
+                                     "Default: %.0f px", DEFAULT_COMPACT_ROW1_ICON_SIZE);
                             ImGui::SetTooltip("%s", compact_icon_size_tooltip_buffer);
                         }
 
                         // The shared icon is drawn on top of the strip icon, so it can never be bigger
                         // than it: that is its upper bound, and shrinking Icon Size above drags it down too.
-                        if (temp_settings.compact_icon_shared_size > temp_settings.overlay_row1_icon_size)
-                            temp_settings.compact_icon_shared_size = temp_settings.overlay_row1_icon_size;
+                        if (temp_settings.compact_icon_shared_size > temp_settings.compact_row1_icon_size)
+                            temp_settings.compact_icon_shared_size = temp_settings.compact_row1_icon_size;
                         if (ImGui::DragFloat("Shared Icon Size##CompactRow1Icons", &temp_settings.compact_icon_shared_size,
-                                             0.5f, COMPACT_ICON_SHARED_SIZE_MIN, temp_settings.overlay_row1_icon_size,
+                                             0.5f, COMPACT_ICON_SHARED_SIZE_MIN, temp_settings.compact_row1_icon_size,
                                              "%.0f")) {
                             if (temp_settings.compact_icon_shared_size < COMPACT_ICON_SHARED_SIZE_MIN)
                                 temp_settings.compact_icon_shared_size = COMPACT_ICON_SHARED_SIZE_MIN;
-                            if (temp_settings.compact_icon_shared_size > temp_settings.overlay_row1_icon_size)
-                                temp_settings.compact_icon_shared_size = temp_settings.overlay_row1_icon_size;
+                            if (temp_settings.compact_icon_shared_size > temp_settings.compact_row1_icon_size)
+                                temp_settings.compact_icon_shared_size = temp_settings.compact_row1_icon_size;
                         }
                         if (ImGui::IsItemHovered()) {
                             char compact_icon_shared_tooltip_buffer[512];
@@ -3867,7 +3867,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "strip (a criterion belonging to more than one advancement). 0 hides it.\n"
                                      "It sits on the strip icon, so Icon Size (%.0f) is its upper bound and\n"
                                      "lowering that lowers this with it.\n"
-                                     "Default: %.0f", temp_settings.overlay_row1_icon_size,
+                                     "Default: %.0f", temp_settings.compact_row1_icon_size,
                                      DEFAULT_COMPACT_ICON_SHARED_SIZE);
                             ImGui::SetTooltip("%s", compact_icon_shared_tooltip_buffer);
                         }

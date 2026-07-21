@@ -2363,7 +2363,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     std::vector<Row1Item> icon_items;
     std::vector<char> icon_removed;
     unsigned long long icon_sig = 0;
-    float icon_size = settings->overlay_row1_icon_size;
+    float icon_size = settings->compact_row1_icon_size;
     float icon_full_w = snap_px(icon_size + settings->compact_row1_spacing);
     bool have_icons = false;
     if (settings->compact_show_row1_icons && !run_complete) {
@@ -2523,7 +2523,7 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
         // here, so this assumes there will be icons to show; overlay_render_compact shrinks the window
         // if the loaded template has none. Matches the reserve math there (icon size + gap below).
         float icon_reserve = settings->compact_show_row1_icons
-                                 ? (settings->overlay_row1_icon_size + settings->compact_icon_row_gap)
+                                 ? (settings->compact_row1_icon_size + settings->compact_icon_row_gap)
                                  : 0.0f;
         o->layout_row1_y = 0.0f;
         o->layout_row2_y = 0.0f;
