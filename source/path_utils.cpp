@@ -82,7 +82,7 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
         struct passwd *pw = getpwuid(getuid());
         if (pw) home_dir = pw->pw_dir;
     }
-    if (home_dir) {
+    if (home_dir) { 
 #if __APPLE__
     snprintf(out_path, max_len, "%s/Library/Application Support/minecraft/saves", home_dir);
 #else
@@ -1284,7 +1284,7 @@ int list_setting_presets(char out_names[][SETTING_PRESET_NAME_LEN], int max_name
 
     // Keep only "<name>.json" entries, drop the extension, and exclude settings.json.
     std::vector<std::string> names;
-    for (auto &fname : presets) {
+    for (auto &fname: presets) {
         if (fname.size() <= 5) continue; // shorter than "x.json"
         if (fname.compare(fname.size() - 5, 5, ".json") != 0) continue;
         std::string base = fname.substr(0, fname.size() - 5);
@@ -1303,7 +1303,7 @@ int list_setting_presets(char out_names[][SETTING_PRESET_NAME_LEN], int max_name
     });
 
     int count = 0;
-    for (auto &n : names) {
+    for (auto &n: names) {
         if (count >= max_names) break;
         strncpy(out_names[count], n.c_str(), SETTING_PRESET_NAME_LEN - 1);
         out_names[count][SETTING_PRESET_NAME_LEN - 1] = '\0';

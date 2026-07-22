@@ -975,7 +975,8 @@ bool rename_template_files(const char *src_version, const char *src_category, co
     fs_ensure_directory_exists(dest_category_path);
 
     char dest_base_filename[MAX_PATH_LENGTH];
-    snprintf(dest_base_filename, sizeof(dest_base_filename), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
+    snprintf(dest_base_filename, sizeof(dest_base_filename), "%s_%s%s", dest_version_filename, dest_category,
+             dest_flag);
 
     // 5. Collect the suffixes of all associated source files first, then move them. Collecting up front
     // avoids enumerating files we create mid-scan when the destination shares the source directory.
@@ -2333,7 +2334,10 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
                 std::string got = lang_flag_from_filename(find_data.cFileName);
                 if (got == "<NOMATCH>") continue;
                 bool dup = false;
-                for (const auto &f: out) if (f == got) { dup = true; break; }
+                for (const auto &f: out) if (f == got) {
+                    dup = true;
+                    break;
+                }
                 if (!dup) out.push_back(std::move(got));
             } while (FindNextFileA(h_find, &find_data) != 0);
             FindClose(h_find);
@@ -2349,7 +2353,10 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
                 std::string got = lang_flag_from_filename(entry->d_name);
                 if (got == "<NOMATCH>") continue;
                 bool dup = false;
-                for (const auto &f: out) if (f == got) { dup = true; break; }
+                for (const auto &f: out) if (f == got) {
+                    dup = true;
+                    break;
+                }
                 if (!dup) out.push_back(std::move(got));
             }
             closedir(d);
@@ -2366,10 +2373,11 @@ std::vector<std::string> list_lang_flags_in_zip(const char *zip_path) {
         std::string got = lang_flag_from_filename(fs.m_filename);
         if (got == "<NOMATCH>") continue;
         bool dup = false;
-        for (const auto &f: out) if (f == got) {
-            dup = true;
-            break;
-        }
+        for (const auto &f: out)
+            if (f == got) {
+                dup = true;
+                break;
+            }
         if (!dup) out.push_back(std::move(got));
     }
     mz_zip_reader_end(&zip);
@@ -2459,7 +2467,10 @@ std::vector<std::string> list_layout_flags_in_zip(const char *zip_path) {
                 std::string got = layout_flag_from_filename(find_data.cFileName);
                 if (got == "<NOMATCH>") continue;
                 bool dup = false;
-                for (const auto &f: out) if (f == got) { dup = true; break; }
+                for (const auto &f: out) if (f == got) {
+                    dup = true;
+                    break;
+                }
                 if (!dup) out.push_back(std::move(got));
             } while (FindNextFileA(h_find, &find_data) != 0);
             FindClose(h_find);
@@ -2475,7 +2486,10 @@ std::vector<std::string> list_layout_flags_in_zip(const char *zip_path) {
                 std::string got = layout_flag_from_filename(entry->d_name);
                 if (got == "<NOMATCH>") continue;
                 bool dup = false;
-                for (const auto &f: out) if (f == got) { dup = true; break; }
+                for (const auto &f: out) if (f == got) {
+                    dup = true;
+                    break;
+                }
                 if (!dup) out.push_back(std::move(got));
             }
             closedir(d);
@@ -2492,10 +2506,11 @@ std::vector<std::string> list_layout_flags_in_zip(const char *zip_path) {
         std::string got = layout_flag_from_filename(fs.m_filename);
         if (got == "<NOMATCH>") continue;
         bool dup = false;
-        for (const auto &f: out) if (f == got) {
-            dup = true;
-            break;
-        }
+        for (const auto &f: out)
+            if (f == got) {
+                dup = true;
+                break;
+            }
         if (!dup) out.push_back(std::move(got));
     }
     mz_zip_reader_end(&zip);

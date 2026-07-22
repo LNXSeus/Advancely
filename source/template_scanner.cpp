@@ -166,7 +166,10 @@ static void finalize_layout_flags(DiscoveredTemplate &dt) {
     if (dt.has_layout) {
         bool has_default = false;
         for (const auto &f: dt.available_layout_flags) {
-            if (f.empty()) { has_default = true; break; }
+            if (f.empty()) {
+                has_default = true;
+                break;
+            }
         }
         if (!has_default) dt.available_layout_flags.emplace_back("");
     }

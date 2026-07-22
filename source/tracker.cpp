@@ -156,7 +156,8 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
     if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
     if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
     if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
-                           || strcasecmp(search, "manual") == 0)) return true;
+                           || strcasecmp(search, "manual") == 0))
+        return true;
     return false;
 }
 
@@ -6089,15 +6090,33 @@ static ImVec2 rect_anchor_point(const ImVec2 &mn, const ImVec2 &mx, AnchorPoint 
     float cy = (mn.y + mx.y) * 0.5f;
     float x = cx, y = cy;
     switch (anchor) {
-        case ANCHOR_TOP_LEFT: x = mn.x; y = mn.y; break;
-        case ANCHOR_TOP_CENTER: x = cx; y = mn.y; break;
-        case ANCHOR_TOP_RIGHT: x = mx.x; y = mn.y; break;
-        case ANCHOR_CENTER_LEFT: x = mn.x; y = cy; break;
-        case ANCHOR_CENTER: x = cx; y = cy; break;
-        case ANCHOR_CENTER_RIGHT: x = mx.x; y = cy; break;
-        case ANCHOR_BOTTOM_LEFT: x = mn.x; y = mx.y; break;
-        case ANCHOR_BOTTOM_CENTER: x = cx; y = mx.y; break;
-        case ANCHOR_BOTTOM_RIGHT: x = mx.x; y = mx.y; break;
+        case ANCHOR_TOP_LEFT: x = mn.x;
+            y = mn.y;
+            break;
+        case ANCHOR_TOP_CENTER: x = cx;
+            y = mn.y;
+            break;
+        case ANCHOR_TOP_RIGHT: x = mx.x;
+            y = mn.y;
+            break;
+        case ANCHOR_CENTER_LEFT: x = mn.x;
+            y = cy;
+            break;
+        case ANCHOR_CENTER: x = cx;
+            y = cy;
+            break;
+        case ANCHOR_CENTER_RIGHT: x = mx.x;
+            y = cy;
+            break;
+        case ANCHOR_BOTTOM_LEFT: x = mn.x;
+            y = mx.y;
+            break;
+        case ANCHOR_BOTTOM_CENTER: x = cx;
+            y = mx.y;
+            break;
+        case ANCHOR_BOTTOM_RIGHT: x = mx.x;
+            y = mx.y;
+            break;
     }
     return ImVec2(x, y);
 }
@@ -6295,8 +6314,10 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     }
 
     // Register this item for selection rectangle hit-testing
-    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos, link, linkable,
-                                     visual_item_key});
+    s_visual_layout_items.push_back({
+        item_screen_pos, hit_box_size, &target_pos, link, linkable,
+        visual_item_key
+    });
 
     // Record this element's hierarchical parent so multi-drag can leave automatic children alone.
     s_visual_parent_map[&target_pos] = hierarchy_parent_pos;
@@ -7009,8 +7030,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // --- Calculate width needed for PARENT text (using main font size) ---
             float parent_text_required_width = 0.0f;
             parent_text_required_width = fmaxf(parent_text_required_width,
-                tracker_cached_name_width(cat->display_name, cat->cached_name_w, cat->cached_name_w_font,
-                                          settings->tracker_font_size, t->tracker_font->LegacySize));
+                                               tracker_cached_name_width(
+                                                   cat->display_name, cat->cached_name_w, cat->cached_name_w_font,
+                                                   settings->tracker_font_size, t->tracker_font->LegacySize));
 
             // Calculate width for the progress text below the parent
             char progress_text_width_calc[32] = "";
@@ -7033,8 +7055,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
             // Scale for progress text width calculation
             float progress_text_actual_width = tracker_cached_text_width(progress_text_width_calc,
-                cat->cached_prog_text, (int) sizeof(cat->cached_prog_text), cat->cached_prog_w, cat->cached_prog_font,
-                settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                                                                         cat->cached_prog_text,
+                                                                         (int) sizeof(cat->cached_prog_text),
+                                                                         cat->cached_prog_w, cat->cached_prog_font,
+                                                                         settings->tracker_sub_font_size,
+                                                                         t->tracker_font->LegacySize);
             parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width);
             // Ensure width accommodates progress text
 
@@ -7051,7 +7076,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_matches_search = parent_text_matches
-                                               || (child_matches_render && item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1))
+                                               || (child_matches_render && item_matches_search(
+                                                       crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1))
                                                || s_linked_sub.count(crit_link_key);
 
                     if (crit && !crit_should_hide_width && crit_matches_search) {
@@ -7074,8 +7100,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
                         }
                         float crit_progress_width = tracker_cached_text_width(crit_progress_text_width,
-                            crit->cached_prog_text, (int) sizeof(crit->cached_prog_text), crit->cached_prog_w,
-                            crit->cached_prog_font, sub_font_size, t->tracker_font->LegacySize);
+                                                                              crit->cached_prog_text,
+                                                                              (int) sizeof(crit->cached_prog_text),
+                                                                              crit->cached_prog_w,
+                                                                              crit->cached_prog_font, sub_font_size,
+                                                                              t->tracker_font->LegacySize);
                         float checkbox_width = (is_stat_section && cat->criteria_count > 1) ? (20 + 4) : 0;
                         // Checkbox + padding
                         float total_crit_width = 32 + 4 + checkbox_width + crit_text_width + (
@@ -7169,7 +7198,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     if (should_hide_crit_render) continue;
 
-                    bool crit_search = item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1);
+                    bool crit_search =
+                            item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1);
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_linked = s_linked_sub.count(crit_link_key) > 0;
 
@@ -7456,7 +7486,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float tex_w = 0.0f, tex_h = 0.0f;
                     SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
                     ImVec2 target_box_size = ImVec2(settings->adv_icon_size * t->zoom_level,
-                                                settings->adv_icon_size * t->zoom_level);
+                                                    settings->adv_icon_size * t->zoom_level);
                     // Target box size on screen
                     float scale_factor = 1.0f;
                     if (tex_w > 0 && tex_h > 0) {
@@ -7868,11 +7898,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImRect checkbox_rect(
                                 check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
                             bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                            bool crit_cb_visible = rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
-                                                   rect_in_reveal_radius(checkbox_rect.Min, checkbox_rect.Max,
-                                                                         settings->checkbox_reveal_enabled &&
-                                                                         !t->is_visual_layout_editing,
-                                                                         reveal_radius_screen_px(settings, t));
+                            bool crit_cb_visible =
+                                    rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
+                                    rect_in_reveal_radius(checkbox_rect.Min, checkbox_rect.Max,
+                                                          settings->checkbox_reveal_enabled &&
+                                                          !t->is_visual_layout_editing,
+                                                          reveal_radius_screen_px(settings, t));
 
                             // Coop: face under the manual-completion checkbox when a
                             // single player ticked it. Drawn before the semi-transparent
@@ -7910,9 +7941,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                                 if (crit->is_manually_completed && !t->is_visual_layout_editing) {
                                     // Draw checkmark
-                                    ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
-                                    ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
-                                    ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
+                                    ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level,
+                                                       check_pos.y + 10 * t->zoom_level);
+                                    ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level,
+                                                       check_pos.y + 15 * t->zoom_level);
+                                    ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level,
+                                                       check_pos.y + 6 * t->zoom_level);
                                     draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
                                     draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                                 }
@@ -8204,8 +8238,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     }
 
                                     if (text_reveal_ok(crit_progress_pos,
-                                                       ImVec2(crit_progress_pos.x + crit_progress_size.x * t->zoom_level,
-                                                              crit_progress_pos.y + crit_progress_size.y * t->zoom_level),
+                                                       ImVec2(
+                                                           crit_progress_pos.x + crit_progress_size.x * t->zoom_level,
+                                                           crit_progress_pos.y + crit_progress_size.y * t->zoom_level),
                                                        reveal_anchor(settings, crit->progress_pos, ANCHOR_TOP_LEFT),
                                                        io.DisplaySize, settings, t))
                                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
@@ -8881,7 +8916,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 if (text_reveal_ok(unlock_text_pos,
                                    ImVec2(unlock_text_pos.x + text_size.x * t->zoom_level,
                                           unlock_text_pos.y + text_size.y * t->zoom_level),
-                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings,
+                                   t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        unlock_text_pos, current_text_color, item->display_name);
 
@@ -9057,8 +9093,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                 // Scale for progress text width calculation
                 float progress_width = tracker_cached_text_width(progress_text_width_calc, item->cached_prog_text,
-                    (int) sizeof(item->cached_prog_text), item->cached_prog_w, item->cached_prog_font,
-                    settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                                                                 (int) sizeof(item->cached_prog_text),
+                                                                 item->cached_prog_w, item->cached_prog_font,
+                                                                 settings->tracker_sub_font_size,
+                                                                 t->tracker_font->LegacySize);
 
                 // The required width is the max of the main text width and the progress text width (as they are on separate lines)
                 float required_text_width = fmaxf(text_width, progress_width);
@@ -9372,7 +9410,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 if (text_reveal_ok(cg_text_pos,
                                    ImVec2(cg_text_pos.x + text_size.x * t->zoom_level,
                                           cg_text_pos.y + text_size.y * t->zoom_level),
-                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                   reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings,
+                                   t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        cg_text_pos, current_text_color, item->display_name);
 
@@ -9406,7 +9445,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         if (text_reveal_ok(cg_prog_pos,
                                            ImVec2(cg_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   cg_prog_pos.y + progress_text_size.y * t->zoom_level),
-                                           reveal_anchor(settings, item->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                           reveal_anchor(settings, item->progress_pos, ANCHOR_TOP_CENTER),
+                                           io.DisplaySize, settings, t))
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                cg_prog_pos, current_text_color, progress_text);
 
@@ -9673,8 +9713,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             snprintf(progress_text_calc, sizeof(progress_text_calc), "(%d / %d)",
                      goal->completed_count, goal->linked_goal_count);
             float progress_width = tracker_cached_text_width(progress_text_calc, goal->cached_prog_text,
-                (int) sizeof(goal->cached_prog_text), goal->cached_prog_w, goal->cached_prog_font,
-                settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                                                             (int) sizeof(goal->cached_prog_text), goal->cached_prog_w,
+                                                             goal->cached_prog_font,
+                                                             settings->tracker_sub_font_size,
+                                                             t->tracker_font->LegacySize);
 
             float required_text_width = fmaxf(text_width, progress_width);
             uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
@@ -9887,7 +9929,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 if (text_reveal_ok(counter_text_pos,
                                    ImVec2(counter_text_pos.x + text_size.x * t->zoom_level,
                                           counter_text_pos.y + text_size.y * t->zoom_level),
-                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings,
+                                   t))
                     draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                        counter_text_pos, current_text_color, goal->display_name);
 
@@ -10115,8 +10158,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 }
                 // Scale for stage text width calculation
                 float stage_width = tracker_cached_text_width(stage_text_width_calc, goal->cached_prog_text,
-                    (int) sizeof(goal->cached_prog_text), goal->cached_prog_w, goal->cached_prog_font,
-                    settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                                                              (int) sizeof(goal->cached_prog_text), goal->cached_prog_w,
+                                                              goal->cached_prog_font,
+                                                              settings->tracker_sub_font_size,
+                                                              t->tracker_font->LegacySize);
 
                 // Required width is the max needed for either line
                 float required_text_width = fmaxf(name_width, stage_width);
@@ -10402,7 +10447,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     text_reveal_ok(ms_text_pos,
                                    ImVec2(ms_text_pos.x + text_size.x * t->zoom_level,
                                           ms_text_pos.y + text_size.y * t->zoom_level),
-                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                   reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings,
+                                   t))
                     draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                        ms_text_pos, current_text_color, goal->display_name);
 
@@ -10437,7 +10483,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     text_reveal_ok(ms_stage_pos,
                                    ImVec2(ms_stage_pos.x + stage_text_size.x * t->zoom_level,
                                           ms_stage_pos.y + stage_text_size.y * t->zoom_level),
-                                   reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings, t))
+                                   reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
+                                   settings, t))
                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                        ms_stage_pos, current_text_color, stage_text); // Use formatted stage text
 
@@ -11679,7 +11726,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         "Show All (Inv.)",
     };
     float visibility_dropdown_width = 0.0f;
-    for (const char *label : visibility_labels) {
+    for (const char *label: visibility_labels) {
         float w = ImGui::CalcTextSize(label).x;
         if (w > visibility_dropdown_width) visibility_dropdown_width = w;
     }
@@ -11799,7 +11846,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::BulletText("recipe / rcp  - recipe advancements");
         ImGui::BulletText("pos / manual  - goals with custom manual-layout coordinates");
         ImGui::TextUnformatted("Row keywords match the overlay row a goal actually lands on, and show the\n"
-                               "goal itself only (an advancement matching \"r2\" is shown without its criteria).");
+            "goal itself only (an advancement matching \"r2\" is shown without its criteria).");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 
@@ -13879,8 +13926,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     cJSON *counter_goals_json = cJSON_GetObjectItem(template_json, "counter_goals");
     // Decorations come from the layout file when one is present (authoritative); otherwise
     // from the template itself. Decoration display text always stays in the language file.
-    cJSON *decorations_json = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
-                                          : cJSON_GetObjectItem(template_json, "decorations");
+    cJSON *decorations_json = layout_json
+                                  ? cJSON_GetObjectItem(layout_json, "decorations")
+                                  : cJSON_GetObjectItem(template_json, "decorations");
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);

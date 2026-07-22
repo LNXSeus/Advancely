@@ -576,7 +576,8 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
         bool present = false;
         switch (ci->kind) {
             case COMPACT_COUNTER_CRITERIA: // complex advancement (recipes are their own kind)
-            case COMPACT_COUNTER_RECIPE_CRITERIA: { // complex recipe
+            case COMPACT_COUNTER_RECIPE_CRITERIA: {
+                // complex recipe
                 bool want_recipe = (ci->kind == COMPACT_COUNTER_RECIPE_CRITERIA);
                 for (int j = 0; j < td->advancement_count && !present; j++) {
                     const TrackableCategory *a = td->advancements[j];
@@ -735,11 +736,14 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
     settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
     settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
-    strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT, sizeof(settings->compact_label_font_name) - 1);
+    strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT,
+            sizeof(settings->compact_label_font_name) - 1);
     settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
-    strncpy(settings->compact_count_font_name, DEFAULT_COMPACT_COUNT_FONT, sizeof(settings->compact_count_font_name) - 1);
+    strncpy(settings->compact_count_font_name, DEFAULT_COMPACT_COUNT_FONT,
+            sizeof(settings->compact_count_font_name) - 1);
     settings->compact_count_font_name[sizeof(settings->compact_count_font_name) - 1] = '\0';
-    strncpy(settings->compact_stack_font_name, DEFAULT_COMPACT_STACK_FONT, sizeof(settings->compact_stack_font_name) - 1);
+    strncpy(settings->compact_stack_font_name, DEFAULT_COMPACT_STACK_FONT,
+            sizeof(settings->compact_stack_font_name) - 1);
     settings->compact_stack_font_name[sizeof(settings->compact_stack_font_name) - 1] = '\0';
     settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
     settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
@@ -1589,16 +1593,28 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         // --- Icon size and position within the background texture ---
         const cJSON *icon_size_json = cJSON_GetObjectItem(visual_settings, "adv_icon_size");
-        if (icon_size_json && cJSON_IsNumber(icon_size_json)) settings->adv_icon_size = (float) icon_size_json->valuedouble;
-        else { settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE; defaults_were_used = true; }
+        if (icon_size_json && cJSON_IsNumber(icon_size_json))
+            settings->adv_icon_size = (float) icon_size_json->valuedouble;
+        else {
+            settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE;
+            defaults_were_used = true;
+        }
 
         const cJSON *icon_off_x_json = cJSON_GetObjectItem(visual_settings, "adv_icon_offset_x");
-        if (icon_off_x_json && cJSON_IsNumber(icon_off_x_json)) settings->adv_icon_offset_x = (float) icon_off_x_json->valuedouble;
-        else { settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X; defaults_were_used = true; }
+        if (icon_off_x_json && cJSON_IsNumber(icon_off_x_json))
+            settings->adv_icon_offset_x = (float) icon_off_x_json->valuedouble;
+        else {
+            settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
+            defaults_were_used = true;
+        }
 
         const cJSON *icon_off_y_json = cJSON_GetObjectItem(visual_settings, "adv_icon_offset_y");
-        if (icon_off_y_json && cJSON_IsNumber(icon_off_y_json)) settings->adv_icon_offset_y = (float) icon_off_y_json->valuedouble;
-        else { settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y; defaults_were_used = true; }
+        if (icon_off_y_json && cJSON_IsNumber(icon_off_y_json))
+            settings->adv_icon_offset_y = (float) icon_off_y_json->valuedouble;
+        else {
+            settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
+            defaults_were_used = true;
+        }
 
         // Clamp to valid bounds so the icon box always stays inside the 96x96 background.
         if (settings->adv_icon_size < ADV_ICON_MIN_SIZE) settings->adv_icon_size = ADV_ICON_MIN_SIZE;
@@ -1612,7 +1628,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         // --- Compact mode panel ---
         const cJSON *compact_path_json = cJSON_GetObjectItem(visual_settings, "compact_panel_path");
         if (compact_path_json && cJSON_IsString(compact_path_json)) {
-            strncpy(settings->compact_panel_path, compact_path_json->valuestring, sizeof(settings->compact_panel_path) - 1);
+            strncpy(settings->compact_panel_path, compact_path_json->valuestring,
+                    sizeof(settings->compact_panel_path) - 1);
             settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
         } else {
             strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
@@ -1622,30 +1639,51 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         const cJSON *compact_il = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_left");
         if (compact_il && cJSON_IsNumber(compact_il)) settings->compact_panel_inset_left = compact_il->valueint;
-        else { settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+        else {
+            settings->compact_panel_inset_left = DEFAULT_COMPACT_PANEL_INSET;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_ir = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_right");
         if (compact_ir && cJSON_IsNumber(compact_ir)) settings->compact_panel_inset_right = compact_ir->valueint;
-        else { settings->compact_panel_inset_right = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+        else {
+            settings->compact_panel_inset_right = DEFAULT_COMPACT_PANEL_INSET;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_it = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_top");
         if (compact_it && cJSON_IsNumber(compact_it)) settings->compact_panel_inset_top = compact_it->valueint;
-        else { settings->compact_panel_inset_top = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+        else {
+            settings->compact_panel_inset_top = DEFAULT_COMPACT_PANEL_INSET;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_ib = cJSON_GetObjectItem(visual_settings, "compact_panel_inset_bottom");
         if (compact_ib && cJSON_IsNumber(compact_ib)) settings->compact_panel_inset_bottom = compact_ib->valueint;
-        else { settings->compact_panel_inset_bottom = DEFAULT_COMPACT_PANEL_INSET; defaults_were_used = true; }
+        else {
+            settings->compact_panel_inset_bottom = DEFAULT_COMPACT_PANEL_INSET;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_scale = cJSON_GetObjectItem(visual_settings, "compact_panel_pixel_scale");
-        if (compact_scale && cJSON_IsNumber(compact_scale)) settings->compact_panel_pixel_scale = compact_scale->valueint;
-        else { settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE; defaults_were_used = true; }
+        if (compact_scale && cJSON_IsNumber(compact_scale))
+            settings->compact_panel_pixel_scale = compact_scale->valueint;
+        else {
+            settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_pad = cJSON_GetObjectItem(visual_settings, "compact_panel_padding");
-        if (compact_pad && cJSON_IsNumber(compact_pad)) settings->compact_panel_padding = (float) compact_pad->valuedouble;
-        else { settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING; defaults_were_used = true; }
+        if (compact_pad && cJSON_IsNumber(compact_pad))
+            settings->compact_panel_padding = (float) compact_pad->valuedouble;
+        else {
+            settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_align = cJSON_GetObjectItem(visual_settings, "compact_panel_align");
-        if (compact_align && cJSON_IsNumber(compact_align) && compact_align->valueint >= OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
+        if (compact_align && cJSON_IsNumber(compact_align) && compact_align->valueint >=
+            OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
             && compact_align->valueint <= OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) {
             settings->compact_panel_align = (OverlayProgressTextAlignment) compact_align->valueint;
         } else {
@@ -1692,22 +1730,34 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         const cJSON *compact_label_size = cJSON_GetObjectItem(visual_settings, "compact_label_font_size");
         if (compact_label_size && cJSON_IsNumber(compact_label_size))
             settings->compact_label_font_size = (float) compact_label_size->valuedouble;
-        else { settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE; defaults_were_used = true; }
+        else {
+            settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_count_size = cJSON_GetObjectItem(visual_settings, "compact_count_font_size");
         if (compact_count_size && cJSON_IsNumber(compact_count_size))
             settings->compact_count_font_size = (float) compact_count_size->valuedouble;
-        else { settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE; defaults_were_used = true; }
+        else {
+            settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_stack_size = cJSON_GetObjectItem(visual_settings, "compact_stack_font_size");
         if (compact_stack_size && cJSON_IsNumber(compact_stack_size))
             settings->compact_stack_font_size = (float) compact_stack_size->valuedouble;
-        else { settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE; defaults_were_used = true; }
+        else {
+            settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_panel_line_gap = cJSON_GetObjectItem(visual_settings, "compact_panel_line_gap");
         if (compact_panel_line_gap && cJSON_IsNumber(compact_panel_line_gap))
             settings->compact_panel_line_gap = (float) compact_panel_line_gap->valuedouble;
-        else { settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP; defaults_were_used = true; }
+        else {
+            settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_types = cJSON_GetObjectItem(visual_settings, "compact_cycle_types");
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
@@ -1750,13 +1800,19 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MIN;
             if (settings->compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
                 settings->compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
-        } else { settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL; defaults_were_used = true; }
+        } else {
+            settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+            defaults_were_used = true;
+        }
 
         // Row-1 icon strip above the panel.
         const cJSON *compact_show_icons = cJSON_GetObjectItem(visual_settings, "compact_show_row1_icons");
         if (compact_show_icons && cJSON_IsBool(compact_show_icons))
             settings->compact_show_row1_icons = cJSON_IsTrue(compact_show_icons);
-        else { settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS; defaults_were_used = true; }
+        else {
+            settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_icon_cycle = cJSON_GetObjectItem(visual_settings, "compact_icon_cycle_interval");
         if (compact_icon_cycle && cJSON_IsNumber(compact_icon_cycle)) {
@@ -1765,7 +1821,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MIN;
             if (settings->compact_icon_cycle_interval > COMPACT_ICON_CYCLE_INTERVAL_MAX)
                 settings->compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MAX;
-        } else { settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL; defaults_were_used = true; }
+        } else {
+            settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_icon_gap = cJSON_GetObjectItem(visual_settings, "compact_icon_row_gap");
         if (compact_icon_gap && cJSON_IsNumber(compact_icon_gap)) {
@@ -1774,21 +1833,30 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MIN;
             if (settings->compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
                 settings->compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
-        } else { settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP; defaults_were_used = true; }
+        } else {
+            settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_row1_spacing_json = cJSON_GetObjectItem(visual_settings, "compact_row1_spacing");
         if (compact_row1_spacing_json && cJSON_IsNumber(compact_row1_spacing_json)) {
             settings->compact_row1_spacing = (float) compact_row1_spacing_json->valuedouble;
             if (settings->compact_row1_spacing < 0.0f) settings->compact_row1_spacing = 0.0f;
             if (settings->compact_row1_spacing > 7680.0f) settings->compact_row1_spacing = 7680.0f;
-        } else { settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING; defaults_were_used = true; }
+        } else {
+            settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_row1_clear_json = cJSON_GetObjectItem(visual_settings, "compact_row1_clear_animation");
         if (compact_row1_clear_json && cJSON_IsNumber(compact_row1_clear_json)) {
             settings->compact_row1_clear_animation = (float) compact_row1_clear_json->valuedouble;
             if (settings->compact_row1_clear_animation < -10.0f) settings->compact_row1_clear_animation = -10.0f;
             if (settings->compact_row1_clear_animation > 10.0f) settings->compact_row1_clear_animation = 10.0f;
-        } else { settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION; defaults_were_used = true; }
+        } else {
+            settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
+            defaults_were_used = true;
+        }
 
         // Shared-parent overlay size on a strip icon. The upper cap against compact_row1_icon_size is
         // applied later, once that value has been read (it loads after this compact block).
@@ -1797,7 +1865,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->compact_icon_shared_size = (float) compact_icon_shared->valuedouble;
             if (settings->compact_icon_shared_size < COMPACT_ICON_SHARED_SIZE_MIN)
                 settings->compact_icon_shared_size = COMPACT_ICON_SHARED_SIZE_MIN;
-        } else { settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE; defaults_were_used = true; }
+        } else {
+            settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
+            defaults_were_used = true;
+        }
 
         // Pop-out stack selection (independent of the panel cycle) + its motion/layout settings.
         const cJSON *compact_stack_types = cJSON_GetObjectItem(visual_settings, "compact_stack_types");
@@ -1868,7 +1939,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_stack_row_gap = COMPACT_STACK_ROW_GAP_MIN;
             if (settings->compact_stack_row_gap > COMPACT_STACK_ROW_GAP_MAX)
                 settings->compact_stack_row_gap = COMPACT_STACK_ROW_GAP_MAX;
-        } else { settings->compact_stack_row_gap = DEFAULT_COMPACT_STACK_ROW_GAP; defaults_were_used = true; }
+        } else {
+            settings->compact_stack_row_gap = DEFAULT_COMPACT_STACK_ROW_GAP;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_stack_max = cJSON_GetObjectItem(visual_settings, "compact_stack_max_lines");
         if (compact_stack_max && cJSON_IsNumber(compact_stack_max)) {
@@ -1877,7 +1951,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_stack_max_lines = COMPACT_STACK_MAX_LINES_MIN;
             if (settings->compact_stack_max_lines > COMPACT_STACK_MAX_LINES_MAX)
                 settings->compact_stack_max_lines = COMPACT_STACK_MAX_LINES_MAX;
-        } else { settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES; defaults_were_used = true; }
+        } else {
+            settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_stack_hold = cJSON_GetObjectItem(visual_settings, "compact_stack_hold_time");
         if (compact_stack_hold && cJSON_IsNumber(compact_stack_hold)) {
@@ -1888,7 +1965,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MIN;
             else if (settings->compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
                 settings->compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MAX;
-        } else { settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME; defaults_were_used = true; }
+        } else {
+            settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_stack_rise = cJSON_GetObjectItem(visual_settings, "compact_stack_rise_time");
         if (compact_stack_rise && cJSON_IsNumber(compact_stack_rise)) {
@@ -1897,7 +1977,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_stack_rise_time = COMPACT_STACK_RISE_TIME_MIN;
             if (settings->compact_stack_rise_time > COMPACT_STACK_RISE_TIME_MAX)
                 settings->compact_stack_rise_time = COMPACT_STACK_RISE_TIME_MAX;
-        } else { settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME; defaults_were_used = true; }
+        } else {
+            settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_pop_icon = cJSON_GetObjectItem(visual_settings, "compact_pop_icon_size");
         if (compact_pop_icon && cJSON_IsNumber(compact_pop_icon)) {
@@ -1906,7 +1989,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MIN;
             if (settings->compact_pop_icon_size > COMPACT_POP_ICON_SIZE_MAX)
                 settings->compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MAX;
-        } else { settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE; defaults_were_used = true; }
+        } else {
+            settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
+            defaults_were_used = true;
+        }
 
         // Bounded above by the pop icon it is drawn on, which is loaded just above. Clamping here (and
         // not only in the settings UI) keeps a hand-edited or older config from ever holding a shared
@@ -1942,7 +2028,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 settings->compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MIN;
             if (settings->compact_coop_panel_face_size > COMPACT_COOP_PANEL_FACE_SIZE_MAX)
                 settings->compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MAX;
-        } else { settings->compact_coop_panel_face_size = DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE; defaults_were_used = true; }
+        } else {
+            settings->compact_coop_panel_face_size = DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE;
+            defaults_were_used = true;
+        }
 
         const cJSON *compact_coop_face_x = cJSON_GetObjectItem(visual_settings, "compact_coop_panel_face_offset_x");
         if (compact_coop_face_x && cJSON_IsNumber(compact_coop_face_x)) {
@@ -2134,19 +2223,19 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             bool *enabled;
             OverlayProgressTextAlignment *align;
         } freeze_fields[] = {
-            {
-                "overlay_row1_freeze_enabled", "overlay_row1_freeze_align",
-                &settings->overlay_row1_freeze_enabled, &settings->overlay_row1_freeze_align
-            },
-            {
-                "overlay_row2_freeze_enabled", "overlay_row2_freeze_align",
-                &settings->overlay_row2_freeze_enabled, &settings->overlay_row2_freeze_align
-            },
-            {
-                "overlay_row3_freeze_enabled", "overlay_row3_freeze_align",
-                &settings->overlay_row3_freeze_enabled, &settings->overlay_row3_freeze_align
-            },
-        };
+                    {
+                        "overlay_row1_freeze_enabled", "overlay_row1_freeze_align",
+                        &settings->overlay_row1_freeze_enabled, &settings->overlay_row1_freeze_align
+                    },
+                    {
+                        "overlay_row2_freeze_enabled", "overlay_row2_freeze_align",
+                        &settings->overlay_row2_freeze_enabled, &settings->overlay_row2_freeze_align
+                    },
+                    {
+                        "overlay_row3_freeze_enabled", "overlay_row3_freeze_align",
+                        &settings->overlay_row3_freeze_enabled, &settings->overlay_row3_freeze_align
+                    },
+                };
         for (auto &f: freeze_fields) {
             const cJSON *enabled = cJSON_GetObjectItem(visual_settings, f.enabled_key);
             if (enabled && cJSON_IsBool(enabled))

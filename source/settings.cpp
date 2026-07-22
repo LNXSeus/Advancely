@@ -220,9 +220,9 @@ static bool compact_icon_selectable(const char *id, const char *text, bool selec
 // Points at one of the two Compact goal-selection models (panel cycle or pop-out stack) so the
 // shared selection UI below can edit either.
 struct CompactSelTarget {
-    bool *type;               // COMPACT_COUNTER_TYPE_COUNT bools: which whole-section types are on
-    CompactCycleItem *items;  // individually selected goals
-    int *count;               // number of valid entries in items
+    bool *type; // COMPACT_COUNTER_TYPE_COUNT bools: which whole-section types are on
+    CompactCycleItem *items; // individually selected goals
+    int *count; // number of valid entries in items
 };
 
 // Renders the shared Compact goal-selection UI: a "goal types" multiselect over every type present
@@ -234,8 +234,8 @@ struct CompactSelTarget {
 // `cc` has to come from it with the caller's own hidden rule: real totals for the cycle, hidden-aware
 // (`show_hidden`) for the stack, which only lists what can really pop.
 static void compact_selection_ui(const char *suffix, const TemplateData *ctd, const CompactCounter *cc,
-                                  bool modern, const char *types_label, CompactSelTarget tgt,
-                                  int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden) {
+                                 bool modern, const char *types_label, CompactSelTarget tgt,
+                                 int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden) {
     // A goal hidden in the template is normally not listed here; the "Show Hidden Goals" overlay
     // option surfaces it so it can be selected. hidden_now() folds that in (true = treat as hidden).
     auto hidden_now = [&](bool h) { return h && !show_hidden; };
@@ -780,117 +780,117 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 // untouched. Keep this in sync with the settings->... reads in overlay.cpp.
 static bool overlay_settings_different(const AppSettings *a, const AppSettings *b) {
     return
-        // Whether the overlay process should exist / how fast it runs / its width.
-        a->enable_overlay != b->enable_overlay ||
-        a->overlay_fps != b->overlay_fps ||
-        a->overlay_window.w != b->overlay_window.w ||
+            // Whether the overlay process should exist / how fast it runs / its width.
+            a->enable_overlay != b->enable_overlay ||
+            a->overlay_fps != b->overlay_fps ||
+            a->overlay_window.w != b->overlay_window.w ||
 
-        // Config read from the overlay's own copy (mod flags).
-        // NOTE: version_str / display_version_str / category_display_name are intentionally
-        // NOT here: they're pushed live via the IPC header (fill_overlay_ipc_labels), so a
-        // template/version/category change updates the overlay without a restart.
-        a->using_hermes != b->using_hermes ||
-        a->print_debug_status != b->print_debug_status ||
+            // Config read from the overlay's own copy (mod flags).
+            // NOTE: version_str / display_version_str / category_display_name are intentionally
+            // NOT here: they're pushed live via the IPC header (fill_overlay_ipc_labels), so a
+            // template/version/category change updates the overlay without a restart.
+            a->using_hermes != b->using_hermes ||
+            a->print_debug_status != b->print_debug_status ||
 
-        // Top info bar content/formatting.
-        a->overlay_show_world != b->overlay_show_world ||
-        a->overlay_show_run_details != b->overlay_show_run_details ||
-        a->overlay_show_progress != b->overlay_show_progress ||
-        a->overlay_show_igt != b->overlay_show_igt ||
-        a->overlay_show_update_timer != b->overlay_show_update_timer ||
-        a->igt_unit_spacing != b->igt_unit_spacing ||
-        a->igt_always_show_ms != b->igt_always_show_ms ||
-        a->overlay_progress_text_align != b->overlay_progress_text_align ||
-        strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
+            // Top info bar content/formatting.
+            a->overlay_show_world != b->overlay_show_world ||
+            a->overlay_show_run_details != b->overlay_show_run_details ||
+            a->overlay_show_progress != b->overlay_show_progress ||
+            a->overlay_show_igt != b->overlay_show_igt ||
+            a->overlay_show_update_timer != b->overlay_show_update_timer ||
+            a->igt_unit_spacing != b->igt_unit_spacing ||
+            a->igt_always_show_ms != b->igt_always_show_ms ||
+            a->overlay_progress_text_align != b->overlay_progress_text_align ||
+            strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
-        // Scrolling / freeze behavior.
-        a->overlay_render_mode != b->overlay_render_mode ||
-        a->overlay_page_interval != b->overlay_page_interval ||
-        a->overlay_page_align != b->overlay_page_align ||
-        strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
-        a->compact_panel_inset_left != b->compact_panel_inset_left ||
-        a->compact_panel_inset_right != b->compact_panel_inset_right ||
-        a->compact_panel_inset_top != b->compact_panel_inset_top ||
-        a->compact_panel_inset_bottom != b->compact_panel_inset_bottom ||
-        a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
-        a->compact_panel_padding != b->compact_panel_padding ||
-        a->compact_panel_align != b->compact_panel_align ||
-        strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
-        strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
-        strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
-        a->compact_label_font_size != b->compact_label_font_size ||
-        a->compact_count_font_size != b->compact_count_font_size ||
-        a->compact_stack_font_size != b->compact_stack_font_size ||
-        a->compact_panel_line_gap != b->compact_panel_line_gap ||
-        compact_cycle_different(a, b) ||
-        a->compact_cycle_interval != b->compact_cycle_interval ||
-        a->compact_show_row1_icons != b->compact_show_row1_icons ||
-        a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
-        a->compact_icon_row_gap != b->compact_icon_row_gap ||
-        a->compact_row1_spacing != b->compact_row1_spacing ||
-        a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
-        a->compact_icon_shared_size != b->compact_icon_shared_size ||
-        compact_stack_different(a, b) ||
-        a->compact_show_completion_markers != b->compact_show_completion_markers ||
-        a->compact_stack_row_gap != b->compact_stack_row_gap ||
-        a->compact_stack_max_lines != b->compact_stack_max_lines ||
-        a->compact_stack_hold_time != b->compact_stack_hold_time ||
-        a->compact_stack_rise_time != b->compact_stack_rise_time ||
-        a->compact_pop_icon_size != b->compact_pop_icon_size ||
-        a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
-        a->compact_stack_face_size != b->compact_stack_face_size ||
-        a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
-        a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
-        a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
-        // Now read by the Compact overlay for contributor faces, so a change must restart the overlay.
-        a->coop_show_contributor_faces != b->coop_show_contributor_faces ||
-        a->coop_stat_merge != b->coop_stat_merge ||
-        a->overlay_scroll_speed != b->overlay_scroll_speed ||
-        a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
-        a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
-        a->overlay_row2_custom_scroll_speed_enabled != b->overlay_row2_custom_scroll_speed_enabled ||
-        a->overlay_row2_scroll_speed != b->overlay_row2_scroll_speed ||
-        a->overlay_row3_custom_scroll_speed_enabled != b->overlay_row3_custom_scroll_speed_enabled ||
-        a->overlay_row3_scroll_speed != b->overlay_row3_scroll_speed ||
-        a->overlay_row1_freeze_enabled != b->overlay_row1_freeze_enabled ||
-        a->overlay_row1_freeze_align != b->overlay_row1_freeze_align ||
-        a->overlay_row2_freeze_enabled != b->overlay_row2_freeze_enabled ||
-        a->overlay_row2_freeze_align != b->overlay_row2_freeze_align ||
-        a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
-        a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
-        a->overlay_clear_animation != b->overlay_clear_animation ||
-        a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
+            // Scrolling / freeze behavior.
+            a->overlay_render_mode != b->overlay_render_mode ||
+            a->overlay_page_interval != b->overlay_page_interval ||
+            a->overlay_page_align != b->overlay_page_align ||
+            strcmp(a->compact_panel_path, b->compact_panel_path) != 0 ||
+            a->compact_panel_inset_left != b->compact_panel_inset_left ||
+            a->compact_panel_inset_right != b->compact_panel_inset_right ||
+            a->compact_panel_inset_top != b->compact_panel_inset_top ||
+            a->compact_panel_inset_bottom != b->compact_panel_inset_bottom ||
+            a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
+            a->compact_panel_padding != b->compact_panel_padding ||
+            a->compact_panel_align != b->compact_panel_align ||
+            strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
+            strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
+            strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
+            a->compact_label_font_size != b->compact_label_font_size ||
+            a->compact_count_font_size != b->compact_count_font_size ||
+            a->compact_stack_font_size != b->compact_stack_font_size ||
+            a->compact_panel_line_gap != b->compact_panel_line_gap ||
+            compact_cycle_different(a, b) ||
+            a->compact_cycle_interval != b->compact_cycle_interval ||
+            a->compact_show_row1_icons != b->compact_show_row1_icons ||
+            a->compact_icon_cycle_interval != b->compact_icon_cycle_interval ||
+            a->compact_icon_row_gap != b->compact_icon_row_gap ||
+            a->compact_row1_spacing != b->compact_row1_spacing ||
+            a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
+            a->compact_icon_shared_size != b->compact_icon_shared_size ||
+            compact_stack_different(a, b) ||
+            a->compact_show_completion_markers != b->compact_show_completion_markers ||
+            a->compact_stack_row_gap != b->compact_stack_row_gap ||
+            a->compact_stack_max_lines != b->compact_stack_max_lines ||
+            a->compact_stack_hold_time != b->compact_stack_hold_time ||
+            a->compact_stack_rise_time != b->compact_stack_rise_time ||
+            a->compact_pop_icon_size != b->compact_pop_icon_size ||
+            a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
+            a->compact_stack_face_size != b->compact_stack_face_size ||
+            a->compact_coop_panel_face_size != b->compact_coop_panel_face_size ||
+            a->compact_coop_panel_face_offset_x != b->compact_coop_panel_face_offset_x ||
+            a->compact_coop_panel_face_offset_y != b->compact_coop_panel_face_offset_y ||
+            // Now read by the Compact overlay for contributor faces, so a change must restart the overlay.
+            a->coop_show_contributor_faces != b->coop_show_contributor_faces ||
+            a->coop_stat_merge != b->coop_stat_merge ||
+            a->overlay_scroll_speed != b->overlay_scroll_speed ||
+            a->overlay_row1_custom_scroll_speed_enabled != b->overlay_row1_custom_scroll_speed_enabled ||
+            a->overlay_row1_scroll_speed != b->overlay_row1_scroll_speed ||
+            a->overlay_row2_custom_scroll_speed_enabled != b->overlay_row2_custom_scroll_speed_enabled ||
+            a->overlay_row2_scroll_speed != b->overlay_row2_scroll_speed ||
+            a->overlay_row3_custom_scroll_speed_enabled != b->overlay_row3_custom_scroll_speed_enabled ||
+            a->overlay_row3_scroll_speed != b->overlay_row3_scroll_speed ||
+            a->overlay_row1_freeze_enabled != b->overlay_row1_freeze_enabled ||
+            a->overlay_row1_freeze_align != b->overlay_row1_freeze_align ||
+            a->overlay_row2_freeze_enabled != b->overlay_row2_freeze_enabled ||
+            a->overlay_row2_freeze_align != b->overlay_row2_freeze_align ||
+            a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
+            a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
+            a->overlay_clear_animation != b->overlay_clear_animation ||
+            a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
 
-        // Row spacing / sizing.
-        a->overlay_row1_spacing != b->overlay_row1_spacing ||
-        a->compact_row1_icon_size != b->compact_row1_icon_size ||
-        a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
-        a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
-        a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
-        a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
-        a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
-        a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
-        a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
+            // Row spacing / sizing.
+            a->overlay_row1_spacing != b->overlay_row1_spacing ||
+            a->compact_row1_icon_size != b->compact_row1_icon_size ||
+            a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+            a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
+            a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
+            a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
+            a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
+            a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+            a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
 
-        // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
-        a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
-        a->overlay_gap_top_to_row1 != b->overlay_gap_top_to_row1 ||
-        a->overlay_gap_row1_to_row2 != b->overlay_gap_row1_to_row2 ||
-        a->overlay_gap_row2_to_row3 != b->overlay_gap_row2_to_row3 ||
-        a->overlay_gap_row3_to_bottom != b->overlay_gap_row3_to_bottom ||
+            // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
+            a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
+            a->overlay_gap_top_to_row1 != b->overlay_gap_top_to_row1 ||
+            a->overlay_gap_row1_to_row2 != b->overlay_gap_row1_to_row2 ||
+            a->overlay_gap_row2_to_row3 != b->overlay_gap_row2_to_row3 ||
+            a->overlay_gap_row3_to_bottom != b->overlay_gap_row3_to_bottom ||
 
-        // Fonts / colors / background textures loaded at overlay init.
-        strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
-        a->overlay_progress_font_size != b->overlay_progress_font_size ||
-        a->overlay_row_font_size != b->overlay_row_font_size ||
-        memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
-        memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
-        strcmp(a->adv_bg_path, b->adv_bg_path) != 0 ||
-        strcmp(a->adv_bg_half_done_path, b->adv_bg_half_done_path) != 0 ||
-        strcmp(a->adv_bg_done_path, b->adv_bg_done_path) != 0 ||
-        a->adv_icon_size != b->adv_icon_size ||
-        a->adv_icon_offset_x != b->adv_icon_offset_x ||
-        a->adv_icon_offset_y != b->adv_icon_offset_y;
+            // Fonts / colors / background textures loaded at overlay init.
+            strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
+            a->overlay_progress_font_size != b->overlay_progress_font_size ||
+            a->overlay_row_font_size != b->overlay_row_font_size ||
+            memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
+            memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
+            strcmp(a->adv_bg_path, b->adv_bg_path) != 0 ||
+            strcmp(a->adv_bg_half_done_path, b->adv_bg_half_done_path) != 0 ||
+            strcmp(a->adv_bg_done_path, b->adv_bg_done_path) != 0 ||
+            a->adv_icon_size != b->adv_icon_size ||
+            a->adv_icon_offset_x != b->adv_icon_offset_x ||
+            a->adv_icon_offset_y != b->adv_icon_offset_y;
 }
 
 // Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
@@ -1365,8 +1365,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Presets are full snapshots of settings.json stored next to it in resources/config/.
     // preset_loaded_this_frame is set when a preset is loaded so the completion-threshold
     // state below adopts the loaded values instead of resetting them on the template change.
-    bool preset_loaded_this_frame = false;
-    {
+    bool preset_loaded_this_frame = false; {
         // Some settings clash with the synchronised lobby state, so lock the section while active.
         bool preset_lobby_locked = g_coop_ctx &&
                                    (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
@@ -2428,7 +2427,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "Pre-filled from the selected language file's 'display_category' field if present,\n"
                                  "otherwise automatically formatted from the Category and Optional Flag.\n"
                                  "You can override it with any custom text here.\n"
-                                 "Default: auto-filled from the template/language (e.g. \"%s\")", DEFAULT_DISPLAY_CATEGORY);
+                                 "Default: auto-filled from the template/language (e.g. \"%s\")",
+                                 DEFAULT_DISPLAY_CATEGORY);
                     }
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -3625,153 +3625,159 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // separator, sub-stat cycling, clear animation). Compact mode uses none of these, so hide
                 // the whole section while it is active.
                 if (temp_settings.overlay_render_mode != OVERLAY_RENDER_MODE_COMPACT) {
-                ImGui::Separator();
-                ImGui::Spacing();
-                ImGui::Text("Content & Behavior");
-
-                ImGui::Text("Overlay Text Sections:");
-                if (ImGui::IsItemHovered()) {
-                    char overlay_text_sections_tooltip_buffer[1024];
-                    snprintf(overlay_text_sections_tooltip_buffer, sizeof(overlay_text_sections_tooltip_buffer),
-                             "Configure which sections of the overlay progress text to display.\n"
-                             "Hover over each checkbox for more info.\n"
-                             "The socials can't be removed.");
-                    ImGui::SetTooltip("%s", overlay_text_sections_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("World", &temp_settings.overlay_show_world);
-                if (ImGui::IsItemHovered()) {
-                    char overlay_text_world_tooltip_buffer[1024];
-                    snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
-                             "Shows the current world name.\n"
-                             "For Co-op receivers, this shows 'Syncing with <Host>'\n"
-                             "or 'Syncing for <Player>' depending on the player dropdown selection.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details);
-                if (ImGui::IsItemHovered()) {
-                    char overlay_text_run_tooltip_buffer[1024];
-                    snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
-                             "Shows the selected Template Version & Template Category.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress);
-                if (ImGui::IsItemHovered()) {
-                    ImGui::BeginTooltip();
-                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
-
-                    ImGui::TextUnformatted("Progress Breakdown");
                     ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Content & Behavior");
 
-                    ImGui::BulletText(
-                        "The %s counter tracks only the main goals defined in the \"%s\" section of your template file.",
-                        advancement_label_uppercase, advancements_label_plural_lowercase);
+                    ImGui::Text("Overlay Text Sections:");
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_text_sections_tooltip_buffer[1024];
+                        snprintf(overlay_text_sections_tooltip_buffer, sizeof(overlay_text_sections_tooltip_buffer),
+                                 "Configure which sections of the overlay progress text to display.\n"
+                                 "Hover over each checkbox for more info.\n"
+                                 "The socials can't be removed.");
+                        ImGui::SetTooltip("%s", overlay_text_sections_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("World", &temp_settings.overlay_show_world);
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_text_world_tooltip_buffer[1024];
+                        snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
+                                 "Shows the current world name.\n"
+                                 "For Co-op receivers, this shows 'Syncing with <Host>'\n"
+                                 "or 'Syncing for <Player>' depending on the player dropdown selection.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details);
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_text_run_tooltip_buffer[1024];
+                        snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
+                                 "Shows the selected Template Version & Template Category.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress);
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
 
-                    ImGui::BulletText(
-                        "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
-                        "Each of the following tasks has an equal weight in the calculation:");
-                    ImGui::Indent();
-                    ImGui::BulletText("Recipes");
-                    ImGui::BulletText("%s Criteria", advancements_label_short_upper);
-                    ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
-                    ImGui::BulletText("Individual Sub-Stats");
-                    ImGui::BulletText("Custom Goals");
-                    ImGui::BulletText("Counter Goals");
-                    ImGui::BulletText("Multi-Stage Goal Stages");
-                    ImGui::Unindent();
+                        ImGui::TextUnformatted("Progress Breakdown");
+                        ImGui::Separator();
 
-                    ImGui::Separator();
-                    ImGui::TextUnformatted("Default: On");
+                        ImGui::BulletText(
+                            "The %s counter tracks only the main goals defined in the \"%s\" section of your template file.",
+                            advancement_label_uppercase, advancements_label_plural_lowercase);
 
-                    ImGui::PopTextWrapPos();
-                    ImGui::EndTooltip();
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt);
-                if (ImGui::IsItemHovered()) {
-                    char overlay_text_igt_tooltip_buffer[1024];
-                    snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
-                             "Shows the in-game time since the start of the run.\n"
-                             "It's read from the statistics file so it's in ticks\n"
-                             "and only updated when the game saves.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
-                if (ImGui::IsItemHovered()) {
-                    char overlay_text_timer_tooltip_buffer[1024];
-                    snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
-                             "Shows the time since the last game file update.\n"
-                             "When Hermes is active this timer only represents the time\n"
-                             "since the last full game-save sync from disk.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
-                }
+                        ImGui::BulletText(
+                            "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
+                            "Each of the following tasks has an equal weight in the calculation:");
+                        ImGui::Indent();
+                        ImGui::BulletText("Recipes");
+                        ImGui::BulletText("%s Criteria", advancements_label_short_upper);
+                        ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
+                        ImGui::BulletText("Individual Sub-Stats");
+                        ImGui::BulletText("Custom Goals");
+                        ImGui::BulletText("Counter Goals");
+                        ImGui::BulletText("Multi-Stage Goal Stages");
+                        ImGui::Unindent();
 
-                ImGui::SetNextItemWidth(80.0f);
-                ImGui::InputText("Segment Separator", temp_settings.overlay_progress_separator,
-                                 sizeof(temp_settings.overlay_progress_separator));
-                if (ImGui::IsItemHovered()) {
-                    char separator_tooltip_buffer[512];
-                    snprintf(separator_tooltip_buffer, sizeof(separator_tooltip_buffer),
-                             "The character(s) drawn between segments anywhere a separator is shown:\n"
-                             "the overlay's top bar, the tracker info bar, the tracker info window's\n"
-                             "title bar, and the OS window title.\n"
-                             "Replace it if your tracker/overlay font does not have\n"
-                             "the pipe glyph. Up to %zu characters.\n"
-                             "Default: \"|\"",
-                             sizeof(temp_settings.overlay_progress_separator) - 1);
-                    ImGui::SetTooltip("%s", separator_tooltip_buffer);
-                }
+                        ImGui::Separator();
+                        ImGui::TextUnformatted("Default: On");
 
-                ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
-                if (ImGui::IsItemHovered()) {
-                    char hide_completed_row_3_tooltip_buffer[1024];
-                    snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
-                             "If checked, goals in Row 3 (Stats, Custom Goals,\n"
-                             "Multi-Stage Goals, Counters, and any %s/Unlocks\n"
-                             "forced to Row 3) will disappear when completed.\n"
-                             "This is independent of the main 'Goal Visibility' setting.\n\n"
-                             "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
-                             "ignoring this setting.\n"
-                             "Default: Off", advancements_label_plural_uppercase);
+                        ImGui::PopTextWrapPos();
+                        ImGui::EndTooltip();
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt);
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_text_igt_tooltip_buffer[1024];
+                        snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
+                                 "Shows the in-game time since the start of the run.\n"
+                                 "It's read from the statistics file so it's in ticks\n"
+                                 "and only updated when the game saves.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_text_timer_tooltip_buffer[1024];
+                        snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
+                                 "Shows the time since the last game file update.\n"
+                                 "When Hermes is active this timer only represents the time\n"
+                                 "since the last full game-save sync from disk.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
+                    }
 
-                    ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
-                }
+                    ImGui::SetNextItemWidth(80.0f);
+                    ImGui::InputText("Segment Separator", temp_settings.overlay_progress_separator,
+                                     sizeof(temp_settings.overlay_progress_separator));
+                    if (ImGui::IsItemHovered()) {
+                        char separator_tooltip_buffer[512];
+                        snprintf(separator_tooltip_buffer, sizeof(separator_tooltip_buffer),
+                                 "The character(s) drawn between segments anywhere a separator is shown:\n"
+                                 "the overlay's top bar, the tracker info bar, the tracker info window's\n"
+                                 "title bar, and the OS window title.\n"
+                                 "Replace it if your tracker/overlay font does not have\n"
+                                 "the pipe glyph. Up to %zu characters.\n"
+                                 "Default: \"|\"",
+                                 sizeof(temp_settings.overlay_progress_separator) - 1);
+                        ImGui::SetTooltip("%s", separator_tooltip_buffer);
+                    }
 
-                if (ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f,
-                                     60.0f,
-                                     "%.3f s")) {
-                    if (temp_settings.overlay_stat_cycle_speed < 0.1f) temp_settings.overlay_stat_cycle_speed = 0.1f;
-                    if (temp_settings.overlay_stat_cycle_speed > 60.0f) temp_settings.overlay_stat_cycle_speed = 60.0f;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char substat_cycling_interval_tooltip_buffer[256];
-                    snprintf(substat_cycling_interval_tooltip_buffer, sizeof(substat_cycling_interval_tooltip_buffer),
-                             "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n"
-                             "Default: %.1f s", DEFAULT_OVERLAY_STAT_CYCLE_SPEED);
-                    ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
-                }
+                    ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
+                    if (ImGui::IsItemHovered()) {
+                        char hide_completed_row_3_tooltip_buffer[1024];
+                        snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
+                                 "If checked, goals in Row 3 (Stats, Custom Goals,\n"
+                                 "Multi-Stage Goals, Counters, and any %s/Unlocks\n"
+                                 "forced to Row 3) will disappear when completed.\n"
+                                 "This is independent of the main 'Goal Visibility' setting.\n\n"
+                                 "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
+                                 "ignoring this setting.\n"
+                                 "Default: Off", advancements_label_plural_uppercase);
 
-                if (ImGui::DragFloat("Clear Animation (s)", &temp_settings.overlay_clear_animation, 0.01f, -10.0f,
-                                     10.0f,
-                                     "%.2f s")) {
-                    if (temp_settings.overlay_clear_animation < -10.0f) temp_settings.overlay_clear_animation = -10.0f;
-                    if (temp_settings.overlay_clear_animation > 10.0f) temp_settings.overlay_clear_animation = 10.0f;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char clear_animation_tooltip_buffer[512];
-                    snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
-                             "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
-                             "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
-                             "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
-                    ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
-                }
+                        ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f,
+                                         0.1f,
+                                         60.0f,
+                                         "%.3f s")) {
+                        if (temp_settings.overlay_stat_cycle_speed < 0.1f)
+                            temp_settings.overlay_stat_cycle_speed = 0.1f;
+                        if (temp_settings.overlay_stat_cycle_speed > 60.0f)
+                            temp_settings.overlay_stat_cycle_speed = 60.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char substat_cycling_interval_tooltip_buffer[256];
+                        snprintf(substat_cycling_interval_tooltip_buffer,
+                                 sizeof(substat_cycling_interval_tooltip_buffer),
+                                 "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n"
+                                 "Default: %.1f s", DEFAULT_OVERLAY_STAT_CYCLE_SPEED);
+                        ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Clear Animation (s)", &temp_settings.overlay_clear_animation, 0.01f, -10.0f,
+                                         10.0f,
+                                         "%.2f s")) {
+                        if (temp_settings.overlay_clear_animation < -10.0f)
+                            temp_settings.overlay_clear_animation = -10.0f;
+                        if (temp_settings.overlay_clear_animation > 10.0f)
+                            temp_settings.overlay_clear_animation = 10.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char clear_animation_tooltip_buffer[512];
+                        snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
+                                 "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
+                                 "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
+                                 "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
+                        ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
+                    }
                 } // End of Content & Behavior (belt/page only; hidden in Compact mode)
 
                 // Only relevant to Page mode; reveal the page-flip interval when it is selected.
@@ -3854,7 +3860,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // than it: that is its upper bound, and shrinking Icon Size above drags it down too.
                         if (temp_settings.compact_icon_shared_size > temp_settings.compact_row1_icon_size)
                             temp_settings.compact_icon_shared_size = temp_settings.compact_row1_icon_size;
-                        if (ImGui::DragFloat("Shared Icon Size##CompactRow1Icons", &temp_settings.compact_icon_shared_size,
+                        if (ImGui::DragFloat("Shared Icon Size##CompactRow1Icons",
+                                             &temp_settings.compact_icon_shared_size,
                                              0.5f, COMPACT_ICON_SHARED_SIZE_MIN, temp_settings.compact_row1_icon_size,
                                              "%.0f")) {
                             if (temp_settings.compact_icon_shared_size < COMPACT_ICON_SHARED_SIZE_MIN)
@@ -3877,7 +3884,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (ImGui::DragFloat("Horizontal Icon Spacing##CompactRow1Icons",
                                              &temp_settings.compact_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px")) {
                             if (temp_settings.compact_row1_spacing < 0.0f) temp_settings.compact_row1_spacing = 0.0f;
-                            if (temp_settings.compact_row1_spacing > 7680.0f) temp_settings.compact_row1_spacing = 7680.0f;
+                            if (temp_settings.compact_row1_spacing > 7680.0f)
+                                temp_settings.compact_row1_spacing = 7680.0f;
                         }
                         if (ImGui::IsItemHovered()) {
                             char compact_row1_spacing_tooltip_buffer[256];
@@ -4020,7 +4028,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("Panel Alignment", (int *) &temp_settings.compact_panel_align, "Left\0Center\0Right\0");
+                    ImGui::Combo("Panel Alignment", (int *) &temp_settings.compact_panel_align,
+                                 "Left\0Center\0Right\0");
                     if (ImGui::IsItemHovered()) {
                         const char *compact_align_names[] = {"Left", "Center", "Right"};
                         char compact_panel_align_tooltip_buffer[640];
@@ -4071,9 +4080,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         // Goal-type multiselect + per-category individual-goal combos (shared with the
                         // pop-out stack below).
-                        CompactSelTarget cycle_tgt = {temp_settings.compact_cycle_type,
-                                                      temp_settings.compact_cycle_items,
-                                                      &temp_settings.compact_cycle_item_count};
+                        CompactSelTarget cycle_tgt = {
+                            temp_settings.compact_cycle_type,
+                            temp_settings.compact_cycle_items,
+                            &temp_settings.compact_cycle_item_count
+                        };
                         compact_selection_ui("cycle", ctd, cc, modern, "Main Goal Types", cycle_tgt,
                                              &s_type_anchor, s_item_anchor, true,
                                              temp_settings.overlay_show_hidden_goals);
@@ -4092,13 +4103,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
                                 if (cc[i].total <= 0) continue;
                                 if (first < 0) first = i;
-                                if (s->compact_cycle_type[i]) { any = true; break; }
+                                if (s->compact_cycle_type[i]) {
+                                    any = true;
+                                    break;
+                                }
                             }
                             if (!any && first >= 0) s->compact_cycle_type[first] = true;
                         };
                         ensure_something_selected(&temp_settings);
                         ensure_something_selected(&saved_settings);
-
                     }
 
                     if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
@@ -4153,8 +4166,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 const TrackableCategory *a = sctd->advancements[i];
                                 if (!a || a->criteria_count > 0) continue; // complex -> chosen in the dropdown below
                                 if (!count_hidden && a->is_hidden) continue;
-                                if (a->is_recipe) { simple_rec_total++; if (a->done) simple_rec_done++; }
-                                else { simple_adv_total++; if (a->done) simple_adv_done++; }
+                                if (a->is_recipe) {
+                                    simple_rec_total++;
+                                    if (a->done) simple_rec_done++;
+                                } else {
+                                    simple_adv_total++;
+                                    if (a->done) simple_adv_done++;
+                                }
                             }
                             CompactCounter *sadv = &scc[COMPACT_COUNTER_ADVANCEMENTS];
                             sadv->completed = simple_adv_done;
@@ -4177,9 +4195,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             s_stack_anchors_init = true;
                         }
 
-                        CompactSelTarget stack_tgt = {temp_settings.compact_stack_type,
-                                                      temp_settings.compact_stack_items,
-                                                      &temp_settings.compact_stack_item_count};
+                        CompactSelTarget stack_tgt = {
+                            temp_settings.compact_stack_type,
+                            temp_settings.compact_stack_items,
+                            &temp_settings.compact_stack_item_count
+                        };
                         compact_selection_ui("stack", sctd, scc, smodern, "Stack Goal Types", stack_tgt,
                                              &s_stack_type_anchor, s_stack_item_anchor, false,
                                              temp_settings.overlay_show_hidden_goals);
@@ -4232,8 +4252,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "unlocks and criteria are either done or not, so they always pop on\n"
                                          "completion. Shift+Click to range-select.\n"
                                          "Default: %s", DEFAULT_COMPACT_STACK_POP_ON_PROGRESS
-                                             ? "all types pop on progress"
-                                             : "completion only");
+                                                            ? "all types pop on progress"
+                                                            : "completion only");
                                 ImGui::SetTooltip("%s", compact_pop_progress_tooltip_buffer);
                             }
                             ImGui::SameLine();
@@ -4380,369 +4400,372 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // The scroll speed, per-row custom speeds and auto-freeze toggles only affect the
                 // scrolling belt mode, so hide the whole Scrolling section for Page and Compact modes.
                 if (!overlay_page_mode && !overlay_compact_mode) {
-                ImGui::Separator();
-                ImGui::Spacing();
-                ImGui::Text("Scrolling");
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Scrolling");
 
-                if (ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f,
-                                     25.00f,
-                                     "%.3f")) {
-                    if (temp_settings.overlay_scroll_speed < -25.0f) temp_settings.overlay_scroll_speed = -25.0f;
-                    if (temp_settings.overlay_scroll_speed > 25.0f) temp_settings.overlay_scroll_speed = 25.0f;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char overlay_scroll_speed_tooltip_buffer[1024];
-                    snprintf(overlay_scroll_speed_tooltip_buffer, sizeof(overlay_scroll_speed_tooltip_buffer),
-                             "A negative scroll speed animates from right-to-left\n"
-                             "(items always appear in the same order as they are on the tracker).\n"
-                             "A scroll speed of 0.0 is static.\n"
-                             "A value of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
-                             "Holding SPACE while the overlay window is focused speeds up the animation.\n"
-                             "Default: %.2f", DEFAULT_OVERLAY_SCROLL_SPEED);
-                    ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
-                }
-
-                // --- Row 1 Custom Speed + Freeze ---
-                ImGui::Checkbox("Row 1 Custom Speed", &temp_settings.overlay_row1_custom_scroll_speed_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
-                             "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static.\n"
-                             "Default: Off (custom value default %.2f).",
-                             DEFAULT_OVERLAY_SCROLL_SPEED);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row1_custom_scroll_speed_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(150.0f);
-                    if (ImGui::DragFloat("##row1_speed", &temp_settings.overlay_row1_scroll_speed, 0.001f,
-                                         -25.00f, 25.00f, "%.3f")) {
-                        if (temp_settings.overlay_row1_scroll_speed < -25.0f)
-                            temp_settings.overlay_row1_scroll_speed = -25.0f;
-                        if (temp_settings.overlay_row1_scroll_speed > 25.0f)
-                            temp_settings.overlay_row1_scroll_speed = 25.0f;
+                    if (ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f,
+                                         25.00f,
+                                         "%.3f")) {
+                        if (temp_settings.overlay_scroll_speed < -25.0f) temp_settings.overlay_scroll_speed = -25.0f;
+                        if (temp_settings.overlay_scroll_speed > 25.0f) temp_settings.overlay_scroll_speed = 25.0f;
                     }
-                }
-
-                ImGui::Checkbox("Row 1 Auto-Freeze", &temp_settings.overlay_row1_freeze_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "When Row 1's still-visible items fit within the overlay width, stop scrolling\n"
-                             "and show each item once, statically (measured with text width). Useful once only\n"
-                             "a few items remain so they no longer repeat across the row.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row1_freeze_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
-                                 "Left\0Center\0Right\0");
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
+                        char overlay_scroll_speed_tooltip_buffer[1024];
+                        snprintf(overlay_scroll_speed_tooltip_buffer, sizeof(overlay_scroll_speed_tooltip_buffer),
+                                 "A negative scroll speed animates from right-to-left\n"
+                                 "(items always appear in the same order as they are on the tracker).\n"
+                                 "A scroll speed of 0.0 is static.\n"
+                                 "A value of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
+                                 "Holding SPACE while the overlay window is focused speeds up the animation.\n"
+                                 "Default: %.2f", DEFAULT_OVERLAY_SCROLL_SPEED);
+                        ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
+                    }
+
+                    // --- Row 1 Custom Speed + Freeze ---
+                    ImGui::Checkbox("Row 1 Custom Speed", &temp_settings.overlay_row1_custom_scroll_speed_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 1's frozen items within the overlay width.\n"
-                                 "Default: Left");
+                                 "Give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
+                                 "ignoring the global Overlay Scroll Speed above.\n"
+                                 "Negative scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: Off (custom value default %.2f).",
+                                 DEFAULT_OVERLAY_SCROLL_SPEED);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                }
-
-                // --- Row 2 Custom Speed + Freeze ---
-                ImGui::Checkbox("Row 2 Custom Speed", &temp_settings.overlay_row2_custom_scroll_speed_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Give Row 2 (%s, Unlocks, and items forced to Row 2) its own scroll speed,\n"
-                             "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static.\n"
-                             "Default: Off (custom value default %.2f).",
-                             advancements_label_plural_uppercase, DEFAULT_OVERLAY_SCROLL_SPEED);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row2_custom_scroll_speed_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(150.0f);
-                    if (ImGui::DragFloat("##row2_speed", &temp_settings.overlay_row2_scroll_speed, 0.001f,
-                                         -25.00f, 25.00f, "%.3f")) {
-                        if (temp_settings.overlay_row2_scroll_speed < -25.0f)
-                            temp_settings.overlay_row2_scroll_speed = -25.0f;
-                        if (temp_settings.overlay_row2_scroll_speed > 25.0f)
-                            temp_settings.overlay_row2_scroll_speed = 25.0f;
+                    if (temp_settings.overlay_row1_custom_scroll_speed_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f);
+                        if (ImGui::DragFloat("##row1_speed", &temp_settings.overlay_row1_scroll_speed, 0.001f,
+                                             -25.00f, 25.00f, "%.3f")) {
+                            if (temp_settings.overlay_row1_scroll_speed < -25.0f)
+                                temp_settings.overlay_row1_scroll_speed = -25.0f;
+                            if (temp_settings.overlay_row1_scroll_speed > 25.0f)
+                                temp_settings.overlay_row1_scroll_speed = 25.0f;
+                        }
                     }
-                }
 
-                ImGui::Checkbox("Row 2 Auto-Freeze", &temp_settings.overlay_row2_freeze_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "When Row 2's still-visible items fit within the overlay width, stop scrolling\n"
-                             "and show each item once, statically (measured with text width). Useful once only\n"
-                             "a few items remain so they no longer repeat across the row.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row2_freeze_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("##row2_align", (int *) &temp_settings.overlay_row2_freeze_align,
-                                 "Left\0Center\0Right\0");
+                    ImGui::Checkbox("Row 1 Auto-Freeze", &temp_settings.overlay_row1_freeze_enabled);
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
+                        char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 2's frozen items within the overlay width.\n"
-                                 "Default: Left");
+                                 "When Row 1's still-visible items fit within the overlay width, stop scrolling\n"
+                                 "and show each item once, statically (measured with text width). Useful once only\n"
+                                 "a few items remain so they no longer repeat across the row.\n"
+                                 "Default: On");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                }
-
-                // --- Row 3 Custom Speed + Freeze ---
-                ImGui::Checkbox("Row 3 Custom Speed", &temp_settings.overlay_row3_custom_scroll_speed_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Give Row 3 (Stats, Goals, and items forced to Row 3) its own scroll speed,\n"
-                             "ignoring the global Overlay Scroll Speed above.\n"
-                             "Negative scrolls right-to-left; 0.0 is static.\n"
-                             "Default: Off (custom value default %.2f).",
-                             DEFAULT_OVERLAY_SCROLL_SPEED);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row3_custom_scroll_speed_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(150.0f);
-                    if (ImGui::DragFloat("##row3_speed", &temp_settings.overlay_row3_scroll_speed, 0.001f,
-                                         -25.00f, 25.00f, "%.3f")) {
-                        if (temp_settings.overlay_row3_scroll_speed < -25.0f)
-                            temp_settings.overlay_row3_scroll_speed = -25.0f;
-                        if (temp_settings.overlay_row3_scroll_speed > 25.0f)
-                            temp_settings.overlay_row3_scroll_speed = 25.0f;
+                    if (temp_settings.overlay_row1_freeze_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(120.0f);
+                        ImGui::Combo("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
+                                     "Left\0Center\0Right\0");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "How to align Row 1's frozen items within the overlay width.\n"
+                                     "Default: Left");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                     }
-                }
 
-                ImGui::Checkbox("Row 3 Auto-Freeze", &temp_settings.overlay_row3_freeze_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "When Row 3's still-visible items fit within the overlay width, stop scrolling\n"
-                             "and show each item once, statically (measured with text width). Useful once only\n"
-                             "a few items remain so they no longer repeat across the row.\n"
-                             "Works best with 'Hide Completed Row 3 Goals' enabled, so the row actually\n"
-                             "clears out its completed goals and shrinks down to a static few.\n"
-                             "Default: On");
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                if (temp_settings.overlay_row3_freeze_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("##row3_align", (int *) &temp_settings.overlay_row3_freeze_align,
-                                 "Left\0Center\0Right\0");
+                    // --- Row 2 Custom Speed + Freeze ---
+                    ImGui::Checkbox("Row 2 Custom Speed", &temp_settings.overlay_row2_custom_scroll_speed_enabled);
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
+                        char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "How to align Row 3's frozen items within the overlay width.\n"
-                                 "Default: Left");
+                                 "Give Row 2 (%s, Unlocks, and items forced to Row 2) its own scroll speed,\n"
+                                 "ignoring the global Overlay Scroll Speed above.\n"
+                                 "Negative scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: Off (custom value default %.2f).",
+                                 advancements_label_plural_uppercase, DEFAULT_OVERLAY_SCROLL_SPEED);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                }
+                    if (temp_settings.overlay_row2_custom_scroll_speed_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f);
+                        if (ImGui::DragFloat("##row2_speed", &temp_settings.overlay_row2_scroll_speed, 0.001f,
+                                             -25.00f, 25.00f, "%.3f")) {
+                            if (temp_settings.overlay_row2_scroll_speed < -25.0f)
+                                temp_settings.overlay_row2_scroll_speed = -25.0f;
+                            if (temp_settings.overlay_row2_scroll_speed > 25.0f)
+                                temp_settings.overlay_row2_scroll_speed = 25.0f;
+                        }
+                    }
 
+                    ImGui::Checkbox("Row 2 Auto-Freeze", &temp_settings.overlay_row2_freeze_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "When Row 2's still-visible items fit within the overlay width, stop scrolling\n"
+                                 "and show each item once, statically (measured with text width). Useful once only\n"
+                                 "a few items remain so they no longer repeat across the row.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    if (temp_settings.overlay_row2_freeze_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(120.0f);
+                        ImGui::Combo("##row2_align", (int *) &temp_settings.overlay_row2_freeze_align,
+                                     "Left\0Center\0Right\0");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "How to align Row 2's frozen items within the overlay width.\n"
+                                     "Default: Left");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                    }
+
+                    // --- Row 3 Custom Speed + Freeze ---
+                    ImGui::Checkbox("Row 3 Custom Speed", &temp_settings.overlay_row3_custom_scroll_speed_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Give Row 3 (Stats, Goals, and items forced to Row 3) its own scroll speed,\n"
+                                 "ignoring the global Overlay Scroll Speed above.\n"
+                                 "Negative scrolls right-to-left; 0.0 is static.\n"
+                                 "Default: Off (custom value default %.2f).",
+                                 DEFAULT_OVERLAY_SCROLL_SPEED);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    if (temp_settings.overlay_row3_custom_scroll_speed_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f);
+                        if (ImGui::DragFloat("##row3_speed", &temp_settings.overlay_row3_scroll_speed, 0.001f,
+                                             -25.00f, 25.00f, "%.3f")) {
+                            if (temp_settings.overlay_row3_scroll_speed < -25.0f)
+                                temp_settings.overlay_row3_scroll_speed = -25.0f;
+                            if (temp_settings.overlay_row3_scroll_speed > 25.0f)
+                                temp_settings.overlay_row3_scroll_speed = 25.0f;
+                        }
+                    }
+
+                    ImGui::Checkbox("Row 3 Auto-Freeze", &temp_settings.overlay_row3_freeze_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "When Row 3's still-visible items fit within the overlay width, stop scrolling\n"
+                                 "and show each item once, statically (measured with text width). Useful once only\n"
+                                 "a few items remain so they no longer repeat across the row.\n"
+                                 "Works best with 'Hide Completed Row 3 Goals' enabled, so the row actually\n"
+                                 "clears out its completed goals and shrinks down to a static few.\n"
+                                 "Default: On");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    if (temp_settings.overlay_row3_freeze_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(120.0f);
+                        ImGui::Combo("##row3_align", (int *) &temp_settings.overlay_row3_freeze_align,
+                                     "Left\0Center\0Right\0");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "How to align Row 3's frozen items within the overlay width.\n"
+                                     "Default: Left");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                    }
                 } // End of belt-only scrolling / freeze options (hidden in Page mode)
 
                 // Layout & Spacing controls the belt/page 3-row overlay (width, row spacing, alignment).
                 // Compact auto-fits its window and has no rows, so hide the whole section while active.
                 if (!overlay_compact_mode) {
-                ImGui::Separator();
-                ImGui::Spacing();
-                ImGui::Text("Layout & Spacing");
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Layout & Spacing");
 
-                // Slider for overlay width
-                static int overlay_width;
-                overlay_width = temp_settings.overlay_window.w;
-                if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
-                    // Strict clamping for width
-                    if (overlay_width < 200) overlay_width = 200;
-                    if (overlay_width > 7680) overlay_width = 7680;
-                    temp_settings.overlay_window.w = overlay_width;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char overlay_width_tooltip_buffer[1024];
-                    snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
-                             "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
-                    ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
-                }
-
-                ImGui::Text("Overlay Title Alignment:");
-                if (ImGui::IsItemHovered()) {
-                    char overlay_title_alignment_tooltip_buffer[1024];
-                    snprintf(overlay_title_alignment_tooltip_buffer, sizeof(overlay_title_alignment_tooltip_buffer),
-                             "Adjusts the horizontal positioning of the progress text on the overlay.\n"
-                             "Default: Left");
-
-                    ImGui::SetTooltip("%s", overlay_title_alignment_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::RadioButton("Left", (int *) &temp_settings.overlay_progress_text_align,
-                                   OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
-                ImGui::SameLine();
-                ImGui::RadioButton("Center", (int *) &temp_settings.overlay_progress_text_align,
-                                   OVERLAY_PROGRESS_TEXT_ALIGN_CENTER);
-                ImGui::SameLine();
-                ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
-                                   OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
-
-                if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f,
-                                     "%.0f px")) {
-                    if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
-                    if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[256];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Adjusts the horizontal gap (in pixels) between icons\n"
-                             "in the top row (Row 1) of the overlay.\n"
-                             "The horizontal spacing of the 2nd and 3rd row\n"
-                             "depends on the length of the display text.\n"
-                             "Default: %.0f px",
-                             DEFAULT_OVERLAY_ROW1_SPACING);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-
-                if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f,
-                                     48.0f,
-                                     "%.0f px")) {
-                    if (temp_settings.overlay_row1_shared_icon_size < 0.0f)
-                        temp_settings.overlay_row1_shared_icon_size = 0.0f;
-                    if (temp_settings.overlay_row1_shared_icon_size > 48.0f)
-                        temp_settings.overlay_row1_shared_icon_size = 48.0f;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[256];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Adjusts the size of the 'Parent Icon' overlay that appears when\n"
-                             "multiple items share the same icon in Row 1.\n"
-                             "Set to 0 to disable the shared icon overlay entirely.\n"
-                             "Default: %.0f px",
-                             DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-
-                // --- Custom Row 2 Spacing ---
-                ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Check this to override the dynamic width calculation for Row 2 items.\n"
-                             "This allows you to set a fixed, uniform width for all items in this row.\n"
-                             "Applies to %s, Unlocks (unless forced to Row 3),\n"
-                             "and any Stats/Goals forced to Row 2.\n"
-                             "Default: Off (%.0fpx when enabled)",
-                             advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-
-                if (temp_settings.overlay_row2_custom_spacing_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-                    if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f,
-                                         7680.0f,
-                                         "%.0f px")) {
-                        if (temp_settings.overlay_row2_custom_spacing < 96.0f)
-                            temp_settings.overlay_row2_custom_spacing = 96.0f;
-                        if (temp_settings.overlay_row2_custom_spacing > 7680.0f)
-                            temp_settings.overlay_row2_custom_spacing = 7680.0f;
+                    // Slider for overlay width
+                    static int overlay_width;
+                    overlay_width = temp_settings.overlay_window.w;
+                    if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
+                        // Strict clamping for width
+                        if (overlay_width < 200) overlay_width = 200;
+                        if (overlay_width > 7680) overlay_width = 7680;
+                        temp_settings.overlay_window.w = overlay_width;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_width_tooltip_buffer[1024];
+                        snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
+                                 "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+                        ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
+                    }
+
+                    ImGui::Text("Overlay Title Alignment:");
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_title_alignment_tooltip_buffer[1024];
+                        snprintf(overlay_title_alignment_tooltip_buffer, sizeof(overlay_title_alignment_tooltip_buffer),
+                                 "Adjusts the horizontal positioning of the progress text on the overlay.\n"
+                                 "Default: Left");
+
+                        ImGui::SetTooltip("%s", overlay_title_alignment_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Left", (int *) &temp_settings.overlay_progress_text_align,
+                                       OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Center", (int *) &temp_settings.overlay_progress_text_align,
+                                       OVERLAY_PROGRESS_TEXT_ALIGN_CENTER);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
+                                       OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
+
+                    if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f,
+                                         "%.0f px")) {
+                        if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
+                        if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Adjusts the horizontal gap (in pixels) between icons\n"
+                                 "in the top row (Row 1) of the overlay.\n"
+                                 "The horizontal spacing of the 2nd and 3rd row\n"
+                                 "depends on the length of the display text.\n"
+                                 "Default: %.0f px",
+                                 DEFAULT_OVERLAY_ROW1_SPACING);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f,
+                                         0.0f,
+                                         48.0f,
+                                         "%.0f px")) {
+                        if (temp_settings.overlay_row1_shared_icon_size < 0.0f)
+                            temp_settings.overlay_row1_shared_icon_size = 0.0f;
+                        if (temp_settings.overlay_row1_shared_icon_size > 48.0f)
+                            temp_settings.overlay_row1_shared_icon_size = 48.0f;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Adjusts the size of the 'Parent Icon' overlay that appears when\n"
+                                 "multiple items share the same icon in Row 1.\n"
+                                 "Set to 0 to disable the shared icon overlay entirely.\n"
+                                 "Default: %.0f px",
+                                 DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    // --- Custom Row 2 Spacing ---
+                    ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
-                                 "WARNING: If this value is too small, item text will overlap.\n"
-                                 "The item icon is %dpx wide. Default: %.0fpx.",
-                                 96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
+                                 "Check this to override the dynamic width calculation for Row 2 items.\n"
+                                 "This allows you to set a fixed, uniform width for all items in this row.\n"
+                                 "Applies to %s, Unlocks (unless forced to Row 3),\n"
+                                 "and any Stats/Goals forced to Row 2.\n"
+                                 "Default: Off (%.0fpx when enabled)",
+                                 advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                }
 
-                // --- Custom Row 3 Spacing ---
-                ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Check this to override the dynamic width calculation for Row 3 items.\n"
-                             "This allows you to set a fixed, uniform width for all items in this row.\n"
-                             "Applies to Stats, Custom Goals, Multi-Stage Goals, Counters,\n"
-                             "and any %s/Unlocks forced to Row 3.\n"
-                             "Default: Off (%.0fpx when enabled)",
-                             advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-
-                if (temp_settings.overlay_row3_custom_spacing_enabled) {
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-                    if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f,
-                                         7680.0f,
-                                         "%.0f px")) {
-                        if (temp_settings.overlay_row3_custom_spacing < 96.0f)
-                            temp_settings.overlay_row3_custom_spacing = 96.0f;
-                        if (temp_settings.overlay_row3_custom_spacing > 7680.0f)
-                            temp_settings.overlay_row3_custom_spacing = 7680.0f;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[512];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
-                                 "WARNING: If this value is too small, item text will overlap.\n"
-                                 "The item icon is %dpx wide. Default: %.0fpx.",
-                                 96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                }
-
-                // --- Custom Vertical Spacing (overlay row gaps) ---
-                ImGui::Checkbox("Custom Vertical Spacing",
-                                &temp_settings.overlay_custom_vertical_spacing_enabled);
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s",
-                                      "Adjust the vertical gaps between the overlay rows individually.\n"
-                                      "Each gap is added on top of the default, font-driven layout and\n"
-                                      "resizes the overlay window height to match.\n"
-                                      "When disabled, the overlay uses the stock spacing.\n"
-                                      "Default: off.");
-                }
-
-                // Only reveal the individual gap controls when the feature is enabled,
-                // keeping the settings window compact when it is off.
-                if (temp_settings.overlay_custom_vertical_spacing_enabled) {
-                    auto vspacing_gap = [&](const char *label, float *value, float default_value, const char *desc) {
-                        if (ImGui::DragFloat(label, value, 1.0f, OVERLAY_GAP_MIN, OVERLAY_GAP_MAX, "%.0f px")) {
-                            if (*value < OVERLAY_GAP_MIN) *value = OVERLAY_GAP_MIN;
-                            if (*value > OVERLAY_GAP_MAX) *value = OVERLAY_GAP_MAX;
+                    if (temp_settings.overlay_row2_custom_spacing_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                        if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f,
+                                             96.0f,
+                                             7680.0f,
+                                             "%.0f px")) {
+                            if (temp_settings.overlay_row2_custom_spacing < 96.0f)
+                                temp_settings.overlay_row2_custom_spacing = 96.0f;
+                            if (temp_settings.overlay_row2_custom_spacing > 7680.0f)
+                                temp_settings.overlay_row2_custom_spacing = 7680.0f;
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "%s\n"
-                                     "Larger values add space and grow the overlay window height to match.\n"
-                                     "Default: %.0f px.", desc, default_value);
+                                     "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
+                                     "WARNING: If this value is too small, item text will overlap.\n"
+                                     "The item icon is %dpx wide. Default: %.0fpx.",
+                                     96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
-                    };
+                    }
 
-                    vspacing_gap("Top Bar -> Row 1 Gap", &temp_settings.overlay_gap_top_to_row1,
-                                 DEFAULT_OVERLAY_GAP_TOP_TO_ROW1,
-                                 "Extra vertical space between the top info bar and the first row.");
-                    vspacing_gap("Row 1 -> Row 2 Gap", &temp_settings.overlay_gap_row1_to_row2,
-                                 DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2,
-                                 "Extra vertical space between the first and second rows.");
-                    vspacing_gap("Row 2 -> Row 3 Gap", &temp_settings.overlay_gap_row2_to_row3,
-                                 DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3,
-                                 "Extra vertical space between the second and third rows.");
-                    vspacing_gap("Row 3 -> Bottom Gap", &temp_settings.overlay_gap_row3_to_bottom,
-                                 DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM,
-                                 "Extra vertical space below the third row, at the window's bottom edge.");
-                }
+                    // --- Custom Row 3 Spacing ---
+                    ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Check this to override the dynamic width calculation for Row 3 items.\n"
+                                 "This allows you to set a fixed, uniform width for all items in this row.\n"
+                                 "Applies to Stats, Custom Goals, Multi-Stage Goals, Counters,\n"
+                                 "and any %s/Unlocks forced to Row 3.\n"
+                                 "Default: Off (%.0fpx when enabled)",
+                                 advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    if (temp_settings.overlay_row3_custom_spacing_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                        if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f,
+                                             96.0f,
+                                             7680.0f,
+                                             "%.0f px")) {
+                            if (temp_settings.overlay_row3_custom_spacing < 96.0f)
+                                temp_settings.overlay_row3_custom_spacing = 96.0f;
+                            if (temp_settings.overlay_row3_custom_spacing > 7680.0f)
+                                temp_settings.overlay_row3_custom_spacing = 7680.0f;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[512];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
+                                     "WARNING: If this value is too small, item text will overlap.\n"
+                                     "The item icon is %dpx wide. Default: %.0fpx.",
+                                     96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                    }
+
+                    // --- Custom Vertical Spacing (overlay row gaps) ---
+                    ImGui::Checkbox("Custom Vertical Spacing",
+                                    &temp_settings.overlay_custom_vertical_spacing_enabled);
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Adjust the vertical gaps between the overlay rows individually.\n"
+                                          "Each gap is added on top of the default, font-driven layout and\n"
+                                          "resizes the overlay window height to match.\n"
+                                          "When disabled, the overlay uses the stock spacing.\n"
+                                          "Default: off.");
+                    }
+
+                    // Only reveal the individual gap controls when the feature is enabled,
+                    // keeping the settings window compact when it is off.
+                    if (temp_settings.overlay_custom_vertical_spacing_enabled) {
+                        auto vspacing_gap = [&
+                                ](const char *label, float *value, float default_value, const char *desc) {
+                            if (ImGui::DragFloat(label, value, 1.0f, OVERLAY_GAP_MIN, OVERLAY_GAP_MAX, "%.0f px")) {
+                                if (*value < OVERLAY_GAP_MIN) *value = OVERLAY_GAP_MIN;
+                                if (*value > OVERLAY_GAP_MAX) *value = OVERLAY_GAP_MAX;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[512];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "%s\n"
+                                         "Larger values add space and grow the overlay window height to match.\n"
+                                         "Default: %.0f px.", desc, default_value);
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                        };
+
+                        vspacing_gap("Top Bar -> Row 1 Gap", &temp_settings.overlay_gap_top_to_row1,
+                                     DEFAULT_OVERLAY_GAP_TOP_TO_ROW1,
+                                     "Extra vertical space between the top info bar and the first row.");
+                        vspacing_gap("Row 1 -> Row 2 Gap", &temp_settings.overlay_gap_row1_to_row2,
+                                     DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2,
+                                     "Extra vertical space between the first and second rows.");
+                        vspacing_gap("Row 2 -> Row 3 Gap", &temp_settings.overlay_gap_row2_to_row3,
+                                     DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3,
+                                     "Extra vertical space between the second and third rows.");
+                        vspacing_gap("Row 3 -> Bottom Gap", &temp_settings.overlay_gap_row3_to_bottom,
+                                     DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM,
+                                     "Extra vertical space below the third row, at the window's bottom edge.");
+                    }
                 } // End of Layout & Spacing (belt/page only; hidden in Compact mode)
 
                 ImGui::Separator();
@@ -4752,57 +4775,57 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // The single overlay font and the Top/Row text sizes drive the belt/page 3-row layout.
                 // Compact mode has its own per-element fonts below, so hide these while it is active.
                 if (!overlay_compact_mode) {
-                ImGui::Text("Overlay Font: %s", temp_settings.overlay_font_name);
-                ImGui::SameLine();
-                if (ImGui::Button("Browse##OverlayFont")) {
-                    char selected_font[256];
-                    if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
-                        strncpy(temp_settings.overlay_font_name, selected_font,
-                                sizeof(temp_settings.overlay_font_name) - 1);
-                        temp_settings.overlay_font_name[sizeof(temp_settings.overlay_font_name) - 1] = '\0';
+                    ImGui::Text("Overlay Font: %s", temp_settings.overlay_font_name);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##OverlayFont")) {
+                        char selected_font[256];
+                        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+                            strncpy(temp_settings.overlay_font_name, selected_font,
+                                    sizeof(temp_settings.overlay_font_name) - 1);
+                            temp_settings.overlay_font_name[sizeof(temp_settings.overlay_font_name) - 1] = '\0';
+                        }
                     }
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[1024];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Select the font for the text in the separate stream overlay window.\n"
-                             "Only choose fonts within the resources/fonts directory.\n"
-                             "Changing the font may change the overlay window height.\n"
-                             "Default: %s", DEFAULT_OVERLAY_FONT);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[1024];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Select the font for the text in the separate stream overlay window.\n"
+                                 "Only choose fonts within the resources/fonts directory.\n"
+                                 "Changing the font may change the overlay window height.\n"
+                                 "Default: %s", DEFAULT_OVERLAY_FONT);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
 
-                if (ImGui::DragFloat("Top Text Size", &temp_settings.overlay_progress_font_size, 0.5f,
-                                     OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
-                    if (temp_settings.overlay_progress_font_size < OVERLAY_FONT_SIZE_MIN)
-                        temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MIN;
-                    if (temp_settings.overlay_progress_font_size > OVERLAY_FONT_SIZE_MAX)
-                        temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MAX;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Font size for the top info bar (version, progress, IGT and socials).\n"
-                             "A larger size increases the overlay window height to fit the taller text.\n"
-                             "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
+                    if (ImGui::DragFloat("Top Text Size", &temp_settings.overlay_progress_font_size, 0.5f,
+                                         OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.overlay_progress_font_size < OVERLAY_FONT_SIZE_MIN)
+                            temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MIN;
+                        if (temp_settings.overlay_progress_font_size > OVERLAY_FONT_SIZE_MAX)
+                            temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Font size for the top info bar (version, progress, IGT and socials).\n"
+                                 "A larger size increases the overlay window height to fit the taller text.\n"
+                                 "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
 
-                if (ImGui::DragFloat("Row Text Size", &temp_settings.overlay_row_font_size, 0.5f,
-                                     OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
-                    if (temp_settings.overlay_row_font_size < OVERLAY_FONT_SIZE_MIN)
-                        temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MIN;
-                    if (temp_settings.overlay_row_font_size > OVERLAY_FONT_SIZE_MAX)
-                        temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MAX;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Font size for the item text under rows 2 and 3 (name and progress).\n"
-                             "A larger size increases the overlay window height to fit the taller text.\n"
-                             "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
+                    if (ImGui::DragFloat("Row Text Size", &temp_settings.overlay_row_font_size, 0.5f,
+                                         OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.overlay_row_font_size < OVERLAY_FONT_SIZE_MIN)
+                            temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MIN;
+                        if (temp_settings.overlay_row_font_size > OVERLAY_FONT_SIZE_MAX)
+                            temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Font size for the item text under rows 2 and 3 (name and progress).\n"
+                                 "A larger size increases the overlay window height to fit the taller text.\n"
+                                 "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                 } // End of belt/page font + text-size controls (hidden in Compact mode)
 
                 // Compact mode: the goal-type label, the big count and the pop-out stack each have their
@@ -5429,7 +5452,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Default: On");
                             ImGui::SetTooltip("%s", ghost_tip);
                         }
-                        ImGui::TextDisabled("Note: Only players whose save files were touched within the last 7 days are counted as ghosts.");
+                        ImGui::TextDisabled(
+                            "Note: Only players whose save files were touched within the last 7 days are counted as ghosts.");
                         ImGui::Spacing();
 
                         // IPv4 validation
@@ -7011,11 +7035,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             if (ImGui::IsItemHovered()) {
                 char auto_update_tooltip_buffer[1024];
                 int auto_update_len = snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
-                         "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
-                         "You can see your current version (vX.X.X) in the title of the main Advancely window.\n"
-                         "Through that notification you'll then be able to automatically install the update\n"
-                         "for your operating system. You can find more instructions on that popup.\n"
-                         "Default: On");
+                                               "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
+                                               "You can see your current version (vX.X.X) in the title of the main Advancely window.\n"
+                                               "Through that notification you'll then be able to automatically install the update\n"
+                                               "for your operating system. You can find more instructions on that popup.\n"
+                                               "Default: On");
 #ifdef __linux__
                 if (auto_update_len > 0 && (size_t) auto_update_len < sizeof(auto_update_tooltip_buffer)) {
                     snprintf(auto_update_tooltip_buffer + auto_update_len,

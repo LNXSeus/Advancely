@@ -148,6 +148,7 @@ typedef struct {
     char coop_selected_uuid[48];
     bool coop_selected_offline;
     int coop_lobby_count;
+
     struct {
         char uuid[48];
         bool is_offline;
@@ -750,6 +751,7 @@ static void overlay_heapcheck(const char *stage) {
     (void) stage;
 #endif
 }
+
 // ========================================================================================
 
 
@@ -1247,8 +1249,8 @@ static void seed_macos_support_dir_recursive(const char *src, const char *dst) {
 // read-only resources (get_application_dir). Only the user-writable subtrees are copied; read-only
 // assets stay in the bundle. Safe to call every launch: existing files are left untouched.
 static void seed_macos_support_dir(void) {
-    const char *bundle = get_application_dir();  // Read-only source (next to/inside the .app).
-    const char *support = get_resources_path();  // Writable destination in Application Support.
+    const char *bundle = get_application_dir(); // Read-only source (next to/inside the .app).
+    const char *support = get_resources_path(); // Writable destination in Application Support.
 
     // If the destination resolved back to the bundle (e.g. HOME unavailable) there is nothing to do.
     if (strcmp(bundle, support) == 0) return;
@@ -1284,7 +1286,7 @@ enum UpdateStage {
 
 struct UpdateWorker {
     SDL_Thread *thread;
-    SDL_AtomicInt stage;    // UpdateStage, written by worker, read by main.
+    SDL_AtomicInt stage; // UpdateStage, written by worker, read by main.
     SDL_AtomicInt progress; // Progress within the current stage, 0..1000 (per-mille).
     char download_url[256];
     char exe_path[MAX_PATH_LENGTH];
@@ -3100,8 +3102,9 @@ int main(int argc, char *argv[]) {
                             tracker->coop_recv_resync_needed = 0;
                             log_message(LOG_INFO, "[COOP] Receiver: applied %s state. "
                                         "overall_progress=%.1f%% (timer_mirrored=%s)\n",
-                                        (tracker->selected_coop_ghost_idx >= 0) ? "per-ghost"
-                                                                                : (sel >= 0 ? "per-player" : "merged"),
+                                        (tracker->selected_coop_ghost_idx >= 0)
+                                            ? "per-ghost"
+                                            : (sel >= 0 ? "per-player" : "merged"),
                                         tracker->template_data->overall_progress_percentage,
                                         fresh_from_host ? "yes" : "no");
                         } else {
@@ -3234,13 +3237,13 @@ int main(int argc, char *argv[]) {
                     CoopCustomGoalModMsg drained[COOP_MAX_CUSTOM_MODS];
                     int drained_count = coop_net_drain_custom_mods(g_coop_ctx, drained, COOP_MAX_CUSTOM_MODS);
                     for (int mi = 0; mi < drained_count; mi++) {
-                        if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
+                        if (pending_rcv_mod_count < (int) (sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
                             pending_rcv_mods[pending_rcv_mod_count++] = drained[mi];
                     }
                     CoopCustomGoalModMsg host_drained[COOP_MAX_CUSTOM_MODS];
                     int host_drained_count = tracker_drain_host_mods(host_drained, COOP_MAX_CUSTOM_MODS);
                     for (int mi = 0; mi < host_drained_count; mi++) {
-                        if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
+                        if (pending_rcv_mod_count < (int) (sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
                             pending_rcv_mods[pending_rcv_mod_count++] = host_drained[mi];
                     }
                     if ((drained_count > 0 || host_drained_count > 0) && rcv_mod_batch_deadline_ms == 0)
@@ -3269,7 +3272,10 @@ int main(int argc, char *argv[]) {
                             if (pi < 0) continue;
                             bool seen = false;
                             for (int d = 0; d < dirty_count; d++) {
-                                if (dirty_idx[d] == pi) { seen = true; break; }
+                                if (dirty_idx[d] == pi) {
+                                    seen = true;
+                                    break;
+                                }
                             }
                             if (!seen) dirty_idx[dirty_count++] = pi;
                         }
@@ -3349,7 +3355,8 @@ int main(int argc, char *argv[]) {
                     rcv_mod_batch_deadline_ms = 0;
                     // Also drop any host mods that were queued but never flushed.
                     CoopCustomGoalModMsg sink[COOP_MAX_CUSTOM_MODS];
-                    while (tracker_drain_host_mods(sink, COOP_MAX_CUSTOM_MODS) > 0) {}
+                    while (tracker_drain_host_mods(sink, COOP_MAX_CUSTOM_MODS) > 0) {
+                    }
                 }
             }
 
@@ -3594,8 +3601,8 @@ int main(int argc, char *argv[]) {
                                     tracker_update_coop_single_player_by_uuid(
                                         tracker, &app_settings, tracker->selected_coop_ghost_uuid, "");
                                 } else if (tracker->selected_coop_player_idx >= 0 &&
-                                    tracker->selected_coop_player_idx < pc &&
-                                    tracker->coop_player_snapshots[tracker->selected_coop_player_idx]) {
+                                           tracker->selected_coop_player_idx < pc &&
+                                           tracker->coop_player_snapshots[tracker->selected_coop_player_idx]) {
                                     int sel = tracker->selected_coop_player_idx;
                                     merge_coop_progress(tracker->coop_player_snapshots[sel],
                                                         tracker->template_data);
@@ -4221,9 +4228,11 @@ int main(int argc, char *argv[]) {
                                    update_stage == UPDATE_STAGE_EXTRACTING ||
                                    update_stage == UPDATE_STAGE_APPLYING) {
                             const char *stage_label =
-                                    update_stage == UPDATE_STAGE_DOWNLOADING ? "Step 1/3: Downloading update..." :
-                                    update_stage == UPDATE_STAGE_EXTRACTING ? "Step 2/3: Extracting files..." :
-                                    "Step 3/3: Preparing restart...";
+                                    update_stage == UPDATE_STAGE_DOWNLOADING
+                                        ? "Step 1/3: Downloading update..."
+                                        : update_stage == UPDATE_STAGE_EXTRACTING
+                                              ? "Step 2/3: Extracting files..."
+                                              : "Step 3/3: Preparing restart...";
                             ImGui::TextUnformatted(stage_label);
                             ImGui::Spacing();
 

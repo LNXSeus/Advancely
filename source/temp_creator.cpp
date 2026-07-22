@@ -347,11 +347,15 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
     if (in_3rd_row)
         tags[n++] = {"R3", IM_COL32(190, 140, 255, 255), "Forced to the 3rd overlay row"};
     if (is_hidden)
-        tags[n++] = {"H", IM_COL32(255, 180, 60, 255),
-                     "Hidden from the overlay and automatic tracker layout"};
+        tags[n++] = {
+            "H", IM_COL32(255, 180, 60, 255),
+            "Hidden from the overlay and automatic tracker layout"
+        };
     if (is_recipe)
-        tags[n++] = {"rcp", IM_COL32(130, 220, 130, 255),
-                     "Recipe (counts toward progress percentage, not advancements)"};
+        tags[n++] = {
+            "rcp", IM_COL32(130, 220, 130, 255),
+            "Recipe (counts toward progress percentage, not advancements)"
+        };
     if (manual_pos_set)
         tags[n++] = {"pos", IM_COL32(90, 210, 200, 255), "Has custom manual-layout coordinates"};
     draw_editor_row_status_tags(tags, n);
@@ -372,7 +376,8 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
     if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
     if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
     if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
-                           || strcasecmp(search, "manual") == 0)) return true;
+                           || strcasecmp(search, "manual") == 0))
+        return true;
     return false;
 }
 
@@ -922,10 +927,11 @@ static std::vector<std::string> crit_collect_group_ids(const EditorTrackableCate
     for (const auto &c: adv.criteria) {
         if (c.group[0] == '\0') continue;
         bool seen = false;
-        for (const auto &id: ids) if (id == c.group) {
-            seen = true;
-            break;
-        }
+        for (const auto &id: ids)
+            if (id == c.group) {
+                seen = true;
+                break;
+            }
         if (!seen) ids.emplace_back(c.group);
     }
     return ids;
@@ -2080,8 +2086,9 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
 
     // Decorations come from the layout file when one is present (authoritative); otherwise inline.
     // Decoration display text always comes from the language file.
-    cJSON *deco_src = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
-                                  : cJSON_GetObjectItem(root, "decorations");
+    cJSON *deco_src = layout_json
+                          ? cJSON_GetObjectItem(layout_json, "decorations")
+                          : cJSON_GetObjectItem(root, "decorations");
     parse_editor_decorations(deco_src, editor_data.decorations, lang_json);
 
     // Override the inline positions parsed above with the layout file's positions.
@@ -2709,7 +2716,7 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
 // template already has. Best-effort: I/O failures are logged and skipped so one bad file can't abort a
 // save that already succeeded.
 static void write_pending_lang_imports(const char *version, const DiscoveredTemplate &template_info,
-                                       const std::map<std::string, std::map<std::string, std::string>> &pending) {
+                                       const std::map<std::string, std::map<std::string, std::string> > &pending) {
     if (pending.empty()) return;
 
     char version_filename[64];
@@ -2838,12 +2845,12 @@ static LinkedGoalType tc_resolve_linked_goal_section(const EditorTemplate &tpl,
 static const char *tc_linked_goal_type_label(LinkedGoalType type, bool uses_achievements) {
     switch (type) {
         case LINK_TYPE_ADVANCEMENT: return uses_achievements ? "Ach." : "Adv.";
-        case LINK_TYPE_STAT:        return "Stat";
-        case LINK_TYPE_UNLOCK:      return "Unlock";
-        case LINK_TYPE_CUSTOM:      return "Custom";
+        case LINK_TYPE_STAT: return "Stat";
+        case LINK_TYPE_UNLOCK: return "Unlock";
+        case LINK_TYPE_CUSTOM: return "Custom";
         case LINK_TYPE_MULTI_STAGE: return "MS-Goal";
-        case LINK_TYPE_COUNTER:     return "Counter";
-        default:                    return "";
+        case LINK_TYPE_COUNTER: return "Counter";
+        default: return "";
     }
 }
 
@@ -3037,8 +3044,8 @@ static bool validate_and_save_template(const char *creator_version_str,
                                        EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
                                        SaveMessageType &save_message_type, char *status_message,
                                        AppSettings *app_settings,
-                                       std::map<std::string, std::map<std::string, std::string>> *pending_lang_imports
-                                       = nullptr) {
+                                       std::map<std::string, std::map<std::string, std::string> > *pending_lang_imports
+                                               = nullptr) {
     // Reset message state on new save attempt
     save_message_type = MSG_NONE;
     status_message[0] = '\0';
@@ -3689,16 +3696,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         selected_stat = nullptr;
         selected_ms_goal = nullptr;
         if (adv_root[0]) {
-            for (auto &adv : current_template_data.advancements)
-                if (strcmp(adv.root_name, adv_root) == 0) { selected_advancement = &adv; break; }
+            for (auto &adv: current_template_data.advancements)
+                if (strcmp(adv.root_name, adv_root) == 0) {
+                    selected_advancement = &adv;
+                    break;
+                }
         }
         if (stat_root[0]) {
-            for (auto &stat : current_template_data.stats)
-                if (strcmp(stat.root_name, stat_root) == 0) { selected_stat = &stat; break; }
+            for (auto &stat: current_template_data.stats)
+                if (strcmp(stat.root_name, stat_root) == 0) {
+                    selected_stat = &stat;
+                    break;
+                }
         }
         if (ms_root[0]) {
-            for (auto &g : current_template_data.multi_stage_goals)
-                if (strcmp(g.root_name, ms_root) == 0) { selected_ms_goal = &g; break; }
+            for (auto &g: current_template_data.multi_stage_goals)
+                if (strcmp(g.root_name, ms_root) == 0) {
+                    selected_ms_goal = &g;
+                    break;
+                }
         }
     };
     // Visual drag auto-select: which tab to force-select and which goal's header to force-open
@@ -3849,7 +3865,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<std::string> s_template_import_target_langs; // current template's languages
     static std::vector<bool> s_template_import_lang_selected; // parallel to target_langs
     static bool s_template_import_multi_available = false;
-    static std::map<std::string, std::map<std::string, std::string>> s_pending_lang_imports;
+    static std::map<std::string, std::map<std::string, std::string> > s_pending_lang_imports;
     // A save triggered while a text field is still active must wait one frame: clearing the active
     // ID lets that field's deactivation callbacks (e.g. goal rename propagation) run first, so the
     // saved snapshot is fully consistent instead of resurrecting phantom "unsaved changes".
@@ -3917,8 +3933,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                    s_template_import_data.counter_goals, lang_json);
 
         // Decorations come from the layout file when present (authoritative), else inline in the template.
-        cJSON *deco_src = layout_json ? cJSON_GetObjectItem(layout_json, "decorations")
-                                      : cJSON_GetObjectItem(root_json, "decorations");
+        cJSON *deco_src = layout_json
+                              ? cJSON_GetObjectItem(layout_json, "decorations")
+                              : cJSON_GetObjectItem(root_json, "decorations");
         parse_editor_decorations(deco_src, s_template_import_data.decorations, lang_json);
 
         // Override the inline positions parsed above with the layout file's positions (no-op when null).
@@ -3941,10 +3958,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_lang_flags = list_lang_flags_in_zip(file);
         // Always include the default ("") even if not present, so the dropdown is non-empty.
         bool has_default = false;
-        for (const auto &f: s_template_import_lang_flags) if (f.empty()) {
-            has_default = true;
-            break;
-        }
+        for (const auto &f: s_template_import_lang_flags)
+            if (f.empty()) {
+                has_default = true;
+                break;
+            }
         if (!has_default) s_template_import_lang_flags.insert(s_template_import_lang_flags.begin(), std::string());
         s_template_import_lang_index = 0;
 
@@ -3959,10 +3977,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             bool all_present = true;
             for (const auto &cur: s_template_import_target_langs) {
                 bool found = false;
-                for (const auto &src: s_template_import_lang_flags) if (src == cur) {
-                    found = true;
-                    break;
-                }
+                for (const auto &src: s_template_import_lang_flags)
+                    if (src == cur) {
+                        found = true;
+                        break;
+                    }
                 if (!found) {
                     all_present = false;
                     break;
@@ -3991,10 +4010,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_layout_flags = list_layout_flags_in_zip(file);
         if (!s_template_import_layout_flags.empty()) {
             bool has_default_layout = false;
-            for (const auto &f: s_template_import_layout_flags) if (f.empty()) {
-                has_default_layout = true;
-                break;
-            }
+            for (const auto &f: s_template_import_layout_flags)
+                if (f.empty()) {
+                    has_default_layout = true;
+                    break;
+                }
             if (!has_default_layout) {
                 s_template_import_layout_flags.insert(s_template_import_layout_flags.begin(), std::string());
             }
@@ -5031,7 +5051,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // NO OPTIONAL FLAG
                     if (creator_selected_version <= MC_VERSION_1_6_4) {
                         // Legacy snapshot mentioned
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Delete template:\nVersion: %s\nCategory: %s\n\n"
                                  "This deletes the template, associated language files,\n"
                                  "notes and snapshot file for global stats.\n"
                                  "Empty folders within the 'templates' folder will also be deleted.\n"
@@ -5039,7 +5060,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  creator_version_str, selected.category);
                     } else {
                         // No snapshot mentioned
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Delete template:\nVersion: %s\nCategory: %s\n\n"
                                  "This deletes the template, associated language files and notes.\n"
                                  "Empty folders within the 'templates' folder will also be deleted.\n"
                                  "This action cannot be undone.",
@@ -5351,7 +5373,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         recompute_display_category(app_settings);
                         settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                         SDL_SetAtomicInt(&g_settings_changed, 1); // Reload the tracker onto the default template
-                        SDL_SetAtomicInt(&g_settings_resync_from_app, 1); // Don't flag this as an unsaved Settings change
+                        SDL_SetAtomicInt(&g_settings_resync_from_app, 1);
+                        // Don't flag this as an unsaved Settings change
                     }
                 } else {
                     snprintf(status_message, sizeof(status_message), "Error: Failed to delete template '%s'.",
@@ -7002,9 +7025,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
                                                 str_contains_insensitive(advancement.icon_path, tc_search_buffer) ||
                                                 indicator_matches_search(tc_search_buffer, advancement.is_hidden,
-                                                    advancement.in_3rd_row ? 3 : 2, advancement.is_recipe,
-                                                    advancement.icon_pos.is_set || advancement.text_pos.is_set ||
-                                                    advancement.progress_pos.is_set);
+                                                                         advancement.in_3rd_row ? 3 : 2,
+                                                                         advancement.is_recipe,
+                                                                         advancement.icon_pos.is_set || advancement.
+                                                                         text_pos.is_set ||
+                                                                         advancement.progress_pos.is_set);
 
                             if (parent_match) {
                                 advancements_to_render.push_back(&advancement);
@@ -7019,8 +7044,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.group, tc_search_buffer) ||
                                     indicator_matches_search(tc_search_buffer, criterion.is_hidden, 1, false,
-                                        criterion.icon_pos.is_set || criterion.text_pos.is_set ||
-                                        criterion.progress_pos.is_set)) {
+                                                             criterion.icon_pos.is_set || criterion.text_pos.is_set ||
+                                                             criterion.progress_pos.is_set)) {
                                     child_match = true;
                                     break;
                                 }
@@ -8745,8 +8770,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     s_crit_bl_icon_xs = fminf(fmaxf(roundf(s_crit_bl_icon_xs), -MANUAL_POS_MAX),
                                                               MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", &s_crit_bl_icon_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
@@ -8761,8 +8787,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     s_crit_bl_icon_ys = fminf(fmaxf(roundf(s_crit_bl_icon_ys), -MANUAL_POS_MAX),
                                                               MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -8838,8 +8865,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     s_crit_bl_text_xs = fminf(fmaxf(roundf(s_crit_bl_text_xs), -MANUAL_POS_MAX),
                                                               MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", &s_crit_bl_text_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
@@ -8854,8 +8882,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     s_crit_bl_text_ys = fminf(fmaxf(roundf(s_crit_bl_text_ys), -MANUAL_POS_MAX),
                                                               MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -9328,8 +9357,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
                                 advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
-                                if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index
-                                        --;
+                                if (criterion_dnd_target_index > criterion_dnd_source_index)
+                                    criterion_dnd_target_index
+                                            --;
                                 advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
                                                             item_to_move);
                                 s_crit_selection.clear();
@@ -9715,9 +9745,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(stat_cat.icon_path, tc_search_buffer) ||
                                 indicator_matches_search(tc_search_buffer, stat_cat.is_hidden,
-                                    stat_cat.in_2nd_row ? 2 : 3, stat_cat.is_recipe,
-                                    stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
-                                    stat_cat.progress_pos.is_set)) {
+                                                         stat_cat.in_2nd_row ? 2 : 3, stat_cat.is_recipe,
+                                                         stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
+                                                         stat_cat.progress_pos.is_set)) {
                                 should_render = true;
                             }
 
@@ -9739,8 +9769,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
                                         (!stat_cat.is_simple_stat &&
                                          indicator_matches_search(tc_search_buffer, criterion.is_hidden, 1, false,
-                                            criterion.icon_pos.is_set || criterion.text_pos.is_set ||
-                                            criterion.progress_pos.is_set))) {
+                                                                  criterion.icon_pos.is_set || criterion.text_pos.is_set
+                                                                  ||
+                                                                  criterion.progress_pos.is_set))) {
                                         should_render = true;
                                         break; // A matching child was found, no need to check others.
                                     }
@@ -9837,11 +9868,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Invert Selection##stat_ba"))
                                 bulk_invert_selection(s_stat_selection, (int) current_template_data.stats.size());
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                "%s", "Select every stat that is not currently selected, and deselect the rest.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip(
+                                    "%s", "Select every stat that is not currently selected, and deselect the rest.");
                             if (ImGui::Selectable("Set Icon...##stat_ba")) ba_open_icon = true;
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                "%s", "Apply the same icon path to every selected stat.");
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip(
+                                    "%s", "Apply the same icon path to every selected stat.");
                             if (ImGui::Selectable("Toggle Hidden##stat_ba")) ba_do_toggle_hidden = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -10063,8 +10096,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
@@ -10075,8 +10109,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -10767,7 +10802,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) stat_cat.linked_goals.size(); li++) {
                                     auto &lg = stat_cat.linked_goals[li];
                                     char lg_display[512];
-                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1,
+                                                                  current_template_data, lg,
                                                                   creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_stat_cat_lg_%d", li);
@@ -11311,8 +11347,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              "%.0f")) {
                                             *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                            "%s", "Increment added to X for each item after the first.");
+                                        if (ImGui::IsItemHovered())
+                                            ImGui::SetTooltip(
+                                                "%s", "Increment added to X for each item after the first.");
                                         ImGui::SameLine();
                                         ImGui::SetNextItemWidth(70);
                                         if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX,
@@ -11325,8 +11362,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              "%.0f")) {
                                             *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
-                                        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                            "%s", "Increment added to Y for each item after the first.");
+                                        if (ImGui::IsItemHovered())
+                                            ImGui::SetTooltip(
+                                                "%s", "Increment added to Y for each item after the first.");
                                         ImGui::SetNextItemWidth(140);
                                         ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                                      IM_ARRAYSIZE(anchor_point_labels));
@@ -11694,7 +11732,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                     tc_render_add_visual_selection_button(crit_select_btn_id, current_template_data,
                                                                           crit.linked_goals, save_message_type,
-                                                                          crit.root_name, stat_cat.root_name, LINK_TYPE_STAT);
+                                                                          crit.root_name, stat_cat.root_name,
+                                                                          LINK_TYPE_STAT);
 
                                     if (!crit.linked_goals.empty()) {
                                         // AND/OR mode toggle
@@ -11717,7 +11756,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
 
                                         tc_render_remove_all_linked_goals_button(crit_select_btn_id, crit.linked_goals,
-                                                                                 save_message_type);
+                                            save_message_type);
 
                                         // Show linked goals list
                                         char crit_child_id[128];
@@ -11728,8 +11767,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         for (int li = 0; li < (int) crit.linked_goals.size(); li++) {
                                             auto &lg = crit.linked_goals[li];
                                             char lg_display[512];
-                                            tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
-                                                                  creator_version_str);
+                                            tc_format_linked_goal_display(
+                                                lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                creator_version_str);
                                             char crit_remove_btn[64];
                                             snprintf(crit_remove_btn, sizeof(crit_remove_btn),
                                                      "X##remove_sub_stat_lg_%zu_%d", j, li);
@@ -11992,9 +12032,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(unlock.icon_path, tc_search_buffer) ||
                                     indicator_matches_search(tc_search_buffer, unlock.is_hidden,
-                                        unlock.in_3rd_row ? 3 : 2, false,
-                                        unlock.icon_pos.is_set || unlock.text_pos.is_set ||
-                                        unlock.progress_pos.is_set)) {
+                                                             unlock.in_3rd_row ? 3 : 2, false,
+                                                             unlock.icon_pos.is_set || unlock.text_pos.is_set ||
+                                                             unlock.progress_pos.is_set)) {
                                     count_top++;
                                 }
                             }
@@ -12298,8 +12338,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
@@ -12310,8 +12351,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -12402,9 +12444,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.icon_path, tc_search_buffer) &&
                                 !indicator_matches_search(tc_search_buffer, unlock.is_hidden,
-                                    unlock.in_3rd_row ? 3 : 2, false,
-                                    unlock.icon_pos.is_set || unlock.text_pos.is_set ||
-                                    unlock.progress_pos.is_set)) {
+                                                          unlock.in_3rd_row ? 3 : 2, false,
+                                                          unlock.icon_pos.is_set || unlock.text_pos.is_set ||
+                                                          unlock.progress_pos.is_set)) {
                                 continue;
                             }
                         }
@@ -12909,9 +12951,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
                                 (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
                                 indicator_matches_search(tc_search_buffer, goal.is_hidden,
-                                    goal.in_2nd_row ? 2 : 3, false,
-                                    goal.icon_pos.is_set || goal.text_pos.is_set ||
-                                    goal.progress_pos.is_set)) {
+                                                         goal.in_2nd_row ? 2 : 3, false,
+                                                         goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                                         goal.progress_pos.is_set)) {
                                 goals_to_render.push_back(&goal);
                             }
                         }
@@ -13137,8 +13179,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
@@ -13149,8 +13192,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -13410,7 +13454,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) goal.linked_goals.size(); li++) {
                                     auto &lg = goal.linked_goals[li];
                                     char lg_display[512];
-                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1,
+                                                                  current_template_data, lg,
                                                                   creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_cg_lg_%d", li);
@@ -13963,9 +14008,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 str_contains_insensitive(goal.root_name, tc_search_buffer) ||
                                                 str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
                                                 indicator_matches_search(tc_search_buffer, goal.is_hidden,
-                                                    goal.in_2nd_row ? 2 : 3, false,
-                                                    goal.icon_pos.is_set || goal.text_pos.is_set ||
-                                                    goal.progress_pos.is_set);
+                                                                         goal.in_2nd_row ? 2 : 3, false,
+                                                                         goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                                                         goal.progress_pos.is_set);
 
                             if (parent_match) {
                                 goals_to_render.push_back(&goal);
@@ -14300,8 +14345,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
@@ -14312,8 +14358,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -15870,7 +15917,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                     tc_render_add_visual_selection_button(stage_select_btn_id, current_template_data,
                                                                           stage.linked_goals, save_message_type,
-                                                                          goal.root_name, nullptr, LINK_TYPE_MULTI_STAGE);
+                                                                          goal.root_name, nullptr,
+                                                                          LINK_TYPE_MULTI_STAGE);
 
                                     if (!stage.linked_goals.empty()) {
                                         // AND/OR mode toggle
@@ -15894,8 +15942,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
 
                                         if (tc_render_remove_all_linked_goals_button(stage_select_btn_id,
-                                                                                     stage.linked_goals,
-                                                                                     save_message_type)) {
+                                            stage.linked_goals,
+                                            save_message_type)) {
                                             ms_goal_data_changed = true;
                                         }
 
@@ -15908,8 +15956,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         for (int li = 0; li < (int) stage.linked_goals.size(); li++) {
                                             auto &lg = stage.linked_goals[li];
                                             char lg_display[512];
-                                            tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
-                                                                  creator_version_str);
+                                            tc_format_linked_goal_display(
+                                                lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                                creator_version_str);
                                             char stage_remove_btn[64];
                                             snprintf(stage_remove_btn, sizeof(stage_remove_btn),
                                                      "X##remove_stage_lg_%zu_%d", j, li);
@@ -16316,8 +16365,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     str_contains_insensitive(c.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(c.icon_path, tc_search_buffer) ||
                                     indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
-                                        false, c.icon_pos.is_set || c.text_pos.is_set ||
-                                        c.progress_pos.is_set)) {
+                                                             false, c.icon_pos.is_set || c.text_pos.is_set ||
+                                                                    c.progress_pos.is_set)) {
                                     count_top++;
                                 }
                             }
@@ -16344,8 +16393,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 str_contains_insensitive(c.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.icon_path, tc_search_buffer) ||
                                 indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
-                                    false, c.icon_pos.is_set || c.text_pos.is_set ||
-                                    c.progress_pos.is_set)) {
+                                                         false, c.icon_pos.is_set || c.text_pos.is_set ||
+                                                                c.progress_pos.is_set)) {
                                 counters_to_render.push_back(&c);
                             }
                         }
@@ -16582,8 +16631,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+X", s.p_xs, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_xs = fminf(fmaxf(roundf(*s.p_xs), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to X for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to X for each item after the first.");
                                 ImGui::SameLine();
                                 ImGui::SetNextItemWidth(70);
                                 if (ImGui::DragFloat("Y", s.p_y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
@@ -16594,8 +16644,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::DragFloat("+Y", s.p_ys, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
                                     *s.p_ys = fminf(fmaxf(roundf(*s.p_ys), -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                 }
-                                if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                                    "%s", "Increment added to Y for each item after the first.");
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip(
+                                        "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
@@ -16690,8 +16741,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const char *label = show_counter_display_names
                                                 ? (display_name[0] ? display_name : root_name)
                                                 : root_name;
-                        if (label[0] == '\0') label = "[New Counter]";
-                        {
+                        if (label[0] == '\0') label = "[New Counter]"; {
                             bool is_ctr_selected = s_ctr_selection.find(ctr_real_i) != s_ctr_selection.end();
                             if (ImGui::Checkbox("##ctr_bulk_sel", &is_ctr_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -17145,8 +17195,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 auto &lg = counter.linked_goals[li];
                                 // Build display text with numbering and full disambiguation
                                 char lg_display[512];
-                                tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
-                                                                  creator_version_str);
+                                tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1,
+                                                              current_template_data, lg,
+                                                              creator_version_str);
                                 char remove_btn[64];
                                 snprintf(remove_btn, sizeof(remove_btn), "X##remove_lg_%d", li);
                                 if (ImGui::SmallButton(remove_btn)) {
@@ -17596,7 +17647,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int li = 0; li < (int) deco.linked_goals.size(); li++) {
                                     auto &lg = deco.linked_goals[li];
                                     char lg_display[512];
-                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1, current_template_data, lg,
+                                    tc_format_linked_goal_display(lg_display, sizeof(lg_display), li + 1,
+                                                                  current_template_data, lg,
                                                                   creator_version_str);
                                     char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_header_lg_%d", li);
@@ -18984,7 +19036,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (popup_error_msg[0] != '\0') {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
         }
-        if (ImGui::Button("Create", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+        if (ImGui::Button("Create", ImVec2(120, 0)) || (
+                !ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             popup_error_msg[0] = '\0';
             if (validate_and_create_layout_file(creator_version_str, selected.category, selected.optional_flag,
                                                 layout_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
@@ -19123,7 +19176,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const auto &layout_to_delete = selected.available_layout_flags[selected_layout_mgmt_index];
         ImGui::Text("Are you sure you want to delete the '%s' layout file?", layout_to_delete.c_str());
         ImGui::Separator();
-        if (ImGui::Button("Delete", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+        if (ImGui::Button("Delete", ImVec2(120, 0)) || (
+                !ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256];
             if (delete_layout_file(creator_version_str, selected.category, selected.optional_flag,
                                    layout_to_delete.c_str(), error_msg, sizeof(error_msg))) {
@@ -21230,8 +21284,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         break;
                     }
                 }
-                if (committed > 0) log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n",
-                                               committed);
+                if (committed > 0)
+                    log_message(LOG_INFO, "[TEMP CREATOR] Committed %d rename(s) from import.\n",
+                                committed);
                 s_pending_renames.clear();
 
                 int crit_rows = 0;
@@ -21271,8 +21326,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         break;
                     }
                 }
-                if (crit_rows > 0) log_message(
-                    LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
+                if (crit_rows > 0)
+                    log_message(
+                        LOG_INFO, "[TEMP CREATOR] Committed criteria differences for %d row(s).\n", crit_rows);
                 s_pending_criteria_changes.clear();
 
                 if (!s_pending_advancement_removes.empty()) {
@@ -21294,8 +21350,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             removed++;
                         }
                     }
-                    if (removed > 0) log_message(
-                        LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
+                    if (removed > 0)
+                        log_message(
+                            LOG_INFO, "[TEMP CREATOR] Committed %d stale removal(s) from import.\n", removed);
                     s_pending_advancement_removes.clear();
                 }
 
@@ -22566,8 +22623,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_TEMPLATE_CRITERIA: {
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.advancements.size()) return "Invalid parent.";
-                    if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size()) return
-                            "Out of range.";
+                    if (i < 0 || i >= (int) s_template_import_data.advancements[p].criteria.size())
+                        return
+                                "Out of range.";
                     return nullptr;
                 }
                 case IFTS_TEMPLATE_SUB_STATS: {
@@ -22579,8 +22637,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 case IFTS_TEMPLATE_STAGES: {
                     int p = s_template_import_parent_index;
                     if (p < 0 || p >= (int) s_template_import_data.multi_stage_goals.size()) return "Invalid parent.";
-                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size()) return
-                            "Out of range.";
+                    if (i < 0 || i >= (int) s_template_import_data.multi_stage_goals[p].stages.size())
+                        return
+                                "Out of range.";
                     return nullptr;
                 }
                 case IFTS_MS_GOALS: {
@@ -22605,7 +22664,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const auto &cat = s_template_import_data.stats[i];
                     for (const auto &c: cat.criteria) {
                         if (!root_name_valid_for_version(c.root_name, true))
-                            return "Warning: Contains a sub-stat whose root name format does not match this Minecraft version.";
+                            return
+                                    "Warning: Contains a sub-stat whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
                 }
@@ -22639,7 +22699,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             return "Warning: Contains a stage whose type is not supported in this Minecraft version.";
                         if (st.root_name[0] != '\0' && !root_name_valid_for_version(
                                 st.root_name, st.type == SUBGOAL_STAT))
-                            return "Warning: Contains a stage whose root name format does not match this Minecraft version.";
+                            return
+                                    "Warning: Contains a stage whose root name format does not match this Minecraft version.";
                     }
                     return nullptr;
                 }
@@ -23118,8 +23179,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (st.type == SUBGOAL_CRITERION && st.parent_advancement[0] &&
                         !will_exist.count(st.parent_advancement)) {
                         char buf[512];
-                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s parent -> %s", goal_root, st.stage_id,
-                                                st.parent_advancement);
+                        if (goal_root)
+                            snprintf(buf, sizeof(buf), "%s/%s parent -> %s", goal_root, st.stage_id,
+                                     st.parent_advancement);
                         else snprintf(buf, sizeof(buf), "%s parent -> %s", st.stage_id, st.parent_advancement);
                         out.emplace_back(buf);
                     }
@@ -23133,8 +23195,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             return;
                         }
                         char buf[512];
-                        if (goal_root) snprintf(buf, sizeof(buf), "%s/%s root -> %s", goal_root, st.stage_id,
-                                                st.root_name);
+                        if (goal_root)
+                            snprintf(buf, sizeof(buf), "%s/%s root -> %s", goal_root, st.stage_id,
+                                     st.root_name);
                         else snprintf(buf, sizeof(buf), "%s root -> %s", st.stage_id, st.root_name);
                         out.emplace_back(buf);
                     }
@@ -23295,8 +23358,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(
-                                        c.icon_path);
+                                    for (const auto &c: item.criteria)
+                                        if (c.icon_path[0])
+                                            icons_to_pull.emplace_back(
+                                                c.icon_path);
                                     current_template_data.advancements.push_back(std::move(item));
                                 }
                             }
@@ -23331,8 +23396,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &c: item.criteria) if (c.icon_path[0]) icons_to_pull.emplace_back(
-                                        c.icon_path);
+                                    for (const auto &c: item.criteria)
+                                        if (c.icon_path[0])
+                                            icons_to_pull.emplace_back(
+                                                c.icon_path);
                                     current_template_data.stats.push_back(std::move(item));
                                 }
                             }
@@ -23442,8 +23509,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         item.progress_pos = ManualPos{};
                                     }
                                     if (item.icon_path[0]) icons_to_pull.emplace_back(item.icon_path);
-                                    for (const auto &st: item.stages) if (st.icon_path[0]) icons_to_pull.emplace_back(
-                                        st.icon_path);
+                                    for (const auto &st: item.stages)
+                                        if (st.icon_path[0])
+                                            icons_to_pull.emplace_back(
+                                                st.icon_path);
                                     current_template_data.multi_stage_goals.push_back(std::move(item));
                                 }
                             }
@@ -23610,7 +23679,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // (source_key, target_key) pairs mirroring save_template_from_editor's lang keys.
                             // They differ only for the parented scopes, where the source and destination
                             // parents differ (criteria/sub-stats/stages move under a different owner).
-                            std::vector<std::pair<std::string, std::string>> key_pairs;
+                            std::vector<std::pair<std::string, std::string> > key_pairs;
                             switch (s_template_import_scope) {
                                 case IFTS_ADVANCEMENTS:
                                     for (int i = 0; i < item_count; i++) {
@@ -23730,7 +23799,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                s_template_import_target_ms->root_name;
                                         for (int i = 0; i < item_count; i++) {
                                             if (!s_template_import_selected[i] || entry_is_final_stage(i) ||
-                                                entry_blocking_reason(i)) continue;
+                                                entry_blocking_reason(i))
+                                                continue;
                                             if (i >= (int) src_goal.stages.size()) continue;
                                             const char *sid = src_goal.stages[i].stage_id;
                                             key_pairs.emplace_back(src_base + ".stage." + sid,

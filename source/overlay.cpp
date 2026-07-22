@@ -226,12 +226,12 @@ static inline float effective_scroll_speed(bool custom_enabled, float custom_spe
 // template itself changes.
 struct ScrollBelt {
     std::vector<int> tiles; // item indices left->right; -1 = gap
-    float head_x = 0.0f;    // left edge x of tiles.front()
+    float head_x = 0.0f; // left edge x of tiles.front()
     float prev_offset = 0.0f;
-    int head_idx = -1;      // real item index seeding left (prepend) spawns
-    int tail_idx = -1;      // real item index seeding right (append) spawns
+    int head_idx = -1; // real item index seeding left (prepend) spawns
+    int tail_idx = -1; // real item index seeding right (append) spawns
     unsigned long long signature = 0;
-    int flow = 0;           // +1 = scrolls right, -1 = scrolls left, 0 = uninit
+    int flow = 0; // +1 = scrolls right, -1 = scrolls left, 0 = uninit
     bool init = false;
 
     // Clear (crop) animation: seconds elapsed since each item was cleared, so a
@@ -244,8 +244,8 @@ struct ScrollBelt {
 // One tile to draw this frame. clear is 0 for a normal item, or (0,1] while the
 // item is animating out (the fraction already cropped away).
 struct BeltTile {
-    int idx;     // item index, or -1 for a gap
-    float x;     // left edge
+    int idx; // item index, or -1 for a gap
+    float x; // left edge
     float clear; // 0 = full, 1 = fully cropped
 };
 
@@ -296,7 +296,10 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
         // Treat items that are already cleared as fully gone so they don't play
         // the crop animation on startup or after a template change.
         for (int i = 0; i < F; ++i) {
-            if (removed[i]) { b.was_removed[i] = 1; b.clear_elapsed[i] = duration; }
+            if (removed[i]) {
+                b.was_removed[i] = 1;
+                b.clear_elapsed[i] = duration;
+            }
         }
         b.anim_prev = SDL_GetTicks();
         b.init = true;
@@ -325,7 +328,10 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
     // First spawnable (never-cleared) item.
     int seed = -1;
     for (int i = 0; i < F; ++i) {
-        if (!removed[i]) { seed = i; break; }
+        if (!removed[i]) {
+            seed = i;
+            break;
+        }
     }
 
     // Move with the scroll, then turn fully-cleared tiles into gaps.
@@ -356,13 +362,21 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
         // Keep the spawn seeds pointing at not-cleared items.
         if (b.head_idx < 0 || removed[b.head_idx]) {
             int real = seed;
-            for (int t: b.tiles) { if (t >= 0 && !removed[t]) { real = t; break; } }
+            for (int t: b.tiles) {
+                if (t >= 0 && !removed[t]) {
+                    real = t;
+                    break;
+                }
+            }
             b.head_idx = real;
         }
         if (b.tail_idx < 0 || removed[b.tail_idx]) {
             int real = seed;
             for (auto it = b.tiles.rbegin(); it != b.tiles.rend(); ++it) {
-                if (*it >= 0 && !removed[*it]) { real = *it; break; }
+                if (*it >= 0 && !removed[*it]) {
+                    real = *it;
+                    break;
+                }
             }
             b.tail_idx = real;
         }
@@ -491,8 +505,8 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
 // from ScrollBelt so more layout modes can be added the same way later.
 struct PageView {
     unsigned long long signature = 0;
-    int page_offset = 0;   // start index into the not-removed item list for the current page
-    int last_page = -1;    // shared page index (Overlay::page_index) last snapped at
+    int page_offset = 0; // start index into the not-removed item list for the current page
+    int last_page = -1; // shared page index (Overlay::page_index) last snapped at
     bool init = false;
 
     std::vector<int> tiles; // item indices for the current page in template order (fixed slots; -1 handled at draw)
@@ -530,7 +544,10 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
     for (int i = 0; i < F; i++) if (!removed[i]) active.push_back(i);
 
     p.tiles.clear();
-    if (active.empty()) { p.page_offset = 0; return; }
+    if (active.empty()) {
+        p.page_offset = 0;
+        return;
+    }
     int n = (int) active.size();
 
     if (repeat) {
@@ -585,7 +602,10 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
         p.was_removed.assign((size_t) F, 0);
         // Items already cleared start fully gone so they never animate on startup.
         for (int i = 0; i < F; i++) {
-            if (removed[i]) { p.was_removed[i] = 1; p.clear_elapsed[i] = duration; }
+            if (removed[i]) {
+                p.was_removed[i] = 1;
+                p.clear_elapsed[i] = duration;
+            }
         }
         p.anim_prev = now;
         p.last_page = page_index;
@@ -760,8 +780,14 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
     if (ir < 0) ir = 0;
     if (it < 0) it = 0;
     if (ib < 0) ib = 0;
-    if (il + ir >= tex_w) { il = 0; ir = 0; } // insets must leave a center strip
-    if (it + ib >= tex_h) { it = 0; ib = 0; }
+    if (il + ir >= tex_w) {
+        il = 0;
+        ir = 0;
+    } // insets must leave a center strip
+    if (it + ib >= tex_h) {
+        it = 0;
+        ib = 0;
+    }
 
     float src_cw = (float) (tex_w - il - ir); // center source width / height
     float src_ch = (float) (tex_h - it - ib);
@@ -781,17 +807,19 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
     SDL_SetTextureColorMod(tex, 255, 255, 255);
     SDL_SetTextureAlphaMod(tex, 255);
 
-    struct { SDL_FRect s, d; } quads[9] = {
-        {{0.0f, 0.0f, (float) il, (float) it},     {dx, dy, dl, dt}}, // top-left
-        {{rx, 0.0f, (float) ir, (float) it},       {dx + dl + dcw, dy, dr, dt}}, // top-right
-        {{0.0f, by, (float) il, (float) ib},       {dx, dy + dt + dch, dl, db}}, // bottom-left
-        {{rx, by, (float) ir, (float) ib},         {dx + dl + dcw, dy + dt + dch, dr, db}}, // bottom-right
-        {{(float) il, 0.0f, src_cw, (float) it},   {dx + dl, dy, dcw, dt}}, // top edge
-        {{(float) il, by, src_cw, (float) ib},     {dx + dl, dy + dt + dch, dcw, db}}, // bottom edge
-        {{0.0f, (float) it, (float) il, src_ch},   {dx, dy + dt, dl, dch}}, // left edge
-        {{rx, (float) it, (float) ir, src_ch},     {dx + dl + dcw, dy + dt, dr, dch}}, // right edge
-        {{(float) il, (float) it, src_cw, src_ch}, {dx + dl, dy + dt, dcw, dch}}, // center
-    };
+    struct {
+        SDL_FRect s, d;
+    } quads[9] = {
+                {{0.0f, 0.0f, (float) il, (float) it}, {dx, dy, dl, dt}}, // top-left
+                {{rx, 0.0f, (float) ir, (float) it}, {dx + dl + dcw, dy, dr, dt}}, // top-right
+                {{0.0f, by, (float) il, (float) ib}, {dx, dy + dt + dch, dl, db}}, // bottom-left
+                {{rx, by, (float) ir, (float) ib}, {dx + dl + dcw, dy + dt + dch, dr, db}}, // bottom-right
+                {{(float) il, 0.0f, src_cw, (float) it}, {dx + dl, dy, dcw, dt}}, // top edge
+                {{(float) il, by, src_cw, (float) ib}, {dx + dl, dy + dt + dch, dcw, db}}, // bottom edge
+                {{0.0f, (float) it, (float) il, src_ch}, {dx, dy + dt, dl, dch}}, // left edge
+                {{rx, (float) it, (float) ir, src_ch}, {dx + dl + dcw, dy + dt, dr, dch}}, // right edge
+                {{(float) il, (float) it, src_cw, src_ch}, {dx + dl, dy + dt, dcw, dch}}, // center
+            };
     for (int i = 0; i < 9; i++) {
         if (quads[i].s.w <= 0.0f || quads[i].s.h <= 0.0f || quads[i].d.w <= 0.0f || quads[i].d.h <= 0.0f) continue;
         SDL_RenderTexture(r, tex, &quads[i].s, &quads[i].d);
@@ -809,12 +837,12 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
 struct CompactEntry {
     char label[200];
     int completed;
-    int total;       // valid only when !no_target
-    bool no_target;  // open-ended goal: show the count with no denominator
-    bool checkbox;   // manually-checkable goal: shows [x] manual / [a] auto-done / [o] not done
-    bool auto_mark;  // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
-    bool manual;     // is_manually_completed (drives [x])
-    bool done;       // completed by any means (drives [a])
+    int total; // valid only when !no_target
+    bool no_target; // open-ended goal: show the count with no denominator
+    bool checkbox; // manually-checkable goal: shows [x] manual / [a] auto-done / [o] not done
+    bool auto_mark; // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
+    bool manual; // is_manually_completed (drives [x])
+    bool done; // completed by any means (drives [a])
 };
 
 // True if the user selected the individual goal (kind + root_name) into the Compact cycle.
@@ -1113,17 +1141,17 @@ static void compact_draw_face(Overlay *o, const char *uuid, AccountType acc, flo
 // One active on-screen pop-out group. Criterion / sub-stat completions are 2-line groups (the parent
 // advancement/category on top, the criterion below); everything else is a single line.
 struct CompactPopGroup {
-    std::string key;          // stable identity, used to coalesce repeat increments in place
+    std::string key; // stable identity, used to coalesce repeat increments in place
     bool two_line;
-    std::string parent_icon;  // resolved icon path (used directly, like the item rows)
+    std::string parent_icon; // resolved icon path (used directly, like the item rows)
     std::string parent_text;
     std::string item_icon;
     std::string item_text;
-    bool item_shared;         // overlay the parent icon on the item icon (shared criterion)
-    std::string face_uuid;    // co-op contributor whose face rides this line (empty = none)
-    float hold_left;          // seconds until it disappears
-    float anim_y;             // current top Y (lerps toward the settled slot)
-    bool placed;              // anim_y initialised
+    bool item_shared; // overlay the parent icon on the item icon (shared criterion)
+    std::string face_uuid; // co-op contributor whose face rides this line (empty = none)
+    float hold_left; // seconds until it disappears
+    float anim_y; // current top Y (lerps toward the settled slot)
+    bool placed; // anim_y initialised
 };
 
 struct CompactStackEngine {
@@ -1131,7 +1159,7 @@ struct CompactStackEngine {
     bool seeded = false;
     Uint64 last_tick = 0;
     std::unordered_map<std::string, unsigned long long> prev; // last-seen encoded value per key
-    std::vector<CompactPopGroup> groups;                      // newest first (index 0 = top)
+    std::vector<CompactPopGroup> groups; // newest first (index 0 = top)
 };
 
 static CompactStackEngine s_compact_stack;
@@ -1165,6 +1193,7 @@ static long long compact_pop_progress(const AppSettings *s, OverlayCompactCounte
 // bit. Non-stat stages just pass 0 progress and move only when the stage does.
 #define COMPACT_MS_STAGE_SHIFT 31
 #define COMPACT_MS_MAX_STAGE 511
+
 static long long compact_ms_pack(int stage, int stat_progress) {
     if (stage < 0) stage = 0;
     if (stage > COMPACT_MS_MAX_STAGE) stage = COMPACT_MS_MAX_STAGE;
@@ -1363,7 +1392,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         // Already on-screen? Refresh in place regardless of direction (revert or progress).
         for (size_t gi = 0; gi < eng.groups.size(); gi++) {
             if (eng.groups[gi].key != k) continue;
-            if (enc == 0ULL) { // reverted to no progress and not done -> just disappear
+            if (enc == 0ULL) {
+                // reverted to no progress and not done -> just disappear
                 eng.groups.erase(eng.groups.begin() + (long) gi);
                 return;
             }
@@ -1525,7 +1555,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     if (sub->done) {
                         auto it = eng.prev.find(key);
                         unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
-                        if (penc < (1ULL << 40)) { // newly completing this frame
+                        if (penc < (1ULL << 40)) {
+                            // newly completing this frame
                             pshown = ++sub_shown;
                             if (pshown < 1) pshown = 1; // grouped/edge safety
                         }
@@ -1687,7 +1718,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     // panel bottom and slides down into place (the only animation - removal is instant).
     float y = stack_top;
     float rise = settings->compact_stack_rise_time;
-    for (auto &g : eng.groups) {
+    for (auto &g: eng.groups) {
         float gh = (g.two_line ? 2.0f : 1.0f) * line_h;
         float target = y;
         y += gh;
@@ -1722,8 +1753,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         bool show_face = faces_on && draw_face && !face_uuid.empty();
         float face_slot = show_face ? (face_size + COMPACT_POP_FACE_GAP) : 0.0f;
         float icon_x = right_align ? (stack_right - icon_size) : stack_x;
-        float face_x = right_align ? (stack_right - icon_size - face_slot)
-                                   : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
+        float face_x = right_align
+                           ? (stack_right - icon_size - face_slot)
+                           : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
         float icon_y = ly + (line_box - icon_size) / 2.0f;
         compact_draw_icon(o, icon.c_str(), icon_x, icon_y, icon_size);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
@@ -1745,7 +1777,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             }
         }
     };
-    for (auto &g : eng.groups) {
+    for (auto &g: eng.groups) {
         if (g.two_line) {
             // The face rides the item (completed) line; the parent line reserves the slot but shows none.
             draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, g.face_uuid, false);
@@ -1821,7 +1853,8 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             }
             measure(buf);
         } else {
-            if (!compact_stack_allows(settings, COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name)) continue;
+            if (!compact_stack_allows(settings, COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name))
+                continue;
             compact_worst_count(cnt, sizeof(cnt), s->criteria_count, wdig);
             snprintf(buf, sizeof(buf), "[x] %s (%s)", sn, cnt);
             measure(buf);
@@ -1861,7 +1894,8 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *g = td->multi_stage_goals[i];
         if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
-        if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name)) continue;
+        if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name))
+            continue;
         char gn[224];
         compact_ms_label(gn, sizeof(gn), compact_display_name(g->display_name, g->root_name));
         for (int j = 0; j < g->stage_count; j++) {
@@ -1971,7 +2005,8 @@ static float compact_supporter_hold(const AppSettings *settings) {
 static void compact_promo_shuffle_order(CompactPromoState &p) {
     p.order.clear();
     for (int i = 0; i < NUM_SUPPORTERS; i++) p.order.push_back(i);
-    for (int i = (int) p.order.size() - 1; i > 0; i--) { // Fisher-Yates
+    for (int i = (int) p.order.size() - 1; i > 0; i--) {
+        // Fisher-Yates
         int j = rand() % (i + 1);
         int tmp = p.order[i];
         p.order[i] = p.order[j];
@@ -2114,7 +2149,8 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (promo_tex) {
         float tw = 0.0f;
         SDL_GetTextureSize(promo_tex, &tw, nullptr); // only the width decides whether it has to move
-        if (strncmp(p.shown_text, promo_text, sizeof(p.shown_text) - 1) != 0) { // a new line starts over
+        if (strncmp(p.shown_text, promo_text, sizeof(p.shown_text) - 1) != 0) {
+            // a new line starts over
             strncpy(p.shown_text, promo_text, sizeof(p.shown_text) - 1);
             p.shown_text[sizeof(p.shown_text) - 1] = '\0';
             p.scroll_x = 0.0f;
@@ -2189,7 +2225,11 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
                              std::vector<Row1Item> &items, std::vector<char> &removed,
                              unsigned long long &signature) {
     items.clear();
-    if (!t || !t->template_data) { removed.clear(); signature = 1469598103934665603ULL; return; }
+    if (!t || !t->template_data) {
+        removed.clear();
+        signature = 1469598103934665603ULL;
+        return;
+    }
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *cat = t->template_data->advancements[i];
@@ -3242,7 +3282,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
-                              window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
+                                     window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
                 belt_row1.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {
                 belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
@@ -3714,7 +3754,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                 } else if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
-                                  window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
+                                         window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
                     belt_row2.init = false; // reset so scrolling re-initialises cleanly if it resumes
                 } else {
                     belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
@@ -3727,8 +3767,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap left by a cleared item
-                    const OverlayDisplayItem &display_item = row2_items[tiles[ti].idx];
-                    {
+                    const OverlayDisplayItem &display_item = row2_items[tiles[ti].idx]; {
                         float current_x = snap_px(tiles[ti].x);
 
                         float bg_x_offset = snap_px((cell_width_row2 - ITEM_WIDTH) / 2.0f);
@@ -3812,7 +3851,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     // Cycle logic for multi-stat
                                     std::vector<int> incomplete_indices;
                                     for (int j = 0; j < stat->criteria_count; ++j) {
-                                        if (!stat->criteria[j]->done && !goal_is_hidden(stat->criteria[j]->is_hidden, settings)) {
+                                        if (!stat->criteria[j]->done && !goal_is_hidden(
+                                                stat->criteria[j]->is_hidden, settings)) {
                                             incomplete_indices.push_back(j);
                                         }
                                     }
@@ -3891,7 +3931,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                         snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
                                                  active_stage->display_text, active_stage->current_stat_progress,
                                                  active_stage->required_progress);
-                                    } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
+                                    } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress ==
+                                               -1) {
                                         snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
                                                  active_stage->display_text, active_stage->current_stat_progress);
                                     } else {
@@ -3926,9 +3967,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
                         SDL_FRect icon_rect = {
-                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
-                        settings->adv_icon_size, settings->adv_icon_size
-                    };
+                            bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
+                            settings->adv_icon_size, settings->adv_icon_size
+                        };
                         SDL_Texture *tex = nullptr;
                         AnimatedTexture *anim_tex = nullptr;
                         if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
@@ -4213,7 +4254,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
-                              window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
+                                     window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
                 belt_row3.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {
                 belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
@@ -4226,8 +4267,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             for (size_t ti = 0; ti < tiles.size(); ++ti) {
                 if (tiles[ti].idx < 0) continue; // gap left by a cleared item
-                const OverlayDisplayItem &display_item = row3_items[tiles[ti].idx];
-                {
+                const OverlayDisplayItem &display_item = row3_items[tiles[ti].idx]; {
                     float current_x = snap_px(tiles[ti].x);
 
                     float bg_x_offset = snap_px((cell_width_row3 - ITEM_WIDTH) / 2.0f);
@@ -4312,7 +4352,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                                 std::vector<int> incomplete_indices;
                                 for (int j = 0; j < stat->criteria_count; ++j) {
-                                    if (!stat->criteria[j]->done && !goal_is_hidden(stat->criteria[j]->is_hidden, settings)) {
+                                    if (!stat->criteria[j]->done && !goal_is_hidden(
+                                            stat->criteria[j]->is_hidden, settings)) {
                                         incomplete_indices.push_back(j);
                                     }
                                 }
@@ -4404,7 +4445,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
                                              active_stage->display_text, active_stage->current_stat_progress,
                                              active_stage->required_progress);
-                                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
+                                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -
+                                           1) {
                                     snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
                                              active_stage->display_text, active_stage->current_stat_progress);
                                 } else {
@@ -4462,13 +4504,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     if (name_texture) {
                         float w, h;
                         SDL_GetTextureSize(name_texture, &w, &h);
-                        float text_x = current_x + snap_px((cell_width_row3 - w) / 2.0f); // Center using cell_width_row3
+                        float text_x = current_x + snap_px((cell_width_row3 - w) / 2.0f);
+                        // Center using cell_width_row3
                         SDL_FRect dest_rect = {text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                         SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
 
                         if (progress_buf[0] != '\0') {
                             // Use progress_buf which holds current text
-                            SDL_Texture *progress_texture = get_text_texture_from_cache(o, o->font, progress_buf, text_color);
+                            SDL_Texture *progress_texture = get_text_texture_from_cache(
+                                o, o->font, progress_buf, text_color);
                             if (progress_texture) {
                                 float pw, ph;
                                 SDL_GetTextureSize(progress_texture, &pw, &ph);

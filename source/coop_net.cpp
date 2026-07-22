@@ -2002,8 +2002,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         // liveness. Gating these on the read-timeout branch let a steady stream of
         // inbound frames starve our outbound heartbeat and trip the host's 25s
         // stale-slot kick even though we were perfectly alive.
-        Uint32 now = SDL_GetTicks();
-        {
+        Uint32 now = SDL_GetTicks(); {
             if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
                 cJSON *hb = cJSON_CreateObject();
                 cJSON_AddStringToObject(hb, "uuid", ctx->connect_uuid);
@@ -2191,8 +2190,7 @@ static int SDLCALL host_relay_thread_func(void *data) {
         // returned a frame or timed out: send our host heartbeat so the relay and
         // receivers see us alive, log diag, and expire stale slots. Gating these on
         // the read-timeout branch let a busy room's inbound stream starve them.
-        Uint32 now = SDL_GetTicks();
-        {
+        Uint32 now = SDL_GetTicks(); {
             if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
                 SDL_LockMutex(ctx->relay_send_mutex);
                 bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT, nullptr, 0);

@@ -121,6 +121,7 @@ struct Overlay {
     char coop_selected_uuid[48];
     bool coop_selected_offline;
     int coop_lobby_count;
+
     struct {
         char uuid[48];
         bool is_offline;
