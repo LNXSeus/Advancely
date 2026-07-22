@@ -356,11 +356,19 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
     target_td->custom_goals = (TrackableItem **) calloc(target_td->custom_goal_count, sizeof(TrackableItem *));
     target_td->counter_goals = (CounterGoal **) calloc(target_td->counter_goal_count, sizeof(CounterGoal *));
 
+    // Decorations aren't serialized to the overlay; the memcpy above carried over the tracker's
+    // dangling pointer and count, so clear them here to make a stray dereference impossible.
+    target_td->decorations = nullptr;
+    target_td->decoration_count = 0;
+
     // 3. Read advancements and their criteria.
     for (int i = 0; i < target_td->advancement_count; i++) {
         target_td->advancements[i] = (TrackableCategory *) calloc(1, sizeof(TrackableCategory));
         memcpy(target_td->advancements[i], head, sizeof(TrackableCategory));
         head += sizeof(TrackableCategory);
+        // linked_goals aren't serialized; drop the dangling tracker pointer/count carried by the memcpy.
+        target_td->advancements[i]->linked_goals = nullptr;
+        target_td->advancements[i]->linked_goal_count = 0;
         target_td->advancements[i]->criteria = (TrackableItem **) calloc(
             target_td->advancements[i]->criteria_count, sizeof(TrackableItem *));
         for (int j = 0; j < target_td->advancements[i]->criteria_count; j++) {
@@ -375,6 +383,9 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
         target_td->stats[i] = (TrackableCategory *) calloc(1, sizeof(TrackableCategory));
         memcpy(target_td->stats[i], head, sizeof(TrackableCategory));
         head += sizeof(TrackableCategory);
+        // linked_goals aren't serialized; drop the dangling tracker pointer/count carried by the memcpy.
+        target_td->stats[i]->linked_goals = nullptr;
+        target_td->stats[i]->linked_goal_count = 0;
         target_td->stats[i]->criteria = (TrackableItem **) calloc(target_td->stats[i]->criteria_count,
                                                                   sizeof(TrackableItem *));
         for (int j = 0; j < target_td->stats[i]->criteria_count; j++) {
@@ -395,6 +406,9 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
             target_td->multi_stage_goals[i]->stages[j] = (SubGoal *) calloc(1, sizeof(SubGoal));
             memcpy(target_td->multi_stage_goals[i]->stages[j], head, sizeof(SubGoal));
             head += sizeof(SubGoal);
+            // linked_goals aren't serialized; drop the dangling tracker pointer/count carried by the memcpy.
+            target_td->multi_stage_goals[i]->stages[j]->linked_goals = nullptr;
+            target_td->multi_stage_goals[i]->stages[j]->linked_goal_count = 0;
         }
     }
 
@@ -705,6 +719,38 @@ static void free_deserialized_data(TemplateData *td) {
     // Set pointers to nullptr after freeing to prevent double-freeing
     memset(td, 0, sizeof(TemplateData));
 }
+
+// ===================== TEMP DEBUG: overlay heap-corruption bisection =====================
+// Walks every process heap (this is the same NT-heap validation whose failure fires the
+// ntdll fast-fail we've been chasing, so it catches the corruption the CRT malloc/free heap
+// suffers). Called at each stage of the overlay loop; logs exactly once, naming the FIRST
+// stage in the whole run where a heap goes bad, which pins the culprit.
+// Remove this block and its call sites once the crash is found.
+static void overlay_heapcheck(const char *stage) {
+#ifdef _WIN32
+    static bool reported = false;
+    if (reported) return;
+    HANDLE heaps[64];
+    DWORD n = GetProcessHeaps(64, heaps);
+    if (n > 64) n = 64;
+    for (DWORD i = 0; i < n; i++) {
+        if (!HeapValidate(heaps[i], 0, nullptr)) {
+            reported = true;
+            // OutputDebugString first: it goes straight to the debugger console and does NOT touch the
+            // CRT heap/stdio, so it survives even if the corruption then crashes the fprintf log write.
+            char msg[160];
+            snprintf(msg, sizeof(msg), "[OVERLAY HEAPCHECK] Heap %p first detected CORRUPT at stage: %s\n",
+                     heaps[i], stage);
+            OutputDebugStringA(msg);
+            log_message(LOG_ERROR, "%s", msg);
+            return;
+        }
+    }
+#else
+    (void) stage;
+#endif
+}
+// ========================================================================================
 
 
 // A global helper to show a user-facing error pop-up
@@ -1612,6 +1658,7 @@ int main(int argc, char *argv[]) {
             float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            overlay_heapcheck("frame_start"); // TEMP DEBUG
 
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
@@ -1621,6 +1668,7 @@ int main(int argc, char *argv[]) {
                 // Minimal event handling for the overlay window
                 overlay_events(overlay, &event, &is_running, &deltaTime, &settings);
             }
+            overlay_heapcheck("after_events"); // TEMP DEBUG
 
             if (overlay->p_shared_data) {
 #ifdef _WIN32
@@ -1687,9 +1735,11 @@ int main(int argc, char *argv[]) {
 
                             // 3. Free the template data from the PREVIOUS frame.
                             free_deserialized_data(&live_template_data);
+                            overlay_heapcheck("after_free_deserialized"); // TEMP DEBUG
 
                             // 4. Deserialize the main template data, which starts AFTER the header.
                             deserialize_template_data(buffer_head, &live_template_data);
+                            overlay_heapcheck("after_deserialize"); // TEMP DEBUG
                         }
                     }
                     // --- End of Critical Section ---
@@ -1709,12 +1759,17 @@ int main(int argc, char *argv[]) {
             }
 
 
+            overlay_heapcheck("after_ipc_block"); // TEMP DEBUG
+
             // Promote any worker-decoded contributor faces into textures before rendering.
             skin_cache_pump();
+            overlay_heapcheck("after_skin_pump"); // TEMP DEBUG
 
             // The update and render functions now receive live data!
             overlay_update(overlay, &deltaTime, &proxy_tracker, &settings);
+            overlay_heapcheck("after_overlay_update"); // TEMP DEBUG
             overlay_render(overlay, &proxy_tracker, &settings);
+            overlay_heapcheck("after_overlay_render"); // TEMP DEBUG
 
             float frame_target_time = 1000.0f / settings.overlay_fps; // Overlay has it's own FPS limit
             const float frame_time = (float) SDL_GetTicks() - (float) current_time;

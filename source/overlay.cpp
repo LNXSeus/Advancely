@@ -2294,7 +2294,10 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         // Build the selected cycle, then pick the entry showing this frame. The shared page_index is
         // advanced by the cycle-interval timer (overlay_update) and by SPACE (overlay_events), exactly
         // like Page mode; static when there's only one entry.
-        CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
+        // static: this is ~223 KB (label is char[200] x ~1034 slots); keep it off the per-frame stack.
+        // Safe because overlay_render_compact only runs on the overlay's single render thread, and
+        // compact_build_cycle fully rewrites the [0, entry_count) range it returns each call.
+        static CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
         int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
 
         int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;

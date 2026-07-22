@@ -319,6 +319,11 @@ else ()
                 -Wno-stringop-truncation
                 -Wno-format-truncation  # Ignore truncation warnings
         )
+        # TEMP DEBUG: stack-smashing detection to hunt the overlay corruption crash. If a stack
+        # buffer is overrun, __stack_chk_fail aborts at the offending function's return, so gdb's
+        # backtrace names the culprit directly. Remove once the crash is found.
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE -fstack-protector-all)
+        target_link_options(${EXECUTABLE_NAME} PRIVATE -fstack-protector-all)
     endif ()
 endif ()
 
