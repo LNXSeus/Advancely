@@ -726,7 +726,8 @@ static void free_deserialized_data(TemplateData *td) {
 // ntdll fast-fail we've been chasing, so it catches the corruption the CRT malloc/free heap
 // suffers). Called at each stage of the overlay loop; logs exactly once, naming the FIRST
 // stage in the whole run where a heap goes bad, which pins the culprit.
-// Remove this block and its call sites once the crash is found.
+// Disabled since the crash stopped reproducing; reinstate this block and its call sites if it recurs.
+#if 0
 static void overlay_heapcheck(const char *stage) {
 #ifdef _WIN32
     static bool reported = false;
@@ -751,6 +752,7 @@ static void overlay_heapcheck(const char *stage) {
     (void) stage;
 #endif
 }
+#endif
 
 // ========================================================================================
 
@@ -1660,7 +1662,7 @@ int main(int argc, char *argv[]) {
             float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
-            overlay_heapcheck("frame_start"); // TEMP DEBUG
+            // overlay_heapcheck("frame_start"); // TEMP DEBUG
 
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
@@ -1670,7 +1672,7 @@ int main(int argc, char *argv[]) {
                 // Minimal event handling for the overlay window
                 overlay_events(overlay, &event, &is_running, &deltaTime, &settings);
             }
-            overlay_heapcheck("after_events"); // TEMP DEBUG
+            // overlay_heapcheck("after_events"); // TEMP DEBUG
 
             if (overlay->p_shared_data) {
 #ifdef _WIN32
@@ -1737,11 +1739,11 @@ int main(int argc, char *argv[]) {
 
                             // 3. Free the template data from the PREVIOUS frame.
                             free_deserialized_data(&live_template_data);
-                            overlay_heapcheck("after_free_deserialized"); // TEMP DEBUG
+                            // overlay_heapcheck("after_free_deserialized"); // TEMP DEBUG
 
                             // 4. Deserialize the main template data, which starts AFTER the header.
                             deserialize_template_data(buffer_head, &live_template_data);
-                            overlay_heapcheck("after_deserialize"); // TEMP DEBUG
+                            // overlay_heapcheck("after_deserialize"); // TEMP DEBUG
                         }
                     }
                     // --- End of Critical Section ---
@@ -1761,17 +1763,17 @@ int main(int argc, char *argv[]) {
             }
 
 
-            overlay_heapcheck("after_ipc_block"); // TEMP DEBUG
+            // overlay_heapcheck("after_ipc_block"); // TEMP DEBUG
 
             // Promote any worker-decoded contributor faces into textures before rendering.
             skin_cache_pump();
-            overlay_heapcheck("after_skin_pump"); // TEMP DEBUG
+            // overlay_heapcheck("after_skin_pump"); // TEMP DEBUG
 
             // The update and render functions now receive live data!
             overlay_update(overlay, &deltaTime, &proxy_tracker, &settings);
-            overlay_heapcheck("after_overlay_update"); // TEMP DEBUG
+            // overlay_heapcheck("after_overlay_update"); // TEMP DEBUG
             overlay_render(overlay, &proxy_tracker, &settings);
-            overlay_heapcheck("after_overlay_render"); // TEMP DEBUG
+            // overlay_heapcheck("after_overlay_render"); // TEMP DEBUG
 
             float frame_target_time = 1000.0f / settings.overlay_fps; // Overlay has it's own FPS limit
             const float frame_time = (float) SDL_GetTicks() - (float) current_time;
