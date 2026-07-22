@@ -744,6 +744,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
     settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
     settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
+    settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
     settings->compact_cycle_item_count = 0;
@@ -1703,6 +1704,11 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->compact_stack_font_size = (float) compact_stack_size->valuedouble;
         else { settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE; defaults_were_used = true; }
 
+        const cJSON *compact_panel_line_gap = cJSON_GetObjectItem(visual_settings, "compact_panel_line_gap");
+        if (compact_panel_line_gap && cJSON_IsNumber(compact_panel_line_gap))
+            settings->compact_panel_line_gap = (float) compact_panel_line_gap->valuedouble;
+        else { settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP; defaults_were_used = true; }
+
         const cJSON *compact_types = cJSON_GetObjectItem(visual_settings, "compact_cycle_types");
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
         if (compact_types && cJSON_IsArray(compact_types)) {
@@ -2377,6 +2383,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_label_font_size = DEFAULT_COMPACT_LABEL_FONT_SIZE;
         settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
         settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
+        settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
         settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_cycle_item_count = 0;
@@ -3100,6 +3107,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_font_size");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_font_size",
                               cJSON_CreateNumber(settings->compact_stack_font_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_line_gap");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_line_gap",
+                              cJSON_CreateNumber(settings->compact_panel_line_gap));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_types");
         cJSON *compact_types_array = cJSON_CreateArray();
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {

@@ -610,6 +610,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_label_font_size != b->compact_label_font_size ||
         a->compact_count_font_size != b->compact_count_font_size ||
         a->compact_stack_font_size != b->compact_stack_font_size ||
+        a->compact_panel_line_gap != b->compact_panel_line_gap ||
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
         a->compact_show_row1_icons != b->compact_show_row1_icons ||
@@ -820,6 +821,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
         a->compact_label_font_size != b->compact_label_font_size ||
         a->compact_count_font_size != b->compact_count_font_size ||
         a->compact_stack_font_size != b->compact_stack_font_size ||
+        a->compact_panel_line_gap != b->compact_panel_line_gap ||
         compact_cycle_different(a, b) ||
         a->compact_cycle_interval != b->compact_cycle_interval ||
         a->compact_show_row1_icons != b->compact_show_row1_icons ||
@@ -4872,6 +4874,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Point size of the big progress count.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_COUNT_FONT_SIZE);
                         ImGui::SetTooltip("%s", compact_count_size_tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Line Spacing", &temp_settings.compact_panel_line_gap, 0.5f,
+                                         COMPACT_PANEL_LINE_GAP_MIN, COMPACT_PANEL_LINE_GAP_MAX, "%.0f px")) {
+                        if (temp_settings.compact_panel_line_gap < COMPACT_PANEL_LINE_GAP_MIN)
+                            temp_settings.compact_panel_line_gap = COMPACT_PANEL_LINE_GAP_MIN;
+                        if (temp_settings.compact_panel_line_gap > COMPACT_PANEL_LINE_GAP_MAX)
+                            temp_settings.compact_panel_line_gap = COMPACT_PANEL_LINE_GAP_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char compact_line_gap_tooltip_buffer[512];
+                        snprintf(compact_line_gap_tooltip_buffer, sizeof(compact_line_gap_tooltip_buffer),
+                                 "Vertical spacing between the label line and the count line inside the panel.\n"
+                                 "The panel background and window size grow to fit.\n"
+                                 "Default: %.0f px", DEFAULT_COMPACT_PANEL_LINE_GAP);
+                        ImGui::SetTooltip("%s", compact_line_gap_tooltip_buffer);
                     }
 
                     ImGui::Text("Stack Font: %s", temp_settings.compact_stack_font_name);

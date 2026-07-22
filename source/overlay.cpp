@@ -2303,7 +2303,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;
         CompactEntry *cur = &entries[cur_idx];
 
-        snprintf(label_buf, sizeof(label_buf), "%s:", cur->label);
+        compact_ms_label(label_buf, sizeof(label_buf), cur->label);
         compact_format_count(count_buf, sizeof(count_buf), settings, cur);
 
         // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
@@ -2313,7 +2313,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         char wdig = compact_widest_digit(count_font);
         for (int i = 0; i < entry_count; i++) {
             char lbl[224];
-            snprintf(lbl, sizeof(lbl), "%s:", entries[i].label);
+            compact_ms_label(lbl, sizeof(lbl), entries[i].label);
             int lwm = 0;
             TTF_MeasureString(label_font, lbl, 0, 0, &lwm, nullptr);
             char wc[64];
@@ -2332,7 +2332,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     if (label_tex) SDL_GetTextureSize(label_tex, &lw, &lh);
     if (count_tex) SDL_GetTextureSize(count_tex, &cw, &ch);
 
-    const float line_gap = 4.0f;
+    const float line_gap = settings->compact_panel_line_gap;
     float pad = settings->compact_panel_padding;
     float border_x = (float) ((settings->compact_panel_inset_left + settings->compact_panel_inset_right) *
                               settings->compact_panel_pixel_scale);
@@ -2514,7 +2514,7 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
         float count_lh = (float) TTF_GetFontHeight(count_font);
         int count_descent = TTF_GetFontDescent(count_font);
         if (count_descent < 0) count_descent = -count_descent;
-        const float line_gap = 4.0f;
+        const float line_gap = settings->compact_panel_line_gap;
         float pad = settings->compact_panel_padding;
         float border_y = (float) ((settings->compact_panel_inset_top + settings->compact_panel_inset_bottom) *
                                   settings->compact_panel_pixel_scale);

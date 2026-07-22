@@ -277,6 +277,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_LABEL_FONT_SIZE 24.0f
 #define DEFAULT_COMPACT_COUNT_FONT_SIZE 48.0f
 #define DEFAULT_COMPACT_STACK_FONT_SIZE 20.0f
+#define DEFAULT_COMPACT_PANEL_LINE_GAP 0.0f // Vertical px between the label line and the count line inside the panel.
+#define COMPACT_PANEL_LINE_GAP_MIN (-32.0f)
+#define COMPACT_PANEL_LINE_GAP_MAX 128.0f
 // Co-op contributor face size on a pop-out stack line. Independent of the pop icon size; defaults to
 // the stack text size so a face matches the line's text out of the box.
 #define DEFAULT_COMPACT_STACK_FACE_SIZE DEFAULT_COMPACT_STACK_FONT_SIZE
@@ -496,6 +499,7 @@ struct AppSettings {
     float compact_label_font_size; // Point size for the goal-type label.
     float compact_count_font_size; // Point size for the big progress count.
     float compact_stack_font_size; // Point size for the pop-out stack text.
+    float compact_panel_line_gap; // Vertical px between the label line and the count line inside the panel.
     bool compact_cycle_type[COMPACT_COUNTER_TYPE_COUNT]; // Which whole-section type counts are in the cycle.
     CompactCycleItem compact_cycle_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals selected into the cycle by name.
     int compact_cycle_item_count; // Number of valid entries in compact_cycle_items.
