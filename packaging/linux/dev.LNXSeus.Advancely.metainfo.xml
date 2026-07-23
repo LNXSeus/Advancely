@@ -15,6 +15,25 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.6.1" date="2026-07-23">
+      <description>
+        <p>The Zesskyo Update: introduces the new Compact Overlay Mode, heavily inspired by Zesskyo's All Advancements video.</p>
+        <ul>
+          <li>Compact Overlay Mode: a compact panel (with a new default background texture) shows the advancements/achievements count while all other goal types cycle in place on a single label. You pick exactly which goal types cycle: advancement and recipe criteria (separately), counters, multi-stats, complex advancements/achievements/recipes (version-aware), and custom goals, via multi-select dropdowns with icons.</li>
+          <li>Pop-out stack below the panel: goals pop out as they complete, right-aligned, with pop-in and disappearing animations. The stack respects multiple pops of the same goal, respects hidden items in its counts, and shows criteria and sub-stat icons. Hold time defaults to 60 seconds (max 15 minutes).</li>
+          <li>Manual-completion indicators in the compact mode: [o]/[x] in front of anything completable manually (x means checked off manually) and [a] when an auto-link completes a goal in the stack; the indicators are a toggleable setting.</li>
+          <li>Compact mode coop support: player faces on the panel and stack (positioning options in the Coop tab) with a player head size control, and no leftover spacing when no face is shown.</li>
+          <li>Promo text and a run completion screen with supporters on the compact overlay, plus a row-1 icon strip above the panel with its own icon size and horizontal spacing settings.</li>
+          <li>Fine-grained compact layout controls: panel line spacing, vertical spacing between panel and stack, and resizing/positioning of icons relative to the background textures.</li>
+          <li>Multi-stage stats now pop up whenever they change (not just on stage increase), sub-stats show on any update, and stats in multi-stage goals can use a -1 target value since stages can be completed by other means.</li>
+          <li>Coop fix: cumulative live Hermes syncing no longer double-counts stat-based multi-stage goal stages.</li>
+          <li>Template editor: imports can now replace existing templates, and pressing Enter on overwrite warnings (imports, copies, renames, creations) no longer skips the warning.</li>
+          <li>Visual layout editor performance: only items actually being moved are synced, and the per-frame template count rescan is disabled while editing.</li>
+          <li>Added/updated all_advancements _categorical templates for 1.12, 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.21.11, 26.1, 26.2 and 26.3, plus a new 3D Wither Skeleton model and an updated 26.2 nether wastes texture.</li>
+          <li>Fixes: criteria stack count on first world load when multiple criteria pop the same frame (same for sub-stats), missing player face during the first Hermes read, face gap for parents, and overlay page repeat now defaults to on.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-07-08">
       <description>
         <p>The Overlay Update: a major overhaul of the overlay, plus template editor improvements and important fixes.</p>
