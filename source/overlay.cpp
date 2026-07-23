@@ -1691,13 +1691,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     int max_lines = settings->compact_stack_max_lines;
 
     // Expire by hold: a group whose hold has run out just disappears (no slide-off). Iterate back to
-    // front so erasing doesn't skip entries. An infinite hold skips this entirely, leaving overflow
-    // as the only way a group leaves the stack.
-    if (settings->compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_INFINITE) {
-        for (int i = (int) eng.groups.size() - 1; i >= 0; i--) {
-            eng.groups[i].hold_left -= dt;
-            if (eng.groups[i].hold_left <= 0.0f) eng.groups.erase(eng.groups.begin() + i);
-        }
+    // front so erasing doesn't skip entries.
+    for (int i = (int) eng.groups.size() - 1; i >= 0; i--) {
+        eng.groups[i].hold_left -= dt;
+        if (eng.groups[i].hold_left <= 0.0f) eng.groups.erase(eng.groups.begin() + i);
     }
 
     // Overflow: while more than the line budget is on-screen, drop the oldest (bottom) group
@@ -1992,8 +1989,7 @@ static float compact_supporter_gap() {
     return COMPACT_SUPPORTER_GAP_MIN + f * (COMPACT_SUPPORTER_GAP_MAX - COMPACT_SUPPORTER_GAP_MIN);
 }
 
-// How long a supporter stays up: the stack's hold time, except on an infinite hold, which would pile
-// every supporter up forever.
+// How long a supporter stays up: the stack's hold time.
 static float compact_supporter_hold(const AppSettings *settings) {
     return settings->compact_stack_hold_time > 0.0f
                ? settings->compact_stack_hold_time
