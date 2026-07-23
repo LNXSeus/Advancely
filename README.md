@@ -747,6 +747,12 @@ allows you to switch to the UI font for improved readability.
 Advancely includes a dedicated, customizable window perfect for showing your progress to viewers. It's an animated,
 real-time display that you can easily add to your stream layout.
 
+<p align="center">
+  <img src="readme_assets/Advancely_Compact_Overlay.gif" alt="Advancely_Compact_Overlay.gif">
+  <br>
+  <em>The <code>Compact</code> overlay mode: a tall counter panel with goals popping out beneath it.</em> <b>Inspired by Zesskyo!</b>
+</p>
+
 <details>
 <summary><strong>Setup in OBS & Customization Guide</strong></summary>
 <br>
