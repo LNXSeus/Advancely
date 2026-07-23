@@ -3652,6 +3652,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // replace-confirmation popup (mirrors the create flow above).
     static bool show_replace_copy_popup = false;
     static bool show_replace_rename_popup = false;
+    // Set when an import attempt hits an existing template name (same flow as above).
+    static bool show_replace_import_popup = false;
 
     // State for the "Copy" view
     static bool show_copy_view = false;
@@ -18582,10 +18584,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Error: Template name cannot end with '_snapshot' for legacy versions.");
                     save_message_type = MSG_ERROR;
                 } else {
+                    bool name_collision = false;
                     if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag,
                                                 import_zip_has_icons && import_icons_checkbox,
                                                 status_message,
-                                                sizeof(status_message))) {
+                                                sizeof(status_message), false, &name_collision)) {
                         // SUCCESS!
                         if (import_zip_delete_after) {
                             remove(import_zip_path);
@@ -18603,6 +18606,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         creator_version_idx = import_version_idx;
                         SDL_SetAtomicInt(&g_templates_changed, 1);
                         last_scanned_version[0] = '\0'; // Force rescan
+                    } else if (name_collision) {
+                        // A template with this name already exists: offer to replace it instead of erroring.
+                        status_message[0] = '\0';
+                        show_replace_import_popup = true;
                     }
                     save_message_type = MSG_ERROR; // Show status message (will be an error on failure)
                 }
@@ -18648,7 +18655,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
         ImGui::Separator();
 
+        // The IsWindowAppearing() check swallows the ENTER press that opened this popup so it
+        // can't instantly confirm the replace in the same frame.
         if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         !ImGui::IsWindowAppearing() &&
                                                          ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256] = "";
             if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
@@ -18708,7 +18718,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
         ImGui::Separator();
 
+        // The IsWindowAppearing() check swallows the ENTER press that opened this popup so it
+        // can't instantly confirm the replace in the same frame.
         if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         !ImGui::IsWindowAppearing() &&
                                                          ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (selected_template_index != -1 && copy_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
@@ -18775,7 +18788,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
         ImGui::Separator();
 
+        // The IsWindowAppearing() check swallows the ENTER press that opened this popup so it
+        // can't instantly confirm the replace in the same frame.
         if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         !ImGui::IsWindowAppearing() &&
                                                          ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (selected_template_index != -1 && rename_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
@@ -18833,6 +18849,83 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_replace_rename_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char cancel_tooltip_buffer[256];
+            snprintf(cancel_tooltip_buffer, sizeof(cancel_tooltip_buffer),
+                     "You can also press ESCAPE.\nKeeps the existing template.");
+            ImGui::SetTooltip("%s", cancel_tooltip_buffer);
+        }
+        ImGui::EndPopup();
+    }
+
+    // Replace-confirmation popup for "Confirm Import": shown when the import name collides with an
+    // existing template. Mirrors the create-template replace popup above.
+    if (show_replace_import_popup) ImGui::OpenPopup("Replace Existing Template? (Import)");
+    if (ImGui::BeginPopupModal("Replace Existing Template? (Import)", &show_replace_import_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        const char *dest_version = (import_version_idx >= 0)
+                                       ? VERSION_STRINGS[import_version_idx]
+                                       : creator_version_str;
+        ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
+                    import_category, import_flag, dest_version);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                           "Replacing it permanently deletes the existing template and ALL of its\n"
+                           "associated files (language, layout, notes and snapshot). This cannot be undone.");
+        ImGui::Separator();
+
+        // The IsWindowAppearing() check swallows the ENTER press that opened this popup so it
+        // can't instantly confirm the replace in the same frame.
+        if (ImGui::Button("Replace", ImVec2(120, 0)) || (!ImGui::IsItemActive() &&
+                                                         !ImGui::IsWindowAppearing() &&
+                                                         ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+            if (import_version_idx >= 0) {
+                if (execute_import_from_zip(import_zip_path, dest_version, import_category, import_flag,
+                                            import_zip_has_icons && import_icons_checkbox,
+                                            status_message,
+                                            sizeof(status_message), true, nullptr)) {
+                    // SUCCESS!
+                    if (import_zip_delete_after) {
+                        remove(import_zip_path);
+                    }
+                    if (import_zip_has_icons && import_icons_checkbox)
+                        snprintf(status_message, sizeof(status_message),
+                                 "Template imported to version %s (icons installed)!", dest_version);
+                    else
+                        snprintf(status_message, sizeof(status_message),
+                                 "Template imported to version %s!", dest_version);
+                    show_import_confirmation_view = false;
+                    // Switch UI to the newly imported version
+                    strncpy(creator_version_str, dest_version, sizeof(creator_version_str) - 1);
+                    creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                    creator_version_idx = import_version_idx;
+                    SDL_SetAtomicInt(&g_templates_changed, 1);
+                    last_scanned_version[0] = '\0'; // Force rescan
+
+                    // If we just replaced the template the tracker is currently using, reload it so it
+                    // reflects the imported data instead of showing the old cached data.
+                    if (app_settings &&
+                        strcmp(dest_version, app_settings->version_str) == 0 &&
+                        strcmp(import_category, app_settings->category) == 0 &&
+                        strcmp(import_flag, app_settings->optional_flag) == 0) {
+                        SDL_SetAtomicInt(&g_settings_changed, 1);
+                    }
+                }
+                save_message_type = MSG_ERROR; // Show status message (will be an error on failure)
+            }
+            show_replace_import_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char replace_tooltip_buffer[256];
+            snprintf(replace_tooltip_buffer, sizeof(replace_tooltip_buffer),
+                     "You can also press ENTER.\nOverwrites the existing template with the imported one.");
+            ImGui::SetTooltip("%s", replace_tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_replace_import_popup = false;
             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsItemHovered()) {

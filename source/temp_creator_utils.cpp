@@ -1732,7 +1732,9 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
 
 bool execute_import_from_zip(const char *zip_path, const char *version, const char *category,
                              const char *flag, bool import_icons,
-                             char *error_message, size_t msg_size) {
+                             char *error_message, size_t msg_size, bool overwrite_existing,
+                             bool *out_name_collision) {
+    if (out_name_collision) *out_name_collision = false;
     // Final validation before extracting. A template's identity is its (category, flag) pair, not the
     // concatenated filename: differently-split names that concatenate to the same string live in
     // separate category directories and are distinct, coexisting templates, so only an exact
@@ -1756,10 +1758,16 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     }
 
     if (exists) {
-        snprintf(error_message, msg_size,
-                 "Error: A template with category '%s' and flag '%s' already exists for version %s.",
-                 category, flag ? flag : "", version);
-        return false;
+        if (out_name_collision) *out_name_collision = true;
+        if (!overwrite_existing) {
+            snprintf(error_message, msg_size,
+                     "Error: A template with category '%s' and flag '%s' already exists for version %s.",
+                     category, flag ? flag : "", version);
+            return false;
+        }
+        // Overwrite requested: delete the existing template (and all its associated files)
+        // before extracting the imported one in its place.
+        delete_template_files(version, category, flag);
     }
 
 

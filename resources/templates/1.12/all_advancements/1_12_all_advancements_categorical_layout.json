@@ -104,7 +104,7 @@
 	"advancement.minecraft.end.levitate":	{
 		"icon_pos":	{
 			"x":	310,
-			"y":	640
+			"y":	645
 		}
 	},
 	"advancement.minecraft.end.dragon_egg":	{
@@ -349,14 +349,14 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs":	{
 		"icon_pos":	{
-			"x":	1890,
+			"x":	1895,
 			"y":	100
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.blaze":	{
 		"icon_pos":	{
 			"x":	30,
-			"y":	145
+			"y":	155
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -367,7 +367,7 @@
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.enderman":	{
 		"icon_pos":	{
 			"x":	70,
-			"y":	145
+			"y":	155
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -378,7 +378,7 @@
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.shulker":	{
 		"icon_pos":	{
 			"x":	110,
-			"y":	145
+			"y":	155
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -587,7 +587,7 @@
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.guardian":	{
 		"icon_pos":	{
 			"x":	30,
-			"y":	675
+			"y":	630
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -604,7 +604,7 @@
 	"advancement.minecraft.husbandry.balanced_diet.criteria.rotten_flesh":	{
 		"icon_pos":	{
 			"x":	30,
-			"y":	105
+			"y":	110
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -615,7 +615,7 @@
 	"advancement.minecraft.husbandry.balanced_diet.criteria.spider_eye":	{
 		"icon_pos":	{
 			"x":	70,
-			"y":	105
+			"y":	110
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -626,7 +626,7 @@
 	"advancement.minecraft.husbandry.balanced_diet.criteria.chorus_fruit":	{
 		"icon_pos":	{
 			"x":	110,
-			"y":	105
+			"y":	110
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -889,7 +889,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.melon":	{
 		"icon_pos":	{
-			"x":	1410,
+			"x":	1405,
 			"y":	825
 		},
 		"text_pos":	{
@@ -900,7 +900,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cookie":	{
 		"icon_pos":	{
-			"x":	1450,
+			"x":	1445,
 			"y":	825
 		},
 		"text_pos":	{
@@ -967,7 +967,7 @@
 	"advancement.minecraft.husbandry.balanced_diet.criteria.pufferfish":	{
 		"icon_pos":	{
 			"x":	30,
-			"y":	630
+			"y":	585
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -978,7 +978,7 @@
 	"advancement.minecraft.husbandry.balanced_diet.criteria.enchanted_golden_apple":	{
 		"icon_pos":	{
 			"x":	75,
-			"y":	630
+			"y":	585
 		},
 		"text_pos":	{
 			"x":	-3000,
@@ -988,7 +988,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals":	{
 		"icon_pos":	{
-			"x":	1890,
+			"x":	1895,
 			"y":	305
 		}
 	},
@@ -1071,7 +1071,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.bred_wolf":	{
 		"icon_pos":	{
-			"x":	1410,
+			"x":	1405,
 			"y":	585
 		},
 		"text_pos":	{
@@ -1082,7 +1082,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.bred_ocelot":	{
 		"icon_pos":	{
-			"x":	1410,
+			"x":	1405,
 			"y":	861
 		},
 		"text_pos":	{
@@ -1312,13 +1312,63 @@
 			"hidden":	true
 		}
 	},
-	"stat.serious_dedication_copy":	{
+	"stat.hdwgh_summary":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	670
+		}
+	},
+	"stat.hdwgh_summary.criteria.stat.mineBlock.end_stone":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	65
+		},
+		"progress_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.hdwgh_summary.criteria.brew_potions":	{
+		"icon_pos":	{
+			"x":	1530,
+			"y":	65
+		},
+		"progress_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.hdwgh_summary.criteria.beaconator":	{
+		"icon_pos":	{
+			"x":	170,
+			"y":	585
+		},
+		"progress_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.hdwgh_summary.criteria.hdwgh":	{
+		"icon_pos":	{
+			"x":	170,
+			"y":	630
+		},
+		"progress_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.dedication_summary":	{
 		"icon_pos":	{
 			"x":	1575,
 			"y":	360
 		}
 	},
-	"stat.gold_blocks":	{
+	"stat.gold_blocks_summary":	{
 		"icon_pos":	{
 			"x":	1315,
 			"y":	65
@@ -1330,23 +1380,10 @@
 			"y":	240
 		}
 	},
-	"stat.tears":	{
-		"icon_pos":	{
-			"x":	465,
-			"y":	790
-		}
-	},
-	"stat.end_crystals":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
 	"stat.gold_blocks_copy":	{
 		"icon_pos":	{
-			"x":	1890,
-			"y":	570
+			"x":	1895,
+			"y":	810
 		}
 	},
 	"stat.fishing":	{
@@ -1355,88 +1392,41 @@
 			"y":	205
 		}
 	},
+	"stat.serious_dedication":	{
+		"icon_pos":	{
+			"x":	1895,
+			"y":	670
+		}
+	},
+	"stat.tears":	{
+		"icon_pos":	{
+			"x":	465,
+			"y":	790
+		}
+	},
 	"stat.fortress":	{
 		"icon_pos":	{
 			"x":	735,
-			"y":	590
+			"y":	600
 		}
 	},
-	"stat.serious_dedication":	{
+	"stat.stat_complete_helper":	{
+		"icon_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"custom.egap_summary":	{
+		"icon_pos":	{
+			"x":	1830,
+			"y":	545
+		}
+	},
+	"multi_stage_goal.beacon_summary":	{
 		"icon_pos":	{
 			"x":	1765,
-			"y":	570
-		}
-	},
-	"stat.lapis2":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"stat.obsidian2":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"stat.pearls2":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"stat.hdwgh":	{
-		"icon_pos":	{
-			"x":	170,
-			"y":	640
-		}
-	},
-	"stat.hdwgh.criteria.stat.mineBlock.end_stone":	{
-		"icon_pos":	{
-			"x":	30,
-			"y":	65
-		},
-		"progress_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"stat.hdwgh.criteria.brew_potions":	{
-		"icon_pos":	{
-			"x":	1530,
-			"y":	65
-		},
-		"progress_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"stat.hdwgh.criteria.beaconator":	{
-		"icon_pos":	{
-			"x":	30,
-			"y":	590
-		},
-		"progress_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
-	"custom.notch_apple_obtained":	{
-		"icon_pos":	{
-			"x":	1765,
-			"y":	770
-		}
-	},
-	"multi_stage_goal.ms_goal:beacon":	{
-		"icon_pos":	{
-			"x":	1890,
-			"y":	770
+			"y":	810
 		}
 	},
 	"counter.any%":	{
@@ -1555,7 +1545,7 @@
 					"type":	"stat"
 				}, {
 					"root_name":	"stat.mineBlock.end_stone",
-					"parent_root":	"hdwgh",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}],
 			"pos":	{
@@ -1590,11 +1580,12 @@
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"hdwgh",
+					"root_name":	"beaconator",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"beaconator",
-					"parent_root":	"hdwgh",
+					"root_name":	"hdwgh_summary",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}],
 			"pos":	{
@@ -1838,14 +1829,14 @@
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"serious_dedication_copy",
+					"root_name":	"dedication_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"fishing",
 					"type":	"stat"
 				}, {
 					"root_name":	"brew_potions",
-					"parent_root":	"hdwgh",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}],
 			"pos":	{
@@ -1900,7 +1891,7 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"gold_blocks",
+					"root_name":	"gold_blocks_summary",
 					"type":	"stat"
 				}],
 			"pos":	{
@@ -1910,6 +1901,34 @@
 		}, {
 			"id":	"summary",
 			"type":	"text_header",
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
+				}, {
+					"root_name":	"gold_blocks_copy",
+					"type":	"stat"
+				}, {
+					"root_name":	"serious_dedication",
+					"type":	"stat"
+				}, {
+					"root_name":	"egap_summary",
+					"type":	"custom"
+				}, {
+					"root_name":	"ms_goal:beacon",
+					"type":	"multi_stage"
+				}],
 			"pos":	{
 				"x":	1765,
 				"y":	25
@@ -2114,7 +2133,7 @@
 			"thickness":	5,
 			"opacity":	1,
 			"pos2":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	0
 			},
 			"pos":	{
@@ -2127,7 +2146,7 @@
 			"thickness":	5,
 			"opacity":	1,
 			"pos2":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	1130
 			},
 			"pos":	{
@@ -2140,7 +2159,7 @@
 			"thickness":	3.5,
 			"opacity":	1,
 			"pos2":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	955
 			},
 			"pos":	{
@@ -2153,7 +2172,7 @@
 			"thickness":	3.5,
 			"opacity":	1,
 			"pos2":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	520
 			},
 			"pos":	{
@@ -2179,11 +2198,11 @@
 			"thickness":	5,
 			"opacity":	1,
 			"pos2":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	1130
 			},
 			"pos":	{
-				"x":	2015,
+				"x":	2020,
 				"y":	0
 			}
 		}, {
@@ -2268,7 +2287,7 @@
 			"id":	"credits",
 			"type":	"text_header",
 			"pos":	{
-				"x":	2014,
+				"x":	2019,
 				"y":	1141,
 				"anchor":	2
 			}

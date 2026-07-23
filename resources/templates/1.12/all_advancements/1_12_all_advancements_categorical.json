@@ -675,7 +675,44 @@
 		}
 	},
 	"stats":	{
-		"serious_dedication_copy":	{
+		"hdwgh_summary":	{
+			"icon":	"items/bucket_25w14craftmine.png",
+			"criteria":	{
+				"stat.mineBlock.end_stone":	{
+					"icon":	"monsters/wither.png",
+					"target":	12,
+					"linked_goals":	[{
+							"root_name":	"minecraft:nether/summon_wither",
+							"type":	"advancement"
+						}]
+				},
+				"brew_potions":	{
+					"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
+					"target":	1
+				},
+				"beaconator":	{
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"minecraft:nether/create_full_beacon",
+							"type":	"advancement"
+						}]
+				},
+				"hdwgh":	{
+					"icon":	"items/bucket_1.13.png",
+					"target":	1,
+					"linked_goals":	[{
+							"root_name":	"minecraft:nether/all_effects",
+							"type":	"advancement"
+						}]
+				}
+			},
+			"linked_goals":	[{
+					"root_name":	"minecraft:nether/all_effects",
+					"type":	"advancement"
+				}]
+		},
+		"dedication_summary":	{
 			"icon":	"items/diamond_hoe_1.9.png",
 			"root_name":	"stat.useItem.minecraft.diamond_hoe",
 			"target":	1561,
@@ -688,17 +725,13 @@
 				}],
 			"linked_goal_mode":	"or"
 		},
-		"gold_blocks":	{
+		"gold_blocks_summary":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/create_full_beacon"
-				}, {
-					"root_name":	"gold_blocks_copy",
-					"type":	"stat"
-				}],
-			"linked_goal_mode":	"or"
+				}]
 		},
 		"early_game_items":	{
 			"icon":	"blocks/Chest_(S)_JE2.png",
@@ -709,21 +742,14 @@
 					"icon":	"blocks/Obsidian_JE3_BE2.png",
 					"target":	-1,
 					"linked_goals":	[{
-							"root_name":	"obsidian2",
+							"root_name":	"stat.pickup.minecraft.obsidian",
+							"parent_root":	"stat_complete_helper",
 							"type":	"stat"
 						}]
 				},
 				"stat.pickup.minecraft.lapis_lazuli":	{
 					"icon":	"items/lapis_lazuli_1.13.png",
-					"target":	-1,
-					"linked_goals":	[{
-							"root_name":	"lapis2",
-							"type":	"stat"
-						}, {
-							"root_name":	"minecraft:story/enchant_item",
-							"type":	"advancement"
-						}],
-					"linked_goal_mode":	"or"
+					"target":	-1
 				},
 				"stat.pickup.minecraft.redstone":	{
 					"icon":	"items/redstone_1.13.png",
@@ -738,39 +764,21 @@
 				}
 			}
 		},
-		"tears":	{
-			"icon":	"items/ghast_tear_1.0.png",
-			"in_2nd_row":	true,
-			"root_name":	"stat.pickup.minecraft.ghast_tear",
-			"target":	4,
-			"linked_goals":	[{
-					"root_name":	"minecraft:end/respawn_dragon",
-					"type":	"advancement"
-				}, {
-					"root_name":	"end_crystals",
-					"type":	"stat"
-				}],
-			"linked_goal_mode":	"or"
-		},
-		"end_crystals":	{
-			"icon":	"blocks/placeholder.png",
-			"hidden":	true,
-			"root_name":	"stat.craft.minecraft.end_crystal",
-			"target":	4
-		},
 		"gold_blocks_copy":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
 			"hidden":	true,
+			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/create_full_beacon",
-					"type":	"advancement"
+					"root_name":	"gold_blocks_summary",
+					"type":	"stat"
 				}]
 		},
 		"fishing":	{
 			"icon":	"items/fish_cod_raw_1.11.png",
 			"hidden":	true,
+			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.fish",
 			"target":	-1,
 			"linked_goals":	[{
@@ -799,6 +807,23 @@
 					"type":	"advancement"
 				}]
 		},
+		"serious_dedication":	{
+			"icon":	"items/diamond_hoe_1.9.png",
+			"hidden":	true,
+			"in_2nd_row":	true,
+			"root_name":	"stat.useItem.minecraft.diamond_hoe",
+			"target":	1561,
+			"linked_goals":	[{
+					"root_name":	"minecraft:husbandry/break_diamond_hoe",
+					"type":	"advancement"
+				}]
+		},
+		"tears":	{
+			"icon":	"items/ghast_tear_1.0.png",
+			"in_2nd_row":	true,
+			"root_name":	"stat.pickup.minecraft.ghast_tear",
+			"target":	4
+		},
 		"fortress":	{
 			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
 			"hidden":	true,
@@ -816,10 +841,12 @@
 					"icon":	"items/blaze_rod_1.0.png",
 					"target":	3,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/all_effects",
-							"type":	"advancement"
+							"root_name":	"brew_potions",
+							"parent_root":	"hdwgh_summary",
+							"type":	"stat"
 						}, {
-							"root_name":	"end_crystals",
+							"root_name":	"stat.craft.minecraft.end_crystal",
+							"parent_root":	"stat_complete_helper",
 							"type":	"stat"
 						}]
 				},
@@ -827,91 +854,50 @@
 					"icon":	"items/nether_wart_1.0.png",
 					"target":	2,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/all_effects",
-							"type":	"advancement"
-						}]
-				},
-				"stat.pickup.minecraft.soul_sand":	{
-					"icon":	"blocks/Soul_Sand_JE2_BE2.png",
-					"target":	4,
-					"linked_goals":	[{
-							"root_name":	"minecraft:nether/summon_wither",
-							"type":	"advancement"
+							"root_name":	"brew_potions",
+							"parent_root":	"hdwgh_summary",
+							"type":	"stat"
 						}]
 				}
 			}
 		},
-		"serious_dedication":	{
-			"icon":	"items/diamond_hoe_1.9.png",
-			"hidden":	true,
-			"root_name":	"stat.useItem.minecraft.diamond_hoe",
-			"target":	1561,
-			"linked_goals":	[{
-					"root_name":	"minecraft:husbandry/break_diamond_hoe",
-					"type":	"advancement"
-				}]
-		},
-		"lapis2":	{
+		"stat_complete_helper":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
-			"root_name":	"stat.pickup.minecraft.lapis_lazuli",
-			"target":	16
-		},
-		"obsidian2":	{
-			"icon":	"blocks/placeholder.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"stat.pickup.minecraft.obsidian",
-			"target":	32,
-			"linked_goals":	[{
-					"root_name":	"minecraft:nether/fast_travel",
-					"type":	"advancement"
-				}]
-		},
-		"pearls2":	{
-			"icon":	"blocks/placeholder.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"stat.pickup.minecraft.ender_pearl",
-			"target":	32
-		},
-		"hdwgh":	{
-			"icon":	"items/bucket_25w14craftmine.png",
 			"criteria":	{
-				"stat.mineBlock.end_stone":	{
-					"icon":	"monsters/wither.png",
-					"target":	12,
+				"stat.craft.minecraft.end_crystal":	{
+					"icon":	"blocks/placeholder.png",
+					"target":	4,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/summon_wither",
+							"root_name":	"minecraft:end/respawn_dragon",
 							"type":	"advancement"
 						}]
 				},
-				"brew_potions":	{
-					"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
-					"target":	1,
+				"stat.pickup.minecraft.obsidian":	{
+					"icon":	"blocks/placeholder.png",
+					"target":	24,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/brew_potion",
+							"root_name":	"minecraft:nether/fast_travel",
+							"type":	"advancement"
+						}, {
+							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
 						}]
 				},
-				"beaconator":	{
-					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
-					"target":	1,
+				"stat.pickup.minecraft.lapis_lazuli":	{
+					"icon":	"blocks/placeholder.png",
+					"target":	24,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/create_full_beacon",
+							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
 						}]
 				}
-			},
-			"linked_goals":	[{
-					"root_name":	"minecraft:nether/all_effects",
-					"type":	"advancement"
-				}]
+			}
 		}
 	},
 	"unlocks":	[],
 	"custom":	[{
-			"root_name":	"notch_apple_obtained",
+			"root_name":	"egap_summary",
 			"icon":	"items/Enchanted_Golden_Apple_JE1_BE1_unoptimized.gif",
 			"linked_goals":	[{
 					"root_name":	"enchanted_golden_apple",
@@ -920,21 +906,30 @@
 				}]
 		}],
 	"multi_stage_goals":	[{
-			"root_name":	"ms_goal:beacon",
+			"root_name":	"beacon_summary",
 			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"use_stage_icons":	true,
 			"stages":	[{
+					"stage_id":	"0",
+					"icon":	"monsters/Wither_Skeleton_JE4_BE3.png",
+					"type":	"stat",
+					"root_name":	"stat.killEntity.WitherSkeleton",
+					"target":	-1,
+					"complete_with_next":	true
+				}, {
 					"stage_id":	"1",
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.skull",
-					"target":	3
+					"target":	3,
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
-					"target":	1
+					"target":	1,
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
@@ -998,7 +993,7 @@
 					"type":	"advancement"
 				}, {
 					"root_name":	"stat.mineBlock.end_stone",
-					"parent_root":	"hdwgh",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]
 		}, {
@@ -1234,7 +1229,7 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
 				}, {
-					"root_name":	"gold_blocks",
+					"root_name":	"gold_blocks_summary",
 					"type":	"stat"
 				}]
 		}, {
@@ -1420,14 +1415,14 @@
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"serious_dedication_copy",
+					"root_name":	"dedication_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"fishing",
 					"type":	"stat"
 				}, {
 					"root_name":	"brew_potions",
-					"parent_root":	"hdwgh",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]
 		}, {
@@ -1493,11 +1488,12 @@
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"hdwgh",
+					"root_name":	"beaconator",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"beaconator",
-					"parent_root":	"hdwgh",
+					"root_name":	"hdwgh_summary",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]
 		}]

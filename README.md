@@ -951,6 +951,11 @@ dropdown to keep the button row tidy:
   files are added. If the zip contains bundled icon files, an **Import bundled icon
   files** checkbox will appear and enabling it extracts those icons directly into your `resources/icons/` folder so
   they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
+  Importing uses the same replace-instead-of-error behaviour as creating, copying and renaming: if the chosen `version`,
+  `Category Name` **and** `Optional Flag` all match an existing template, the **`Replace Existing Template?`**
+  confirmation appears. Choosing **`Replace`** permanently deletes the existing template and **all** of its associated
+  files (language, layout, `notes` and global-stats `snapshot`) before the import overwrites it, and reloads the tracker
+  if it was using that template.
 * **Export Template**: Packages the selected template and all its language **and layout files** into a single `.zip`
   file, perfect for
   sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz). Clicking the button opens a
@@ -1788,24 +1793,24 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                                 | Optional Flag(s)         | Languages           |
-|--------------------|-----------------------------------------------------|--------------------------|---------------------|
-| `any%`             | 25w14craftmine                                      |                          | Default             |
-| `AMI`              | 25w14craftmine                                      |                          | Default             |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4         |                          | Default, ger        |
-| `all_achievements` | 1.6.4                                               | `_ssg_keimaseed`         | Default, ger        |
-| `all_achievements` | 1.11                                                |                          | Default             |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                          |                          | Default             |
-| `all_advancements` | 1.12                                                | `_categorical`           | Default             |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2 |                          | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1, 1.16.2, 1.17, 1.21.11, 26.1, 26.2           | `_categorical`           | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2                   | `_aatool_optimized`      | Default, ger, zh_cn |
-| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2     | `_optimized`             | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1                                              | `_ssg_blackcat`, `_coop` | Default, ger, zh_cn |
-| `all_blocks`       | 1.16.1                                              |                          | Default             |
-| `miku%`            | 1.21                                                |                          | Default             |
-| `all_trims`        | 1.21                                                |                          | Default             |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine          | `1`                      | Default             |
+| Category           | Template Version(s)                                         | Optional Flag(s)         | Languages           |
+|--------------------|-------------------------------------------------------------|--------------------------|---------------------|
+| `any%`             | 25w14craftmine                                              |                          | Default             |
+| `AMI`              | 25w14craftmine                                              |                          | Default             |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                 |                          | Default, ger        |
+| `all_achievements` | 1.6.4                                                       | `_ssg_keimaseed`         | Default, ger        |
+| `all_achievements` | 1.11                                                        |                          | Default             |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                                  |                          | Default             |
+| `all_advancements` | 1.12                                                        | `_categorical`           | Default             |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3   |                          | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.21.11, 26.1, 26.2, 26.3 | `_categorical`           | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.2                     | `_aatool_optimized`      | Default, ger, zh_cn |
+| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3       | `_optimized`             | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                                      | `_ssg_blackcat`, `_coop` | Default, ger, zh_cn |
+| `all_blocks`       | 1.16.1                                                      |                          | Default             |
+| `miku%`            | 1.21                                                        |                          | Default             |
+| `all_trims`        | 1.21                                                        |                          | Default             |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                  | `1`                      | Default             |
 
 If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the bottom right of the tracker.
 

@@ -289,11 +289,16 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
  *                       and relink the icon paths in the extracted template JSON.
  * @param error_message  Output buffer for error text.
  * @param msg_size       Size of error_message.
+ * @param overwrite_existing If true, a template whose identity collides with the imported one is deleted
+ *        first (with all its associated files) so the import replaces it instead of failing.
+ * @param out_name_collision Optional. Set to true when the failure is specifically a name collision,
+ *        letting the caller offer an overwrite instead of showing a plain error.
  * @return true on success.
  */
 bool execute_import_from_zip(const char *zip_path, const char *version, const char *category,
                              const char *flag, bool import_icons,
-                             char *error_message, size_t msg_size);
+                             char *error_message, size_t msg_size, bool overwrite_existing = false,
+                             bool *out_name_collision = nullptr);
 
 /**
  * @brief Exports a template to a zip, optionally bundling icon files.
