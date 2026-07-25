@@ -15,6 +15,15 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.6.2" date="2026-07-25">
+      <description>
+        <p>Hotfix for the Linux packages (.deb/.rpm/AUR): overlay settings now apply correctly.</p>
+        <ul>
+          <li>Fixed a critical bug where overlay-related settings (Compact mode, background color, and every other overlay option) saved but never took effect: the overlay process read from a read-only system location instead of your user data directory. It now inherits the correct data directory from the main tracker.</li>
+          <li>Fixed the overlay window icon failing to load; it now loads from the installed application assets like the tracker icon does.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.1" date="2026-07-23">
       <description>
         <p>The Zesskyo Update: introduces the new Compact Overlay Mode, heavily inspired by Zesskyo's All Advancements video.</p>
