@@ -122,7 +122,7 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
 
     // Window Icon Cross-platform
     char icon_path[MAX_PATH_LENGTH];
-    snprintf(icon_path, sizeof(icon_path), "%s%s", get_resources_path(), ADVANCELY_ICON_PATH);
+    snprintf(icon_path, sizeof(icon_path), "%s%s", get_application_dir(), ADVANCELY_ICON_PATH);
     SDL_Surface *icon_surface = IMG_Load(icon_path);
     if (icon_surface) {
         SDL_SetWindowIcon(o->window, icon_surface);
