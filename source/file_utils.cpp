@@ -43,7 +43,7 @@ cJSON *cJSON_from_file(const char *filename) {
     // Sanity check to prevent allocating massive buffers due to file errors
     if (length > 100000000) {
         // 100 MB limit, generous for a JSON file
-        log_message(LOG_ERROR, "[FILE_UTILS] File size is abnormally large (%ld bytes). Aborting read: %s\n", length,
+        log_message(LOG_ERROR, "[FILE UTILS] File size is abnormally large (%ld bytes). Aborting read: %s\n", length,
                     filename);
         fclose(f);
         return nullptr;
@@ -51,7 +51,7 @@ cJSON *cJSON_from_file(const char *filename) {
 
     char *buffer = (char *) malloc(length + 1);
     if (!buffer) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to allocate buffer for file: %s\n", filename);
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to allocate buffer for file: %s\n", filename);
         fclose(f);
         return nullptr;
     }
@@ -60,7 +60,7 @@ cJSON *cJSON_from_file(const char *filename) {
     fclose(f);
 
     if (bytes_read != (size_t) length) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to read entire file (size changed during read): %s\n", filename);
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to read entire file (size changed during read): %s\n", filename);
         free(buffer);
         return nullptr;
     }
@@ -89,7 +89,7 @@ bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root) {
 
     char *json_str = cJSON_Print(root);
     if (!json_str) {
-        log_message(LOG_ERROR, "[FILE_UTILS] cJSON_Print failed while saving: %s\n", filename);
+        log_message(LOG_ERROR, "[FILE UTILS] cJSON_Print failed while saving: %s\n", filename);
         return false;
     }
     size_t json_len = strlen(json_str);
@@ -105,14 +105,14 @@ bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root) {
 #endif
     int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.%lu", filename, pid);
     if (n < 0 || (size_t) n >= sizeof(tmp_path)) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Temp path too long while saving: %s\n", filename);
+        log_message(LOG_ERROR, "[FILE UTILS] Temp path too long while saving: %s\n", filename);
         free(json_str);
         return false;
     }
 
     FILE *f = fopen(tmp_path, "wb");
     if (!f) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to open temp file for writing: %s\n", tmp_path);
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to open temp file for writing: %s\n", tmp_path);
         free(json_str);
         return false;
     }
@@ -134,7 +134,7 @@ bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root) {
     if (fclose(f) != 0) ok = false;
 
     if (!ok) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to write temp file: %s\n", tmp_path);
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to write temp file: %s\n", tmp_path);
         remove(tmp_path);
         return false;
     }
@@ -143,14 +143,14 @@ bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root) {
     // is atomic, so a concurrent reader always sees either the old or new file whole.
 #ifdef _WIN32
     if (!MoveFileExA(tmp_path, filename, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to replace '%s' (err %lu).\n", filename,
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to replace '%s' (err %lu).\n", filename,
                     (unsigned long) GetLastError());
         remove(tmp_path);
         return false;
     }
 #else
     if (rename(tmp_path, filename) != 0) {
-        log_message(LOG_ERROR, "[FILE_UTILS] Failed to rename temp over '%s'.\n", filename);
+        log_message(LOG_ERROR, "[FILE UTILS] Failed to rename temp over '%s'.\n", filename);
         remove(tmp_path);
         return false;
     }

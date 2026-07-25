@@ -1203,6 +1203,40 @@ const char *get_templates_display_path() {
     return path;
 }
 
+// Builds the argument list for (re)launching the overlay child process, propagating the runtime
+// flags this process was started with. This is critical: the overlay resolves its data directory
+// from get_resources_path(), which on Linux depends on --use-home-dir, and its settings file from
+// get_settings_file_path(), which depends on --settings-file. Without propagation the overlay reads
+// a different location than the tracker. On the Linux packages (.deb/.rpm/AUR) the launcher passes
+// --use-home-dir to the tracker, so an overlay spawned without it reads the read-only /usr/share
+// copy of settings.json and never sees the user's changes (and fails to write its skin cache there).
+#ifdef _WIN32
+static void build_overlay_command_line(char *out, size_t out_size, const char *exe_path) {
+    snprintf(out, out_size, "\"%s\" --overlay", exe_path);
+    if (g_custom_settings_path[0] != '\0') {
+        size_t len = strlen(out);
+        if (len < out_size) {
+            snprintf(out + len, out_size - len, " --settings-file \"%s\"", g_custom_settings_path);
+        }
+    }
+}
+#else
+// Fills argv (capacity must be >= 6, including the nullptr terminator).
+static void build_overlay_argv(char *exe_path, char *argv[]) {
+    int n = 0;
+    argv[n++] = exe_path;
+    argv[n++] = (char *) "--overlay";
+#ifdef __linux__
+    if (g_use_home_dir) argv[n++] = (char *) "--use-home-dir";
+#endif
+    if (g_custom_settings_path[0] != '\0') {
+        argv[n++] = (char *) "--settings-file";
+        argv[n++] = g_custom_settings_path;
+    }
+    argv[n] = nullptr;
+}
+#endif
+
 #if defined(__APPLE__)
 // Recursively copies src into dst, copying only files that are MISSING at the destination so the
 // user's settings, custom templates and edits are never overwritten. Updated default templates are
@@ -2315,8 +2349,8 @@ int main(int argc, char *argv[]) {
                 STARTUPINFOA si;
                 memset(&si, 0, sizeof(si));
                 si.cb = sizeof(si);
-                char args[MAX_PATH_LENGTH + 16];
-                snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
+                char args[MAX_PATH_LENGTH * 2 + 64];
+                build_overlay_command_line(args, sizeof(args), exe_path);
 
                 if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
                                    &tracker->overlay_process_info)) {
@@ -2330,7 +2364,8 @@ int main(int argc, char *argv[]) {
                 pid_t pid = fork();
                 if (pid == 0) {
                     // Child process
-                    char *args[] = {exe_path, (char *) "--overlay", nullptr};
+                    char *args[6];
+                    build_overlay_argv(exe_path, args);
                     execv(exe_path, args);
                     _exit(1); // Should not be reached
                 } else if (pid > 0) {
@@ -2679,8 +2714,8 @@ int main(int argc, char *argv[]) {
                         STARTUPINFOA si;
                         memset(&si, 0, sizeof(si));
                         si.cb = sizeof(si);
-                        char args[MAX_PATH_LENGTH + 16];
-                        snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
+                        char args[MAX_PATH_LENGTH * 2 + 64];
+                        build_overlay_command_line(args, sizeof(args), exe_path);
 
                         if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
                                            &tracker->overlay_process_info)) {
@@ -2694,7 +2729,8 @@ int main(int argc, char *argv[]) {
                         pid_t pid = fork();
                         if (pid == 0) {
                             // Child process
-                            char *args[] = {exe_path, (char *) "--overlay", nullptr};
+                            char *args[6];
+                            build_overlay_argv(exe_path, args);
                             execv(exe_path, args);
                             // If execv returns, it's an error
                             log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
