@@ -28,7 +28,8 @@ typedef enum {
 enum GoalHidingMode {
     HIDE_ALL_COMPLETED, // Hides both "done" items and hidden within template
     HIDE_ONLY_TEMPLATE_HIDDEN, // Hides only hidden within template, but shows completed
-    SHOW_ALL // Shows hidden and completed
+    SHOW_ALL, // Shows hidden and completed
+    SHOW_ONLY_INCOMPLETE // Hides only completed items, every incomplete item shows (even hidden ones)
 };
 
 // Co-op networking mode

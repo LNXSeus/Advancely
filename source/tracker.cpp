@@ -6537,9 +6537,35 @@ static inline bool tracker_should_hide_by_mode(const AppSettings *settings, bool
             return template_hidden || (settings->invert_hiding_mode ? !is_done : is_done);
         case HIDE_ONLY_TEMPLATE_HIDDEN:
             return template_hidden;
+        case SHOW_ONLY_INCOMPLETE:
+            // Completion is the only criterion here: template-hidden items still show while incomplete.
+            // Inverted, it keeps only the completed items visible instead.
+            return settings->invert_hiding_mode ? !is_done : is_done;
         case SHOW_ALL:
         default:
             return false;
+    }
+}
+
+/**
+ * @brief Decides whether an element marked "Hidden" in the Visual Layout Editor stays hidden.
+ *
+ * Manual layout has its own per-element hidden flag, which is the manual-layout counterpart of the
+ * template "Hidden" flag. It applies in every mode except "Show All", and in "Show Only Incomplete"
+ * it only applies to the side the mode filters out, so hidden elements on the shown side are revealed
+ * there too.
+ *
+ * @param settings The app settings.
+ * @param is_done True if the item is considered completed.
+ */
+static inline bool tracker_layout_hiding_active(const AppSettings *settings, bool is_done) {
+    switch (settings->goal_hiding_mode) {
+        case SHOW_ALL:
+            return false;
+        case SHOW_ONLY_INCOMPLETE:
+            return settings->invert_hiding_mode ? !is_done : is_done;
+        default:
+            return true;
     }
 }
 
@@ -6583,8 +6609,9 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     char counter_str[128] = "";
     if (total_visible_count > 0) {
         // Only show counters if there are items to count
-        if (settings->goal_hiding_mode == HIDE_ALL_COMPLETED) {
-            // --- HIDE_ALL_COMPLETED Mode: Show only totals ---
+        if (settings->goal_hiding_mode == HIDE_ALL_COMPLETED ||
+            settings->goal_hiding_mode == SHOW_ONLY_INCOMPLETE) {
+            // --- HIDE_ALL_COMPLETED / SHOW_ONLY_INCOMPLETE Mode: Show only totals ---
             if (completed_sub_count != -1 && total_visible_sub_count > 0) {
                 // Sections with sub-items (Advancements/Stats with criteria, Multi-Stage)
                 // Format: "Title (Total Main | Total Sub)"
@@ -7299,8 +7326,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // Skip auto-layout items that are fully hidden in manual layout
             if (settings->use_manual_layout && !cat->icon_pos.is_set &&
                 cat->icon_pos.is_hidden_in_layout && cat->text_pos.is_hidden_in_layout &&
-                (!has_progress_text || cat->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode !=
-                SHOW_ALL) {
+                (!has_progress_text || cat->progress_pos.is_hidden_in_layout) &&
+                tracker_layout_hiding_active(settings, is_considered_complete_render)) {
                 continue;
             }
 
@@ -7344,12 +7371,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             // Per-position hiding for manual layout
-            bool hide_icon_in_layout = settings->use_manual_layout && cat->icon_pos.is_hidden_in_layout && settings->
-                                       goal_hiding_mode != SHOW_ALL;
-            bool hide_text_in_layout = settings->use_manual_layout && cat->text_pos.is_hidden_in_layout && settings->
-                                       goal_hiding_mode != SHOW_ALL;
+            bool layout_hiding_active = tracker_layout_hiding_active(settings, is_considered_complete_render);
+            bool hide_icon_in_layout = settings->use_manual_layout && cat->icon_pos.is_hidden_in_layout &&
+                                       layout_hiding_active;
+            bool hide_text_in_layout = settings->use_manual_layout && cat->text_pos.is_hidden_in_layout &&
+                                       layout_hiding_active;
             bool hide_progress_in_layout = settings->use_manual_layout && cat->progress_pos.is_hidden_in_layout &&
-                                           settings->goal_hiding_mode != SHOW_ALL;
+                                           layout_hiding_active;
 
             // --- Rendering Core Logic (Only if visible) ---
             if (is_visible_on_screen) {
@@ -7719,12 +7747,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         bool is_manually_placed =
                                 settings->use_manual_layout && crit->icon_pos.is_set;
+                        bool crit_layout_hiding_active = tracker_layout_hiding_active(settings, crit->done);
                         bool hide_crit_icon_in_layout =
-                                settings->use_manual_layout && crit->icon_pos.is_hidden_in_layout && settings->
-                                goal_hiding_mode != SHOW_ALL;
+                                settings->use_manual_layout && crit->icon_pos.is_hidden_in_layout &&
+                                crit_layout_hiding_active;
                         bool hide_crit_text_in_layout =
-                                settings->use_manual_layout && crit->text_pos.is_hidden_in_layout && settings->
-                                goal_hiding_mode != SHOW_ALL;
+                                settings->use_manual_layout && crit->text_pos.is_hidden_in_layout &&
+                                crit_layout_hiding_active;
 
                         float item_screen_y = 0.0f;
                         if (!is_manually_placed) {
@@ -7864,7 +7893,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                       coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                       cat->first_contributor_uuid[0] != '\0' &&
                                                       t->zoom_level > settings->coop_face_lod_threshold &&
-                                                      (settings->goal_hiding_mode == HIDE_ALL_COMPLETED || crit->done);
+                                                      (settings->goal_hiding_mode == HIDE_ALL_COMPLETED ||
+                                                       settings->goal_hiding_mode == SHOW_ONLY_INCOMPLETE ||
+                                                       crit->done);
                         bool adv_crit_face_follows_text = settings->use_manual_layout && crit->text_pos.is_set;
                         if (adv_crit_face_eligible && !adv_crit_face_follows_text) {
                             CoopLobbyPlayer ac_lobby[COOP_MAX_LOBBY];
@@ -7932,11 +7963,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImU32 check_fill = (is_hovered && !t->is_visual_layout_editing)
                                                    ? checkbox_hover_color
                                                    : checkbox_fill_color;
+                            // Fade the outline and checkmark alongside the sub-stat's icon and text.
+                            bool crit_cb_faded = tracker_is_faded_by_mode(settings, crit->done);
+                            ImU32 crit_cb_outline_color = crit_cb_faded ? text_color_faded : text_color;
+                            ImU32 crit_cb_checkmark_color = crit_cb_faded ? text_color_faded : checkmark_color;
                             if (crit_cb_visible) {
                                 float cb_round = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
                                 draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill, cb_round);
                                 if (!t->is_visual_layout_editing) {
-                                    draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, cb_round);
+                                    draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, crit_cb_outline_color,
+                                                       cb_round);
                                 }
 
                                 if (crit->is_manually_completed && !t->is_visual_layout_editing) {
@@ -7947,8 +7983,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                        check_pos.y + 15 * t->zoom_level);
                                     ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level,
                                                        check_pos.y + 6 * t->zoom_level);
-                                    draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
-                                    draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                                    draw_list->AddLine(p1, p2, crit_cb_checkmark_color, 2.0f * t->zoom_level);
+                                    draw_list->AddLine(p2, p3, crit_cb_checkmark_color, 2.0f * t->zoom_level);
                                 }
                             }
 
@@ -8729,7 +8765,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         // Skip auto-layout items that are fully hidden in manual layout
         if (settings->use_manual_layout && !item->icon_pos.is_set &&
             item->icon_pos.is_hidden_in_layout && item->text_pos.is_hidden_in_layout &&
-            (!has_progress_text || item->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+            (!has_progress_text || item->progress_pos.is_hidden_in_layout) &&
+            tracker_layout_hiding_active(settings, item->done)) {
             continue;
         }
 
@@ -8769,12 +8806,13 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
 
         // Per-position hiding for manual layout
-        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
-        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
+        bool item_layout_hiding_active = tracker_layout_hiding_active(settings, item->done);
+        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout &&
+                                        item_layout_hiding_active;
+        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout &&
+                                        item_layout_hiding_active;
         bool hide_item_progress_in_layout = settings->use_manual_layout && item->progress_pos.is_hidden_in_layout &&
-                                            settings->goal_hiding_mode != SHOW_ALL;
+                                            item_layout_hiding_active;
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
@@ -9169,7 +9207,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // Skip auto-layout items that are fully hidden in manual layout
         if (settings->use_manual_layout && !item->icon_pos.is_set &&
             item->icon_pos.is_hidden_in_layout && item->text_pos.is_hidden_in_layout &&
-            (!has_progress_text || item->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+            (!has_progress_text || item->progress_pos.is_hidden_in_layout) &&
+            tracker_layout_hiding_active(settings, item->done)) {
             continue;
         }
 
@@ -9209,12 +9248,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
 
         // Per-position hiding for manual layout
-        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
-        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
+        bool item_layout_hiding_active = tracker_layout_hiding_active(settings, item->done);
+        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout &&
+                                        item_layout_hiding_active;
+        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout &&
+                                        item_layout_hiding_active;
         bool hide_item_progress_in_layout = settings->use_manual_layout && item->progress_pos.is_hidden_in_layout &&
-                                            settings->goal_hiding_mode != SHOW_ALL;
+                                            item_layout_hiding_active;
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
@@ -9753,9 +9793,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
 
         // Skip auto-layout items that are fully hidden in manual layout
+        bool goal_layout_hiding_active = tracker_layout_hiding_active(settings, goal->done);
         if (settings->use_manual_layout && !goal->icon_pos.is_set &&
             goal->icon_pos.is_hidden_in_layout && goal->text_pos.is_hidden_in_layout &&
-            goal->progress_pos.is_hidden_in_layout && settings->goal_hiding_mode != SHOW_ALL) {
+            goal->progress_pos.is_hidden_in_layout && goal_layout_hiding_active) {
             continue;
         }
 
@@ -9787,12 +9828,12 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         if (settings->use_manual_layout) is_visible_on_screen = true;
 
         // Per-position hiding for manual layout (multi-stage goals)
-        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
-        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout &&
+                                        goal_layout_hiding_active;
+        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout &&
+                                        goal_layout_hiding_active;
         bool hide_goal_progress_in_layout = settings->use_manual_layout && goal->progress_pos.is_hidden_in_layout &&
-                                            settings->goal_hiding_mode != SHOW_ALL;
+                                            goal_layout_hiding_active;
 
         if (is_visible_on_screen) {
             bool show_goal_text = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_goal_text_in_layout;
@@ -10221,9 +10262,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
 
         // Skip auto-layout items that are fully hidden in manual layout
+        bool goal_layout_hiding_active = tracker_layout_hiding_active(settings, is_done_render);
         if (settings->use_manual_layout && !goal->icon_pos.is_set &&
             goal->icon_pos.is_hidden_in_layout && goal->text_pos.is_hidden_in_layout &&
-            goal->progress_pos.is_hidden_in_layout && settings->goal_hiding_mode != SHOW_ALL) {
+            goal->progress_pos.is_hidden_in_layout && goal_layout_hiding_active) {
             continue;
         }
 
@@ -10259,12 +10301,12 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         }
 
         // Per-position hiding for manual layout (multi-stage goals)
-        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
-        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout && settings->
-                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout &&
+                                        goal_layout_hiding_active;
+        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout &&
+                                        goal_layout_hiding_active;
         bool hide_goal_progress_in_layout = settings->use_manual_layout && goal->progress_pos.is_hidden_in_layout &&
-                                            settings->goal_hiding_mode != SHOW_ALL;
+                                            goal_layout_hiding_active;
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
@@ -10822,8 +10864,10 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                                                elem->end_goal_stage, nullptr);
 
                 // Hide arrow if its end goal is hidden by HIDE_ALL_COMPLETED (or its inverse, which hides
-                // goals that are not yet completed).
-                if (elem->end_goal_root[0] != '\0' && settings->goal_hiding_mode == HIDE_ALL_COMPLETED &&
+                // goals that are not yet completed) or by SHOW_ONLY_INCOMPLETE.
+                if (elem->end_goal_root[0] != '\0' &&
+                    (settings->goal_hiding_mode == HIDE_ALL_COMPLETED ||
+                     settings->goal_hiding_mode == SHOW_ONLY_INCOMPLETE) &&
                     (settings->invert_hiding_mode ? !end_completed : end_completed)) {
                     break;
                 }
@@ -11724,6 +11768,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         "Hide Template-Hidden (Inv.)",
         "Show All",
         "Show All (Inv.)",
+        "Show Only Incomplete",
+        "Show Only Completed",
     };
     float visibility_dropdown_width = 0.0f;
     for (const char *label: visibility_labels) {
@@ -12117,6 +12163,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             {"Hide Template-Hidden (Inv.)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
             {"Show All", SHOW_ALL, false},
             {"Show All (Inv.)", SHOW_ALL, true},
+            {"Show Only Incomplete", SHOW_ONLY_INCOMPLETE, false},
+            {"Show Only Completed", SHOW_ONLY_INCOMPLETE, true},
         };
         const int visibility_option_count = (int) (sizeof(visibility_options) / sizeof(visibility_options[0]));
 
@@ -12162,7 +12210,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                          " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
                          " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
                          " - Show All: nothing is hidden.\n"
-                         " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n\n"
+                         " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n"
+                         " - Show Only Incomplete: hides completed goals and shows every incomplete one,\n"
+                         "   including template-hidden goals.\n"
+                         " - Show Only Completed: the reverse, only completed goals are shown,\n"
+                         "   including template-hidden ones.\n\n"
                          "Changing this saves immediately and does not restart the overlay.");
             }
             ImGui::SetTooltip("%s", tooltip_buffer);

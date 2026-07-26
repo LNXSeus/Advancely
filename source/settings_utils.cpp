@@ -1274,7 +1274,13 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         const cJSON *hiding_mode = cJSON_GetObjectItem(general_settings, "goal_hiding_mode");
         if (hiding_mode && cJSON_IsNumber(hiding_mode)) {
-            settings->goal_hiding_mode = (GoalHidingMode) hiding_mode->valueint;
+            // Guard against out-of-range values from hand-edited or newer settings files
+            if (hiding_mode->valueint < HIDE_ALL_COMPLETED || hiding_mode->valueint > SHOW_ONLY_INCOMPLETE) {
+                settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
+                defaults_were_used = true;
+            } else {
+                settings->goal_hiding_mode = (GoalHidingMode) hiding_mode->valueint;
+            }
         } else {
             // Backwards compatibility: Check for the old boolean key
             const cJSON *remove_completed = cJSON_GetObjectItem(general_settings, "remove_completed_goals");

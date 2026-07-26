@@ -2277,7 +2277,8 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
         }
 
         cJSON *stages_array = cJSON_CreateArray();
-        for (const auto &stage: goal.stages) {
+        for (size_t si = 0; si < goal.stages.size(); ++si) {
+            const auto &stage = goal.stages[si];
             cJSON *stage_json = cJSON_CreateObject();
             cJSON_AddStringToObject(stage_json, "stage_id", stage.stage_id);
 
@@ -2309,8 +2310,11 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
                 // Serialize stage linked goals (non-final stages only)
                 serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
-                // Auto-complete this stage when the next stage is completed
-                if (stage.complete_with_next) {
+                // Auto-complete this stage when the next stage is completed.
+                // Never written for the stage before the 'Final' stage, where it has no effect.
+                const bool next_is_final = (si + 1 >= goal.stages.size()) ||
+                                           goal.stages[si + 1].type == SUBGOAL_MANUAL;
+                if (stage.complete_with_next && !next_is_final) {
                     cJSON_AddBoolToObject(stage_json, "complete_with_next", true);
                 }
             }
@@ -15857,7 +15861,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
 
                                 // --- Auto-complete this stage when the next stage is completed ---
-                                {
+                                // Hidden for the stage directly before the 'Final' stage: the final stage is
+                                // never satisfied on its own, so there is nothing to inherit from it.
+                                // Re-evaluated every frame, so moving a stage into that slot removes the option.
+                                const bool next_stage_is_final = (j + 1 >= goal.stages.size()) ||
+                                                                 goal.stages[j + 1].type == SUBGOAL_MANUAL;
+                                if (!next_stage_is_final) {
                                     char cwn_id[128];
                                     snprintf(cwn_id, sizeof(cwn_id),
                                              "Auto-complete if next stage is completed##cwn_%s_%zu",

@@ -589,9 +589,10 @@ You can manipulate the view using several intuitive controls:
 * **Reset Camera**: Click the `Reset Camera` button in the bottom-right corner to instantly reset the pan and zoom to
   their default positions.
 * **Goal Visibility Dropdown**: A dropdown in the bottom controls (next to `Manual Layout`) lets you switch the goal
-  visibility mode on the fly. It exposes all six combinations of the three modes and the invert flag in one list:
+  visibility mode on the fly. It exposes all eight combinations of the four modes and the invert flag in one list:
   `Hide All Completed`, `Hide All Incomplete (Inv.)`, `Hide Template-Hidden Only` (the default),
-  `Hide Template-Hidden (Inv.)`, `Show All`, and `Show All (Inv.)`. Changing it saves immediately and applies
+  `Hide Template-Hidden (Inv.)`, `Show All`, `Show All (Inv.)`, `Show Only Incomplete`, and
+  `Show Only Completed`. Changing it saves immediately and applies
   instantly **without restarting the overlay**. See [The Tracker Window](#the-tracker-window) - open the **Controls & Features** dropdown and scroll
   to **Section Completion Counters** for exactly how each mode affects what is shown and counted.
 
@@ -657,6 +658,9 @@ do not appear in manual layout mode.
   e.g., `(Completed Main / Total Main)`).
 * **Show All**: Counts show completed vs. total for every single item defined in the template for that section,
   including hidden ones (e.g., `(Completed Main / Total Main)`).
+* **Show Only Incomplete**: Like `Hide All Completed`, the counters display only the **total number of remaining
+  items**, but template-hidden items are counted too since they stay visible while incomplete. Inverted
+  (`Show Only Completed`), they display the total number of **completed** items instead.
 
 **Hiding in Manual Layout vs. Automatic Layout:**
 
@@ -666,7 +670,9 @@ Advancely has two separate hiding systems that target different layout modes:
   **stream overlay**. This checkbox is completely ignored when using the manual layout.
 * **Per-position `Hide` checkboxes** (per icon/text/progress position, in the Template Editor): Controls visibility
   on the **manual layout** only. Each position (icon, text, progress) can be hidden independently. These checkboxes
-  only take effect in `Hide All Completed` and `Hide Template-Hidden Only` modes; `Show All` ignores them.
+  only take effect in `Hide All Completed` and `Hide Template-Hidden Only` modes; `Show All` ignores them, and
+  `Show Only Incomplete` only applies them to the side it filters out (completed goals, or incomplete ones when
+  inverted).
 
 In `Hide All Completed` mode, completed goals fully disappear from the manual layout. In `Hide Template-Hidden Only`
 mode, completed goals are greyed out but remain visible.
@@ -674,8 +680,8 @@ mode, completed goals are greyed out but remain visible.
 **Invert Hiding Mode:**
 
 The inverted variants in the **Goal Visibility Dropdown** (`Hide All Incomplete (Inv.)`,
-`Hide Template-Hidden (Inv.)`, `Show All (Inv.)`) flip the completion behaviour of whichever base mode is
-selected:
+`Hide Template-Hidden (Inv.)`, `Show All (Inv.)`, `Show Only Completed`) flip the completion behaviour of
+whichever base mode is selected:
 
 * **`Hide All Completed`** (warning): hides every goal that is **not yet completed** instead of the completed ones
   (template-hidden goals stay hidden). Your tracker starts almost completely empty and goals appear as you complete
@@ -684,6 +690,16 @@ selected:
   greyed out and lower transparency instead of completed ones. Goals snap to full transparency once completed.
 * **`Show All`**: same inverted greying as above, and template-hidden goals are revealed too, including in the manual
   layout.
+* **`Show Only Incomplete`**: becomes `Show Only Completed`, showing only the goals you have already finished
+  (template-hidden and layout-hidden ones included) and hiding everything still open. Handy as a trophy view or for
+  checking what a run has produced so far.
+
+**Show Only Incomplete:**
+
+`Show Only Incomplete` sits at the bottom of the **Goal Visibility Dropdown**. It hides completed goals and shows
+**every** incomplete goal, including ones marked `Hidden` in the template and positions marked `Hide` in the manual
+layout. Use it when you want a pure "what's left to do" view without having to un-hide anything in the template first.
+Unlike `Hide All Completed`, hidden goals are not filtered out here, that is the whole point of the mode.
 
 ### The Player Dropdown (Co-op)
 
@@ -1108,6 +1124,9 @@ overlay.
       checkbox. When enabled, the stage is also considered complete once the following stage is complete (on top of its
       own trigger and any linked goals). This chains backward, so a completed later stage pulls every earlier opted-in
       stage forward. Useful when an earlier stage's trigger isn't reliably detectable but a later milestone is.
+      The checkbox is not shown on the stage directly before the `Final` stage, since the `Final` stage is never
+      completed on its own and there would be nothing to inherit. It disappears automatically if you drag another
+      stage into that slot.
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
       overlay.
@@ -1138,8 +1157,8 @@ tied to any game data. These elements are only visible when "Manual Layout" mode
     * **Start Goal**: Select any goal, sub-goal, or multi-stage goal stage from the template. Before this goal is
       completed the arrow renders at its **Opacity Before** value (default: faded). Once completed, the arrow
       transitions to **Opacity After** (default: fully opaque).
-    * **End Goal**: When this goal is completed and the goal visibility mode is set to "Hide All Completed",
-      the arrow is hidden entirely.
+    * **End Goal**: When this goal is completed and the goal visibility mode is set to "Hide All Completed" or
+      "Show Only Incomplete", the arrow is hidden entirely.
     * Use the **Select Goal** popup (with search via `Ctrl+F` / `Cmd+F`) to pick goals from any tab in the template.
 
 ### Visual Layout Editor
@@ -1661,7 +1680,8 @@ How the Host combines multiple players' progress into the **All Players** view d
   save, when `Track disconnected / offline players (ghosts)` is on) appear in the assignment dropdown too, labeled
   `(ghost)`, and are tracked exactly like live players since assignment is keyed by UUID.
 * **Advancement criteria:** Inside a complex advancement, each criterion can also display the parent advancement's
-  leader face beside its icon. In `Hide All Completed` the face rides on every (still-visible) criterion so the
+  leader face beside its icon. In `Hide All Completed` and `Show Only Incomplete` the face rides on every
+  (still-visible) criterion so the
   leader stays on screen while the advancement is partial; in `Hide Template-Hidden Only` and `Show All` the face
   appears only on criteria that have actually been completed, since completed criteria stay visible in those modes.
 * **Unlocks (25w14craftmine):** `AND` - an unlock counts only when *every* roster player has obtained it. Pre-
