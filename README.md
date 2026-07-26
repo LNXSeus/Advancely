@@ -1125,8 +1125,9 @@ overlay.
       own trigger and any linked goals). This chains backward, so a completed later stage pulls every earlier opted-in
       stage forward. Useful when an earlier stage's trigger isn't reliably detectable but a later milestone is.
       The checkbox is not shown on the stage directly before the `Final` stage, since the `Final` stage is never
-      completed on its own and there would be nothing to inherit. It disappears automatically if you drag another
-      stage into that slot.
+      completed on its own and there would be nothing to inherit. It disappears automatically if you drag a stage
+      into that slot, and an already-ticked setting is remembered (and saved) while hidden, so moving the stage back
+      out restores it.
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
       overlay.

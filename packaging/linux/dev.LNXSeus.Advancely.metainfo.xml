@@ -15,6 +15,17 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.6.3" date="2026-07-26">
+      <description>
+        <p>A new goal visibility mode, small tracker and template editor refinements, and categorical template fixes.</p>
+        <ul>
+          <li>New "Show Only Incomplete" goal visibility mode at the bottom of the dropdown: hides completed goals and shows every incomplete one, including goals marked Hidden in the template and positions hidden in the manual layout, so you get a pure "what's left to do" view without un-hiding anything first. Its inverted variant, "Show Only Completed", does the reverse.</li>
+          <li>Completed sub-stats now fade their checkbox along with their icon and text, instead of leaving a fully opaque checkbox behind.</li>
+          <li>Template editor: the "Auto-complete if next stage is completed" option is no longer offered on the stage directly before the Final stage, where it could never have any effect. It disappears as soon as a stage is moved into that slot and an already-ticked setting is remembered, so moving the stage back out restores it.</li>
+          <li>Template fixes: corrected naming errors in the all_advancements categorical templates so they can complete fully.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.2" date="2026-07-25">
       <description>
         <p>Hotfix for the Linux packages (.deb/.rpm/AUR): overlay settings now apply correctly.</p>

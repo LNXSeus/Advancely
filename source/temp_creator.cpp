@@ -2277,8 +2277,7 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
         }
 
         cJSON *stages_array = cJSON_CreateArray();
-        for (size_t si = 0; si < goal.stages.size(); ++si) {
-            const auto &stage = goal.stages[si];
+        for (const auto &stage: goal.stages) {
             cJSON *stage_json = cJSON_CreateObject();
             cJSON_AddStringToObject(stage_json, "stage_id", stage.stage_id);
 
@@ -2311,10 +2310,10 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 // Serialize stage linked goals (non-final stages only)
                 serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
                 // Auto-complete this stage when the next stage is completed.
-                // Never written for the stage before the 'Final' stage, where it has no effect.
-                const bool next_is_final = (si + 1 >= goal.stages.size()) ||
-                                           goal.stages[si + 1].type == SUBGOAL_MANUAL;
-                if (stage.complete_with_next && !next_is_final) {
+                // Always written, even for the stage before the 'Final' stage where the editor hides the
+                // checkbox: the flag is inert there (the final stage is never satisfied on its own), and
+                // keeping it means moving the stage back out of that slot restores the setting.
+                if (stage.complete_with_next) {
                     cJSON_AddBoolToObject(stage_json, "complete_with_next", true);
                 }
             }
