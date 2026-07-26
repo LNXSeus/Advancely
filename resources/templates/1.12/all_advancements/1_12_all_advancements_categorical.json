@@ -751,17 +751,9 @@
 					"icon":	"items/lapis_lazuli_1.13.png",
 					"target":	-1,
 					"linked_goals":	[{
-							"root_name":	"minecraft:husbandry/bred_all_animals",
-							"type":	"advancement"
-						}, {
-							"root_name":	"minecraft:adventure/kill_all_mobs",
-							"type":	"advancement"
-						}, {
-							"root_name":	"minecraft:adventure/adventuring_time",
-							"type":	"advancement"
-						}, {
-							"root_name":	"minecraft:nether/all_effects",
-							"type":	"advancement"
+							"root_name":	"stat.pickup.minecraft.lapis_lazuli",
+							"parent_root":	"stat_complete_helper",
+							"type":	"stat"
 						}]
 				},
 				"stat.pickup.minecraft.redstone":	{
