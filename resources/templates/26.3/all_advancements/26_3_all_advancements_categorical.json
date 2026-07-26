@@ -3634,7 +3634,7 @@
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh_summary",
+					"root_name":	"hdwgh",
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
