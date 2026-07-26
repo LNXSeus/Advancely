@@ -749,7 +749,20 @@
 				},
 				"stat.pickup.minecraft.lapis_lazuli":	{
 					"icon":	"items/lapis_lazuli_1.13.png",
-					"target":	-1
+					"target":	-1,
+					"linked_goals":	[{
+							"root_name":	"minecraft:husbandry/bred_all_animals",
+							"type":	"advancement"
+						}, {
+							"root_name":	"minecraft:adventure/kill_all_mobs",
+							"type":	"advancement"
+						}, {
+							"root_name":	"minecraft:adventure/adventuring_time",
+							"type":	"advancement"
+						}, {
+							"root_name":	"minecraft:nether/all_effects",
+							"type":	"advancement"
+						}]
 				},
 				"stat.pickup.minecraft.redstone":	{
 					"icon":	"items/redstone_1.13.png",
@@ -822,7 +835,11 @@
 			"icon":	"items/ghast_tear_1.0.png",
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.ghast_tear",
-			"target":	4
+			"target":	4,
+			"linked_goals":	[{
+					"root_name":	"minecraft:end/respawn_dragon",
+					"type":	"advancement"
+				}]
 		},
 		"fortress":	{
 			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
