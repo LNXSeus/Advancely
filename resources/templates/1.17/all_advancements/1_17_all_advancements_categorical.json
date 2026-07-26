@@ -1409,7 +1409,7 @@
 					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"minecraft:used/minecraft:conduit",
-							"parent_root":	"hdwgh_summaryyyy",
+							"parent_root":	"hdwgh_summary",
 							"type":	"stat"
 						}]
 				},
@@ -1437,7 +1437,7 @@
 					"target":	8,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
-							"parent_root":	"hdwgh_summaryyyy",
+							"parent_root":	"hdwgh_summary",
 							"type":	"stat"
 						}, {
 							"root_name":	"golden_carrot",
@@ -2535,26 +2535,26 @@
 					"type":	"advancement"
 				}, {
 					"root_name":	"brew_potions",
-					"parent_root":	"hdwgh_summaryyyy",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"beaconator",
-					"parent_root":	"hdwgh_summaryyyy",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"minecraft:used/minecraft:conduit",
-					"parent_root":	"hdwgh_summaryyyy",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"hero_of_the_village",
-					"parent_root":	"hdwgh_summaryyyy",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh_summaryyyy",
-					"parent_root":	"hdwgh_summaryyyy",
+					"root_name":	"hdwgh",
+					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"birch_bees",
+					"root_name":	"bees_summary",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"end_again",

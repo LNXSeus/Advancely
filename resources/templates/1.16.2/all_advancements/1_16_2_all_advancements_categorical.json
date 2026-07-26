@@ -1404,7 +1404,7 @@
 					"root_name":	"minecraft:nether/all_effects"
 				}]
 		}, {
-			"root_name":	"bees_summary",
+			"root_name":	"bees",
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
 			"stages":	[{
 					"stage_id":	"1",
@@ -1498,7 +1498,7 @@
 					"root_name":	""
 				}]
 		}, {
-			"root_name":	"bees",
+			"root_name":	"bees_summary",
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
 			"hidden":	true,
 			"in_2nd_row":	true,
@@ -2344,11 +2344,11 @@
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh_summary",
+					"root_name":	"hdwgh",
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"birch_bees",
+					"root_name":	"bees_summary",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"end_again",
