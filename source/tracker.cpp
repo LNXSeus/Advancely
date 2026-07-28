@@ -11577,8 +11577,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Use the latched completion flag (honors the optional completion thresholds).
     bool is_run_complete = t->template_data->run_completed;
 
-    // Use frozen IGT for the info window when the run is completed
-    long long display_ticks = is_run_complete
+    // Use frozen IGT for the info window when the run is completed, unless the timer is
+    // configured to keep counting up like the window title does.
+    long long display_ticks = (is_run_complete && settings->igt_freeze_on_completion)
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
     format_time(display_ticks, formatted_time, sizeof(formatted_time),
@@ -14513,9 +14514,10 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     // Use the latched completion flag (honors the optional completion thresholds).
     bool is_run_complete = t->template_data->run_completed;
 
-    // Format the time to DD:HH:MM:SS.MS — use frozen time when the run is completed
+    // Format the time to DD:HH:MM:SS.MS — use frozen time when the run is completed, unless
+    // the timer is configured to keep counting up.
     char formatted_time[128];
-    long long display_ticks = is_run_complete
+    long long display_ticks = (is_run_complete && settings->igt_freeze_on_completion)
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
     format_time(display_ticks, formatted_time, sizeof(formatted_time),

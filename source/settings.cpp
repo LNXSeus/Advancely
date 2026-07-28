@@ -681,6 +681,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_show_igt != b->overlay_show_igt ||
         a->igt_unit_spacing != b->igt_unit_spacing ||
         a->igt_always_show_ms != b->igt_always_show_ms ||
+        a->igt_freeze_on_completion != b->igt_freeze_on_completion ||
         a->overlay_show_update_timer != b->overlay_show_update_timer ||
         strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
@@ -800,6 +801,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_show_update_timer != b->overlay_show_update_timer ||
             a->igt_unit_spacing != b->igt_unit_spacing ||
             a->igt_always_show_ms != b->igt_always_show_ms ||
+            a->igt_freeze_on_completion != b->igt_freeze_on_completion ||
             a->overlay_progress_text_align != b->overlay_progress_text_align ||
             strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
@@ -3599,6 +3601,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // Timer formatting is not tied to a render mode: it drives the tracker's own timers, the
                 // belt/page top bar, and the Compact mode's final time on the run-completed panel. So it
                 // lives here, outside the mode-specific sections, and stays reachable in every mode.
+                ImGui::Checkbox("Freeze Timer on Completion", &temp_settings.igt_freeze_on_completion);
+                if (ImGui::IsItemHovered()) {
+                    char igt_freeze_tooltip_buffer[512];
+                    snprintf(igt_freeze_tooltip_buffer, sizeof(igt_freeze_tooltip_buffer),
+                             "Freezes the IGT at the final time once the run is completed, in the\n"
+                             "tracker info window, the debug print output and the overlay.\n"
+                             "When off, those timers keep counting up like the tracker window title.\n"
+                             "Default: %s", DEFAULT_IGT_FREEZE_ON_COMPLETION ? "On" : "Off");
+                    ImGui::SetTooltip("%s", igt_freeze_tooltip_buffer);
+                }
+                ImGui::SameLine();
                 ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);
                 if (ImGui::IsItemHovered()) {
                     char igt_spacing_tooltip_buffer[256];

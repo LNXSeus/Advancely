@@ -2320,7 +2320,10 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         // The run is over: the panel stops cycling and freezes on the completion screen. The final
         // time comes from the frozen tick count and honors the same IGT options as the other modes.
         snprintf(label_buf, sizeof(label_buf), "RUN COMPLETED!");
-        format_time(td->frozen_play_time_ticks, count_buf, sizeof(count_buf), settings->igt_unit_spacing,
+        long long compact_ticks = settings->igt_freeze_on_completion
+                                      ? td->frozen_play_time_ticks
+                                      : td->play_time_ticks;
+        format_time(compact_ticks, count_buf, sizeof(count_buf), settings->igt_unit_spacing,
                     settings->igt_always_show_ms);
         int lwm = 0, cwm = 0;
         TTF_MeasureString(label_font, label_buf, 0, 0, &lwm, nullptr);
@@ -3140,8 +3143,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (is_run_complete) {
             char formatted_time[64];
-            // Use frozen IGT so the final time doesn't keep ticking
-            format_time(t->template_data->frozen_play_time_ticks, formatted_time, sizeof(formatted_time),
+            // Use frozen IGT so the final time doesn't keep ticking, unless the timer is
+            // configured to keep counting up.
+            long long final_ticks = settings->igt_freeze_on_completion
+                                        ? t->template_data->frozen_play_time_ticks
+                                        : t->template_data->play_time_ticks;
+            format_time(final_ticks, formatted_time, sizeof(formatted_time),
                         settings->igt_unit_spacing, settings->igt_always_show_ms);
             snprintf(info_buffer, sizeof(info_buffer),
                      "*** RUN COMPLETED! ***%sFinal Time: %s%sDonate (mentioning 'Advancely') to be featured!",

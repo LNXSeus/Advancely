@@ -135,6 +135,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING 256.0f // 96px icon + more (took spacing from 1.16 AA template)
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 #define DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS false // If true, goals marked hidden in the template still show in the overlay
+#define DEFAULT_IGT_FREEZE_ON_COMPLETION true // If true, the IGT freezes at the final time once the run is completed
 
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_OVERLAY_CLEAR_ANIMATION (-1.2f) // Seconds for the clear (crop) animation; 0 = instant, sign = direction
@@ -657,6 +658,7 @@ struct AppSettings {
     bool overlay_show_igt; // If true, the in-game time is shown in the overlay.
     bool igt_unit_spacing; // If true, a space is inserted before every time unit suffix (e.g. "02 m 04 s").
     bool igt_always_show_ms; // If true, milliseconds are always shown regardless of the time magnitude.
+    bool igt_freeze_on_completion; // If true, the IGT freezes at the final time once the run is completed.
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
     char overlay_progress_separator[9];
     // Separator string drawn between top-bar segments. Default "|". Up to 8 visible characters.

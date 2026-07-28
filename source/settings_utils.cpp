@@ -917,6 +917,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_show_igt = true;
     settings->igt_unit_spacing = false;
     settings->igt_always_show_ms = false;
+    settings->igt_freeze_on_completion = DEFAULT_IGT_FREEZE_ON_COMPLETION;
     settings->overlay_show_update_timer = true;
     strncpy(settings->overlay_progress_separator, "|", sizeof(settings->overlay_progress_separator) - 1);
     settings->overlay_progress_separator[sizeof(settings->overlay_progress_separator) - 1] = '\0';
@@ -1430,6 +1431,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->igt_always_show_ms = cJSON_IsTrue(igt_always_show_ms);
         else {
             settings->igt_always_show_ms = false;
+            defaults_were_used = true;
+        }
+
+        const cJSON *igt_freeze_on_completion = cJSON_GetObjectItem(general_settings, "igt_freeze_on_completion");
+        if (igt_freeze_on_completion && cJSON_IsBool(igt_freeze_on_completion))
+            settings->igt_freeze_on_completion = cJSON_IsTrue(igt_freeze_on_completion);
+        else {
+            settings->igt_freeze_on_completion = DEFAULT_IGT_FREEZE_ON_COMPLETION;
             defaults_were_used = true;
         }
 
@@ -3017,6 +3026,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "igt_unit_spacing", cJSON_CreateBool(settings->igt_unit_spacing));
         cJSON_DeleteItemFromObject(general_obj, "igt_always_show_ms");
         cJSON_AddItemToObject(general_obj, "igt_always_show_ms", cJSON_CreateBool(settings->igt_always_show_ms));
+        cJSON_DeleteItemFromObject(general_obj, "igt_freeze_on_completion");
+        cJSON_AddItemToObject(general_obj, "igt_freeze_on_completion",
+                              cJSON_CreateBool(settings->igt_freeze_on_completion));
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
         cJSON_AddItemToObject(general_obj, "overlay_show_update_timer",
                               cJSON_CreateBool(settings->overlay_show_update_timer));
