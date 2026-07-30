@@ -52,7 +52,7 @@ extern "C" {
 // Local includes
 #include "tracker.h" // includes main.h
 #include "temp_creator.h"
-#include "temp_creator_utils.h" // For fs_ensure_directory_exists when seeding the data directory
+#include "file_utils.h" // For fs_ensure_directory_exists when seeding the data directory
 #include "overlay.h"
 #include "settings.h"
 #include "global_event_handler.h"

@@ -32,11 +32,8 @@
 #include "miniz.h"
 
 #ifdef _WIN32
-#include <direct.h> // For _mkdir
 #include <windows.h>
-#define MKDIR(path) _mkdir(path)
 #else
-#define MKDIR(path) mkdir(path, 0755) // 0755 provides read/write/execute for owner, read/execute for others
 #include <dirent.h>
 #include <unistd.h> // For rmdir()
 #include <sys/wait.h>
@@ -315,37 +312,6 @@ static bool ends_with(const char *str, const char *suffix) {
         return false;
     }
     return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
-}
-
-void fs_ensure_directory_exists(const char *path) {
-    char *path_copy = strdup(path);
-    if (!path_copy) return;
-
-    // Iterate through the path and create each directory level
-    for (char *p = path_copy + 1; *p; p++) {
-        if (*p == '/' || *p == '\\') {
-            char original_char = *p;
-            *p = '\0'; // Temporarily terminate the string
-
-            // Check if directory exists, if not, create it
-            struct stat st;
-            memset(&st, 0, sizeof(st));
-            if (stat(path_copy, &st) == -1) {
-                MKDIR(path_copy);
-            }
-
-            *p = original_char; // Restore the slash
-        }
-    }
-    // After the loop, create the final directory if the path itself is a directory path
-    struct stat st;
-    memset(&st, 0, sizeof(st));
-    if (stat(path_copy, &st) == -1) {
-        MKDIR(path_copy);
-    }
-
-    free(path_copy);
-    path_copy = nullptr;
 }
 
 // Local helper to copy a file from source to destination

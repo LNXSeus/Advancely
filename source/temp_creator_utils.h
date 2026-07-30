@@ -81,13 +81,6 @@ bool parse_player_unlocks_for_import(const char *file_path, std::vector<Importab
                                      char *error_message, size_t error_msg_size);
 
 /**
- * @brief Ensures that the directory for a given file path exists, creating it if necessary.
- * This function is cross-platform.
- * @param path The full path to a file, e.g., "resources/templates/1.21/my_cat/1_21_my_cat_flag.json".
- */
-void fs_ensure_directory_exists(const char *path);
-
-/**
  * @brief Creates a new, empty template JSON file with a basic skeleton.
  * @param path The full path where the file should be created.
  */

@@ -13,12 +13,48 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <sys/stat.h> // stat/mkdir for fs_ensure_directory_exists
+
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h> // _commit, _fileno
+#include <direct.h> // _mkdir
+#define MKDIR(path) _mkdir(path)
 #else
 #include <unistd.h> // fsync, getpid
+#define MKDIR(path) mkdir(path, 0755) // 0755 provides read/write/execute for owner, read/execute for others
 #endif
+
+void fs_ensure_directory_exists(const char *path) {
+    char *path_copy = strdup(path);
+    if (!path_copy) return;
+
+    // Iterate through the path and create each directory level
+    for (char *p = path_copy + 1; *p; p++) {
+        if (*p == '/' || *p == '\\') {
+            char original_char = *p;
+            *p = '\0'; // Temporarily terminate the string
+
+            // Check if directory exists, if not, create it
+            struct stat st;
+            memset(&st, 0, sizeof(st));
+            if (stat(path_copy, &st) == -1) {
+                MKDIR(path_copy);
+            }
+
+            *p = original_char; // Restore the slash
+        }
+    }
+    // After the loop, create the final directory if the path itself is a directory path
+    struct stat st;
+    memset(&st, 0, sizeof(st));
+    if (stat(path_copy, &st) == -1) {
+        MKDIR(path_copy);
+    }
+
+    free(path_copy);
+    path_copy = nullptr;
+}
 
 // function to read a JSON file
 // In file_utils.cpp

@@ -43,6 +43,14 @@ cJSON *cJSON_from_file(const char *filename);
  */
 bool cJSON_write_to_file_atomic(const char *filename, const cJSON *root);
 
+/**
+ * @brief Ensures that every directory level in a path exists, creating any that are missing.
+ * This function is cross-platform.
+ * @param path The full path, e.g. "resources/templates/1.21/my_cat/1_21_my_cat_flag.json".
+ *             Trailing components are created too, so it works for both file and directory paths.
+ */
+void fs_ensure_directory_exists(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

@@ -20,12 +20,16 @@ where it cannot find its `resources` folder.
 **YOU MUST MOVE THE APP** to your **Applications** folder or **Desktop** before running it.
 
 ℹ️ **FILE LOCATIONS (IMPORTANT):**
-Your editable data (settings, templates and notes) is stored in your user Library, NOT next to the app:
+Your editable data is stored in your user Library, NOT next to the app:
 - **User Data (Editable):** `~/Library/Application Support/Advancely/`
-  (This is where `settings.json`, `templates/` and `notes/` live)
-- **System Files (Read-Only):** the `resources` folder kept next to `Advancely.app`
-This is created automatically on first launch, so the app saves correctly even if the app folder itself is read-only.
-Updating the app refreshes the default templates here (your custom templates and settings are kept).
+  (This is where `config/` with your `settings.json`, plus `templates/`, `notes/`, `icons/`,
+   `fonts/`, `gui/` and `reference_files/` live)
+- **System Files (Read-Only):** the `resources` folder kept next to `Advancely.app`,
+  used only as the source to copy from
+This is filled in automatically on first launch, so the app saves correctly even if the app folder itself is read-only.
+Updating refreshes the default templates and reference files here, while your custom templates, settings, and any
+icons, fonts or backgrounds you imported are kept.
+If a default file ever goes missing, delete the hidden `.seed_version` file in that folder and restart to restore it.
 
 ✔️ **Method 1: Terminal Authorization (Best Option)**
 
@@ -82,11 +86,18 @@ Advancely is now installed as a system application via `.deb` or `.rpm` packages
 ℹ️ **FILE LOCATIONS (IMPORTANT):**
 To comply with Linux standards, your user data is now stored separately:
 - **User Data (Editable):** `~/.local/share/advancely/`
-  (This is where `settings.json`, `templates/`, and `notes/` are stored)
+  (This is where `config/` with your `settings.json`, plus `templates/`, `notes/`, `icons/`,
+   `fonts/`, `gui/` and `reference_files/` are stored)
 - **System Files (Read-Only):** `/usr/share/advancely/`
+This is filled in automatically on first launch. Importing custom icons, fonts or overlay backgrounds writes here too,
+so it works even though the installed program files are read-only.
+If a default file ever goes missing, delete the hidden `.seed_version` file in that folder and restart to restore it.
+(The portable `.zip` build is unaffected and keeps everything in its own `resources` folder next to the executable.)
 
 🔄 **UPDATING:**
-The internal auto-updater is disabled on Linux. To update, simply download and install the new package version. The launcher script will automatically migrate your data.
+The internal auto-updater is disabled on Linux. To update, simply download and install the new package version.
+Advancely refreshes the default templates and reference files on the next launch, while keeping your custom templates,
+settings, and any icons, fonts or backgrounds you imported.
 
 ==================================================
 TL;DR (Summary)
