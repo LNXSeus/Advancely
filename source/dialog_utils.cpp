@@ -104,18 +104,23 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
     std::string full_path_str = selected_path;
     normalize_path(full_path_str);
 
-    // THIS DOES NOT NEED TO BE CHANGED TO HAVE g_resources_path
-    size_t found_pos = full_path_str.find("resources/icons/");
-    if (found_pos != std::string::npos) {
-        // Extract the path relative to the "icons" folder
-        std::string relative_path = full_path_str.substr(found_pos + strlen("resources/icons/"));
+    // Store the path relative to the icons directory resolved above, matching how the font and gui
+    // dialogs validate. Comparing against that base rather than searching for a literal
+    // "resources/icons/" anywhere in the string matters because the loader always resolves icons
+    // against this same base: any other folder that happens to be named resources/icons would be
+    // accepted here and then silently fail to load.
+    if (full_path_str.rfind(start_path, 0) == 0) {
+        std::string relative_path = full_path_str.substr(start_path.length());
         strncpy(out_relative_path, relative_path.c_str(), max_len - 1);
         out_relative_path[max_len - 1] = '\0';
         return true;
     }
 
-    // If the path wasn't inside the project structure, show an error
-    tinyfd_messageBox("Error", "Selected icon must be inside the resources/icons folder.", "ok", "error", 1);
+    // If the path wasn't inside the icons folder, show an error naming the folder we actually expect.
+    char error_message[MAX_PATH_LENGTH + 64];
+    snprintf(error_message, sizeof(error_message),
+             "Selected icon must be inside this folder:\n%s", start_path.c_str());
+    tinyfd_messageBox("Error", error_message, "ok", "error", 1);
     return false;
 }
 
