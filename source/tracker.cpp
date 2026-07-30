@@ -837,7 +837,9 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
     for (int i = 0; i < MAX_COOP_PLAYERS + 1; i++) {
         t->coop_latched_run_completed[i] = false;
         t->coop_latched_frozen_ticks[i] = 0;
+        t->coop_latched_frozen_pending[i] = false;
     }
+    t->template_data->frozen_ticks_pending = false;
 
     // Reset custom goals
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
@@ -1097,6 +1099,7 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
     t->template_data->play_time_ticks = 0;
     t->template_data->frozen_play_time_ticks = 0;
     t->template_data->run_completed = false;
+    t->template_data->frozen_ticks_pending = false;
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
 
@@ -1198,6 +1201,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
     t->template_data->play_time_ticks = 0;
     t->template_data->frozen_play_time_ticks = 0;
     t->template_data->run_completed = false;
+    t->template_data->frozen_ticks_pending = false;
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *ach = t->template_data->advancements[i];
@@ -3540,6 +3544,23 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
 }
 
 /**
+ * @brief Re-latches a provisional frozen IGT once the game writes a newer play time.
+ *
+ * Called by every path that rebuilds progress from the save files. A run that completes on a
+ * live Hermes event freezes against the play time of the PREVIOUS save, because Hermes events
+ * carry no IGT. The first save afterwards (the run-ending pause) reports a higher play time,
+ * which is the real final time. Re-reads of an unchanged file report the same play time and are
+ * ignored, so the value only ever moves once.
+ */
+static void tracker_consume_pending_frozen_igt(TemplateData *td) {
+    if (!td || !td->frozen_ticks_pending) return;
+    if (td->play_time_ticks > td->frozen_play_time_ticks) {
+        td->frozen_play_time_ticks = td->play_time_ticks;
+        td->frozen_ticks_pending = false;
+    }
+}
+
+/**
  * @brief Frees an array of TrackableItem pointers.
  *
  * This is used in tracker_free_template_data(). Used for unlocks and custom goals.
@@ -3900,6 +3921,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     for (int i = 0; i < MAX_COOP_PLAYERS + 1; i++) {
         t->coop_latched_run_completed[i] = false;
         t->coop_latched_frozen_ticks[i] = 0;
+        t->coop_latched_frozen_pending[i] = false;
     }
 
 
@@ -4064,6 +4086,8 @@ static void coop_reset_template_progress(TemplateData *td) {
     td->frozen_play_time_ticks = 0;
     td->run_completed = false;
     td->overall_progress_percentage = 0.0f;
+    // frozen_ticks_pending is deliberately NOT cleared: a Hermes-completed run sets it outside
+    // the merge cycle, and it has to survive this reset to reach the per-view latch below.
 
     for (int i = 0; i < td->advancement_count; i++) {
         TrackableCategory *adv = td->advancements[i];
@@ -4952,6 +4976,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         } while (changed && ++guard < 32);
     }
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
+    tracker_consume_pending_frozen_igt(t->template_data);
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -5490,10 +5515,13 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     if (t->coop_latched_run_completed[0]) {
         t->template_data->run_completed = true;
         t->template_data->frozen_play_time_ticks = t->coop_latched_frozen_ticks[0];
+        t->template_data->frozen_ticks_pending = t->coop_latched_frozen_pending[0];
     }
     tracker_calculate_overall_progress(t, version, settings);
+    tracker_consume_pending_frozen_igt(t->template_data);
     t->coop_latched_run_completed[0] = t->template_data->run_completed;
     t->coop_latched_frozen_ticks[0] = t->template_data->frozen_play_time_ticks;
+    t->coop_latched_frozen_pending[0] = t->template_data->frozen_ticks_pending;
 
     cJSON_Delete(settings_json);
 }
@@ -5595,12 +5623,15 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
         if (t->coop_latched_run_completed[slot]) {
             t->template_data->run_completed = true;
             t->template_data->frozen_play_time_ticks = t->coop_latched_frozen_ticks[slot];
+            t->template_data->frozen_ticks_pending = t->coop_latched_frozen_pending[slot];
         }
     }
     tracker_calculate_overall_progress(t, version, settings);
+    tracker_consume_pending_frozen_igt(t->template_data);
     if (slot >= 0 && slot < MAX_COOP_PLAYERS + 1) {
         t->coop_latched_run_completed[slot] = t->template_data->run_completed;
         t->coop_latched_frozen_ticks[slot] = t->template_data->frozen_play_time_ticks;
+        t->coop_latched_frozen_pending[slot] = t->template_data->frozen_ticks_pending;
     }
 
     cJSON_Delete(settings_json);
@@ -5637,6 +5668,7 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
     }
 
     tracker_calculate_overall_progress(t, version, settings);
+    tracker_consume_pending_frozen_igt(t->template_data);
     cJSON_Delete(settings_json);
 }
 
@@ -13166,7 +13198,15 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
             changed |= tracker_update_multi_stage_linked_goals(t);
         } while (changed && ++guard < 32);
     }
+    bool was_completed = t->template_data->run_completed;
     tracker_calculate_overall_progress(t, version, settings);
+
+    // This is the live path: progress changed between game saves, so the play time frozen by the
+    // call above is the one from the last save, not the one the run actually ended on. Mark it
+    // provisional so the next save re-latches it (see tracker_consume_pending_frozen_igt).
+    if (!was_completed && t->template_data->run_completed && settings->using_hermes) {
+        t->template_data->frozen_ticks_pending = true;
+    }
 }
 
 

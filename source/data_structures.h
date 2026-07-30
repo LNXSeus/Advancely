@@ -612,6 +612,10 @@ struct TemplateData {
     long long play_time_ticks; // Store the player's total playtime in ticks
     long long frozen_play_time_ticks; // IGT frozen at the moment of run completion
     bool run_completed; // True once the run hits 100%; latches until reset
+    // True when the run completed on a live Hermes event. Hermes carries no IGT, so the value
+    // frozen above came from the previous game save. The first save that reports a higher play
+    // time re-latches the real final time and clears this.
+    bool frozen_ticks_pending;
 
     // Taking snapshot for legacy versions when world is changed to track changes per world
     long long playtime_snapshot; // Stores playtime at world load for legacy versions

@@ -158,6 +158,7 @@ struct Tracker {
     // per-player updates every frame, so a single-slot cache wouldn't survive.
     bool coop_latched_run_completed[MAX_COOP_PLAYERS + 1];
     long long coop_latched_frozen_ticks[MAX_COOP_PLAYERS + 1];
+    bool coop_latched_frozen_pending[MAX_COOP_PLAYERS + 1];
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
