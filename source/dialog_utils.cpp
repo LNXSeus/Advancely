@@ -212,8 +212,7 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
         fclose(src);
         char copy_error[MAX_PATH_LENGTH + 64];
         snprintf(copy_error, sizeof(copy_error),
-                 "Could not copy the font into:
-%s", start_path.c_str());
+                 "Could not copy the font into:\n%s", start_path.c_str());
         tinyfd_messageBox("Error", copy_error, "ok", "error", 1);
         return false;
     }
@@ -308,8 +307,7 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
         fclose(src);
         char copy_error[MAX_PATH_LENGTH + 64];
         snprintf(copy_error, sizeof(copy_error),
-                 "Could not copy the texture into:
-%s", start_path.c_str());
+                 "Could not copy the texture into:\n%s", start_path.c_str());
         tinyfd_messageBox("Error", copy_error, "ok", "error", 1);
         return false;
     }
