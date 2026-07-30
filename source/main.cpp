@@ -52,6 +52,7 @@ extern "C" {
 // Local includes
 #include "tracker.h" // includes main.h
 #include "temp_creator.h"
+#include "temp_creator_utils.h" // For fs_ensure_directory_exists when seeding the data directory
 #include "overlay.h"
 #include "settings.h"
 #include "global_event_handler.h"
@@ -90,8 +91,11 @@ extern "C" {
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <libgen.h>
-#include <sys/stat.h> // For mkdir/stat when seeding the writable Application Support directory
-#include <dirent.h>   // For opendir/readdir when seeding the writable Application Support directory
+#endif
+
+#if defined(__APPLE__) || defined(__linux__)
+#include <sys/stat.h> // For mkdir/stat when seeding the writable user data directory
+#include <dirent.h>   // For opendir/readdir when seeding the writable user data directory
 #endif
 
 SDL_AtomicInt g_needs_update;
@@ -1237,18 +1241,36 @@ static void build_overlay_argv(char *exe_path, char *argv[]) {
 }
 #endif
 
-#if defined(__APPLE__)
-// Recursively copies src into dst, copying only files that are MISSING at the destination so the
-// user's settings, custom templates and edits are never overwritten. Updated default templates are
-// delivered by the auto-updater (see apply_update), not by re-seeding.
-static void seed_macos_support_dir_recursive(const char *src, const char *dst) {
+#if defined(__APPLE__) || defined(__linux__)
+// Name of the stamp file written into the data directory after a fully successful seed. It holds
+// the ADVANCELY_VERSION string it was written for; when that matches the running build the entire
+// recursive walk is skipped. Dot-prefixed so it stays out of the way in a folder users browse.
+#define SEED_STAMP_FILENAME ".seed_version"
+
+// How a seeded subdirectory treats files that already exist at the destination.
+typedef enum {
+    SEED_PRESERVE, // Never overwrite. For anything the user owns or imports.
+    SEED_REFRESH   // Overwrite with the shipped copy. For files the app owns and updates.
+} SeedPolicy;
+
+// Recursively copies src into dst. Under SEED_PRESERVE only files MISSING at the destination are
+// copied, so the user's settings, custom templates and imports are never overwritten. Under
+// SEED_REFRESH the shipped copy wins, which is how updated default templates and a refreshed cert
+// bundle reach users. Either way this only runs when the version stamp does not match, so a
+// SEED_REFRESH directory is rewritten once per version, not on every launch.
+//
+// Returns false if anything could not be copied, so the caller can withhold the stamp and retry on
+// the next launch. A source that does not exist is NOT a failure: there is simply nothing to copy,
+// and retrying forever would never fix it.
+static bool seed_copy_recursive(const char *src, const char *dst, SeedPolicy policy) {
     struct stat st;
-    if (stat(src, &st) != 0) return;
+    if (stat(src, &st) != 0) return true; // Nothing to copy from.
 
     if (S_ISDIR(st.st_mode)) {
         mkdir(dst, 0755); // No-op if the directory already exists.
         DIR *dir = opendir(src);
-        if (!dir) return;
+        if (!dir) return false;
+        bool ok = true;
         struct dirent *entry;
         while ((entry = readdir(dir)) != nullptr) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
@@ -1256,59 +1278,132 @@ static void seed_macos_support_dir_recursive(const char *src, const char *dst) {
             char dst_child[MAX_PATH_LENGTH];
             snprintf(src_child, sizeof(src_child), "%s/%s", src, entry->d_name);
             snprintf(dst_child, sizeof(dst_child), "%s/%s", dst, entry->d_name);
-            seed_macos_support_dir_recursive(src_child, dst_child);
+            if (!seed_copy_recursive(src_child, dst_child, policy)) ok = false;
         }
         closedir(dir);
-        return;
+        return ok;
     }
 
-    // Regular file: copy only when the destination does not already exist (no-clobber).
-    if (path_exists(dst)) return;
+    if (policy == SEED_PRESERVE && path_exists(dst)) return true;
 
     FILE *in = fopen(src, "rb");
-    if (!in) return;
+    if (!in) return false;
     FILE *out = fopen(dst, "wb");
     if (!out) {
         fclose(in);
-        return;
+        return false;
     }
     char buffer[8192];
     size_t bytes;
+    bool ok = true;
     while ((bytes = fread(buffer, 1, sizeof(buffer), in)) > 0) {
-        if (fwrite(buffer, 1, bytes, out) != bytes) break;
+        if (fwrite(buffer, 1, bytes, out) != bytes) {
+            ok = false;
+            break;
+        }
     }
+    if (ferror(in)) ok = false;
     fclose(in);
-    fclose(out);
+    if (fclose(out) != 0) ok = false;
+    if (!ok) {
+        // Drop the partial file. The SEED_PRESERVE check above would otherwise treat a truncated
+        // copy as already seeded and never replace it.
+        remove(dst);
+        log_message(LOG_ERROR, "[MAIN] Failed to seed file: %s\n", dst);
+    }
+    return ok;
 }
 
-// Seeds the writable Application Support directory (get_resources_path on macOS) from the bundled
-// read-only resources (get_application_dir). Only the user-writable subtrees are copied; read-only
-// assets stay in the bundle. Safe to call every launch: existing files are left untouched.
-static void seed_macos_support_dir(void) {
-    const char *bundle = get_application_dir(); // Read-only source (next to/inside the .app).
-    const char *support = get_resources_path(); // Writable destination in Application Support.
+// True when the data directory was already seeded by this exact version, meaning the recursive walk
+// can be skipped entirely.
+static bool seed_stamp_matches(const char *support) {
+    char stamp_path[MAX_PATH_LENGTH];
+    snprintf(stamp_path, sizeof(stamp_path), "%s/%s", support, SEED_STAMP_FILENAME);
+    FILE *f = fopen(stamp_path, "rb");
+    if (!f) return false;
+    char buffer[64];
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, f);
+    fclose(f);
+    buffer[n] = '\0';
+    // Tolerate trailing whitespace so a hand-edited stamp still compares equal.
+    while (n > 0 && (buffer[n - 1] == '\n' || buffer[n - 1] == '\r' || buffer[n - 1] == ' ')) {
+        buffer[--n] = '\0';
+    }
+    return strcmp(buffer, ADVANCELY_VERSION) == 0;
+}
 
-    // If the destination resolved back to the bundle (e.g. HOME unavailable) there is nothing to do.
-    if (strcmp(bundle, support) == 0) return;
+static void seed_stamp_write(const char *support) {
+    char stamp_path[MAX_PATH_LENGTH];
+    snprintf(stamp_path, sizeof(stamp_path), "%s/%s", support, SEED_STAMP_FILENAME);
+    FILE *f = fopen(stamp_path, "wb");
+    if (!f) {
+        log_message(LOG_ERROR, "[MAIN] Could not write seed stamp: %s\n", stamp_path);
+        return;
+    }
+    fputs(ADVANCELY_VERSION, f);
+    fclose(f);
+}
 
-    mkdir(support, 0755); // Parent "Application Support" always exists on macOS.
+// Seeds the writable user data directory (get_resources_path) from the shipped read-only resources
+// (get_application_dir). Runs on macOS, where the bundle location is frequently read-only, and on
+// Linux under --use-home-dir, where the install lives in root-owned /usr/share.
+//
+// Doing this in the app rather than in a launcher script means external packages (AUR, NixOS) do
+// not have to mirror this directory list to stay correct. When the data directory resolves back to
+// the install directory (Windows, portable Linux) there is nothing to seed and this returns early.
+//
+// Safe to call every launch: once this version has seeded successfully the walk is skipped entirely.
+static void seed_user_data_dir(void) {
+    const char *shipped = get_application_dir(); // Read-only source (install dir or .app bundle).
+    const char *data = get_resources_path();     // Writable destination.
 
-    // fonts/ and gui/ receive user-imported files at runtime, so they have to live somewhere
-    // writable. reference_files/ follows them so the Help button opens a folder that exists even
-    // when the bundle is translocated to a read-only path.
-    const char *subdirs[] = {
-        "templates", "config", "notes", "ca_certificates",
-        "fonts", "gui", "reference_files"
+    // Portable layouts resolve both to the same place, and so does macOS when HOME is unavailable.
+    if (strcmp(shipped, data) == 0) return;
+
+    // Recursive: ~/.local/share may not exist yet on a fresh Linux account. macOS always has
+    // ~/Library/Application Support, but creating it recursively is harmless there.
+    fs_ensure_directory_exists(data);
+
+    // Version-gated: without this every launch stat()s the whole tree before the window opens,
+    // which grows with the shipped asset count.
+    if (seed_stamp_matches(data)) return;
+
+    // SEED_REFRESH for content the app ships and updates, SEED_PRESERVE for anything the user owns.
+    // fonts/ and gui/ receive user imports at runtime, so they must never be clobbered.
+    // reference_files/ is seeded so the Help button opens a folder that exists even when the
+    // bundle is translocated to a read-only path.
+    struct SeedEntry {
+        const char *name;
+        SeedPolicy policy;
     };
-    for (size_t i = 0; i < sizeof(subdirs) / sizeof(subdirs[0]); i++) {
+    const SeedEntry entries[] = {
+        {"templates", SEED_REFRESH},       // Updated default templates reach users here.
+        {"ca_certificates", SEED_REFRESH}, // The cert bundle must not go stale.
+        {"reference_files", SEED_REFRESH}, // Pure reference material, never user-edited.
+        {"config", SEED_PRESERVE},         // settings.json and presets.
+        {"notes", SEED_PRESERVE},          // The user's notes and their manifest.
+        {"fonts", SEED_PRESERVE},          // User-imported fonts live alongside the defaults.
+        {"gui", SEED_PRESERVE},            // User-imported backgrounds live alongside the defaults.
+    };
+
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
         char src[MAX_PATH_LENGTH];
         char dst[MAX_PATH_LENGTH];
-        snprintf(src, sizeof(src), "%s/%s", bundle, subdirs[i]);
-        snprintf(dst, sizeof(dst), "%s/%s", support, subdirs[i]);
-        seed_macos_support_dir_recursive(src, dst);
+        snprintf(src, sizeof(src), "%s/%s", shipped, entries[i].name);
+        snprintf(dst, sizeof(dst), "%s/%s", data, entries[i].name);
+        if (!seed_copy_recursive(src, dst, entries[i].policy)) ok = false;
     }
 
-    log_message(LOG_INFO, "[MAIN] macOS user data directory ready: %s\n", support);
+    if (!ok) {
+        // Leave the stamp unwritten so the next launch retries rather than caching a partial seed.
+        log_message(LOG_ERROR, "[MAIN] User data directory seeded with errors: %s. "
+                    "Retrying on next launch.\n", data);
+        return;
+    }
+
+    seed_stamp_write(data);
+    log_message(LOG_INFO, "[MAIN] User data directory ready: %s\n", data);
 }
 #endif
 
@@ -1871,12 +1966,13 @@ int main(int argc, char *argv[]) {
     // Initialize the logger at the very beginning
     log_init(false); // Just the main log file
 
-#if defined(__APPLE__)
-    // On macOS all user-writable data lives in ~/Library/Application Support/Advancely because the
-    // bundle location is frequently read-only. Seed it from the bundled resources before anything
-    // reads or writes settings, templates or the single-instance lock. Only the main process seeds;
-    // the overlay child is spawned later and inherits the populated directory.
-    seed_macos_support_dir();
+#if defined(__APPLE__) || defined(__linux__)
+    // Where the install location is read-only (the macOS bundle, and /usr/share on packaged Linux)
+    // all user-writable data lives in a separate data directory. Seed it from the shipped resources
+    // before anything reads or writes settings, templates or the single-instance lock. Only the main
+    // process seeds; the overlay child is spawned later and inherits the populated directory.
+    // No-ops on portable layouts, where both paths resolve to the same directory.
+    seed_user_data_dir();
 #endif
 
 #if !defined(__APPLE__)

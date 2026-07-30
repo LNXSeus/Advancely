@@ -1,23 +1,13 @@
 #!/bin/bash
 
-# Define paths
-CONFIG_DIR="${HOME}/.local/share"
-ADVANCELY_CONFIG_DIRECTORY="${ADVANCELY_CONFIG_DIRECTORY-${CONFIG_DIR}/advancely}"
-APPLICATION_DIRECTORY="/usr/share/advancely"
+# Advancely seeds and maintains its own user data directory (~/.local/share/advancely) on startup:
+# see seed_user_data_dir() in source/main.cpp. It copies the shipped resources out of the installed
+# resources directory on first run and after every version change, so this script no longer has to
+# mirror that directory list. Keeping the list in one place means packages that ship or patch their
+# own launcher (AUR, NixOS) stay correct without tracking changes to it.
+#
+# NOTE FOR PACKAGERS: the NixOS derivation rewrites the install prefix on the line below using
+# substituteInPlace with --replace-fail, which fails the build outright if the prefix it searches
+# for is absent. Keep that path spelled out literally below rather than moving it into a variable.
 
-touch "${ADVANCELY_CONFIG_DIRECTORY}/version"
-
-if [ ! -d "${ADVANCELY_CONFIG_DIRECTORY}" ] || ! cmp "${ADVANCELY_CONFIG_DIRECTORY}/version" "/usr/share/advancely/version"; then
-  mkdir -p "${ADVANCELY_CONFIG_DIRECTORY}"
-
-  # Refreshed on every version change: shipped defaults win.
-  cp -r "${APPLICATION_DIRECTORY}/resources/"{notes,templates,ca_certificates,reference_files} "${ADVANCELY_CONFIG_DIRECTORY}/"
-  # No-clobber: these hold user-created and user-imported files (custom fonts, gui backgrounds,
-  # settings). New shipped files still land here because -n only skips names that already exist.
-  cp -rn "${APPLICATION_DIRECTORY}/resources/"{config,fonts,gui} "${ADVANCELY_CONFIG_DIRECTORY}/"
-
-  cp "${APPLICATION_DIRECTORY}/version" "${ADVANCELY_CONFIG_DIRECTORY}/version"
-fi
-
-# Execute the binary using the modified environment
 /usr/share/advancely/Advancely --disable-updater --use-home-dir "$@"

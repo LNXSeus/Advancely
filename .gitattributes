@@ -8,3 +8,7 @@ LICENSE export-ignore
 *.sh   text eol=lf
 *.pl   text eol=lf
 *.py   text eol=lf
+
+# The Linux package launcher has no extension, so the rules above miss it. CRLF here makes the
+# installed .deb/.rpm fail to start with "bad interpreter: /bin/bash^M".
+packaging/linux/launcher text eol=lf
