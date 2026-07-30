@@ -51,6 +51,8 @@ const char *get_resources_path();
 
 const char *get_application_dir();
 
+const char *get_icons_base_path();
+
 const char *get_cert_bundle_path();
 
 const char *get_settings_file_path();
@@ -65,6 +67,14 @@ const char *get_config_display_path();
 
 const char *get_templates_display_path();
 
+const char *get_icons_display_path();
+
+const char *get_fonts_display_path();
+
+const char *get_gui_display_path();
+
+const char *get_reference_files_display_path();
+
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO
 
@@ -73,7 +83,7 @@ const char *get_templates_display_path();
 // This is the version that gets compared with the latest release tag on GitHub
 // This automatically applies versioning to metainfo.xml through GitHub Actions.
 // TODO: ONLY UPDATE PKGBUILD FOR RELEASES!!! FOR BIG RELEASES EDIT metainfo.xml MANUALLY
-#define ADVANCELY_VERSION "v1.6.4" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v1.6.5" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window

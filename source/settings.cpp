@@ -3053,9 +3053,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "This affects the goal display text, the top info bar,\n"
                          "the bottom control buttons, the notes window,\n"
                          "and manual layout text header decorations.\n"
-                         "Only choose fonts within the resources/fonts directory.\n\n"
+                         "Only choose fonts within the %s directory.\n\n"
                          "A restart is required to properly apply changes.\n"
-                         "Default: %s", DEFAULT_TRACKER_FONT);
+                         "Default: %s", get_fonts_display_path(), DEFAULT_TRACKER_FONT);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -3186,8 +3186,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Select the background texture for %s items.\n"
                              "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
-                             "Must be a .png or .gif file located inside the resources/gui folder.\n"
-                             "Default: %s", label, default_path);
+                             "Must be a .png or .gif file located inside the %s folder.\n"
+                             "Default: %s", label, get_gui_display_path(), default_path);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
             };
@@ -3299,9 +3299,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Select the font for UI windows.\n"
                          "This affects the Settings, Template Creator, and Notes windows.\n"
-                         "Only choose fonts within the resources/fonts directory.\n\n"
+                         "Only choose fonts within the %s directory.\n\n"
                          "IMPORTANT: Requires restarting Advancely to apply.\n"
-                         "Default: %s", DEFAULT_UI_FONT);
+                         "Default: %s", get_fonts_display_path(), DEFAULT_UI_FONT);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
             // UI Font Size
@@ -3982,8 +3982,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(compact_panel_tex_tooltip_buffer, sizeof(compact_panel_tex_tooltip_buffer),
                                  "The 9-slice panel texture drawn behind the counter.\n"
                                  "Use a small square texture; its border pixels repeat to fit any size.\n"
-                                 "Must be a .png or .gif inside the resources/gui folder.\n"
-                                 "Default: %s", DEFAULT_COMPACT_PANEL_PATH);
+                                 "Must be a .png or .gif inside the %s folder.\n"
+                                 "Default: %s", get_gui_display_path(), DEFAULT_COMPACT_PANEL_PATH);
                         ImGui::SetTooltip("%s", compact_panel_tex_tooltip_buffer);
                     }
 
@@ -4791,9 +4791,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         char tooltip_buffer[1024];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Select the font for the text in the separate stream overlay window.\n"
-                                 "Only choose fonts within the resources/fonts directory.\n"
+                                 "Only choose fonts within the %s directory.\n"
                                  "Changing the font may change the overlay window height.\n"
-                                 "Default: %s", DEFAULT_OVERLAY_FONT);
+                                 "Default: %s", get_fonts_display_path(), DEFAULT_OVERLAY_FONT);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
@@ -4848,8 +4848,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         char compact_label_font_tooltip_buffer[512];
                         snprintf(compact_label_font_tooltip_buffer, sizeof(compact_label_font_tooltip_buffer),
                                  "Font for the goal-type label (e.g. 'Advancements:').\n"
-                                 "Only choose fonts within the resources/fonts directory.\n"
-                                 "Default: %s", DEFAULT_COMPACT_LABEL_FONT);
+                                 "Only choose fonts within the %s directory.\n"
+                                 "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_LABEL_FONT);
                         ImGui::SetTooltip("%s", compact_label_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Label Text Size", &temp_settings.compact_label_font_size, 0.5f,
@@ -4882,8 +4882,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         char compact_count_font_tooltip_buffer[512];
                         snprintf(compact_count_font_tooltip_buffer, sizeof(compact_count_font_tooltip_buffer),
                                  "Font for the big progress count (e.g. '70/80').\n"
-                                 "Only choose fonts within the resources/fonts directory.\n"
-                                 "Default: %s", DEFAULT_COMPACT_COUNT_FONT);
+                                 "Only choose fonts within the %s directory.\n"
+                                 "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_COUNT_FONT);
                         ImGui::SetTooltip("%s", compact_count_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Count Text Size", &temp_settings.compact_count_font_size, 0.5f,
@@ -4932,8 +4932,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         char compact_stack_font_tooltip_buffer[512];
                         snprintf(compact_stack_font_tooltip_buffer, sizeof(compact_stack_font_tooltip_buffer),
                                  "Font for the pop-out goals stacked below the panel.\n"
-                                 "Only choose fonts within the resources/fonts directory.\n"
-                                 "Default: %s", DEFAULT_COMPACT_STACK_FONT);
+                                 "Only choose fonts within the %s directory.\n"
+                                 "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_STACK_FONT);
                         ImGui::SetTooltip("%s", compact_stack_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Stack Text Size", &temp_settings.compact_stack_font_size, 0.5f,
@@ -7380,7 +7380,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "Resets all settings (besides window size/position & hotkeys) in this window to their\n"
                  "default values. This does not modify your template files.\n\n"
                  "Hover over any individual setting to see the default value it will be reset to.\n"
-                 "The full default set also lives in resources/reference_files/settings.json.");
+                 "The full default set also lives in %s/settings.json.", get_reference_files_display_path());
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 

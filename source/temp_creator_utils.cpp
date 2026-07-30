@@ -1501,7 +1501,7 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
     // --- Add icon files to the zip under icons/<relative_path> ---
     if (include_icons) {
         char icons_base[MAX_PATH_LENGTH];
-        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+        snprintf(icons_base, sizeof(icons_base), "%s", get_icons_base_path());
 
         for (const auto &rel_path: icon_paths) {
             char full_icon_path[MAX_PATH_LENGTH];
@@ -1832,7 +1832,7 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     // --- Extract icon files if requested ---
     if (import_icons && success) {
         char icons_base[MAX_PATH_LENGTH];
-        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+        snprintf(icons_base, sizeof(icons_base), "%s", get_icons_base_path());
 
         // Re-iterate the zip for icon entries
         for (mz_uint i = 0; i < num_files; i++) {
@@ -2535,7 +2535,7 @@ int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::stri
         char dir[MAX_PATH_LENGTH];
         if (!get_parent_directory(zip_path, dir, sizeof(dir), 1)) return 0;
         char icons_base[MAX_PATH_LENGTH];
-        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+        snprintf(icons_base, sizeof(icons_base), "%s", get_icons_base_path());
 
         std::unordered_set<std::string> seen;
         int written = 0;
@@ -2578,7 +2578,7 @@ int extract_zip_icons_by_paths(const char *zip_path, const std::vector<std::stri
     }
 
     char icons_base[MAX_PATH_LENGTH];
-    snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+    snprintf(icons_base, sizeof(icons_base), "%s", get_icons_base_path());
 
     int written = 0;
     mz_uint num_files = mz_zip_reader_get_num_files(&zip);

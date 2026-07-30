@@ -1147,6 +1147,26 @@ const char *get_application_dir() {
     return path;
 }
 
+// Base directory holding the goal icons, WITHOUT a trailing slash.
+//
+// Icons live in the writable data directory so that importing a template can extract its icons and
+// so the icon picker shows shipped and imported icons in one listing. If that directory is missing
+// (seeding has not run or failed) this falls back to the shipped copy, which always exists, so a bad
+// seed degrades to "cannot import new icons" instead of "no icons render at all".
+//
+// Resolved once per process: seeding happens at startup long before any icon loads, and a single
+// cached check keeps this off the hot path of loading thousands of individual icons.
+const char *get_icons_base_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/icons", get_resources_path());
+        if (!path_exists(path)) {
+            snprintf(path, sizeof(path), "%s/icons", get_application_dir());
+        }
+    }
+    return path;
+}
+
 const char *get_settings_file_path() {
     // Check for custom path from CLI first
     if (g_custom_settings_path[0] != '\0') {
@@ -1203,6 +1223,38 @@ const char *get_templates_display_path() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         snprintf(path, sizeof(path), "%s/templates", get_data_dir_display_base());
+    }
+    return path;
+}
+
+const char *get_icons_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/icons", get_data_dir_display_base());
+    }
+    return path;
+}
+
+const char *get_fonts_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/fonts", get_data_dir_display_base());
+    }
+    return path;
+}
+
+const char *get_gui_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/gui", get_data_dir_display_base());
+    }
+    return path;
+}
+
+const char *get_reference_files_display_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/reference_files", get_data_dir_display_base());
     }
     return path;
 }
@@ -1384,6 +1436,10 @@ static void seed_user_data_dir(void) {
         {"notes", SEED_PRESERVE},          // The user's notes and their manifest.
         {"fonts", SEED_PRESERVE},          // User-imported fonts live alongside the defaults.
         {"gui", SEED_PRESERVE},            // User-imported backgrounds live alongside the defaults.
+        // Icons are by far the largest subtree (~111 MB, ~4700 files). SEED_PRESERVE keeps updates
+        // cheap: only genuinely new icons are copied, rather than rewriting everything each version.
+        // It also protects icons the user imported along with a template.
+        {"icons", SEED_PRESERVE},
     };
 
     bool ok = true;
@@ -4281,8 +4337,8 @@ int main(int argc, char *argv[]) {
                             ImGui::TextUnformatted("KEEPS your settings.json and _notes.txt files.");
 #if defined(__APPLE__)
                             ImGui::TextUnformatted(
-                                "REPLACES the app bundle, libraries (.dylib), and the official icons next to the "
-                                "app, plus the default templates, fonts, gui and reference_files in your "
+                                "REPLACES the app bundle and libraries (.dylib), plus the default templates, "
+                                "icons, fonts, gui and reference_files in your "
                                 "'~/Library/Application Support/Advancely' folder.");
 #else
                             ImGui::TextUnformatted(

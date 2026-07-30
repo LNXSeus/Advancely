@@ -398,7 +398,8 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script, "SUPPORT_DIR=\"$HOME/Library/Application Support/Advancely\"\n");
     fprintf(updater_script, "if [ -d \"$SUPPORT_DIR\" ]; then\n");
     fprintf(updater_script, "    mkdir -p \"$SUPPORT_DIR/templates\" \"$SUPPORT_DIR/ca_certificates\" "
-            "\"$SUPPORT_DIR/fonts\" \"$SUPPORT_DIR/gui\" \"$SUPPORT_DIR/reference_files\"\n");
+            "\"$SUPPORT_DIR/fonts\" \"$SUPPORT_DIR/gui\" \"$SUPPORT_DIR/reference_files\" "
+            "\"$SUPPORT_DIR/icons\"\n");
     fprintf(updater_script,
             "    rsync -av \"${SOURCE_DIR}/resources/templates/\" \"$SUPPORT_DIR/templates/\" 2>/dev/null || true\n");
     fprintf(updater_script,
@@ -411,6 +412,10 @@ bool apply_update(const char *main_executable_path) {
             "    rsync -av \"${SOURCE_DIR}/resources/gui/\" \"$SUPPORT_DIR/gui/\" 2>/dev/null || true\n");
     fprintf(updater_script,
             "    rsync -av \"${SOURCE_DIR}/resources/reference_files/\" \"$SUPPORT_DIR/reference_files/\" 2>/dev/null || true\n");
+    // Icons are the largest subtree, so only copy what is missing (--ignore-existing) rather than
+    // rewriting ~4700 files on every update. This also preserves icons imported with a template.
+    fprintf(updater_script,
+            "    rsync -av --ignore-existing \"${SOURCE_DIR}/resources/icons/\" \"$SUPPORT_DIR/icons/\" 2>/dev/null || true\n");
     fprintf(updater_script, "fi\n");
 #endif
 

@@ -2189,7 +2189,7 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         // panel like the promo row.
         float row_y = snap_px(stack_top + (float) (i + 1) * line_h + slide);
         char emote_path[MAX_PATH_LENGTH];
-        snprintf(emote_path, sizeof(emote_path), "%s/icons/%s", get_application_dir(),
+        snprintf(emote_path, sizeof(emote_path), "%s/%s", get_icons_base_path(),
                  p.emotes[si] ? p.emotes[si] : "");
         SDL_SetRenderClipRect(o->renderer, &reveal_clip);
         compact_draw_icon(o, emote_path, icon_x, row_y, icon_size);
@@ -3464,7 +3464,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 SDL_Texture *tex = nullptr;
                 AnimatedTexture *anim_tex = nullptr;
                 char full_icon_path[MAX_PATH_LENGTH];
-                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(),
                          render_info.icon_path);
 
                 // Check the file extension to decide which cache function to use

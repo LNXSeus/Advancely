@@ -1722,7 +1722,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             char full_icon_path[sizeof(new_cat->icon_path)];
 
             // Put whatever is in "icon" into "resources/icons/"
-            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(), icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
             new_cat->icon_path[sizeof(new_cat->icon_path) - 1] = '\0';
 
@@ -1809,8 +1809,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
                         if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
                             char full_crit_icon_path[sizeof(new_crit->icon_path)];
-                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/icons/%s",
-                                     get_application_dir(),
+                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/%s",
+                                     get_icons_base_path(),
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
                             new_crit->icon_path[sizeof(new_crit->icon_path) - 1] = '\0';
@@ -2162,7 +2162,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsString(icon)) {
                 // Append "icon" to "resources/icons/"
                 char full_icon_path[sizeof(new_item->icon_path)];
-                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(),
                          icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
                 new_item->icon_path[sizeof(new_item->icon_path) - 1] = '\0';
@@ -2266,7 +2266,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         }
         if (cJSON_IsString(icon)) {
             char full_icon_path[sizeof(new_goal->icon_path)];
-            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(), icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
             new_goal->icon_path[sizeof(new_goal->icon_path) - 1] = '\0';
 
@@ -2377,7 +2377,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     cJSON *stage_icon = cJSON_GetObjectItem(stage_item_json, "icon");
                     if (cJSON_IsString(stage_icon)) {
                         char full_icon_path[sizeof(new_stage->icon_path)];
-                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
+                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(),
                                  stage_icon->valuestring);
                         strncpy(new_stage->icon_path, full_icon_path, sizeof(new_stage->icon_path) - 1);
                         new_stage->icon_path[sizeof(new_stage->icon_path) - 1] = '\0';
@@ -2464,7 +2464,7 @@ static void tracker_parse_counter_goals(Tracker *t, cJSON *counters_json, cJSON 
         }
         if (cJSON_IsString(icon)) {
             char full_icon_path[sizeof(new_goal->icon_path)];
-            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", get_icons_base_path(), icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
             new_goal->icon_path[sizeof(new_goal->icon_path) - 1] = '\0';
 

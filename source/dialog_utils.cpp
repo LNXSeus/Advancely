@@ -33,10 +33,11 @@ static void normalize_path(std::string &path) {
     }
 }
 
-// Gets the absolute path to the application's resources/icons directory
+// Gets the absolute path to the icons directory, with a trailing slash so it can be used directly
+// as a prefix when converting a picked file back into a path relative to it.
 static bool get_icons_start_path(std::string &out_path) {
     char icons_path[MAX_PATH_LENGTH];
-    snprintf(icons_path, sizeof(icons_path), "%s/icons/", get_application_dir());
+    snprintf(icons_path, sizeof(icons_path), "%s/", get_icons_base_path());
     if (!path_exists(icons_path)) return false;
     out_path = icons_path;
     normalize_path(out_path); // normalize_path is still useful here
@@ -88,8 +89,12 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
     const char *filter_patterns[2] = {"*.png", "*.gif"};
     int filter_count = 2;
 #endif
+    char dialog_title[MAX_PATH_LENGTH + 64];
+    snprintf(dialog_title, sizeof(dialog_title),
+             "Select an Icon - IMPORTANT: The icon must be inside the %s folder!", get_icons_display_path());
+
     const char *selected_path = tinyfd_openFileDialog(
-        "Select an Icon - IMPORTANT: The icon must be inside the resources/icons folder!",
+        dialog_title,
         start_path.c_str(),
         filter_count,
         filter_patterns,
@@ -183,10 +188,14 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
     }
 
     // Warn the user the file will be copied before proceeding
+    char copy_prompt[MAX_PATH_LENGTH + 192];
+    snprintf(copy_prompt, sizeof(copy_prompt),
+             "This font is outside the %s folder and will be copied into it.\n"
+             "Note: frequently importing different fonts will accumulate files in that folder.",
+             get_fonts_display_path());
     int confirmed = tinyfd_messageBox(
         "Copy Font?",
-        "This font is outside the resources/fonts folder and will be copied into it.\n"
-        "Note: frequently importing different fonts will accumulate files in that folder.",
+        copy_prompt,
         "yesno", "question", 1
     );
     if (confirmed != 1) return false;
@@ -201,7 +210,11 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
     FILE *dst = fopen(dest_path.c_str(), "wb");
     if (!dst) {
         fclose(src);
-        tinyfd_messageBox("Error", "Could not copy font into the resources/fonts directory.", "ok", "error", 1);
+        char copy_error[MAX_PATH_LENGTH + 64];
+        snprintf(copy_error, sizeof(copy_error),
+                 "Could not copy the font into:
+%s", start_path.c_str());
+        tinyfd_messageBox("Error", copy_error, "ok", "error", 1);
         return false;
     }
     char copy_buf[4096];
@@ -271,10 +284,14 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
     }
 
     // Warn the user the file will be copied before proceeding
+    char copy_prompt[MAX_PATH_LENGTH + 192];
+    snprintf(copy_prompt, sizeof(copy_prompt),
+             "This texture is outside the %s folder and will be copied into it.\n"
+             "Note: frequently importing different textures will accumulate files in that folder.",
+             get_gui_display_path());
     int confirmed = tinyfd_messageBox(
         "Copy Texture?",
-        "This texture is outside the resources/gui folder and will be copied into it.\n"
-        "Note: frequently importing different textures will accumulate files in that folder.",
+        copy_prompt,
         "yesno", "question", 1
     );
     if (confirmed != 1) return false;
@@ -289,7 +306,11 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
     FILE *dst = fopen(dest_path.c_str(), "wb");
     if (!dst) {
         fclose(src);
-        tinyfd_messageBox("Error", "Could not copy texture into the resources/gui directory.", "ok", "error", 1);
+        char copy_error[MAX_PATH_LENGTH + 64];
+        snprintf(copy_error, sizeof(copy_error),
+                 "Could not copy the texture into:
+%s", start_path.c_str());
+        tinyfd_messageBox("Error", copy_error, "ok", "error", 1);
         return false;
     }
     char copy_buf[4096];

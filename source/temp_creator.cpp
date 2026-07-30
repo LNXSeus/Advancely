@@ -1176,7 +1176,7 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
         }
         // If path is non-empty
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), item.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), item.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
                      item.icon_path);
@@ -1200,7 +1200,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
 
         // When path is wrong
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), goal.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), goal.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
                      goal.icon_path);
@@ -1216,7 +1216,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
                     return false;
                 }
 
-                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), stage.icon_path);
+                snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), stage.icon_path);
                 if (!path_exists(full_path)) {
                     snprintf(error_message_buffer, 256, "Error: Icon file not found for stage '%s': '%s'",
                              stage.stage_id, stage.icon_path);
@@ -1255,7 +1255,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
         }
         // When path exists we validate correctness
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), cat.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), cat.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name,
                      cat.icon_path);
@@ -1276,7 +1276,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
             // check for incorrect path when it's not empty and complex stat
             if (crit.icon_path[0] != '\0') {
                 char full_path[MAX_PATH_LENGTH];
-                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), crit.icon_path);
+                snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), crit.icon_path);
                 if (!path_exists(full_path)) {
                     snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
                              crit.root_name, crit.icon_path);
@@ -1300,7 +1300,7 @@ static bool validate_counter_icon_paths(const std::vector<EditorCounterGoal> &co
         }
         // When path is wrong
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), counter.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), counter.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for counter '%s': '%s'",
                      counter.root_name, counter.icon_path);
@@ -8212,9 +8212,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[128];
+                            char icon_path_tooltip_buffer[256];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -8230,7 +8230,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char resource_folder_tooltip_buffer[1024];
                             snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
                         }
                         // Add the "Is Recipe" checkbox only for modern versions
@@ -9180,7 +9180,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) {
                                 char icon_path_tooltip_buffer[1024];
                                 snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                         "Path to the icon file, relative to the 'resources/icons' directory.");
+                                         "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             ImGui::SameLine();
@@ -9195,7 +9195,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) {
                                 char icon_path_tooltip_buffer[1024];
                                 snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                         "The icon must be inside the 'resources/icons' folder!");
+                                         "The icon must be inside the '%s' folder!", get_icons_display_path());
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             bool is_crit_selected = s_crit_selection.find((int) j) != s_crit_selection.end();
@@ -10626,7 +10626,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -10641,7 +10641,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
@@ -11545,7 +11545,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) {
                                     char icon_path_tooltip_buffer[1024];
                                     snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                             "Path to the icon file, relative to the 'resources/icons' directory.");
+                                             "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
                                 ImGui::SameLine();
@@ -11560,7 +11560,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (ImGui::IsItemHovered()) {
                                     char icon_path_tooltip_buffer[1024];
                                     snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                             "The icon must be inside the 'resources/icons' folder!");
+                                             "The icon must be inside the '%s' folder!", get_icons_display_path());
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
                                 if (ImGui::InputInt("Target Value", &crit.goal)) {
@@ -12526,7 +12526,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -12541,7 +12541,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         } {
                             bool is_unlock_selected = s_unlocks_selection.find((int) i) != s_unlocks_selection.end();
@@ -13353,9 +13353,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[128];
+                            char icon_path_tooltip_buffer[256];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -13370,7 +13370,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::InputInt("Target Value", &goal.goal)) {
@@ -14868,7 +14868,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -14885,7 +14885,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
@@ -15455,7 +15455,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     char icon_path_tooltip_buffer[256];
                                     snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
                                              "Path to the icon file for this specific stage,\n"
-                                             "relative to the 'resources/icons' directory.");
+                                             "relative to the '%s' directory.", get_icons_display_path());
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
                                 ImGui::SameLine();
@@ -15469,9 +15469,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char icon_path_tooltip_buffer[128];
+                                    char icon_path_tooltip_buffer[256];
                                     snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                             "The icon must be inside the 'resources/icons' folder!");
+                                             "The icon must be inside the '%s' folder!", get_icons_display_path());
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
                             }
@@ -17106,7 +17106,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -17121,7 +17121,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -18537,9 +18537,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Extracts the icon files bundled in this zip into your resources/icons/ folder.\n"
+                         "Extracts the icon files bundled in this zip into your %s/ folder.\n"
                          "Icon paths in the imported template will be updated automatically to point to them.\n"
-                         "Disable this if you already have the required icons installed.");
+                         "Disable this if you already have the required icons installed.",
+                         get_icons_display_path());
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
@@ -23415,11 +23416,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             bool confirm_clicked = ImGui::Button("Confirm Import##template_import", ImVec2(140, 0));
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s",
-                                  "Append the ticked entries to this template. Referenced icons are\n"
-                                  "extracted from the source zip into resources/icons/ (existing files\n"
-                                  "are skipped). Existing root names or ids are rejected with an error.\n"
-                                  "(You can also press ENTER)");
+                char confirm_import_tooltip_buffer[512];
+                snprintf(confirm_import_tooltip_buffer, sizeof(confirm_import_tooltip_buffer),
+                         "Append the ticked entries to this template. Referenced icons are\n"
+                         "extracted from the source zip into %s/ (existing files\n"
+                         "are skipped). Existing root names or ids are rejected with an error.\n"
+                         "(You can also press ENTER)", get_icons_display_path());
+                ImGui::SetTooltip("%s", confirm_import_tooltip_buffer);
             }
             if (confirm_clicked ||
                 ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
