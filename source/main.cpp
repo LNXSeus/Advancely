@@ -1107,9 +1107,9 @@ const char *get_resources_path() {
 #elif defined(__APPLE__)
     // macOS denies write access to anything shipped alongside the .app bundle (read-only DMGs,
     // App Translocation, restrictive extract permissions), so all user-writable data lives in
-    // ~/Library/Application Support/Advancely. Read-only assets (fonts, icons, gui, reference_files)
-    // keep loading from the bundle via get_application_dir(); seed_macos_support_dir() populates this
-    // location on first run.
+    // ~/Library/Application Support/Advancely. Only icons/ and the app's own logo keep loading from
+    // the bundle via get_application_dir() (never written to, and 111 MB not worth duplicating);
+    // seed_macos_support_dir() populates this location on first run.
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         const char *homedir = getenv("HOME");
@@ -1293,7 +1293,13 @@ static void seed_macos_support_dir(void) {
 
     mkdir(support, 0755); // Parent "Application Support" always exists on macOS.
 
-    const char *subdirs[] = {"templates", "config", "notes", "ca_certificates"};
+    // fonts/ and gui/ receive user-imported files at runtime, so they have to live somewhere
+    // writable. reference_files/ follows them so the Help button opens a folder that exists even
+    // when the bundle is translocated to a read-only path.
+    const char *subdirs[] = {
+        "templates", "config", "notes", "ca_certificates",
+        "fonts", "gui", "reference_files"
+    };
     for (size_t i = 0; i < sizeof(subdirs) / sizeof(subdirs[0]); i++) {
         char src[MAX_PATH_LENGTH];
         char dst[MAX_PATH_LENGTH];
@@ -2218,12 +2224,18 @@ int main(int argc, char *argv[]) {
         // 1. Load the UI Font (replaces Roboto).
         // The first font loaded becomes the default for ImGui. We also get a pointer to it.
         char ui_font_path[MAX_PATH_LENGTH];
-        snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_application_dir(), app_settings.ui_font_name);
+        snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), app_settings.ui_font_name);
         if (path_exists(ui_font_path)) {
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, app_settings.ui_font_size);
         } else {
             // Fallback to default if user-selected font is not found
-            snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_UI_FONT);
+            snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_UI_FONT);
+            if (!path_exists(ui_font_path)) {
+                // Seeding into the writable data dir never ran or failed. The shipped copy in the
+                // install/bundle directory is always present, so use it rather than starting
+                // without a font at all.
+                snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_UI_FONT);
+            }
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, DEFAULT_UI_FONT_SIZE);
             log_message(LOG_ERROR, "[MAIN] UI Font '%s' not found. Falling back to default.\n",
                         app_settings.ui_font_name);
@@ -2231,14 +2243,19 @@ int main(int argc, char *argv[]) {
 
         // 2. Load the Tracker Font (replaces Minecraft) as a secondary font.
         char tracker_font_path[MAX_PATH_LENGTH];
-        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_application_dir(),
+        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
                  app_settings.tracker_font_name);
         if (path_exists(tracker_font_path)) {
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, app_settings.tracker_font_size);
         } else {
             // Fallback to default if user-selected font is not found
-            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_application_dir(),
+            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
                      DEFAULT_TRACKER_FONT);
+            if (!path_exists(tracker_font_path)) {
+                // See the UI font above: fall back to the shipped copy if seeding did not happen.
+                snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_application_dir(),
+                         DEFAULT_TRACKER_FONT);
+            }
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, DEFAULT_TRACKER_FONT_SIZE);
             log_message(LOG_ERROR, "[MAIN] Tracker Font '%s' not found. Falling back to default.\n",
                         app_settings.tracker_font_name);
@@ -4168,8 +4185,8 @@ int main(int argc, char *argv[]) {
                             ImGui::TextUnformatted("KEEPS your settings.json and _notes.txt files.");
 #if defined(__APPLE__)
                             ImGui::TextUnformatted(
-                                "REPLACES the app bundle, libraries (.dylib), and official files: fonts, icons and "
-                                "reference_files next to the app, plus the default templates in your "
+                                "REPLACES the app bundle, libraries (.dylib), and the official icons next to the "
+                                "app, plus the default templates, fonts, gui and reference_files in your "
                                 "'~/Library/Application Support/Advancely' folder.");
 #else
                             ImGui::TextUnformatted(

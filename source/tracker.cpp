@@ -581,7 +581,7 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
                        SDL_Texture **tex_target, AnimatedTexture **anim_target) {
         *tex_target = nullptr;
         *anim_target = nullptr;
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), setting_path);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
 
         if (strstr(full_path, ".gif")) {
             *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
@@ -594,7 +594,11 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
         // Fallback if loading failed
         if (!*tex_target && !*anim_target) {
             log_message(LOG_ERROR, "[TRACKER] Failed to load background: %s. Trying default...\n", setting_path);
-            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            if (!path_exists(full_path)) {
+                // Writable copy missing (seeding never ran or failed); use the shipped one.
+                snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
+            }
             if (strstr(full_path, ".gif")) {
                 *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
                                                                &t->anim_cache_capacity, full_path,
@@ -3969,7 +3973,12 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 
     // Initialize SDL_ttf
     char font_path[MAX_PATH_LENGTH];
-    snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
+    snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+    if (!path_exists(font_path)) {
+        // Seeding into the writable data dir never ran or failed; the shipped copy always exists.
+        // Without this the tracker would refuse to start rather than fall back.
+        snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
+    }
     t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
         log_message(

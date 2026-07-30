@@ -43,10 +43,11 @@ static bool get_icons_start_path(std::string &out_path) {
     return true;
 }
 
-// Gets the absolute path to the application's resources/gui directory
+// Gets the absolute path to the writable gui directory. Imports are copied here, so it must be the
+// user data directory (get_resources_path), not the read-only install/bundle directory.
 static bool get_gui_start_path(std::string &out_path) {
     char gui_path[MAX_PATH_LENGTH];
-    snprintf(gui_path, sizeof(gui_path), "%s/gui/", get_application_dir());
+    snprintf(gui_path, sizeof(gui_path), "%s/gui/", get_resources_path());
     if (!path_exists(gui_path)) {
         log_message(LOG_ERROR, "[DIALOG UTILS] GUI texture directory not found at: %s\n", gui_path);
         return false;
@@ -118,10 +119,11 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
     return false;
 }
 
-// Gets the absolute path to the application's resources/fonts directory
+// Gets the absolute path to the writable fonts directory. Imports are copied here, so it must be the
+// user data directory (get_resources_path), not the read-only install/bundle directory.
 static bool get_fonts_start_path(std::string &out_path) {
     char fonts_path[MAX_PATH_LENGTH];
-    snprintf(fonts_path, sizeof(fonts_path), "%s/fonts/", get_application_dir());
+    snprintf(fonts_path, sizeof(fonts_path), "%s/fonts/", get_resources_path());
     if (!path_exists(fonts_path)) return false;
     out_path = fonts_path;
     normalize_path(out_path);

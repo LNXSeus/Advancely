@@ -397,11 +397,20 @@ bool apply_update(const char *main_executable_path) {
     // launch seeds it from the freshly updated bundle, so skipping here is safe.
     fprintf(updater_script, "SUPPORT_DIR=\"$HOME/Library/Application Support/Advancely\"\n");
     fprintf(updater_script, "if [ -d \"$SUPPORT_DIR\" ]; then\n");
-    fprintf(updater_script, "    mkdir -p \"$SUPPORT_DIR/templates\" \"$SUPPORT_DIR/ca_certificates\"\n");
+    fprintf(updater_script, "    mkdir -p \"$SUPPORT_DIR/templates\" \"$SUPPORT_DIR/ca_certificates\" "
+            "\"$SUPPORT_DIR/fonts\" \"$SUPPORT_DIR/gui\" \"$SUPPORT_DIR/reference_files\"\n");
     fprintf(updater_script,
             "    rsync -av \"${SOURCE_DIR}/resources/templates/\" \"$SUPPORT_DIR/templates/\" 2>/dev/null || true\n");
     fprintf(updater_script,
             "    rsync -av \"${SOURCE_DIR}/resources/ca_certificates/\" \"$SUPPORT_DIR/ca_certificates/\" 2>/dev/null || true\n");
+    // fonts/gui/reference_files now live here too (imports need a writable location). Same rsync
+    // semantics as above: shipped files are refreshed, user-imported files are left alone.
+    fprintf(updater_script,
+            "    rsync -av \"${SOURCE_DIR}/resources/fonts/\" \"$SUPPORT_DIR/fonts/\" 2>/dev/null || true\n");
+    fprintf(updater_script,
+            "    rsync -av \"${SOURCE_DIR}/resources/gui/\" \"$SUPPORT_DIR/gui/\" 2>/dev/null || true\n");
+    fprintf(updater_script,
+            "    rsync -av \"${SOURCE_DIR}/resources/reference_files/\" \"$SUPPORT_DIR/reference_files/\" 2>/dev/null || true\n");
     fprintf(updater_script, "fi\n");
 #endif
 

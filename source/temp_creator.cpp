@@ -5606,7 +5606,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     if (ImGui::Button(help_text)) {
         char reference_path[MAX_PATH_LENGTH];
-        snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_application_dir());
+        snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_resources_path());
 #ifdef _WIN32
         path_to_windows_native(reference_path);
 #endif

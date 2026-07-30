@@ -2133,7 +2133,7 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
 
     // --- The promo row (slides in with promo_y, clipped to below the panel) ---
     char logo_path[MAX_PATH_LENGTH];
-    snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_application_dir(), COMPACT_PROMO_ICON);
+    snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_resources_path(), COMPACT_PROMO_ICON);
     SDL_SetRenderClipRect(o->renderer, &reveal_clip);
     compact_draw_icon(o, logo_path, icon_x, promo_y, icon_size);
     SDL_SetRenderClipRect(o->renderer, nullptr);
@@ -2586,7 +2586,7 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
     // base size, so the anchoring stays correct even if the default font changes.
     float ref_line_height = row_line_height;
     char ref_font_path[1024];
-    snprintf(ref_font_path, sizeof(ref_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_OVERLAY_FONT);
+    snprintf(ref_font_path, sizeof(ref_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_OVERLAY_FONT);
     TTF_Font *ref_font = TTF_OpenFont(ref_font_path, DEFAULT_OVERLAY_FONT_SIZE);
     if (ref_font) {
         ref_line_height = (float) TTF_GetFontHeight(ref_font);
@@ -2650,7 +2650,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
                        SDL_Texture **tex_target, AnimatedTexture **anim_target) {
         *tex_target = nullptr;
         *anim_target = nullptr;
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), setting_path);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
 
         if (strstr(full_path, ".gif")) {
             *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
@@ -2663,7 +2663,11 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         // Fallback if loading failed
         if (!*tex_target && !*anim_target) {
             log_message(LOG_ERROR, "[OVERLAY] Failed to load background: %s. Trying default...\n", setting_path);
-            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            if (!path_exists(full_path)) {
+                // Writable copy missing (seeding never ran or failed); use the shipped one.
+                snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
+            }
             if (strstr(full_path, ".gif")) {
                 *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
                                                                &o->anim_cache_capacity, full_path,
@@ -2691,7 +2695,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // Compact mode 9-slice panel texture. Like the item backgrounds it can be a static .png or an
     // animated .gif (each frame is 9-sliced). Not critical: the draw path guards a null.
     char compact_panel_full_path[MAX_PATH_LENGTH];
-    snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_application_dir(),
+    snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_resources_path(),
              settings->compact_panel_path);
     if (strstr(compact_panel_full_path, ".gif")) {
         o->compact_panel_anim = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
@@ -2705,8 +2709,12 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     if (!o->compact_panel && !o->compact_panel_anim) {
         log_message(LOG_ERROR, "[OVERLAY] Failed to load Compact panel '%s'. Trying default...\n",
                     settings->compact_panel_path);
-        snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_application_dir(),
+        snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_resources_path(),
                  DEFAULT_COMPACT_PANEL_PATH);
+        if (!path_exists(compact_panel_full_path)) {
+            snprintf(compact_panel_full_path, sizeof(compact_panel_full_path), "%s/gui/%s", get_application_dir(),
+                     DEFAULT_COMPACT_PANEL_PATH);
+        }
         o->compact_panel = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
                                                   &o->texture_cache_capacity, compact_panel_full_path,
                                                   SDL_SCALEMODE_NEAREST);
@@ -2716,14 +2724,18 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // and one for the row 2 & 3 text. Fonts are HiDPI aware; SDL_ttf scales them
     // correctly on any monitor at render time.
     char overlay_font_path[1024];
-    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_application_dir(),
+    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(),
              settings->overlay_font_name);
 
     if (!path_exists(overlay_font_path)) {
         log_message(
             LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n",
             settings->overlay_font_name);
-        snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
+        snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+        if (!path_exists(overlay_font_path)) {
+            // Seeding into the writable data dir never ran or failed; the shipped copy always exists.
+            snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
+        }
     }
 
     o->font = TTF_OpenFont(overlay_font_path, settings->overlay_row_font_size);
@@ -2740,9 +2752,12 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // filename never breaks the overlay for belt/page users.
     auto load_compact_font = [&](const char *font_name, float size) -> TTF_Font * {
         char path[1024];
-        snprintf(path, sizeof(path), "%s/fonts/%s", get_application_dir(), font_name);
+        snprintf(path, sizeof(path), "%s/fonts/%s", get_resources_path(), font_name);
         if (!path_exists(path)) {
-            snprintf(path, sizeof(path), "%s/fonts/Minecraft.ttf", get_application_dir());
+            snprintf(path, sizeof(path), "%s/fonts/Minecraft.ttf", get_resources_path());
+            if (!path_exists(path)) {
+                snprintf(path, sizeof(path), "%s/fonts/Minecraft.ttf", get_application_dir());
+            }
         }
         return TTF_OpenFont(path, size);
     };
