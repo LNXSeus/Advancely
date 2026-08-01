@@ -819,7 +819,9 @@ In `Scrolling Belt` and `Page` mode the overlay is organized into three horizont
 different types of goals:
 
 * **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for
-  advancements/recipes and the sub-stats for complex stat goals.
+  advancements/recipes and the sub-stats for complex stat goals. A multi-stat category can be kept out of this row with
+  the Template Editor's `Hide Sub-Stats from Row 1` checkbox, in which case only the category itself is shown, still
+  cycling through its sub-stats as its sub-text.
 * **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks. **It can
   also include Stats, Custom Goals, Multi-Stage Goals, and Counters if forced via the Template Editor.** Items in this
   row always hide when completed.
@@ -869,7 +871,8 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
   repeating and clear away as they complete, aligned per `Page Alignment`. `Compact` replaces the three-row layout
   entirely, so the belt/page-only sections are hidden and the Compact settings appear instead.
 * **Compact Mode**: The `Row 1 Icons` section at the top can show the first-row icons (advancement criteria and
-  sub-stats) in a strip above the panel. Tick `Show Row 1 Icons` to enable it, then set the `Icon Size`, `Shared Icon
+  sub-stats, minus any multi-stat category set to `Hide Sub-Stats from Row 1`) in a strip above the panel. Tick `Show
+  Row 1 Icons` to enable it, then set the `Icon Size`, `Shared Icon
   Size` (the small parent icon overlaid on a shared criterion), `Horizontal Icon Spacing` (horizontal gap between the
   strip icons), `Icon Gap Below` (space between the strip and the panel), `Icon Cycle Interval` (how fast the strip
   flips), and `Clear Animation (s)` (how long a completed icon takes to crop away, `0` = instant, sign = direction;
@@ -1067,8 +1070,9 @@ Opening a template reveals a tabbed interface where you can define every goal.
   (flip the Hidden flag, majority-rule for the target state), `Layout Coordinates...`, and `Delete Selected...` (with
   confirmation). Beyond `Toggle Hidden`, each menu also exposes the other boolean toggles available for that goal type
   (all majority-rule like `Toggle Hidden`): advancements add `Toggle Is Recipe` (modern versions only) and `Toggle Row
-  3`; stats add `Toggle Row 2` and `Toggle Multi-Stat Category` (the latter converts each selected stat, keeping only
-  the first sub-stat when switching back to simple); unlocks add `Toggle Row 3`; custom goals and counters add `Toggle
+  3`; stats add `Toggle Row 2`, `Toggle Multi-Stat Category` (which converts each selected stat, keeping only
+  the first sub-stat when switching back to simple), and `Toggle Hide Sub-Stats from Row 1` (which skips simple stats in
+  the selection); unlocks add `Toggle Row 3`; custom goals and counters add `Toggle
   Row 2`; multi-stage goals add `Toggle Row 2` and `Toggle Per-Stage Icons`. For advancement criteria the menu also
   gets `Add selection to group` / `Ungroup selection` when groups
   are enabled. The row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only
@@ -1107,6 +1111,10 @@ overlay.
       reached).
     * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and
       target, and will cycle on the stream overlay.
+    * **Hide Sub-Stats from Row 1**: Only shown once a stat is a `Multi-Stat Category`. Ticking it keeps that category's
+      sub-stats out of the overlay's first row in every render mode (`Scrolling Belt`, `Page`, and the `Compact` mode's
+      `Row 1 Icons` strip). The category itself is unaffected: it still shows in its own row and still cycles through
+      its sub-stats as the sub-text there. Advancement criteria are never affected by this.
     * **Auto-Complete via Linked Goals**: Both stat categories and individual sub-stats support automatic completion
       through linked goals. Use the `Select Goals` button to pick any combination of advancements, criteria, stats,
       sub-stats, unlocks, custom goals, or multi-stage goal stages. Choose between `AND` mode (all selected goals must

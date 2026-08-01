@@ -2234,6 +2234,7 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
         if (cat->is_single_stat_category) continue;
+        if (cat->hide_substats_in_row1) continue;
         for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
     }
 
@@ -2967,6 +2968,11 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         // If the stat category is a simple stat (defined without a "criteria" block in the template),
         // do not add its auto-generated criterion to Row 1.
         if (cat->is_single_stat_category) {
+            continue;
+        }
+
+        // The template can opt a multi-stat out of Row 1; it still cycles its sub-stats as sub-text.
+        if (cat->hide_substats_in_row1) {
             continue;
         }
 

@@ -1654,6 +1654,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
         new_cat->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_2nd_row")); // 2nd row of overlay
         new_cat->in_3rd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_3rd_row")); // 3rd row of overlay
+        // Multi-stats only: keep the sub-stats out of the overlay's 1st row.
+        new_cat->hide_substats_in_row1 = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "hide_substats_in_row1"));
         // groups_enabled: if explicit in template, use it verbatim; otherwise default-on
         // when any criterion already has a non-empty "group" string (backwards compat for
         // older templates authored before the toggle existed). Resolved after criteria parse.

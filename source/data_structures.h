@@ -340,6 +340,9 @@ struct TrackableCategory {
     bool is_hidden; // If true, this category is hidden unless "Remove Completed Goals" is off.
     bool in_2nd_row; // Forces this stat category (does not apply to complex adv.) to 2nd row of overlay
     bool in_3rd_row; // Forces advancements/recipes to the 3rd overlay row (only meaningful for default Row 2 items)
+    // Keeps this multi-stat's sub-stats out of the overlay's 1st row (only meaningful for multi-stat categories).
+    // They still cycle as the category's sub-text in the other rows.
+    bool hide_substats_in_row1;
     bool groups_enabled; // When false, criterion "group" fields are ignored (no collapse), even if present.
 
     // Stat auto-completion via linked goals (only used for stat categories)

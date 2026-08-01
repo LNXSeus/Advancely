@@ -189,6 +189,7 @@ struct EditorTrackableCategory {
     bool in_3rd_row; // Forces advancements/recipes from Row 2 to Row 3
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
+    bool hide_substats_in_row1; // Multi-stats only: keep the sub-stats out of the overlay's 1st row
     bool groups_enabled = false; // If true, show criterion grouping UI and persist groups_enabled flag.
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
@@ -662,6 +663,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.in_3rd_row != b.in_3rd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
+        a.hide_substats_in_row1 != b.hide_substats_in_row1 ||
         a.groups_enabled != b.groups_enabled ||
         a.linked_goal_mode != b.linked_goal_mode ||
         are_linked_goals_different(a.linked_goals, b.linked_goals) ||
@@ -1536,6 +1538,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
         cJSON *in_2nd_row = cJSON_GetObjectItem(category_json, "in_2nd_row");
         cJSON *in_3rd_row = cJSON_GetObjectItem(category_json, "in_3rd_row");
+        cJSON *hide_substats = cJSON_GetObjectItem(category_json, "hide_substats_in_row1");
 
         if (cJSON_IsString(icon)) {
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
@@ -1544,6 +1547,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_cat.in_2nd_row = cJSON_IsTrue(in_2nd_row); // Only for main stat not sub-stats
         if (cJSON_IsBool(in_3rd_row)) new_cat.in_3rd_row = cJSON_IsTrue(in_3rd_row);
+        if (cJSON_IsBool(hide_substats)) new_cat.hide_substats_in_row1 = cJSON_IsTrue(hide_substats);
 
         // Parse manual positions for the parent
         parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
@@ -2227,6 +2231,9 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
             }
         } else {
             // Complex (multi-stat)
+            if (cat.hide_substats_in_row1) {
+                cJSON_AddBoolToObject(cat_json, "hide_substats_in_row1", true);
+            }
             cJSON *criteria_object = cJSON_CreateObject();
             for (const auto &crit: cat.criteria) {
                 cJSON *crit_json = cJSON_CreateObject();
@@ -9849,6 +9856,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool ba_do_toggle_hidden = false;
                         bool ba_do_toggle_row2 = false;
                         bool ba_do_toggle_multistat = false;
+                        bool ba_do_toggle_hide_substats = false;
 
                         float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                          ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -9897,6 +9905,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   "If most are simple they all become multi-stat, and vice versa.\n"
                                                   "Converting a multi-stat category back to simple keeps only its\n"
                                                   "first sub-stat.");
+                            if (ImGui::Selectable("Toggle Hide Sub-Stats from Row 1##stat_ba"))
+                                ba_do_toggle_hide_substats = true;
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s",
+                                                  "Flip Hide Sub-Stats from Row 1 on every selected multi-stat category.\n"
+                                                  "If most are off they all hide their sub-stats, and vice versa.\n"
+                                                  "Simple stats in the selection are skipped.");
                             if (ImGui::Selectable("Layout Coordinates...##stat_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -9939,6 +9954,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
 
+                        // Only multi-stat categories have sub-stats on Row 1, so the majority vote and the
+                        // write both ignore simple stats in the selection.
+                        if (ba_do_toggle_hide_substats) {
+                            int eligible = 0;
+                            int hidden_count = 0;
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
+                                if (current_template_data.stats[idx].is_simple_stat) continue;
+                                eligible++;
+                                if (current_template_data.stats[idx].hide_substats_in_row1) hidden_count++;
+                            }
+                            bool target_hide = (hidden_count * 2 < eligible);
+                            for (int idx: s_stat_selection) {
+                                if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
+                                if (current_template_data.stats[idx].is_simple_stat) continue;
+                                current_template_data.stats[idx].hide_substats_in_row1 = target_hide;
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+
                         if (ba_do_toggle_multistat) {
                             int multi_count = 0;
                             for (int idx: s_stat_selection) {
@@ -9972,6 +10007,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 // If switching FROM Multi-Stat TO Simple Stat
                                 else if (!was_simple_stat && sc.is_simple_stat) {
+                                    // A simple stat has no sub-stats on Row 1, so drop the opt-out with it.
+                                    sc.hide_substats_in_row1 = false;
+
                                     // Copy the first criterion's display name up to the parent.
                                     strncpy(sc.display_name, sc.criteria[0].display_name,
                                             sizeof(sc.display_name) - 1);
@@ -10444,6 +10482,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stat.in_3rd_row = source_stat_ptr->in_3rd_row;
                         new_stat.is_recipe = source_stat_ptr->is_recipe;
                         new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
+                        new_stat.hide_substats_in_row1 = source_stat_ptr->hide_substats_in_row1;
                         new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
                         new_stat.icon_pos = source_stat_ptr->icon_pos;
                         new_stat.text_pos = source_stat_ptr->text_pos;
@@ -10704,6 +10743,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             // If switching FROM Multi-Stat TO Simple Stat
                             else if (!was_simple_stat && stat_cat.is_simple_stat) {
+                                // A simple stat has no sub-stats on Row 1, so drop the opt-out with it.
+                                stat_cat.hide_substats_in_row1 = false;
+
                                 // Copy the first criterion's display name up to the parent.
                                 strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name,
                                         sizeof(stat_cat.display_name) - 1);
@@ -10726,6 +10768,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "but have their own icons similar to %s criteria.",
                                      advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
+                        }
+
+                        // Only a multi-stat has sub-stats that reach Row 1 in the first place.
+                        if (!stat_cat.is_simple_stat) {
+                            ImGui::SameLine();
+                            if (ImGui::Checkbox("Hide Sub-Stats from Row 1",
+                                                &stat_cat.hide_substats_in_row1)) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                // Legacy achievements (1.6.4 and older) have no criteria, so that line is
+                                // dropped entirely there.
+                                char hide_substats_criteria_line[128] = "";
+                                if (creator_selected_version > MC_VERSION_1_6_4) {
+                                    snprintf(hide_substats_criteria_line, sizeof(hide_substats_criteria_line),
+                                             "\n%s criteria are not affected by this.", advancements_label_upper);
+                                }
+                                char hide_substats_tooltip_buffer[512];
+                                snprintf(hide_substats_tooltip_buffer, sizeof(hide_substats_tooltip_buffer),
+                                         "Keeps this category's sub-stats out of the overlay's 1st row\n"
+                                         "in every render mode (scrolling belt, page and compact).\n"
+                                         "The category itself is unaffected: it still shows in its own row\n"
+                                         "and still cycles through its sub-stats as the sub-text there.%s",
+                                         hide_substats_criteria_line);
+                                ImGui::SetTooltip("%s", hide_substats_tooltip_buffer);
+                            }
                         }
 
                         // --- Stat Category Linked Goals (Auto-Completion) ---
