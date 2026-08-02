@@ -7200,15 +7200,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
     // --- GLOBAL HYBRID SHIFT ---
     float padding = 50.0f;
+    float wrap_limit = wrapping_width - padding;
     if (settings->use_manual_layout) {
         padding = get_global_safe_x(t);
 
-        // Prevent auto-layout items from squeezing into a single column!
-        // We force the wrapping width to allow at least 3 items to fit side-by-side
-        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
-        if (wrapping_width < min_wrapping_width) {
-            wrapping_width = min_wrapping_width;
-        }
+        // Auto-layout items start to the right of the manual block, so the wrap limit has to be
+        // measured from that start. Otherwise they collapse into a single column.
+        wrap_limit = padding + fmaxf(wrapping_width - 100.0f, uniform_item_width);
     }
     float current_x = padding, row_max_height = 0.0f;
 
@@ -7383,7 +7381,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 item_y = cat->icon_pos.y + anchor_off.y;
             } else {
                 // Procedural Auto-Layout Wrapping
-                if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                if (current_x > padding && (current_x + uniform_item_width) > wrap_limit) {
                     current_x = padding;
                     current_y += row_max_height;
                     row_max_height = 0.0f;
@@ -8750,15 +8748,13 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     // --- GLOBAL HYBRID SHIFT ---
     float padding = 50.0f;
+    float wrap_limit = wrapping_width - padding;
     if (settings->use_manual_layout) {
         padding = get_global_safe_x(t);
 
-        // Prevent auto-layout items from squeezing into a single column!
-        // We force the wrapping width to allow at least 3 items to fit side-by-side
-        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
-        if (wrapping_width < min_wrapping_width) {
-            wrapping_width = min_wrapping_width;
-        }
+        // Auto-layout items start to the right of the manual block, so the wrap limit has to be
+        // measured from that start. Otherwise they collapse into a single column.
+        wrap_limit = padding + fmaxf(wrapping_width - 100.0f, uniform_item_width);
     }
     float current_x = padding, row_max_height = 0.0f;
 
@@ -8822,7 +8818,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             item_y = item->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
-            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+            if (current_x > padding && (current_x + uniform_item_width) > wrap_limit) {
                 current_x = padding;
                 current_y += row_max_height;
                 row_max_height = 0.0f;
@@ -9192,15 +9188,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
     // --- GLOBAL HYBRID SHIFT ---
     float padding = 50.0f;
+    float wrap_limit = wrapping_width - padding;
     if (settings->use_manual_layout) {
         padding = get_global_safe_x(t);
 
-        // Prevent auto-layout items from squeezing into a single column!
-        // We force the wrapping width to allow at least 3 items to fit side-by-side
-        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
-        if (wrapping_width < min_wrapping_width) {
-            wrapping_width = min_wrapping_width;
-        }
+        // Auto-layout items start to the right of the manual block, so the wrap limit has to be
+        // measured from that start. Otherwise they collapse into a single column.
+        wrap_limit = padding + fmaxf(wrapping_width - 100.0f, uniform_item_width);
     }
     float current_x = padding, row_max_height = 0.0f;
 
@@ -9264,7 +9258,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             item_y = item->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
-            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+            if (current_x > padding && (current_x + uniform_item_width) > wrap_limit) {
                 current_x = padding;
                 current_y += row_max_height;
                 row_max_height = 0.0f;
@@ -9809,10 +9803,13 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
 
     // --- Layout ---
     float padding = 50.0f;
+    float wrap_limit = wrapping_width - padding;
     if (settings->use_manual_layout) {
         padding = get_global_safe_x(t);
-        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
-        if (wrapping_width < min_wrapping_width) wrapping_width = min_wrapping_width;
+
+        // Auto-layout items start to the right of the manual block, so the wrap limit has to be
+        // measured from that start. Otherwise they collapse into a single column.
+        wrap_limit = padding + fmaxf(wrapping_width - 100.0f, uniform_item_width);
     }
     float current_x = padding, row_max_height = 0.0f;
     const float vertical_spacing = settings->tracker_vertical_spacing;
@@ -9851,7 +9848,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             item_x = goal->icon_pos.x + anchor_off.x;
             item_y = goal->icon_pos.y + anchor_off.y;
         } else {
-            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+            if (current_x > padding && (current_x + uniform_item_width) > wrap_limit) {
                 current_x = padding;
                 current_y += row_max_height;
                 row_max_height = 0.0f;
@@ -10260,15 +10257,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
     // --- GLOBAL HYBRID SHIFT ---
     float padding = 50.0f;
+    float wrap_limit = wrapping_width - padding;
     if (settings->use_manual_layout) {
         padding = get_global_safe_x(t);
 
-        // Prevent auto-layout items from squeezing into a single column!
-        // We force the wrapping width to allow at least 3 items to fit side-by-side
-        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
-        if (wrapping_width < min_wrapping_width) {
-            wrapping_width = min_wrapping_width;
-        }
+        // Auto-layout items start to the right of the manual block, so the wrap limit has to be
+        // measured from that start. Otherwise they collapse into a single column.
+        wrap_limit = padding + fmaxf(wrapping_width - 100.0f, uniform_item_width);
     }
     float current_x = padding, row_max_height = 0.0f;
 
@@ -10321,7 +10316,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             item_y = goal->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
-            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+            if (current_x > padding && (current_x + uniform_item_width) > wrap_limit) {
                 current_x = padding;
                 current_y += row_max_height;
                 row_max_height = 0.0f;
