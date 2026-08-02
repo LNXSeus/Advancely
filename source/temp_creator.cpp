@@ -3487,33 +3487,89 @@ static void bulk_layout_apply_decide(const char *section_label, const char *id,
     snprintf(out_label, out_cap, "Apply %s (%s)##%s", section_label, parts, id);
 }
 
+// Identifies the goal a manual position belongs to. Lets the editor seed the coordinates from the
+// spot the element currently occupies on the tracker, and describe how it relates to its parent.
+struct ManualPosContext {
+    Tracker *tracker = nullptr;
+    const char *section = nullptr; // Section id understood by tracker_get_current_element_pos()
+    const char *root_name = nullptr;
+    const char *parent_root_name = nullptr; // Set for criteria and sub-stats
+    bool is_sub_item = false;
+    bool has_sub_items = false;
+};
+
+// Maps the "Icon Pos." / "Text Pos." / "Progress Pos." labels onto the tracker's element ids.
+static const char *manual_pos_element_id(const char *pos_type) {
+    if (strncmp(pos_type, "Icon", 4) == 0) return "icon";
+    if (strncmp(pos_type, "Text", 4) == 0) return "text";
+    if (strncmp(pos_type, "Progress", 8) == 0) return "progress";
+    return nullptr;
+}
+
+// Seeds a never-placed manual position with the spot the element currently occupies on the tracker.
+// Used by the bulk Layout Coordinates popup when the apply only enables positioning, so the selected
+// items stay where they are instead of piling up at 0/0. element_index is 0 icon, 1 text, 2 progress.
+static void seed_manual_pos_from_tracker(ManualPos *pos, Tracker *t, const char *section,
+                                         const char *root_name, const char *parent_root_name,
+                                         int element_index) {
+    static const char *element_ids[3] = {"icon", "text", "progress"};
+    if (!pos || !t || !pos->is_set || pos->x != 0.0f || pos->y != 0.0f) return;
+    if (element_index < 0 || element_index > 2) return;
+
+    float current_x = 0.0f, current_y = 0.0f;
+    if (tracker_get_current_element_pos(t, section, root_name, parent_root_name,
+                                        element_ids[element_index], pos->anchor,
+                                        &current_x, &current_y)) {
+        pos->x = current_x;
+        pos->y = current_y;
+    }
+}
+
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false,
-                                 bool show_hide_checkbox = true, bool note_player_face = false) {
+                                 bool show_hide_checkbox = true, bool note_player_face = false,
+                                 const ManualPosContext *ctx = nullptr) {
+    bool is_sub_item = ctx && ctx->is_sub_item;
+    bool has_sub_items = ctx && ctx->has_sub_items;
     ImGui::PushID(label_id);
 
     bool was_set = pos->is_set;
     if (ImGui::Checkbox(pos_type, &pos->is_set)) {
         save_msg = MSG_NONE; // Triggers unsaved changes!
-        // Give it a sensible default if they are turning it on for the first time
+        // Start it off where the element currently sits, so enabling a position doesn't teleport it
         if (pos->is_set && !was_set && pos->x == 0.0f && pos->y == 0.0f) {
-            pos->x = 100.0f;
-            pos->y = 100.0f;
+            const char *element_id = manual_pos_element_id(pos_type);
+            float current_x = 0.0f, current_y = 0.0f;
+            if (ctx && ctx->tracker && ctx->section && element_id &&
+                tracker_get_current_element_pos(ctx->tracker, ctx->section, ctx->root_name,
+                                                ctx->parent_root_name, element_id, pos->anchor,
+                                                &current_x, &current_y)) {
+                pos->x = current_x;
+                pos->y = current_y;
+            } else {
+                pos->x = 100.0f;
+                pos->y = 100.0f;
+            }
         }
     }
     if (ImGui::IsItemHovered()) {
-        char tooltip[512];
+        char tooltip[768];
+        const char *independence_note = is_sub_item
+                                            ? "\nWith its own position it is independent from the parent,\n"
+                                              "including its \"Hide\" toggle. Without one it belongs to the\n"
+                                              "parent and follows the parent's position and hidden state."
+                                            : "";
         if (note_player_face) {
             snprintf(tooltip, sizeof(tooltip),
                      "Enable manual positioning for the %s of this %s.\n"
                      "In coop, the contributor player face is part of this box:\n"
                      "left/center anchors place the face to the left of the text,\n"
-                     "right anchors place it to the right.",
-                     pos_type, tooltip_item_name);
+                     "right anchors place it to the right.%s",
+                     pos_type, tooltip_item_name, independence_note);
         } else {
-            snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type,
-                     tooltip_item_name);
+            snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.%s", pos_type,
+                     tooltip_item_name, independence_note);
         }
         ImGui::SetTooltip("%s", tooltip);
     }
@@ -3524,15 +3580,28 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
             save_msg = MSG_NONE;
         }
         if (ImGui::IsItemHovered()) {
-            char tooltip[512];
+            char tooltip[768];
+            const char *relation_note = "";
+            if (is_sub_item) {
+                relation_note = "This toggle is independent as long as this element has its own\n"
+                        "position: it stays visible even when the parent is hidden.\n"
+                        "Without its own position it belongs to the parent and\n"
+                        "inherits the parent's hidden state instead.\n";
+            } else if (has_sub_items) {
+                relation_note = "Sub-items without their own position are only hidden once\n"
+                        "this goal's icon, text and progress are all hidden.\n"
+                        "Sub-item elements with their own position stay visible\n"
+                        "either way.\n";
+            }
             snprintf(tooltip, sizeof(tooltip),
                      "Hide the %s of this %s in the manual layout.\n"
+                     "%s"
                      "The \"Show All\" goal hiding mode still makes it visible.\n"
                      "You must apply unsaved changes for this to take visual effect.\n"
                      "This does not affect the automatic layout or the overlay.\n"
                      "The separate \"Hidden\" checkbox controls visibility in\n"
                      "the automatic layout and overlay.",
-                     pos_type, tooltip_item_name);
+                     pos_type, tooltip_item_name, relation_note);
             ImGui::SetTooltip("%s", tooltip);
         }
     }
@@ -6265,6 +6334,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                           strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                           strcmp(selected_template_info.optional_flag,
                                                  app_settings->optional_flag) == 0;
+
+        // Only the running template's data knows where an element currently sits, so manual
+        // positions can only be seeded from it while the active template is being edited.
+        Tracker *layout_seed_tracker = is_editing_active_template ? t : nullptr;
+
         if (is_editing_active_template) {
             auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
                 tracker_pos.x = editor_pos.x;
@@ -7461,6 +7535,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                    -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                     }
                                     if (icon_w_an) a.icon_pos.anchor = (AnchorPoint) s_adv_bl_icon_anchor;
+                                    if (icon_w_en && !icon_w_po)
+                                        seed_manual_pos_from_tracker(&a.icon_pos, layout_seed_tracker,
+                                                                     "advancement", a.root_name, nullptr, 0);
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
@@ -7469,7 +7546,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s",
                                                   "Applies only the buckets you changed since opening this popup.\n"
                                                   "Change nothing (or all four) to apply everything.\n"
-                                                  "Untouched fields are left as-is on each selected advancement.");
+                                                  "Untouched fields are left as-is on each selected advancement.\n"
+                                                  "Enabling a position without changing X/Y keeps items in place.");
                             ImGui::PopID();
 
                             ImGui::Separator();
@@ -7568,6 +7646,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                    -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                     }
                                     if (text_w_an) a.text_pos.anchor = (AnchorPoint) s_adv_bl_text_anchor;
+                                    if (text_w_en && !text_w_po)
+                                        seed_manual_pos_from_tracker(&a.text_pos, layout_seed_tracker,
+                                                                     "advancement", a.root_name, nullptr, 1);
                                     n++;
                                 }
                                 save_message_type = MSG_NONE;
@@ -7576,7 +7657,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s",
                                                   "Applies only the buckets you changed since opening this popup.\n"
                                                   "Change nothing (or all four) to apply everything.\n"
-                                                  "Untouched fields are left as-is on each selected advancement.");
+                                                  "Untouched fields are left as-is on each selected advancement.\n"
+                                                  "Enabling a position without changing X/Y keeps items in place.");
                             ImGui::PopID();
 
                             bool any_selected_complex = false;
@@ -7691,6 +7773,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                             }
                                             if (prog_w_an) a.progress_pos.anchor = (AnchorPoint) s_adv_bl_prog_anchor;
+                                            if (prog_w_en && !prog_w_po)
+                                                seed_manual_pos_from_tracker(&a.progress_pos, layout_seed_tracker,
+                                                                             "advancement", a.root_name, nullptr, 2);
                                         }
                                         n++;
                                     }
@@ -8305,15 +8390,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  advancement.root_name,
                                                                  force_open_header_root_name) == 0)) {
+                            ManualPosContext adv_ctx = {
+                                layout_seed_tracker, "advancement", advancement.root_name, nullptr, false,
+                                !advancement.criteria.empty()
+                            };
                             render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Pos.",
-                                                 &advancement.icon_pos, save_message_type);
+                                                 &advancement.icon_pos, save_message_type, false, true, false,
+                                                 &adv_ctx);
                             render_manual_pos_ui("text", advancements_label_singular_lower, "Text Pos.",
-                                                 &advancement.text_pos, save_message_type);
+                                                 &advancement.text_pos, save_message_type, false, true, false,
+                                                 &adv_ctx);
 
                             // ONLY show progress pos if this advancement has criteria!
-                            if (!advancement.criteria.empty()) {
+                            if (adv_ctx.has_sub_items) {
                                 render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Pos.",
-                                                     &advancement.progress_pos, save_message_type);
+                                                     &advancement.progress_pos, save_message_type, false, true, false,
+                                                     &adv_ctx);
                             }
                         }
 
@@ -8847,6 +8939,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
                                         if (icon_w_an) c.icon_pos.anchor = (AnchorPoint) s_crit_bl_icon_anchor;
+                                        if (icon_w_en && !icon_w_po)
+                                            seed_manual_pos_from_tracker(&c.icon_pos, layout_seed_tracker,
+                                                                         "advancement", c.root_name,
+                                                                         advancement.root_name, 0);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -8855,7 +8951,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected criterion.");
+                                                      "Untouched fields are left as-is on each selected criterion.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -8942,6 +9039,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       -MANUAL_POS_MAX), MANUAL_POS_MAX);
                                         }
                                         if (text_w_an) c.text_pos.anchor = (AnchorPoint) s_crit_bl_text_anchor;
+                                        if (text_w_en && !text_w_po)
+                                            seed_manual_pos_from_tracker(&c.text_pos, layout_seed_tracker,
+                                                                         "advancement", c.root_name,
+                                                                         advancement.root_name, 1);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -8950,7 +9051,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected criterion.");
+                                                      "Untouched fields are left as-is on each selected criterion.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
 
                                 ImGui::Separator();
@@ -9322,10 +9424,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                  force_open_child_header_root_name[0] != '\0' && strcmp(
                                                                      criterion.root_name,
                                                                      force_open_child_header_root_name) == 0)) {
+                                ManualPosContext crit_ctx = {
+                                    layout_seed_tracker, "advancement", criterion.root_name, advancement.root_name, true, false
+                                };
                                 render_manual_pos_ui("c_icon", "criterion", "Icon Pos.", &criterion.icon_pos,
-                                                     save_message_type);
+                                                     save_message_type, false, true, false, &crit_ctx);
                                 render_manual_pos_ui("c_text", "criterion", "Text Pos.", &criterion.text_pos,
-                                                     save_message_type, false, true, true);
+                                                     save_message_type, false, true, true, &crit_ctx);
                             }
 
                             ImGui::EndGroup();
@@ -10198,6 +10303,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               MANUAL_POS_MAX);
                                         }
                                         if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                        if (w_en && !w_po)
+                                            seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                         "stat", st.root_name,
+                                                                         nullptr, si);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -10206,7 +10315,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected item.");
+                                                      "Untouched fields are left as-is on each selected item.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
                             }
 
@@ -10903,14 +11013,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  stat_cat.root_name,
                                                                  force_open_header_root_name) == 0)) {
+                            ManualPosContext stat_ctx = {
+                                layout_seed_tracker, "stat", stat_cat.root_name, nullptr, false, stat_cat.criteria.size() > 1
+                            };
                             render_manual_pos_ui("s_icon", "stat category", "Icon Pos.", &stat_cat.icon_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &stat_ctx);
                             render_manual_pos_ui("s_text", "stat category", "Text Pos.", &stat_cat.text_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &stat_ctx);
 
                             render_manual_pos_ui("s_prog", "stat category", "Progress Pos.",
                                                  &stat_cat.progress_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &stat_ctx);
                         }
 
                         ImGui::Separator();
@@ -11483,6 +11596,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         MANUAL_POS_MAX);
                                                 }
                                                 if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                                if (w_en && !w_po)
+                                                    seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                                 "stat", c.root_name,
+                                                                                 stat_cat.root_name, si);
                                                 n++;
                                             }
                                             save_message_type = MSG_NONE;
@@ -11491,7 +11608,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             ImGui::SetTooltip("%s",
                                                               "Applies only the buckets you changed since opening this popup.\n"
                                                               "Change nothing (or all four) to apply everything.\n"
-                                                              "Untouched fields are left as-is on each selected item.");
+                                                              "Untouched fields are left as-is on each selected item.\n"
+                                                              "Enabling a position without changing X/Y keeps items in place.");
                                         ImGui::PopID();
                                     }
 
@@ -11870,12 +11988,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                      force_open_child_header_root_name[0] != '\0' &&
                                                                      strcmp(crit.root_name,
                                                                             force_open_child_header_root_name) == 0)) {
+                                    ManualPosContext sub_stat_ctx = {
+                                        layout_seed_tracker, "stat", crit.root_name, stat_cat.root_name, true, false
+                                    };
                                     render_manual_pos_ui("sc_icon", "sub-stat", "Icon Pos.", &crit.icon_pos,
-                                                         save_message_type);
+                                                         save_message_type, false, true, false, &sub_stat_ctx);
                                     render_manual_pos_ui("sc_text", "sub-stat", "Text Pos.", &crit.text_pos,
-                                                         save_message_type, false, true, true);
+                                                         save_message_type, false, true, true, &sub_stat_ctx);
                                     render_manual_pos_ui("sc_prog", "sub-stat", "Progress Pos.", &crit.progress_pos,
-                                                         save_message_type);
+                                                         save_message_type, false, true, false, &sub_stat_ctx);
                                 }
 
                                 ImGui::EndGroup();
@@ -12466,6 +12587,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               MANUAL_POS_MAX);
                                         }
                                         if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                        if (w_en && !w_po)
+                                            seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                         "unlock", u.root_name,
+                                                                         nullptr, si);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -12474,7 +12599,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected item.");
+                                                      "Untouched fields are left as-is on each selected item.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
                             }
 
@@ -12719,10 +12845,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("unlock",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  unlock.root_name, force_open_header_root_name) == 0)) {
+                            ManualPosContext unlock_ctx = {layout_seed_tracker, "unlock", unlock.root_name, nullptr, false, false};
                             render_manual_pos_ui("u_icon", "unlock", "Icon Pos.", &unlock.icon_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &unlock_ctx);
                             render_manual_pos_ui("u_text", "unlock", "Text Pos.", &unlock.text_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &unlock_ctx);
                         }
 
                         ImGui::EndGroup();
@@ -13308,6 +13435,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               MANUAL_POS_MAX);
                                         }
                                         if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                        if (w_en && !w_po)
+                                            seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                         "custom", g.root_name,
+                                                                         nullptr, si);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -13316,7 +13447,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected item.");
+                                                      "Untouched fields are left as-is on each selected item.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
                             }
 
@@ -13679,15 +13811,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("custom goal",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  goal.root_name, force_open_header_root_name) == 0)) {
+                            ManualPosContext cg_ctx = {layout_seed_tracker, "custom", goal.root_name, nullptr, false, false};
                             render_manual_pos_ui("cg_icon", "custom goal", "Icon Pos.", &goal.icon_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &cg_ctx);
                             render_manual_pos_ui("cg_text", "custom goal", "Text Pos.", &goal.text_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &cg_ctx);
 
                             // ONLY show progress pos if this Custom Goal is a counter!
                             if (goal.goal > 0 || goal.goal == -1) {
                                 render_manual_pos_ui("cg_prog", "custom goal", "Progress Pos.", &goal.progress_pos,
-                                                     save_message_type);
+                                                     save_message_type, false, true, false, &cg_ctx);
                             }
                         }
 
@@ -14478,6 +14611,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               MANUAL_POS_MAX);
                                         }
                                         if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                        if (w_en && !w_po)
+                                            seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                         "multi_stage", g.root_name,
+                                                                         nullptr, si);
                                         n++;
                                     }
                                     ms_goal_data_changed = true;
@@ -14487,7 +14624,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected item.");
+                                                      "Untouched fields are left as-is on each selected item.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
                             }
 
@@ -15021,12 +15159,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("multi-stage goal",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  goal.root_name, force_open_header_root_name) == 0)) {
+                            ManualPosContext ms_ctx = {layout_seed_tracker, "multi_stage", goal.root_name, nullptr, false, false};
                             render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Pos.", &goal.icon_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &ms_ctx);
                             render_manual_pos_ui("ms_text", "multi-stage goal", "Text Pos.", &goal.text_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &ms_ctx);
                             render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Pos.", &goal.progress_pos,
-                                                 save_message_type);
+                                                 save_message_type, false, true, false, &ms_ctx);
                         }
 
                         ImGui::Separator();
@@ -16769,6 +16908,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                               MANUAL_POS_MAX);
                                         }
                                         if (w_an) target->anchor = (AnchorPoint) *s.p_anchor;
+                                        if (w_en && !w_po)
+                                            seed_manual_pos_from_tracker(target, layout_seed_tracker,
+                                                                         "counter", g.root_name,
+                                                                         nullptr, si);
                                         n++;
                                     }
                                     save_message_type = MSG_NONE;
@@ -16777,7 +16920,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s",
                                                       "Applies only the buckets you changed since opening this popup.\n"
                                                       "Change nothing (or all four) to apply everything.\n"
-                                                      "Untouched fields are left as-is on each selected item.");
+                                                      "Untouched fields are left as-is on each selected item.\n"
+                                                      "Enabling a position without changing X/Y keeps items in place.");
                                 ImGui::PopID();
                             }
 
@@ -17304,12 +17448,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  counter.root_name,
                                                                  force_open_header_root_name) == 0)) {
+                            ManualPosContext ctr_ctx = {layout_seed_tracker, "counter", counter.root_name, nullptr, false, false};
                             render_manual_pos_ui("ctr_icon", "counter", "Icon Pos.",
-                                                 &counter.icon_pos, save_message_type);
+                                                 &counter.icon_pos, save_message_type, false, true, false, &ctr_ctx);
                             render_manual_pos_ui("ctr_text", "counter", "Text Pos.",
-                                                 &counter.text_pos, save_message_type);
+                                                 &counter.text_pos, save_message_type, false, true, false, &ctr_ctx);
                             render_manual_pos_ui("ctr_prog", "counter", "Progress Pos.",
-                                                 &counter.progress_pos, save_message_type);
+                                                 &counter.progress_pos, save_message_type, false, true, false,
+                                                 &ctr_ctx);
                         }
                     } else {
                         ImGui::Text("Select a Counter from the list to edit its details.");

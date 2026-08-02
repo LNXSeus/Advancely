@@ -1094,12 +1094,17 @@ Opening a template reveals a tabbed interface where you can define every goal.
     (for example `Apply Text Pos. (Hide)`). Change nothing, or change all four buckets, and it applies everything
     (labelled `(Everything)`), which is also how you stamp the default values onto a selection. Available wherever the goal type has at least one
     `ManualPos` field; stages and decorations are excluded (stages have no `ManualPos`; decoration shapes have
-    type-specific endpoint geometry that doesn't bulk-stride cleanly).
+    type-specific endpoint geometry that doesn't bulk-stride cleanly). Enabling a position without changing `X` / `Y`
+    seeds each selected goal with the spot it currently occupies on the tracker.
 * **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and
 the **stream overlay**. Separately, when a goal has manual positions set (for use with Manual Layout mode), each
 position (icon, text, progress) gains its own `Hide` checkbox that controls visibility on the **manual layout**
 only. This lets you, for example, hide a goal's progress text in the manual layout while still showing it on the
-overlay.
+overlay. For sub-items (criteria and sub-stats), a position with its own coordinates is independent: its `Hide`
+checkbox is the only thing that hides it, so it stays visible even when the parent goal is hidden. A sub-item
+position without its own coordinates belongs to the parent and inherits the parent's hidden state. Ticking a position
+for the first time starts it at the spot the element currently occupies on the tracker (when you are editing the
+active template), so enabling manual positioning never teleports the element.
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and

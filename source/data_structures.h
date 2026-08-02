@@ -187,6 +187,14 @@ struct ManualPos {
     bool is_set; // True if the user has manually placed this, false to fallback to auto-layout
     bool is_hidden_in_layout; // If true, this element is hidden in the manual layout (does not affect auto layout)
     AnchorPoint anchor = ANCHOR_TOP_LEFT; // The reference point for the coordinates
+
+    // Runtime only (never serialized): the world-space rect this element last rendered at.
+    // Lets the template editor seed manual coordinates with the element's current position.
+    float auto_x = 0.0f;
+    float auto_y = 0.0f;
+    float auto_w = 0.0f;
+    float auto_h = 0.0f;
+    bool auto_valid = false;
 };
 
 // --------- STAT AUTO-COMPLETION VIA LINKED GOALS ---------

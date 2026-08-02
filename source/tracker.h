@@ -661,6 +661,23 @@ const CounterLinkedGoal *tracker_get_visual_selected_goals(void);
 // Requests the tracker to clear its visual selection on the next frame.
 void tracker_request_clear_visual_selection(void);
 
+/**
+ * @brief Looks up the position an element currently renders at, in template-editor coordinates.
+ *
+ * Used to seed a manual position with the element's current spot the moment the user enables it,
+ * instead of dropping it at a fixed default. Reports false when the element is unknown or has not
+ * rendered yet (culled or hidden), in which case the caller keeps its own default.
+ *
+ * @param section          "advancement", "stat", "unlock", "custom", "multi_stage" or "counter".
+ * @param root_name        Root name of the goal, or of the criterion/sub-stat when parent_root_name is set.
+ * @param parent_root_name Root name of the parent category for criteria/sub-stats, NULL otherwise.
+ * @param element          "icon", "text" or "progress".
+ * @param anchor           The anchor the returned coordinates should refer to.
+ */
+bool tracker_get_current_element_pos(Tracker *t, const char *section, const char *root_name,
+                                     const char *parent_root_name, const char *element,
+                                     AnchorPoint anchor, float *out_x, float *out_y);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
