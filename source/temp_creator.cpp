@@ -7399,6 +7399,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##adv_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_adv_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_adv_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
@@ -7814,6 +7819,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##adv_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -7826,8 +7834,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_adv = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##adv_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -8831,6 +8846,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
                                 bool submit_apply = ImGui::Button("Apply##crit_bulk_icon");
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                      "(You can also press ENTER, or ESCAPE to cancel)");
+                                }
+                                if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                    submit_apply = true;
                                 if ((submit_enter || submit_apply) && s_crit_bulk_icon_buf[0] != '\0') {
                                     for (int idx: s_crit_selection) {
                                         if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
@@ -9080,6 +9101,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                 ImGui::Separator();
                                 if (ImGui::Button("Close##crit_bulk_layout")) ImGui::CloseCurrentPopup();
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                                }
                                 ImGui::EndPopup();
                             }
 
@@ -9089,8 +9113,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     bulk_delete_criteria = true;
                                     ImGui::CloseCurrentPopup();
                                 }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                                }
                                 ImGui::SameLine();
                                 if (ImGui::Button("Cancel##crit_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                      "(You can also press ESCAPE)");
+                                }
                                 ImGui::EndPopup();
                             }
 
@@ -10181,6 +10212,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##stat_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_stat_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_stat_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.stats.size()) continue;
@@ -10350,6 +10386,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##stat_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -10359,8 +10398,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_stats = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##stat_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -11471,6 +11517,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     bool submit_apply = ImGui::Button("Apply##sub_bulk_icon");
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                          "(You can also press ENTER, or ESCAPE to cancel)");
+                                    }
+                                    if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                        submit_apply = true;
                                     if ((submit_enter || submit_apply) && s_sub_bulk_icon_buf[0] != '\0') {
                                         for (int idx: s_sub_selection) {
                                             if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
@@ -11648,6 +11700,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                     ImGui::Separator();
                                     if (ImGui::Button("Close##sub_bulk_layout")) ImGui::CloseCurrentPopup();
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                                    }
                                     ImGui::EndPopup();
                                 }
 
@@ -11657,8 +11712,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         bulk_delete_sub = true;
                                         ImGui::CloseCurrentPopup();
                                     }
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s", "Delete every selected entry.\n"
+                                                          "(Press ESCAPE to cancel)");
+                                    }
                                     ImGui::SameLine();
                                     if (ImGui::Button("Cancel##sub_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                    if (ImGui::IsItemHovered()) {
+                                        ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                          "(You can also press ESCAPE)");
+                                    }
                                     ImGui::EndPopup();
                                 }
 
@@ -12489,6 +12552,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##unlocks_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_unlocks_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_unlocks_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
@@ -12644,6 +12712,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##unlocks_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -12653,9 +12724,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_unlocks = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##unlocks_bulk_confirm")) {
                                 ImGui::CloseCurrentPopup();
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
                             }
                             ImGui::EndPopup();
                         }
@@ -13342,6 +13420,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##custom_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_custom_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_custom_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
@@ -13498,6 +13581,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##custom_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -13507,8 +13593,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_custom = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##custom_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -14511,6 +14604,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##msg_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_msg_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_msg_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.multi_stage_goals.size())
@@ -14681,6 +14779,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##msg_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -14690,8 +14791,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_msg = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##msg_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -15555,6 +15663,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
                                 bool submit_apply = ImGui::Button("Apply##stage_bulk_icon");
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                      "(You can also press ENTER, or ESCAPE to cancel)");
+                                }
+                                if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))
+                                    submit_apply = true;
                                 if ((submit_enter || submit_apply) && s_stage_bulk_icon_buf[0] != '\0') {
                                     for (int idx: s_stage_selection) {
                                         if (idx < 0 || (size_t) idx >= goal.stages.size()) continue;
@@ -15576,8 +15690,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     bulk_delete_stages = true;
                                     ImGui::CloseCurrentPopup();
                                 }
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                                }
                                 ImGui::SameLine();
                                 if (ImGui::Button("Cancel##stage_bulk_confirm")) ImGui::CloseCurrentPopup();
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                      "(You can also press ESCAPE)");
+                                }
                                 ImGui::EndPopup();
                             }
 
@@ -16821,6 +16942,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             bool submit_apply = ImGui::Button("Apply##ctr_bulk_icon");
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Apply this icon path to every selected entry.\n"
+                                                  "(You can also press ENTER, or ESCAPE to cancel)");
+                            }
+                            if (!ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter)) submit_apply = true;
                             if ((submit_enter || submit_apply) && s_ctr_bulk_icon_buf[0] != '\0') {
                                 for (int idx: s_ctr_selection) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.counter_goals.size()) continue;
@@ -16988,6 +17114,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::Button("Close##ctr_bulk_layout")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Close the popup.\n(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -16997,8 +17126,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_ctr = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##ctr_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
@@ -17789,8 +17925,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bulk_delete_decos = true;
                                 ImGui::CloseCurrentPopup();
                             }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Delete every selected entry.\n(Press ESCAPE to cancel)");
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Cancel##deco_bulk_confirm")) ImGui::CloseCurrentPopup();
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("%s", "Keep everything and close the popup.\n"
+                                                  "(You can also press ESCAPE)");
+                            }
                             ImGui::EndPopup();
                         }
 
