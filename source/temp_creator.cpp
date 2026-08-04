@@ -1007,6 +1007,12 @@ static int multi_move_selected(std::vector<T> &vec, std::set<int> &sel, int targ
     return adjusted;
 }
 
+// Selects every index in [0, total_count). Used by the "Select All" bulk action in every tab.
+static void bulk_select_all(std::set<int> &sel, int total_count) {
+    sel.clear();
+    for (int i = 0; i < total_count; i++) sel.insert(i);
+}
+
 // Inverts a bulk selection: every index in [0, total_count) not currently selected becomes
 // selected, and vice versa. Used by the "Invert Selection" bulk action in every tab.
 static void bulk_invert_selection(std::set<int> &sel, int total_count) {
@@ -7244,6 +7250,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          : advancements_label_plural_lower);
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##adv_ba"))
+                                bulk_select_all(s_adv_selection,
+                                                (int) current_template_data.advancements.size());
+                            if (ImGui::IsItemHovered()) {
+                                char tip[256];
+                                snprintf(tip, sizeof(tip),
+                                         "Select every %s in the list.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
                             if (ImGui::Selectable("Invert Selection##adv_ba"))
                                 bulk_invert_selection(s_adv_selection,
                                                       (int) current_template_data.advancements.size());
@@ -7254,6 +7270,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", tip);
                             }
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##adv_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered()) {
                                 char tip[256];
@@ -8711,12 +8728,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          s_crit_selection.size() == 1 ? "criterion" : "criteria");
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
+                                if (ImGui::Selectable("Select All##crit_ba"))
+                                    bulk_select_all(s_crit_selection, (int) advancement.criteria.size());
+                                if (ImGui::IsItemHovered()) {
+                                    ImGui::SetTooltip("%s", "Select every criterion in the list.");
+                                }
                                 if (ImGui::Selectable("Invert Selection##crit_ba"))
                                     bulk_invert_selection(s_crit_selection, (int) advancement.criteria.size());
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
                                                       "Select every criterion that is not currently selected, and deselect the rest.");
                                 }
+                                ImGui::Separator();
                                 if (ImGui::Selectable("Set Icon...##crit_ba")) ba_open_icon = true;
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
@@ -9984,11 +10007,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_stat_selection.size() == 1 ? "stat" : "stats");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##stat_ba"))
+                                bulk_select_all(s_stat_selection, (int) current_template_data.stats.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every stat in the list.");
                             if (ImGui::Selectable("Invert Selection##stat_ba"))
                                 bulk_invert_selection(s_stat_selection, (int) current_template_data.stats.size());
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip(
                                     "%s", "Select every stat that is not currently selected, and deselect the rest.");
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##stat_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip(
@@ -11373,11 +11401,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              s_sub_selection.size() == 1 ? "" : "s");
                                     ImGui::TextDisabled("%s", hdr);
                                     ImGui::Separator();
+                                    if (ImGui::Selectable("Select All##sub_ba"))
+                                        bulk_select_all(s_sub_selection, (int) stat_cat.criteria.size());
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s", "Select every sub-stat in the list.");
                                     if (ImGui::Selectable("Invert Selection##sub_ba"))
                                         bulk_invert_selection(s_sub_selection, (int) stat_cat.criteria.size());
                                     if (ImGui::IsItemHovered())
                                         ImGui::SetTooltip("%s",
                                                           "Select every sub-stat that is not currently selected, and deselect the rest.");
+                                    ImGui::Separator();
                                     if (ImGui::Selectable("Set Icon...##sub_ba")) ba_open_icon = true;
                                     if (ImGui::IsItemHovered())
                                         ImGui::SetTooltip("%s",
@@ -12368,11 +12401,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_unlocks_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##unlocks_ba"))
+                                bulk_select_all(s_unlocks_selection, (int) current_template_data.unlocks.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every unlock in the list.");
                             if (ImGui::Selectable("Invert Selection##unlocks_ba"))
                                 bulk_invert_selection(s_unlocks_selection, (int) current_template_data.unlocks.size());
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
                                                   "Select every unlock that is not currently selected, and deselect the rest.");
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##unlocks_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -13213,12 +13251,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_custom_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##custom_ba"))
+                                bulk_select_all(s_custom_selection,
+                                                (int) current_template_data.custom_goals.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every custom goal in the list.");
                             if (ImGui::Selectable("Invert Selection##custom_ba"))
                                 bulk_invert_selection(s_custom_selection,
                                                       (int) current_template_data.custom_goals.size());
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
                                                   "Select every custom goal that is not currently selected, and deselect the rest.");
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##custom_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -14355,12 +14399,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_msg_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##msg_ba"))
+                                bulk_select_all(s_msg_selection,
+                                                (int) current_template_data.multi_stage_goals.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every multi-stage goal in the list.");
                             if (ImGui::Selectable("Invert Selection##msg_ba"))
                                 bulk_invert_selection(s_msg_selection,
                                                       (int) current_template_data.multi_stage_goals.size());
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
                                                   "Select every multi-stage goal that is not currently selected, and deselect the rest.");
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##msg_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -15456,11 +15506,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          s_stage_selection.size() == 1 ? "" : "s");
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
+                                if (ImGui::Selectable("Select All##stage_ba"))
+                                    bulk_select_all(s_stage_selection, (int) goal.stages.size());
+                                if (ImGui::IsItemHovered())
+                                    ImGui::SetTooltip("%s", "Select every stage in the list.");
                                 if (ImGui::Selectable("Invert Selection##stage_ba"))
                                     bulk_invert_selection(s_stage_selection, (int) goal.stages.size());
                                 if (ImGui::IsItemHovered())
                                     ImGui::SetTooltip("%s",
                                                       "Select every stage that is not currently selected, and deselect the rest.");
+                                ImGui::Separator();
                                 if (goal.use_stage_icons) {
                                     if (ImGui::Selectable("Set Icon...##stage_ba")) ba_open_icon = true;
                                     if (ImGui::IsItemHovered())
@@ -16676,12 +16731,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_ctr_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##ctr_ba"))
+                                bulk_select_all(s_ctr_selection,
+                                                (int) current_template_data.counter_goals.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every counter in the list.");
                             if (ImGui::Selectable("Invert Selection##ctr_ba"))
                                 bulk_invert_selection(s_ctr_selection,
                                                       (int) current_template_data.counter_goals.size());
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
                                                   "Select every counter that is not currently selected, and deselect the rest.");
+                            ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##ctr_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -17701,6 +17762,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      s_deco_selection.size() == 1 ? "" : "s");
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
+                            if (ImGui::Selectable("Select All##deco_ba"))
+                                bulk_select_all(s_deco_selection,
+                                                (int) current_template_data.decorations.size());
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", "Select every decoration in the list.");
                             if (ImGui::Selectable("Invert Selection##deco_ba"))
                                 bulk_invert_selection(s_deco_selection,
                                                       (int) current_template_data.decorations.size());
