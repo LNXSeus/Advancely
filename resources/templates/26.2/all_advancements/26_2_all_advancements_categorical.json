@@ -1539,6 +1539,7 @@
 		},
 		"hdwgh_summary":	{
 			"icon":	"items/bucket_25w14craftmine.png",
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
@@ -1611,6 +1612,7 @@
 			"icon":	"items/bundle_25w14craftmine.png",
 			"hidden":	true,
 			"in_2nd_row":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"minecraft:picked_up/minecraft:ender_pearl":	{
 					"icon":	"items/ender_pearl_1.20.2.png",
@@ -1844,6 +1846,7 @@
 			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
 			"hidden":	true,
 			"in_2nd_row":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"minecraft:picked_up/minecraft:wither_skeleton_skull":	{
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
@@ -1904,6 +1907,7 @@
 		"stat_complete_helper":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"minecraft:crafted/minecraft:end_crystal":	{
 					"icon":	"blocks/placeholder.png",

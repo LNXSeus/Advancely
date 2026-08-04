@@ -326,30 +326,50 @@
 		"icon_pos":	{
 			"x":	1800,
 			"y":	655
+		},
+		"text_pos":	{
+			"x":	1836,
+			"y":	664
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:crimson_forest":	{
 		"icon_pos":	{
 			"x":	1800,
 			"y":	691
+		},
+		"text_pos":	{
+			"x":	1836,
+			"y":	700
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:warped_forest":	{
 		"icon_pos":	{
 			"x":	1800,
 			"y":	727
+		},
+		"text_pos":	{
+			"x":	1836,
+			"y":	736
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:basalt_deltas":	{
 		"icon_pos":	{
 			"x":	1800,
 			"y":	763
+		},
+		"text_pos":	{
+			"x":	1836,
+			"y":	772
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:soul_sand_valley":	{
 		"icon_pos":	{
 			"x":	1800,
 			"y":	799
+		},
+		"text_pos":	{
+			"x":	1836,
+			"y":	808
 		}
 	},
 	"advancement.minecraft.nether.netherite_armor":	{
@@ -1574,252 +1594,420 @@
 		"icon_pos":	{
 			"x":	0,
 			"y":	650
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	659
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:forest":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	685
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	694
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	720
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	729
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:birch_forest":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	755
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	764
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:birch_forest_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	790
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	799
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:dark_forest":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	825
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	834
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:swamp":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	860
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	869
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:taiga":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	895
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	904
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:taiga_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	930
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	939
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:giant_tree_taiga":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	965
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	974
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:giant_tree_taiga_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1000
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1009
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_taiga":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1035
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1044
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_taiga_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1070
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1079
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_tundra":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1105
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1114
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_mountains":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	650
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	659
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_beach":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	685
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	694
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:frozen_river":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	720
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	729
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:river":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	755
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	764
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:desert":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	790
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	799
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:desert_hills":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	825
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	834
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:savanna":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	860
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	869
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:savanna_plateau":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	895
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	904
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:jungle":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	930
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	939
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:jungle_edge":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	965
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	974
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:jungle_hills":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	1000
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	1009
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:bamboo_jungle":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	1035
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	1044
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:bamboo_jungle_hills":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	1070
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	1079
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:stone_shore":	{
 		"icon_pos":	{
 			"x":	200,
 			"y":	1105
+		},
+		"text_pos":	{
+			"x":	236,
+			"y":	1114
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:mountains":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	650
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	659
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_mountains":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	685
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	694
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:badlands":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	720
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	729
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:badlands_plateau":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	755
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	764
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_badlands_plateau":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	790
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	799
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:mushroom_fields":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	825
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	834
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:mushroom_field_shore":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	860
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	869
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:beach":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	895
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	904
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:warm_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	930
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	939
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:lukewarm_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	965
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	974
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_lukewarm_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	1000
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	1009
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:cold_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	1035
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	1044
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_cold_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	1070
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	1079
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_frozen_ocean":	{
 		"icon_pos":	{
 			"x":	400,
 			"y":	1105
+		},
+		"text_pos":	{
+			"x":	436,
+			"y":	1114
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs":	{

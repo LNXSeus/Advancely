@@ -4,20 +4,18 @@
 	"stats":	{
 		"mob_heads":	{
 			"icon":	"blocks/Player_Head.png",
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"minecraft:picked_up/minecraft:creeper_head":	{
 					"icon":	"blocks/Creeper_Head.png",
-					"hidden":	true,
 					"target":	1
 				},
 				"minecraft:picked_up/minecraft:skeleton_skull":	{
 					"icon":	"blocks/Skeleton_Skull.png",
-					"hidden":	true,
 					"target":	1
 				},
 				"minecraft:picked_up/minecraft:zombie_head":	{
 					"icon":	"blocks/Zombie_Head.png",
-					"hidden":	true,
 					"target":	1
 				}
 			}

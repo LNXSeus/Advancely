@@ -2297,10 +2297,10 @@
 			"y":	760
 		}
 	},
-	"multi_stage_goal.bees_summary":	{
+	"multi_stage_goal.bees":	{
 		"icon_pos":	{
-			"x":	2125,
-			"y":	760
+			"x":	450,
+			"y":	885
 		}
 	},
 	"multi_stage_goal.thunder_summary":	{
@@ -2321,10 +2321,10 @@
 			"y":	1070
 		}
 	},
-	"multi_stage_goal.bees":	{
+	"multi_stage_goal.bees_summary":	{
 		"icon_pos":	{
-			"x":	450,
-			"y":	885
+			"x":	2125,
+			"y":	760
 		}
 	},
 	"multi_stage_goal.end_again":	{

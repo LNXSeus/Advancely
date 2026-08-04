@@ -677,6 +677,7 @@
 	"stats":	{
 		"hdwgh_summary":	{
 			"icon":	"items/bucket_25w14craftmine.png",
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.mineBlock.end_stone":	{
 					"icon":	"monsters/wither.png",
@@ -737,6 +738,7 @@
 			"icon":	"blocks/Chest_(S)_JE2.png",
 			"hidden":	true,
 			"in_2nd_row":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.pickup.minecraft.obsidian":	{
 					"icon":	"blocks/Obsidian_JE3_BE2.png",
@@ -837,6 +839,7 @@
 			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
 			"hidden":	true,
 			"in_2nd_row":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.pickup.minecraft.skull":	{
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
@@ -873,6 +876,7 @@
 		"stat_complete_helper":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.craft.minecraft.end_crystal":	{
 					"icon":	"blocks/placeholder.png",

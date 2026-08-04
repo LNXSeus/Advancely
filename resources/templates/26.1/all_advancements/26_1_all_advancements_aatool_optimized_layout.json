@@ -298,30 +298,50 @@
 		"icon_pos":	{
 			"x":	1920,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	1956,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:crimson_forest":	{
 		"icon_pos":	{
 			"x":	1920,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	1956,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:warped_forest":	{
 		"icon_pos":	{
 			"x":	1920,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	1956,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:basalt_deltas":	{
 		"icon_pos":	{
 			"x":	1920,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	1956,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.nether.explore_nether.criteria.minecraft:soul_sand_valley":	{
 		"icon_pos":	{
 			"x":	1920,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1956,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.trade_at_world_height":	{
@@ -691,156 +711,260 @@
 		"icon_pos":	{
 			"x":	1120,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:sheep":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:chicken":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:cow":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:mooshroom":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:cat":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:ocelot":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:wolf":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:fox":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:rabbit":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:bee":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:horse":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:donkey":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:mule":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	1156,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:camel":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:llama":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:goat":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:panda":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:sniffer":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:armadillo":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:turtle":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:nautilus":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:axolotl":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:frog":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:strider":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:hoglin":	{
 		"icon_pos":	{
 			"x":	1280,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	1316,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet":	{
@@ -864,240 +988,400 @@
 		"icon_pos":	{
 			"x":	1586,
 			"y":	138
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	147
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_porkchop":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	138
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	147
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.porkchop":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	174
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	183
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_beef":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	174
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	183
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.beef":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	210
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	219
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_chicken":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	210
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	219
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.chicken":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	246
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	255
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_mutton":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	246
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	255
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.mutton":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	282
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	291
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_rabbit":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	282
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	291
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.rabbit":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	318
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	327
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_cod":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	318
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	327
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cod":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	354
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	363
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.tropical_fish":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	354
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	363
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_salmon":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	390
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	399
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.salmon":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	390
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	399
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.pufferfish":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	426
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	435
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cookie":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	426
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	435
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.pumpkin_pie":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	462
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	471
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.apple":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	462
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	471
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.golden_apple":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	498
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	507
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.enchanted_golden_apple":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	498
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	507
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.golden_carrot":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	534
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	543
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.carrot":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	534
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	543
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.melon_slice":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	570
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	579
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.baked_potato":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	570
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	579
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.potato":	{
 		"icon_pos":	{
 			"x":	1586,
 			"y":	606
+		},
+		"text_pos":	{
+			"x":	1622,
+			"y":	615
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.poisonous_potato":	{
 		"icon_pos":	{
 			"x":	1746,
 			"y":	606
+		},
+		"text_pos":	{
+			"x":	1782,
+			"y":	615
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.beetroot":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	138
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	147
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.sweet_berries":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	174
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	183
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.glow_berries":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	210
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	219
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.chorus_fruit":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	246
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	255
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.mushroom_stew":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	282
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	291
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.suspicious_stew":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	318
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	327
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.rabbit_stew":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	354
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	363
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.beetroot_soup":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	390
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	399
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.dried_kelp":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	426
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	435
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.honey_bottle":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	462
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	471
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.rotten_flesh":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	498
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	507
 		}
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.spider_eye":	{
 		"icon_pos":	{
 			"x":	1906,
 			"y":	534
+		},
+		"text_pos":	{
+			"x":	1942,
+			"y":	543
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue":	{
@@ -1121,66 +1405,110 @@
 		"icon_pos":	{
 			"x":	1440,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:calico":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:red":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:black":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:white":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:ragdoll":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:british_shorthair":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:tabby":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:all_black":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:persian":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:siamese":	{
 		"icon_pos":	{
 			"x":	1440,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	1476,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack":	{
@@ -1204,54 +1532,90 @@
 		"icon_pos":	{
 			"x":	1600,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:ashen":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:snowy":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:black":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:rusty":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:chestnut":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:spotted":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:striped":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.husbandry.whole_pack.criteria.minecraft:woods":	{
 		"icon_pos":	{
 			"x":	1600,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	1636,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.husbandry.place_dried_ghast_in_water":	{
@@ -1653,324 +2017,540 @@
 		"icon_pos":	{
 			"x":	0,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:forest":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:birch_forest":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:old_growth_birch_forest":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:dark_forest":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:swamp":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:mangrove_swamp":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:taiga":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:old_growth_pine_taiga":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:old_growth_spruce_taiga":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_taiga":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:grove":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:ice_spikes":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_plains":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_slopes":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:snowy_beach":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:frozen_river":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:frozen_peaks":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:jagged_peaks":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:stony_peaks":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:stony_shore":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:windswept_hills":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:flower_forest":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:sunflower_plains":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:meadow":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:river":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:beach":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:desert":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:savanna":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:savanna_plateau":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:windswept_savanna":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:windswept_forest":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:windswept_gravelly_hills":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:ocean":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:cold_ocean":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:warm_ocean":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:lukewarm_ocean":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:frozen_ocean":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_ocean":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_cold_ocean":	{
 		"icon_pos":	{
 			"x":	0,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	36,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_frozen_ocean":	{
 		"icon_pos":	{
 			"x":	160,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	196,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_lukewarm_ocean":	{
 		"icon_pos":	{
 			"x":	320,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	356,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:mushroom_fields":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:cherry_grove":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:pale_garden":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:jungle":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:sparse_jungle":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:bamboo_jungle":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:badlands":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_badlands":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:eroded_badlands":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:dripstone_caves":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:lush_caves":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time.criteria.minecraft:deep_dark":	{
 		"icon_pos":	{
 			"x":	480,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	516,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs":	{
@@ -1996,247 +2576,408 @@
 			"y":	800
 		},
 		"text_pos":	{
-			"hidden":	true
+			"x":	676,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_horse":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:skeleton":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:husk":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:parched":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:camel_husk":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:drowned":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_nautilus":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:stray":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:bogged":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:spider":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:cave_spider":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:enderman":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:slime":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:magma_cube":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:ghast":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:blaze":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:wither_skeleton":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:piglin":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:piglin_brute":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombified_piglin":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:hoglin":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zoglin":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:silverfish":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:ender_dragon":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:endermite":	{
 		"icon_pos":	{
 			"x":	640,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	676,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:shulker":	{
 		"icon_pos":	{
 			"x":	800,
 			"y":	1268
+		},
+		"text_pos":	{
+			"x":	836,
+			"y":	1277
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:wither":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	800
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	809
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:phantom":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	836
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	845
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:guardian":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	872
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	881
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:elder_guardian":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	908
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	917
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:breeze":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	953
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:creaking":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	980
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	989
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_villager":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1016
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1025
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:witch":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1052
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1061
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:pillager":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1088
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1097
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:vindicator":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1124
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1133
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:evoker":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1160
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1169
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:vex":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1196
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:ravager":	{
 		"icon_pos":	{
 			"x":	960,
 			"y":	1232
+		},
+		"text_pos":	{
+			"x":	996,
+			"y":	1241
 		}
 	},
 	"advancement.minecraft.husbandry.obtain_netherite_hoe":	{
