@@ -142,19 +142,28 @@ static std::unordered_set<std::string> s_linked_top; // Top-level items (root_na
 static std::unordered_set<std::string> s_linked_sub; // Sub-items: composite key "parent_root\troot_name"
 
 // Mirrors the colored status tags shown in the template editor (Hidden, Row 1/2/3, recipe,
-// manual position). The search term must exactly equal a recognized keyword for the matching
-// flag to count, so typing e.g. "hidden" or "pos" filters the list down to flagged goals
-// without polluting ordinary name/root searches. effective_row is the overlay row the goal
-// actually lands on (1, 2 or 3), so "r2"/"r3" reveal goals that sit there by default, not just
-// the ones forced there; pass 0 to disable row matching. Pass false for flags a goal type lacks.
+// multi-stat, hidden sub-stats, manual position). The search term must exactly equal a recognized
+// keyword for the matching flag to count, so typing e.g. "hidden" or "pos" filters the list down to
+// flagged goals without polluting ordinary name/root searches. effective_row is the overlay row the
+// goal actually lands on (1, 2 or 3), so "r2"/"r3" reveal goals that sit there by default, not just
+// the ones forced there; pass 0 to disable row matching. is_multi_stat / substats_hidden_in_row1
+// only apply to stat categories. Pass false for flags a goal type lacks.
 static bool indicator_matches_search(const char *search, bool is_hidden, int effective_row,
-                                     bool is_recipe, bool manual_pos_set) {
+                                     bool is_recipe, bool manual_pos_set,
+                                     bool is_multi_stat = false,
+                                     bool substats_hidden_in_row1 = false) {
     if (!search || search[0] == '\0') return false;
     if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
     if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
     if (effective_row == 2 && (strcasecmp(search, "row2") == 0 || strcasecmp(search, "r2") == 0)) return true;
     if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
     if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
+    if (is_multi_stat && (strcasecmp(search, "multi") == 0 || strcasecmp(search, "multistat") == 0
+                          || strcasecmp(search, "multi-stat") == 0))
+        return true;
+    if (substats_hidden_in_row1 && (strcasecmp(search, "nor1") == 0 || strcasecmp(search, "no-r1") == 0
+                                    || strcasecmp(search, "norow1") == 0))
+        return true;
     if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
                            || strcasecmp(search, "manual") == 0))
         return true;
@@ -168,13 +177,38 @@ static int category_effective_row(const TrackableCategory *cat, bool is_stat_sec
     return cat->in_3rd_row ? 3 : 2;
 }
 
-// Text-only category match (no indicator keywords). Used to decide whether a parent's whole
-// child list should be revealed: only a genuine name/id/icon match expands all children, while
-// an indicator match (e.g. "r2") keeps the category atomic so its Row 1 criteria stay hidden.
+// Effective overlay row of a category's sub-items (advancement criteria and multi-stat sub-stats):
+// Row 1, or 0 (no row) when they never reach it. A simple stat's auto-generated criterion is never
+// on Row 1, and a multi-stat can opt its sub-stats out via hide_substats_in_row1, so "r1"/"row1"
+// must not turn either of them up.
+static int subitem_effective_row(const TrackableCategory *cat) {
+    if (cat->is_single_stat_category || cat->hide_substats_in_row1) return 0;
+    return 1;
+}
+
+// Text-only category match (no indicator keywords). Feeds category_reveals_children() below.
 static bool category_text_matches_search(const TrackableCategory *cat, const char *search) {
     return str_contains_insensitive(cat->display_name, search)
            || str_contains_insensitive(cat->root_name, search)
            || str_contains_insensitive(cat->icon_path, search);
+}
+
+// True when the search is one of the multi-stat keywords ("multi", "nor1", ...) and this category
+// answers to it. Every other flag is passed as unset so only those two can match here, which keeps
+// the keyword aliases defined in exactly one place.
+static bool category_substat_keyword_matches(const TrackableCategory *cat, const char *search,
+                                             bool is_stat_section) {
+    if (!is_stat_section || cat->is_single_stat_category) return false;
+    return indicator_matches_search(search, false, 0, false, false, true, cat->hide_substats_in_row1);
+}
+
+// Whether a search should reveal a parent's whole child list. A genuine name/id/icon match does,
+// and so do the multi-stat keywords, since those describe the sub-stats themselves. Other indicator
+// matches (e.g. "r2") keep the category atomic so its Row 1 criteria stay hidden.
+static bool category_reveals_children(const TrackableCategory *cat, const char *search,
+                                      bool is_stat_section) {
+    return category_text_matches_search(cat, search)
+           || category_substat_keyword_matches(cat, search, is_stat_section);
 }
 
 // Search helpers: match display_name, root_name, and icon_path against the search buffer.
@@ -190,11 +224,15 @@ static bool item_matches_search(const TrackableItem *item, const char *search, i
 }
 
 static bool category_matches_search(const TrackableCategory *cat, const char *search, bool is_stat_section) {
+    // Only stat categories can be multi-stats, so the advancement section never matches those two.
+    const bool is_multi_stat = is_stat_section && !cat->is_single_stat_category;
     return category_text_matches_search(cat, search)
            || indicator_matches_search(search, cat->is_hidden, category_effective_row(cat, is_stat_section),
                                        cat->is_recipe,
                                        cat->icon_pos.is_set || cat->text_pos.is_set ||
-                                       cat->progress_pos.is_set);
+                                       cat->progress_pos.is_set,
+                                       is_multi_stat,
+                                       is_multi_stat && cat->hide_substats_in_row1);
 }
 
 // Text-only counter match (no indicator keywords). Used for link expansion so that an indicator
@@ -6962,7 +7000,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (should_hide_parent_based_on_mode) continue;
 
         // Apply Search Filter for counting
-        bool parent_text_matches_search = category_text_matches_search(cat, t->search_buffer);
+        bool parent_reveals_children = category_reveals_children(cat, t->search_buffer, is_stat_section);
         bool parent_matches_search = category_matches_search(cat, t->search_buffer, is_stat_section);
         bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
         bool any_visible_child_matches_search = false;
@@ -6987,14 +7025,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (child_linked) any_child_is_linked = true;
 
                 // Now check search filter for this visible child (criteria/sub-stats are Row 1)
-                if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
+                if (item_matches_search(crit, t->search_buffer, subitem_effective_row(cat))) {
                     any_visible_child_matches_search = true;
                     // Count this child towards sub-totals if it matches search
                     total_visible_sub_count++;
                     if (crit->done) {
                         completed_sub_count++;
                     }
-                } else if (parent_text_matches_search) {
+                } else if (parent_reveals_children) {
                     // If parent matches, still count this visible (but non-matching) child towards sub-totals
                     total_visible_sub_count++;
                     if (crit->done) {
@@ -7061,7 +7099,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 if (should_hide_crit_render) continue;
 
-                if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
+                if (item_matches_search(crit, t->search_buffer, subitem_effective_row(cat))) {
                     child_matches_render = true;
                     break;
                 }
@@ -7152,7 +7190,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (parent_should_hide_render) continue;
 
             // Search Filter (for rendering visibility)
-            bool parent_text_matches = category_text_matches_search(cat, t->search_buffer);
+            bool parent_reveals_children = category_reveals_children(cat, t->search_buffer, is_stat_section);
             bool parent_matches = category_matches_search(cat, t->search_buffer, is_stat_section);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             bool child_matches_render = false;
@@ -7169,7 +7207,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (crit_should_hide_render) continue;
 
                     // Now, check both hiding status AND the search term (criteria are Row 1)
-                    if (item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1)) {
+                    if (item_matches_search(crit, t->search_buffer, subitem_effective_row(cat))) {
                         child_matches_render = true;
                         break;
                     }
@@ -7236,9 +7274,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
-                    bool crit_matches_search = parent_text_matches
+                    bool crit_matches_search = parent_reveals_children
                                                || (child_matches_render && item_matches_search(
-                                                       crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1))
+                                                       crit, t->search_buffer, subitem_effective_row(cat)))
                                                || s_linked_sub.count(crit_link_key);
 
                     if (crit && !crit_should_hide_width && crit_matches_search) {
@@ -7339,15 +7377,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (should_hide_parent_render) continue;
 
             // --- Search Filtering (for rendering) ---
-            // A genuine text match on the parent reveals ALL its children; an indicator match
-            // (e.g. "r2"/"r3") keeps the category atomic, so its Row 1 criteria stay hidden.
-            bool parent_text_matches = category_text_matches_search(cat, t->search_buffer);
+            // A genuine text match on the parent reveals ALL its children, as do the multi-stat
+            // keywords; any other indicator match (e.g. "r2"/"r3") keeps the category atomic, so
+            // its Row 1 criteria stay hidden.
+            bool parent_reveals_children = category_reveals_children(cat, t->search_buffer, is_stat_section);
             bool parent_matches = category_matches_search(cat, t->search_buffer, is_stat_section);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             std::vector<TrackableItem *> matching_children; // Children that match search or are linked
             bool child_matches_search = false; // Flag if any child matches search
             bool any_child_linked = false;
-            if (!parent_text_matches) {
+            if (!parent_reveals_children) {
                 for (int j = 0; j < cat->criteria_count; j++) {
                     TrackableItem *crit = cat->criteria[j];
                     if (!crit) continue;
@@ -7358,7 +7397,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (should_hide_crit_render) continue;
 
                     bool crit_search =
-                            item_matches_search(crit, t->search_buffer, cat->is_single_stat_category ? 0 : 1);
+                            item_matches_search(crit, t->search_buffer, subitem_effective_row(cat));
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_linked = s_linked_sub.count(crit_link_key) > 0;
 
@@ -7374,7 +7413,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // --- PREPARE CHILDREN LIST ---
             std::vector<TrackableItem *> children_to_render;
-            if (parent_text_matches) {
+            if (parent_reveals_children) {
                 // Text search matches parent → show ALL visible children (existing behavior)
                 for (int j = 0; j < cat->criteria_count; ++j) {
                     TrackableItem *crit = cat->criteria[j];
@@ -12099,14 +12138,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             "Using the search filter also dynamically updates the completion counters in the section headers.");
         ImGui::Separator();
         ImGui::TextUnformatted("Indicator keywords (match the colored tags in the template editor):");
+        ImGui::BulletText("recipe / rcp  - recipe advancements");
         ImGui::BulletText("hidden        - goals flagged as Hidden");
-        ImGui::BulletText("row1 / r1     - criteria & sub-stats (always the 1st overlay row)");
+        ImGui::BulletText("row1 / r1     - criteria & sub-stats that reach the 1st overlay row");
         ImGui::BulletText("row2 / r2     - every goal on the 2nd overlay row (default or forced)");
         ImGui::BulletText("row3 / r3     - every goal on the 3rd overlay row (default or forced)");
-        ImGui::BulletText("recipe / rcp  - recipe advancements");
+        ImGui::BulletText("multi         - multi-stat categories (with sub-stats)");
+        ImGui::BulletText("nor1          - multi-stats with sub-stats hidden from Row 1");
         ImGui::BulletText("pos / manual  - goals with custom manual-layout coordinates");
         ImGui::TextUnformatted("Row keywords match the overlay row a goal actually lands on, and show the\n"
-            "goal itself only (an advancement matching \"r2\" is shown without its criteria).");
+            "goal itself only (an advancement matching \"r2\" is shown without its criteria).\n"
+            "\"multi\" and \"nor1\" instead show each matching category with all of its sub-stats.");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 

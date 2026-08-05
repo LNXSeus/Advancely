@@ -339,23 +339,39 @@ static void draw_editor_row_status_tags(const EditorRowTag *tags, int count) {
 
 // Builds and draws the status tags for a goal-list row from its individual flags.
 // Pass in_2nd_row / in_3rd_row / is_recipe as false for goal types that don't support them.
+// is_multi_stat / substats_hidden_in_row1 only apply to stat categories; leave them false elsewhere.
 static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3rd_row,
-                                      bool is_recipe, bool manual_pos_set) {
-    EditorRowTag tags[5];
+                                      bool is_recipe, bool manual_pos_set,
+                                      bool is_multi_stat = false,
+                                      bool substats_hidden_in_row1 = false) {
+    EditorRowTag tags[7];
     int n = 0;
-    if (in_2nd_row)
-        tags[n++] = {"R2", IM_COL32(100, 180, 255, 255), "Forced to the 2nd overlay row"};
-    if (in_3rd_row)
-        tags[n++] = {"R3", IM_COL32(190, 140, 255, 255), "Forced to the 3rd overlay row"};
+    // Tag order mirrors the order of the checkboxes in the detail pane of every goal type:
+    // Is Recipe, Hidden, Row 2 / Row 3, Multi-Stat Category, Hide Sub-Stats from Row 1, then the
+    // manual-layout coordinates further down the pane.
+    if (is_recipe)
+        tags[n++] = {
+            "rcp", IM_COL32(130, 220, 130, 255),
+            "Recipe (counts toward progress percentage, not advancements)"
+        };
     if (is_hidden)
         tags[n++] = {
             "H", IM_COL32(255, 180, 60, 255),
             "Hidden from the overlay and automatic tracker layout"
         };
-    if (is_recipe)
+    if (in_2nd_row)
+        tags[n++] = {"R2", IM_COL32(100, 180, 255, 255), "Forced to the 2nd overlay row"};
+    if (in_3rd_row)
+        tags[n++] = {"R3", IM_COL32(190, 140, 255, 255), "Forced to the 3rd overlay row"};
+    if (is_multi_stat)
         tags[n++] = {
-            "rcp", IM_COL32(130, 220, 130, 255),
-            "Recipe (counts toward progress percentage, not advancements)"
+            "multi", IM_COL32(255, 140, 205, 255),
+            "Multi-stat category (tracks several sub-stats)"
+        };
+    if (substats_hidden_in_row1)
+        tags[n++] = {
+            "noR1", IM_COL32(235, 130, 95, 255),
+            "Sub-stats hidden from the overlay's 1st row"
         };
     if (manual_pos_set)
         tags[n++] = {"pos", IM_COL32(90, 210, 200, 255), "Has custom manual-layout coordinates"};
@@ -363,19 +379,28 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
 }
 
 // Matches the search term against a goal's status-indicator flags so the editor's search box
-// can filter by the colored row tags (Hidden, Row 1/2/3, recipe, manual position). The term must
-// exactly equal a recognized keyword for the matching flag to count, so it does not pollute
-// ordinary name/root searches. effective_row is the overlay row the goal actually lands on (1, 2
-// or 3), so "r2"/"r3" reveal goals that sit there by default, not just the ones forced there; pass
-// 0 to disable row matching. Pass false for flags a goal type does not support.
+// can filter by the colored row tags (Hidden, Row 1/2/3, recipe, multi-stat, hidden sub-stats,
+// manual position). The term must exactly equal a recognized keyword for the matching flag to
+// count, so it does not pollute ordinary name/root searches. effective_row is the overlay row the
+// goal actually lands on (1, 2 or 3), so "r2"/"r3" reveal goals that sit there by default, not just
+// the ones forced there; pass 0 to disable row matching. Pass false for flags a goal type does not
+// support.
 static bool indicator_matches_search(const char *search, bool is_hidden, int effective_row,
-                                     bool is_recipe, bool manual_pos_set) {
+                                     bool is_recipe, bool manual_pos_set,
+                                     bool is_multi_stat = false,
+                                     bool substats_hidden_in_row1 = false) {
     if (!search || search[0] == '\0') return false;
     if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
     if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
     if (effective_row == 2 && (strcasecmp(search, "row2") == 0 || strcasecmp(search, "r2") == 0)) return true;
     if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
     if (is_recipe && (strcasecmp(search, "recipe") == 0 || strcasecmp(search, "rcp") == 0)) return true;
+    if (is_multi_stat && (strcasecmp(search, "multi") == 0 || strcasecmp(search, "multistat") == 0
+                          || strcasecmp(search, "multi-stat") == 0))
+        return true;
+    if (substats_hidden_in_row1 && (strcasecmp(search, "nor1") == 0 || strcasecmp(search, "no-r1") == 0
+                                    || strcasecmp(search, "norow1") == 0))
+        return true;
     if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
                            || strcasecmp(search, "manual") == 0))
         return true;
@@ -383,8 +408,11 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
 }
 
 // Indicator match for a Row 1 sub-item (advancement criterion or sub-stat): hidden, r1/row1, pos.
-static bool subitem_indicator_matches_search(const EditorTrackableItem &c, const char *search) {
-    return indicator_matches_search(search, c.is_hidden, 1, false,
+// Pass on_row1 as false for the sub-stats of a multi-stat that opts out of Row 1
+// ("Hide Sub-Stats from Row 1"), so "r1"/"row1" does not turn them up.
+static bool subitem_indicator_matches_search(const EditorTrackableItem &c, const char *search,
+                                             bool on_row1 = true) {
+    return indicator_matches_search(search, c.is_hidden, on_row1 ? 1 : 0, false,
                                     c.icon_pos.is_set || c.text_pos.is_set || c.progress_pos.is_set);
 }
 
@@ -4599,12 +4627,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // exposes a different subset (e.g. only advancements have recipes; only criteria/sub-stats
             // sit on Row 1). Build the keyword list to match the scope currently being searched.
             bool ind_hidden = false, ind_row1 = false, ind_row23 = false, ind_recipe = false, ind_pos = false;
+            bool ind_multi = false, ind_subh = false;
             switch (current_search_scope) {
                 case SCOPE_ADVANCEMENTS:
                     ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = true;
                     break;
                 case SCOPE_STATS:
                     ind_hidden = ind_row1 = ind_row23 = ind_pos = true;
+                    ind_multi = ind_subh = true;
                     break;
                 case SCOPE_UNLOCKS:
                 case SCOPE_CUSTOM:
@@ -4619,7 +4649,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 default:
                     break;
             }
-            bool any_indicator = ind_hidden || ind_row1 || ind_row23 || ind_recipe || ind_pos;
+            bool any_indicator = ind_hidden || ind_row1 || ind_row23 || ind_recipe || ind_pos
+                                 || ind_multi || ind_subh;
 
             char tooltip_buffer[1024];
             int p = snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -4627,19 +4658,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (any_indicator) {
                 p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                               "\n\nIndicator keywords (match the colored row tags):");
+                if (ind_recipe)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  recipe / rcp  - recipe advancements");
                 if (ind_hidden)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  hidden        - goals flagged as Hidden");
                 if (ind_row1)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
-                                  "\n  row1 / r1     - criteria & sub-stats (always the 1st overlay row)");
+                                  "\n  row1 / r1     - criteria & sub-stats that reach the 1st overlay row");
                 if (ind_row23)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  row2 / r2     - goals on the 2nd overlay row (default or forced)"
                                   "\n  row3 / r3     - goals on the 3rd overlay row (default or forced)");
-                if (ind_recipe)
+                if (ind_multi)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
-                                  "\n  recipe / rcp  - recipe advancements");
+                                  "\n  multi         - multi-stat categories (with sub-stats)");
+                if (ind_subh)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  nor1          - multi-stats with sub-stats hidden from Row 1");
                 if (ind_pos)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  pos / manual  - goals with custom manual-layout coordinates");
@@ -9918,7 +9955,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 indicator_matches_search(tc_search_buffer, stat_cat.is_hidden,
                                                          stat_cat.in_2nd_row ? 2 : 3, stat_cat.is_recipe,
                                                          stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
-                                                         stat_cat.progress_pos.is_set)) {
+                                                         stat_cat.progress_pos.is_set,
+                                                         !stat_cat.is_simple_stat,
+                                                         !stat_cat.is_simple_stat &&
+                                                         stat_cat.hide_substats_in_row1)) {
                                 should_render = true;
                             }
 
@@ -9933,13 +9973,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           criterion.display_name, tc_search_buffer);
 
                                     // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
-                                    // Complex sub-stats are always Row 1; a simple stat has no real sub-stat to filter.
+                                    // Complex sub-stats sit on Row 1 unless the category opts out of it;
+                                    // a simple stat has no real sub-stat to filter.
                                     if (name_match ||
                                         str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
                                         str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
                                         (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
                                         (!stat_cat.is_simple_stat &&
-                                         indicator_matches_search(tc_search_buffer, criterion.is_hidden, 1, false,
+                                         indicator_matches_search(tc_search_buffer, criterion.is_hidden,
+                                                                  stat_cat.hide_substats_in_row1 ? 0 : 1, false,
                                                                   criterion.icon_pos.is_set || criterion.text_pos.is_set
                                                                   ||
                                                                   criterion.progress_pos.is_set))) {
@@ -10523,7 +10565,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         draw_goal_row_status_tags(
                             stat.is_hidden, stat.in_2nd_row, stat.in_3rd_row, false,
-                            stat.icon_pos.is_set || stat.text_pos.is_set || stat.progress_pos.is_set);
+                            stat.icon_pos.is_set || stat.text_pos.is_set || stat.progress_pos.is_set,
+                            !stat.is_simple_stat,
+                            !stat.is_simple_stat && stat.hide_substats_in_row1);
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -11189,7 +11233,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         str_contains_insensitive(crit.root_name, tc_search_buffer) ||
                                         str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
                                         (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
-                                        subitem_indicator_matches_search(crit, tc_search_buffer)) {
+                                        subitem_indicator_matches_search(crit, tc_search_buffer,
+                                                                         !stat_cat.hide_substats_in_row1)) {
                                         visible_criteria_count++;
                                     }
                                 }
@@ -11747,7 +11792,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
                                         !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
                                         (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr) &&
-                                        !subitem_indicator_matches_search(crit, tc_search_buffer)) {
+                                        !subitem_indicator_matches_search(crit, tc_search_buffer,
+                                                                          !stat_cat.hide_substats_in_row1)) {
                                         continue;
                                     }
                                 }
@@ -11876,7 +11922,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
                                                         !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
                                                         (cc.goal == 0 || strstr(gs, tc_search_buffer) == nullptr) &&
-                                                        !subitem_indicator_matches_search(cc, tc_search_buffer)) {
+                                                        !subitem_indicator_matches_search(
+                                                            cc, tc_search_buffer,
+                                                            !stat_cat.hide_substats_in_row1)) {
                                                         continue;
                                                     }
                                                 }

@@ -643,18 +643,25 @@ box (here or anywhere in the template editor's search menus) automatically re-fo
 You can also filter by the status indicators shown as colored tags in the template editor by typing one of these
 keywords (the term must match exactly):
 
+* `recipe`/`rcp`: recipe advancements.
 * `hidden`: goals flagged as Hidden.
-* `row1`/`r1`: criteria and sub-stats, which always sit on the 1st overlay row.
+* `row1`/`r1`: criteria and sub-stats, which sit on the 1st overlay row. The sub-stats of a multi-stat tagged `noR1`
+  are excluded, since that flag keeps them off the 1st row entirely, as are the single sub-stats of simple stats.
 * `row2`/`r2`: every goal that lands on the 2nd overlay row, whether it sits there by default (advancements, unlocks)
   or was forced there. When an advancement matches a row keyword it is shown on its own, without expanding its Row 1
   criteria.
 * `row3`/`r3`: every goal on the 3rd overlay row, by default (stats, custom goals, multi-stage goals, counters) or
   forced there.
-* `recipe`/`rcp`: recipe advancements.
-* `pos`/`manual`: goals with custom manual-layout coordinates.
+* `multi`/`multistat`/`multi-stat`: multi-stat categories, meaning stats that track several sub-stats.
+* `nor1`/`no-r1`/`norow1`: multi-stats whose sub-stats are kept out of the 1st overlay row.
+* `pos`/`position`/`manual`: goals with custom manual-layout coordinates.
 
-These keywords work in both the tracker search and the template editor's search. In the editor, the search box tooltip
-lists only the keywords that apply to the goal type currently selected in the scope dropdown.
+Unlike the row keywords, which show a matching goal on its own, `multi` and `nor1` expand each matching category in the
+tracker with all of its sub-stats, since both keywords are about the sub-stats themselves.
+
+These keywords work in both the tracker search and the template editor's search, and are listed in the tooltip of each
+search box. In the editor, that tooltip lists only the keywords that apply to the goal type currently selected in the
+scope dropdown, so `multi` and `nor1` only show up under the `Stats` scope.
 
 ### Section Completion Counters
 
@@ -1057,9 +1064,10 @@ Opening a template reveals a tabbed interface where you can define every goal.
   order.
 * **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, multi-stage goals,
   and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
-  detail pane: `R2`/`R3` (forced to the 2nd/3rd overlay row), `H` (hidden from the overlay and automatic tracker
-  layout), `rcp` (recipe, advancements only), and `pos` (has custom manual-layout coordinates). Hover the tags for a
-  tooltip describing the active ones.
+  detail pane: `rcp` (recipe, advancements only), `H` (hidden from the overlay and automatic tracker layout),
+  `R2`/`R3` (forced to the 2nd/3rd overlay row), `multi` (multi-stat category, stats only), `noR1` (sub-stats kept out
+  of the 1st overlay row, multi-stats only), and `pos` (has custom manual-layout coordinates). The tags appear in the
+  same order as the matching checkboxes in the detail pane. Hover the tags for a tooltip describing the active ones.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
   selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
