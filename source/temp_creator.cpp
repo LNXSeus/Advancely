@@ -3797,10 +3797,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_stat_display_names = true;
     static bool show_ms_goal_display_names = true;
     static bool show_counter_display_names = true;
+    static bool show_unlock_display_names = true;
+    static bool show_custom_display_names = true;
+    static bool show_deco_display_names = true;
     static EditorTrackableCategory *selected_advancement = nullptr;
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
     static int selected_counter_index = -1;
+    static int selected_unlock_index = -1;
+    static int selected_custom_index = -1;
+    static int selected_deco_index = -1;
 
     // Reverting reassigns the template vectors, invalidating the advancement/stat/multi-stage
     // selection pointers. Counters and custom goals survive because they use an index, so this
@@ -6334,9 +6340,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
             } else if (strcmp(t->visual_drag_goal_type, "Unlock") == 0) {
-                force_select_tab = FORCE_TAB_UNLOCKS;
+                for (int ui = 0; ui < (int) current_template_data.unlocks.size(); ui++) {
+                    if (strcmp(current_template_data.unlocks[ui].root_name, t->visual_drag_root_name) == 0) {
+                        selected_unlock_index = ui;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_UNLOCKS;
+                        break;
+                    }
+                }
             } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
-                force_select_tab = FORCE_TAB_CUSTOM;
+                for (int gi = 0; gi < (int) current_template_data.custom_goals.size(); gi++) {
+                    if (strcmp(current_template_data.custom_goals[gi].root_name, t->visual_drag_root_name) == 0) {
+                        selected_custom_index = gi;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_CUSTOM;
+                        break;
+                    }
+                }
             } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
                 for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
                     if (strcmp(current_template_data.counter_goals[ci].root_name, t->visual_drag_root_name) == 0) {
@@ -6349,7 +6373,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
             } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
-                force_select_tab = FORCE_TAB_DECORATIONS;
+                for (int di = 0; di < (int) current_template_data.decorations.size(); di++) {
+                    if (strcmp(current_template_data.decorations[di].id, t->visual_drag_root_name) == 0) {
+                        selected_deco_index = di;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_DECORATIONS;
+                        break;
+                    }
+                }
             }
 
             if (t->visual_layout_just_clicked) {
@@ -12304,6 +12337,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         else ++it;
                     }
 
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("UnlockListPane", ImVec2(pane_width, 0), true);
+
                     if (ImGui::Button("Import...##unlocks")) {
                         ImGui::OpenPopup("import_unlocks_source_popup");
                     }
@@ -12357,74 +12393,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Counter for the list (right-aligned on the Import line) ---
-                    bool is_unlock_search_active = (
-                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0'); {
-                        char counter_text_top[128];
-                        size_t count_top = 0;
-                        if (!is_unlock_search_active) {
-                            count_top = current_template_data.unlocks.size();
-                        } else {
-                            for (const auto &unlock: current_template_data.unlocks) {
-                                if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
-                                    str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(unlock.icon_path, tc_search_buffer) ||
-                                    indicator_matches_search(tc_search_buffer, unlock.is_hidden,
-                                                             unlock.in_3rd_row ? 3 : 2, false,
-                                                             unlock.icon_pos.is_set || unlock.text_pos.is_set ||
-                                                             unlock.progress_pos.is_set)) {
-                                    count_top++;
-                                }
-                            }
-                        }
-                        int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
-                                               count_top, count_top == 1 ? "Unlock" : "Unlocks");
-                        if (!s_unlocks_selection.empty() && pos_top < (int) sizeof(counter_text_top)) {
-                            snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
-                                     " \xC2\xB7 %d selected", (int) s_unlocks_selection.size());
-                        }
-                        float tw_top = ImGui::CalcTextSize(counter_text_top).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
-                        ImGui::TextDisabled("%s", counter_text_top);
-                    }
-
-                    // Add new unlock button
-                    if (ImGui::Button("Add New Unlock")) {
-                        // Create new unlock with default values
-                        EditorTrackableItem new_unlock = {};
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_unlock.root_name, sizeof(new_unlock.root_name), "minecraft:new_unlock_%d",
-                                     counter);
-                            bool name_exists = false;
-                            for (const auto &unlock: current_template_data.unlocks) {
-                                if (strcmp(unlock.root_name, new_unlock.root_name) == 0) {
-                                    name_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!name_exists) break;
-                            counter++;
-                        }
-                        snprintf(new_unlock.display_name, sizeof(new_unlock.display_name), "New Unlock %d", counter);
-                        strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
-                        new_unlock.icon_path[sizeof(new_unlock.icon_path) - 1] = '\0';
-                        current_template_data.unlocks.push_back(new_unlock);
-                        request_scroll_to_new_goal(new_unlock.root_name);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char add_unlock_tooltip_buffer[1024];
-                        snprintf(add_unlock_tooltip_buffer, sizeof(add_unlock_tooltip_buffer),
-                                 "Add a new blank unlock to this template.\n"
-                                 "Player Unlocks are abilities to unlock using XP levels.\n"
-                                 "Advancely looks for completed unlocks (e.g., 'minecraft:exploration')\n"
-                                 "within the \"obtained\" object of the unlocks file.\n\n"
-                                 "Click the 'Help' button for more info.");
-                        ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
-                    }
-
-                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    // --- Sorting Controls (right-aligned on the Import line) ---
                     bool can_sort_unlocks = false;
                     for (const auto &goal: current_template_data.unlocks) {
                         if (goal.sort_order > 0) {
@@ -12462,8 +12431,89 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::EndDisabled();
 
-                    int item_to_remove = -1;
-                    int item_to_copy = -1;
+                    // Add new unlock button
+                    if (ImGui::Button("Add New Unlock")) {
+                        // Create new unlock with default values
+                        EditorTrackableItem new_unlock = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_unlock.root_name, sizeof(new_unlock.root_name), "minecraft:new_unlock_%d",
+                                     counter);
+                            bool name_exists = false;
+                            for (const auto &unlock: current_template_data.unlocks) {
+                                if (strcmp(unlock.root_name, new_unlock.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_unlock.display_name, sizeof(new_unlock.display_name), "New Unlock %d", counter);
+                        strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
+                        new_unlock.icon_path[sizeof(new_unlock.icon_path) - 1] = '\0';
+                        current_template_data.unlocks.push_back(new_unlock);
+                        selected_unlock_index = (int) current_template_data.unlocks.size() - 1;
+                        request_scroll_to_new_goal(new_unlock.root_name);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char add_unlock_tooltip_buffer[1024];
+                        snprintf(add_unlock_tooltip_buffer, sizeof(add_unlock_tooltip_buffer),
+                                 "Add a new blank unlock to this template.\n"
+                                 "Player Unlocks are abilities to unlock using XP levels.\n"
+                                 "Advancely looks for completed unlocks (e.g., 'minecraft:exploration')\n"
+                                 "within the \"obtained\" object of the unlocks file.\n\n"
+                                 "Click the 'Help' button for more info.");
+                        ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Show Display Names##unl", &show_unlock_display_names);
+
+                    ImGui::Separator();
+
+                    bool unl_search_active = (current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
+
+                    auto unlock_matches_search = [&](const EditorTrackableItem &u) {
+                        return str_contains_insensitive(u.display_name, tc_search_buffer) ||
+                               str_contains_insensitive(u.root_name, tc_search_buffer) ||
+                               str_contains_insensitive(u.icon_path, tc_search_buffer) ||
+                               indicator_matches_search(tc_search_buffer, u.is_hidden,
+                                                        u.in_3rd_row ? 3 : 2, false,
+                                                        u.icon_pos.is_set || u.text_pos.is_set ||
+                                                        u.progress_pos.is_set);
+                    }; {
+                        size_t count_top = 0;
+                        if (!unl_search_active) {
+                            count_top = current_template_data.unlocks.size();
+                        } else {
+                            for (const auto &unlock: current_template_data.unlocks) {
+                                if (unlock_matches_search(unlock)) count_top++;
+                            }
+                        }
+                        char unl_count_text[160];
+                        int unl_pos = snprintf(unl_count_text, sizeof(unl_count_text), "%zu %s",
+                                               count_top, count_top == 1 ? "Unlock" : "Unlocks");
+                        if (!s_unlocks_selection.empty() && unl_pos < (int) sizeof(unl_count_text)) {
+                            snprintf(unl_count_text + unl_pos, sizeof(unl_count_text) - unl_pos,
+                                     " \xC2\xB7 %d selected", (int) s_unlocks_selection.size());
+                        }
+                        float tw = ImGui::CalcTextSize(unl_count_text).x;
+                        ImGui::SetCursorPosX(
+                            ImGui::GetCursorPosX() + (
+                                ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - tw) *
+                            0.5f);
+                        ImGui::TextDisabled("%s", unl_count_text);
+                    }
+
+                    std::vector<EditorTrackableItem *> unlocks_to_render;
+                    for (auto &unlock: current_template_data.unlocks) {
+                        if (unl_search_active && !unlock_matches_search(unlock)) continue;
+                        unlocks_to_render.push_back(&unlock);
+                    }
+
+                    int unl_to_remove_idx = -1;
+                    int unl_to_copy_idx = -1;
                     int unlocks_dnd_source_index = -1;
                     int unlocks_dnd_target_index = -1;
                     bool bulk_delete_unlocks = false;
@@ -12495,8 +12545,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
                                            ImGui::GetStyle().FramePadding.x * 2.0f;
                         float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
 
                         if (ImGui::SmallButton("Bulk Actions...##unlocks")) {
                             ImGui::OpenPopup("unlocks_bulk_actions_menu");
@@ -12798,126 +12847,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
-                    for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
-                        auto &unlock = current_template_data.unlocks[i];
+                    for (size_t i = 0; i < unlocks_to_render.size(); ++i) {
+                        auto &unlock = *unlocks_to_render[i];
+                        int unl_real_i = (int) (&unlock - &current_template_data.unlocks[0]);
+                        ImGui::PushID(&unlock);
 
-                        // SEARCH FILTER
-                        if (is_unlock_search_active) {
-                            if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
-                                !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
-                                !str_contains_insensitive(unlock.icon_path, tc_search_buffer) &&
-                                !indicator_matches_search(tc_search_buffer, unlock.is_hidden,
-                                                          unlock.in_3rd_row ? 3 : 2, false,
-                                                          unlock.icon_pos.is_set || unlock.text_pos.is_set ||
-                                                          unlock.progress_pos.is_set)) {
-                                continue;
-                            }
-                        }
-
-                        ImGui::PushID(i);
-
-                        // Add some vertical spacing to create a gap
-                        ImGui::Spacing();
-
-                        // Create a wide, 8-pixel-high invisible button to act as our drop zone
-                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
-
-                        // Drop target for dropping between items
-                        if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
-                                unlocks_dnd_source_index = *(const int *) payload->Data;
-                                unlocks_dnd_target_index = i;
-                            }
-                            ImGui::EndDragDropTarget();
-                        }
-
-                        // Draw a separator for visual feedback after the drop zone
-                        ImGui::Separator();
-
-                        // The InvisibleButton is now only a drag SOURCE
-                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
-
-                        // Make the whole item group a drag-drop source and target
-                        ImGui::BeginGroup();
-
-                        // Scroll to this item when clicked in visual layout
-                        if (scroll_to_goal_root_name[0] != '\0' &&
-                            strcmp(unlock.root_name, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
-                            scroll_to_goal_root_name[0] = '\0';
-                            scroll_to_align_top = false;
-                        }
-
-                        static char focused_unlock_root[192] = {};
-                        if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemActivated()) {
-                            strncpy(focused_unlock_root, unlock.root_name, sizeof(focused_unlock_root));
-                            focused_unlock_root[sizeof(focused_unlock_root) - 1] = '\0';
-                        }
-                        if (ImGui::IsItemDeactivatedAfterEdit()) {
-                            propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, focused_unlock_root,
-                                                  unlock.root_name, nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals,
-                                                  &current_template_data.multi_stage_goals);
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char root_name_tooltip_buffer[256];
-                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this unlock, e.g., 'minecraft:exploration'.");
-                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                        }
-                        if (ImGui::InputText("Display Name", unlock.display_name, sizeof(unlock.display_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
-                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name for this unlock.");
-                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                        }
-                        if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) {
-                            save_message_type = MSG_NONE; // Clear message on new edit
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[1024];
-                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
-                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Browse##UnlockIcon")) {
-                            char new_path[MAX_PATH_LENGTH];
-                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                                strncpy(unlock.icon_path, new_path, sizeof(unlock.icon_path));
-                                unlock.icon_path[sizeof(unlock.icon_path) - 1] = '\0';
-                                save_message_type = MSG_NONE;
-                            }
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[1024];
-                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
-                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                        } {
-                            bool is_unlock_selected = s_unlocks_selection.find((int) i) != s_unlocks_selection.end();
+                        const char *label = show_unlock_display_names
+                                                ? (unlock.display_name[0] ? unlock.display_name : unlock.root_name)
+                                                : unlock.root_name;
+                        if (label[0] == '\0') label = "[New Unlock]";
+                        {
+                            bool is_unlock_selected = s_unlocks_selection.find(unl_real_i) != s_unlocks_selection.end();
                             if (ImGui::Checkbox("##unlock_bulk_sel", &is_unlock_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_unlocks_last_clicked >= 0 && s_unlocks_last_clicked != (int) i) {
-                                    int lo = std::min(s_unlocks_last_clicked, (int) i);
-                                    int hi = std::max(s_unlocks_last_clicked, (int) i);
+                                if (shift && s_unlocks_last_clicked >= 0 && s_unlocks_last_clicked != unl_real_i) {
+                                    int lo = std::min(s_unlocks_last_clicked, unl_real_i);
+                                    int hi = std::max(s_unlocks_last_clicked, unl_real_i);
                                     for (int k = lo; k <= hi; k++) {
                                         if (k < 0 || (size_t) k >= current_template_data.unlocks.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p: unlocks_to_render) {
+                                            if (p == &current_template_data.unlocks[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!in_filter) continue;
                                         if (is_unlock_selected) s_unlocks_selection.insert(k);
                                         else s_unlocks_selection.erase(k);
                                     }
                                 } else {
-                                    if (is_unlock_selected) s_unlocks_selection.insert((int) i);
-                                    else s_unlocks_selection.erase((int) i);
+                                    if (is_unlock_selected) s_unlocks_selection.insert(unl_real_i);
+                                    else s_unlocks_selection.erase(unl_real_i);
                                 }
-                                s_unlocks_last_clicked = (int) i;
+                                s_unlocks_last_clicked = unl_real_i;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char sel_tip[320];
@@ -12930,204 +12893,202 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::SameLine();
                         }
-                        if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[512];
-                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, this unlock will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the automatic layout.\n"
-                                     "Does not affect the manual layout. Use the per-position\n"
-                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
-                                     "Visibility can be toggled in the main tracker settings.");
-                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                        }
 
-                        ImGui::SameLine();
-                        if (ImGui::Checkbox("Row 3##Unlock", &unlock.in_3rd_row)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[256];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this unlock to display on the 3rd row of the overlay\n"
-                                     "(normally reserved for stats, custom goals, etc.).");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
+                        char unl_badge_label[64];
+                        if (unlock.sort_order > 0)
+                            snprintf(unl_badge_label, sizeof(unl_badge_label), "%d##unl_badge", unlock.sort_order);
+                        else
+                            snprintf(unl_badge_label, sizeof(unl_badge_label), " - ##unl_badge");
 
-                        ImGui::SameLine();
+                        const char *unl_text_end = strstr(unl_badge_label, "##");
+                        float unl_badge_text_w = ImGui::CalcTextSize(unl_badge_label, unl_text_end).x;
+                        float unl_badge_w = std::max(28.0f, unl_badge_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
-                        if (ImGui::Button("Copy")) {
-                            item_to_copy = i;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Unlock:\n%s", unlock.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Remove")) {
-                            item_to_remove = i;
-                            save_message_type = MSG_NONE; // Clear message on new edit
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Unlock:\n%s", unlock.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-
-                        ImGui::SameLine();
-
-                        // --- Sort Badge ---
-                        char badge_label[32];
-                        if (unlock.sort_order > 0) {
-                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", unlock.sort_order, i);
-                        } else {
-                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
-                        }
-
-                        const char *text_end = strstr(badge_label, "##");
-                        float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
-                        float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
+                        if (ImGui::Button(unl_badge_label, ImVec2(unl_badge_w, 0))) {
                             if (unlock.sort_order > 0) unlock.sort_order = 0;
                             else unlock.sort_order = get_next_sort_order(current_template_data.unlocks);
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            if (unlock.sort_order > 0) {
+                            if (unlock.sort_order > 0)
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove unlock sort order");
-                            } else {
+                            else
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign unlock sort order");
-                            }
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
-
-                        if (render_layout_coordinates_header("unlock",
-                                                             force_open_header_root_name[0] != '\0' && strcmp(
-                                                                 unlock.root_name, force_open_header_root_name) == 0)) {
-                            ManualPosContext unlock_ctx = {layout_seed_tracker, "unlock", unlock.root_name, nullptr, false, false};
-                            render_manual_pos_ui("u_icon", "unlock", "Icon Pos.", &unlock.icon_pos,
-                                                 save_message_type, false, true, false, &unlock_ctx);
-                            render_manual_pos_ui("u_text", "unlock", "Text Pos.", &unlock.text_pos,
-                                                 save_message_type, false, true, false, &unlock_ctx);
-                        }
-
-                        ImGui::EndGroup();
-
                         ImGui::SameLine();
 
-                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
-                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+                        // X (Remove) button
+                        if (ImGui::Button("X")) { unl_to_remove_idx = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
 
-                        if (ImGui::BeginDragDropSource()) {
+                        // Copy button
+                        if (ImGui::Button("Copy")) { unl_to_copy_idx = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, selected_unlock_index == unl_real_i)) {
+                            selected_unlock_index = unl_real_i;
+                        }
+
+                        draw_goal_row_status_tags(
+                            unlock.is_hidden, false, unlock.in_3rd_row, false,
+                            unlock.icon_pos.is_set || unlock.text_pos.is_set ||
+                            unlock.progress_pos.is_set);
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(unlock.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
+                            selected_unlock_index = unl_real_i;
+                            scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
+                        }
+
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
-                            if (s_unlocks_selection.find((int) i) != s_unlocks_selection.end() &&
+                            if (s_unlocks_selection.find(unl_real_i) != s_unlocks_selection.end() &&
                                 s_unlocks_selection.size() > 1) {
                                 ImGui::Text("Reordering %d selected items", (int) s_unlocks_selection.size());
                             } else {
-                                ImGui::Text("Reorder %s", unlock.root_name);
+                                ImGui::Text("Reorder %s", label);
                             }
                             ImGui::EndDragDropSource();
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
+                                unlocks_dnd_source_index = *(const int *) payload->Data;
+                                unlocks_dnd_target_index = (int) i;
+                            }
+                            ImGui::EndDragDropTarget();
                         }
 
                         ImGui::PopID();
                     }
 
-                    // Final drop target to allow dropping at the end of the list
-                    ImGui::InvisibleButton("final_drop_target_unlocks", ImVec2(-1, 8.0f)); // Added larger drop zone
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
-                            unlocks_dnd_source_index = *(const int *) payload->Data;
-                            unlocks_dnd_target_index = current_template_data.unlocks.size();
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-
-                    if (unlocks_dnd_source_index != -1 && unlocks_dnd_target_index != -1 && unlocks_dnd_source_index !=
-                        unlocks_dnd_target_index) {
-                        if (s_unlocks_selection.find(unlocks_dnd_source_index) != s_unlocks_selection.end()) {
-                            multi_move_selected(current_template_data.unlocks, s_unlocks_selection,
-                                                unlocks_dnd_target_index);
-                            s_unlocks_last_clicked = -1;
-                        } else {
-                            EditorTrackableItem item_to_move = current_template_data.unlocks[unlocks_dnd_source_index];
-                            current_template_data.unlocks.erase(
-                                current_template_data.unlocks.begin() + unlocks_dnd_source_index);
-                            if (unlocks_dnd_target_index > unlocks_dnd_source_index) unlocks_dnd_target_index--;
-                            current_template_data.unlocks.insert(
-                                current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
-                            std::set<int> shifted_dnd;
-                            for (int idx: s_unlocks_selection) {
-                                int new_idx = idx;
-                                if (idx == unlocks_dnd_source_index) new_idx = unlocks_dnd_target_index;
-                                else {
-                                    if (idx > unlocks_dnd_source_index) new_idx--;
-                                    if (new_idx >= unlocks_dnd_target_index) new_idx++;
-                                }
-                                shifted_dnd.insert(new_idx);
-                            }
-                            s_unlocks_selection = shifted_dnd;
-                            s_unlocks_last_clicked = -1;
-                        }
-                        save_message_type = MSG_NONE;
-                    }
-
                     if (bulk_delete_unlocks && !s_unlocks_selection.empty()) {
                         std::vector<int> sorted_desc(s_unlocks_selection.begin(), s_unlocks_selection.end());
                         std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_unlock_index >= 0 &&
+                            selected_unlock_index < (int) current_template_data.unlocks.size()) {
+                            strncpy(selected_root_name_before_op,
+                                    current_template_data.unlocks[selected_unlock_index].root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
                         for (int idx: sorted_desc) {
                             if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                             clear_goal_links(current_template_data, current_template_data.unlocks[idx].root_name);
                             current_template_data.unlocks.erase(current_template_data.unlocks.begin() + idx);
                         }
+                        selected_unlock_index = -1;
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (int ui = 0; ui < (int) current_template_data.unlocks.size(); ui++) {
+                                if (strcmp(current_template_data.unlocks[ui].root_name,
+                                           selected_root_name_before_op) == 0) {
+                                    selected_unlock_index = ui;
+                                    break;
+                                }
+                            }
+                        }
                         s_unlocks_selection.clear();
                         s_unlocks_last_clicked = -1;
                         save_message_type = MSG_NONE;
-                        item_to_remove = -1;
+                        unl_to_remove_idx = -1;
+                        unl_to_copy_idx = -1;
+                        unlocks_dnd_source_index = -1;
+                        unlocks_dnd_target_index = -1;
                     }
 
-                    if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data,
-                                         current_template_data.unlocks[item_to_remove].root_name);
-                        current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
-                        std::set<int> shifted_rm;
-                        for (int idx: s_unlocks_selection) {
-                            if (idx == item_to_remove) continue;
-                            shifted_rm.insert(idx > item_to_remove ? idx - 1 : idx);
+                    if (unlocks_dnd_source_index != -1 && unlocks_dnd_target_index != -1) {
+                        EditorTrackableItem *source_item_ptr = unlocks_to_render[unlocks_dnd_source_index];
+                        EditorTrackableItem *target_item_ptr = unlocks_to_render[unlocks_dnd_target_index];
+                        int unl_src_real = (int) (source_item_ptr - &current_template_data.unlocks[0]);
+                        int unl_tgt_real = (int) (target_item_ptr - &current_template_data.unlocks[0]);
+
+                        if (s_unlocks_selection.find(unl_src_real) != s_unlocks_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_unlock_index >= 0 &&
+                                selected_unlock_index < (int) current_template_data.unlocks.size()) {
+                                strncpy(selected_root_name_before_op,
+                                        current_template_data.unlocks[selected_unlock_index].root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.unlocks, s_unlocks_selection, unl_tgt_real);
+                            s_unlocks_last_clicked = -1;
+                            selected_unlock_index = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                for (int ui = 0; ui < (int) current_template_data.unlocks.size(); ui++) {
+                                    if (strcmp(current_template_data.unlocks[ui].root_name,
+                                               selected_root_name_before_op) == 0) {
+                                        selected_unlock_index = ui;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            EditorTrackableItem item_to_move = *source_item_ptr;
+                            current_template_data.unlocks.erase(
+                                current_template_data.unlocks.begin() + unl_src_real);
+                            int insert_at = unl_tgt_real;
+                            if (unl_tgt_real > unl_src_real) insert_at--;
+                            current_template_data.unlocks.insert(
+                                current_template_data.unlocks.begin() + insert_at, item_to_move);
+                            selected_unlock_index = insert_at;
+                            s_unlocks_selection.clear();
+                            s_unlocks_last_clicked = -1;
                         }
-                        s_unlocks_selection = shifted_rm;
-                        if (s_unlocks_last_clicked == item_to_remove) s_unlocks_last_clicked = -1;
-                        else if (s_unlocks_last_clicked > item_to_remove) s_unlocks_last_clicked--;
                         save_message_type = MSG_NONE;
                     }
 
-                    // Logic to handle the copy action after the loop
-                    if (item_to_copy != -1) {
-                        const auto &source_item = current_template_data.unlocks[item_to_copy];
+                    if (unl_to_remove_idx >= 0 && unl_to_remove_idx < (int) unlocks_to_render.size()) {
+                        auto *ptr = unlocks_to_render[unl_to_remove_idx];
+                        int actual_idx = (int) (ptr - &current_template_data.unlocks[0]);
+                        clear_goal_links(current_template_data, ptr->root_name);
+                        current_template_data.unlocks.erase(current_template_data.unlocks.begin() + actual_idx);
+                        if (selected_unlock_index == actual_idx) selected_unlock_index = -1;
+                        else if (selected_unlock_index > actual_idx) selected_unlock_index--;
+                        std::set<int> shifted_rm;
+                        for (int idx: s_unlocks_selection) {
+                            if (idx == actual_idx) continue;
+                            shifted_rm.insert(idx > actual_idx ? idx - 1 : idx);
+                        }
+                        s_unlocks_selection = shifted_rm;
+                        if (s_unlocks_last_clicked == actual_idx) s_unlocks_last_clicked = -1;
+                        else if (s_unlocks_last_clicked > actual_idx) s_unlocks_last_clicked--;
+                        save_message_type = MSG_NONE;
+                    } else if (unl_to_copy_idx >= 0 && unl_to_copy_idx < (int) unlocks_to_render.size()) {
+                        const auto *source_item = unlocks_to_render[unl_to_copy_idx];
+                        int actual_idx = (int) (source_item - &current_template_data.unlocks[0]);
 
                         // Perform a manual, safe copy.
-                        EditorTrackableItem new_item;
-                        strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
+                        EditorTrackableItem new_item = {};
+                        strncpy(new_item.root_name, source_item->root_name, sizeof(new_item.root_name));
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
+                        strncpy(new_item.display_name, source_item->display_name, sizeof(new_item.display_name));
                         new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
-                        strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
+                        strncpy(new_item.icon_path, source_item->icon_path, sizeof(new_item.icon_path));
                         new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
-                        new_item.goal = source_item.goal;
-                        new_item.is_hidden = source_item.is_hidden;
-                        new_item.in_3rd_row = source_item.in_3rd_row;
-                        new_item.icon_pos = source_item.icon_pos;
-                        new_item.text_pos = source_item.text_pos;
-                        new_item.progress_pos = source_item.progress_pos;
+                        new_item.goal = source_item->goal;
+                        new_item.is_hidden = source_item->is_hidden;
+                        new_item.in_3rd_row = source_item->in_3rd_row;
+                        new_item.icon_pos = source_item->icon_pos;
+                        new_item.text_pos = source_item->text_pos;
+                        new_item.progress_pos = source_item->progress_pos;
 
                         new_item.sort_order = 0;
 
                         char base_name[192];
-                        strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
+                        strncpy(base_name, source_item->root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
                         char new_name[192];
                         int copy_counter = 1;
@@ -13146,15 +13107,164 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
-                                                             new_item);
+                        current_template_data.unlocks.insert(
+                            current_template_data.unlocks.begin() + actual_idx + 1, new_item);
+                        selected_unlock_index = actual_idx + 1;
                         request_scroll_to_new_goal(new_item.root_name);
                         std::set<int> shifted_cp;
-                        for (int idx: s_unlocks_selection) shifted_cp.insert(idx > item_to_copy ? idx + 1 : idx);
+                        for (int idx: s_unlocks_selection) shifted_cp.insert(idx > actual_idx ? idx + 1 : idx);
                         s_unlocks_selection = shifted_cp;
-                        if (s_unlocks_last_clicked > item_to_copy) s_unlocks_last_clicked++;
+                        if (s_unlocks_last_clicked > actual_idx) s_unlocks_last_clicked++;
                         save_message_type = MSG_NONE;
                     }
+
+                    ImGui::EndChild();
+
+                    ImGui::SameLine();
+
+                    // ===== Right Pane: Details =====
+                    ImGui::BeginChild("UnlockDetailPane", ImVec2(0, 0), true);
+                    if (selected_unlock_index >= 0 &&
+                        selected_unlock_index < (int) current_template_data.unlocks.size()) {
+                        auto &unlock = current_template_data.unlocks[selected_unlock_index];
+
+                        ImGui::Text("Edit Unlock Details");
+
+                        // "Reset All Positions" button
+                        {
+                            bool any_pos_set = unlock.icon_pos.is_set || unlock.text_pos.is_set;
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&unlock.icon_pos);
+                                    reset_manual_pos(&unlock.text_pos);
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this\n"
+                                             "unlock back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        // Root Name
+                        static char focused_unlock_root[192] = {};
+                        if (ImGui::InputText("Root Name##Unlock", unlock.root_name, sizeof(unlock.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_unlock_root, unlock.root_name, sizeof(focused_unlock_root));
+                            focused_unlock_root[sizeof(focused_unlock_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            if (unlock.root_name[0] == '\0') {
+                                strncpy(unlock.root_name, focused_unlock_root, sizeof(unlock.root_name) - 1);
+                                unlock.root_name[sizeof(unlock.root_name) - 1] = '\0';
+                            } else {
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, focused_unlock_root,
+                                                      unlock.root_name, nullptr, &current_template_data.stats,
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[256];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this unlock, e.g., 'minecraft:exploration'.");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
+
+                        // Display Name
+                        if (ImGui::InputText("Display Name##Unlock", unlock.display_name,
+                                             sizeof(unlock.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this unlock.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+
+                        // Icon Path + Browse
+                        if (ImGui::InputText("Icon Path##Unlock", unlock.icon_path, sizeof(unlock.icon_path))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the '%s' directory.", get_icons_display_path());
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##UnlockIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(unlock.icon_path, new_path, sizeof(unlock.icon_path) - 1);
+                                unlock.icon_path[sizeof(unlock.icon_path) - 1] = '\0';
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "The icon must be inside the '%s' folder!", get_icons_display_path());
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+
+                        // Hidden + Row 3
+                        if (ImGui::Checkbox("Hidden##Unlock", &unlock.is_hidden)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[512];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this unlock will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 3##Unlock", &unlock.in_3rd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this unlock to display on the 3rd row of the overlay\n"
+                                     "(normally reserved for stats, custom goals, etc.).");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        ImGui::Separator();
+
+                        // Layout Coordinates
+                        if (render_layout_coordinates_header("unlock",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 unlock.root_name, force_open_header_root_name) == 0)) {
+                            ManualPosContext unlock_ctx = {layout_seed_tracker, "unlock", unlock.root_name, nullptr, false, false};
+                            render_manual_pos_ui("u_icon", "unlock", "Icon Pos.", &unlock.icon_pos,
+                                                 save_message_type, false, true, false, &unlock_ctx);
+                            render_manual_pos_ui("u_text", "unlock", "Text Pos.", &unlock.text_pos,
+                                                 save_message_type, false, true, false, &unlock_ctx);
+                        }
+                    } else {
+                        ImGui::Text("Select an Unlock from the list to edit its details.");
+                    }
+                    ImGui::EndChild();
+
                     ImGui::EndTabItem();
                 }
             } {
@@ -13171,6 +13281,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             it = s_custom_selection.erase(it);
                         else ++it;
                     }
+
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("CustomGoalListPane", ImVec2(pane_width, 0), true);
 
                     if (ImGui::Button("Import...##custom_goals")) {
                         ImGui::OpenPopup("import_custom_goals_source_popup");
@@ -13191,77 +13304,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Counter for the list (right-aligned on the Import line) ---
-                    bool is_custom_search_active_top = (
-                        current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0'); {
-                        char counter_text_top[128];
-                        size_t count_top = 0;
-                        if (!is_custom_search_active_top) {
-                            count_top = current_template_data.custom_goals.size();
-                        } else {
-                            for (const auto &g: current_template_data.custom_goals) {
-                                char gs[32];
-                                snprintf(gs, sizeof(gs), "%d", g.goal);
-                                if (str_contains_insensitive(g.display_name, tc_search_buffer) ||
-                                    str_contains_insensitive(g.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(g.icon_path, tc_search_buffer) ||
-                                    (g.goal != 0 && strstr(gs, tc_search_buffer) != nullptr)) {
-                                    count_top++;
-                                }
-                            }
-                        }
-                        int pos_top = snprintf(counter_text_top, sizeof(counter_text_top), "%zu %s",
-                                               count_top, count_top == 1 ? "Custom Goal" : "Custom Goals");
-                        if (!s_custom_selection.empty() && pos_top < (int) sizeof(counter_text_top)) {
-                            snprintf(counter_text_top + pos_top, sizeof(counter_text_top) - pos_top,
-                                     " \xC2\xB7 %d selected", (int) s_custom_selection.size());
-                        }
-                        float tw_top = ImGui::CalcTextSize(counter_text_top).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - tw_top);
-                        ImGui::TextDisabled("%s", counter_text_top);
-                    }
-
-                    if (ImGui::Button("Add New Custom Goal")) {
-                        // Create a new custom goal with default values
-                        EditorTrackableItem new_goal = {};
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
-                            bool name_exists = false;
-                            for (const auto &goal: current_template_data.custom_goals) {
-                                if (strcmp(goal.root_name, new_goal.root_name) == 0) {
-                                    name_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!name_exists) break;
-                            counter++;
-                        }
-                        snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
-                        strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
-                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
-                        new_goal.goal = 1; // Default to a progress-based counter
-                        current_template_data.custom_goals.push_back(new_goal);
-                        request_scroll_to_new_goal(new_goal.root_name);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char add_custom_goal_tooltip_buffer[1024];
-                        snprintf(add_custom_goal_tooltip_buffer, sizeof(add_custom_goal_tooltip_buffer),
-                                 "Add a new blank custom goal to this template.\n"
-                                 "Custom Goals are useful for tracking objectives manually\n"
-                                 "that cannot be automatically detected by reading the game's world files.\n"
-                                 "E.g., the amount of times a structure has been visited.\n"
-                                 "Depending on the target value custom goals can have hotkeys.\n"
-                                 "These can then be configured in the settings window after selecting the template.\n"
-                                 "You need to be tabbed into the main tracker window for hotkeys to work.\n\n"
-                                 "Click the 'Help' button for more info.");
-                        ImGui::SetTooltip("%s", add_custom_goal_tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
-
-                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    // --- Sorting Controls (right-aligned on the Import line) ---
                     bool can_sort_custom = false;
                     for (const auto &goal: current_template_data.custom_goals) {
                         if (goal.sort_order > 0) {
@@ -13299,36 +13342,96 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::EndDisabled();
 
-                    // Determine if search is active for this scope
+                    if (ImGui::Button("Add New Custom Goal")) {
+                        // Create a new custom goal with default values
+                        EditorTrackableItem new_goal = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
+                            bool name_exists = false;
+                            for (const auto &goal: current_template_data.custom_goals) {
+                                if (strcmp(goal.root_name, new_goal.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
+                        strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+                        new_goal.goal = 1; // Default to a progress-based counter
+                        current_template_data.custom_goals.push_back(new_goal);
+                        selected_custom_index = (int) current_template_data.custom_goals.size() - 1;
+                        request_scroll_to_new_goal(new_goal.root_name);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char add_custom_goal_tooltip_buffer[1024];
+                        snprintf(add_custom_goal_tooltip_buffer, sizeof(add_custom_goal_tooltip_buffer),
+                                 "Add a new blank custom goal to this template.\n"
+                                 "Custom Goals are useful for tracking objectives manually\n"
+                                 "that cannot be automatically detected by reading the game's world files.\n"
+                                 "E.g., the amount of times a structure has been visited.\n"
+                                 "Depending on the target value custom goals can have hotkeys.\n"
+                                 "These can then be configured in the settings window after selecting the template.\n"
+                                 "You need to be tabbed into the main tracker window for hotkeys to work.\n\n"
+                                 "Click the 'Help' button for more info.");
+                        ImGui::SetTooltip("%s", add_custom_goal_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Show Display Names##cg", &show_custom_display_names);
+
+                    ImGui::Separator();
+
                     bool is_custom_search_active = (
                         current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
 
-                    // Create a filtered list to render
-                    std::vector<EditorTrackableItem *> goals_to_render;
-                    if (is_custom_search_active) {
-                        for (auto &goal: current_template_data.custom_goals) {
-                            char goal_str[32];
-                            snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
-
-                            if (str_contains_insensitive(goal.display_name, tc_search_buffer) ||
-                                str_contains_insensitive(goal.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
-                                (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
-                                indicator_matches_search(tc_search_buffer, goal.is_hidden,
-                                                         goal.in_2nd_row ? 2 : 3, false,
-                                                         goal.icon_pos.is_set || goal.text_pos.is_set ||
-                                                         goal.progress_pos.is_set)) {
-                                goals_to_render.push_back(&goal);
+                    auto custom_matches_search = [&](const EditorTrackableItem &g) {
+                        char goal_str[32];
+                        snprintf(goal_str, sizeof(goal_str), "%d", g.goal);
+                        return str_contains_insensitive(g.display_name, tc_search_buffer) ||
+                               str_contains_insensitive(g.root_name, tc_search_buffer) ||
+                               str_contains_insensitive(g.icon_path, tc_search_buffer) ||
+                               (g.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                               indicator_matches_search(tc_search_buffer, g.is_hidden,
+                                                        g.in_2nd_row ? 2 : 3, false,
+                                                        g.icon_pos.is_set || g.text_pos.is_set ||
+                                                        g.progress_pos.is_set);
+                    }; {
+                        size_t count_top = 0;
+                        if (!is_custom_search_active) {
+                            count_top = current_template_data.custom_goals.size();
+                        } else {
+                            for (const auto &g: current_template_data.custom_goals) {
+                                if (custom_matches_search(g)) count_top++;
                             }
                         }
-                    } else {
-                        for (auto &goal: current_template_data.custom_goals) {
-                            goals_to_render.push_back(&goal);
+                        char cg_count_text[160];
+                        int cg_pos = snprintf(cg_count_text, sizeof(cg_count_text), "%zu %s",
+                                              count_top, count_top == 1 ? "Custom Goal" : "Custom Goals");
+                        if (!s_custom_selection.empty() && cg_pos < (int) sizeof(cg_count_text)) {
+                            snprintf(cg_count_text + cg_pos, sizeof(cg_count_text) - cg_pos,
+                                     " \xC2\xB7 %d selected", (int) s_custom_selection.size());
                         }
+                        float tw = ImGui::CalcTextSize(cg_count_text).x;
+                        ImGui::SetCursorPosX(
+                            ImGui::GetCursorPosX() + (
+                                ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - tw) *
+                            0.5f);
+                        ImGui::TextDisabled("%s", cg_count_text);
                     }
 
-                    int item_to_remove = -1;
-                    int item_to_copy = -1;
+                    // Create a filtered list to render
+                    std::vector<EditorTrackableItem *> goals_to_render;
+                    for (auto &goal: current_template_data.custom_goals) {
+                        if (is_custom_search_active && !custom_matches_search(goal)) continue;
+                        goals_to_render.push_back(&goal);
+                    }
+
+                    int cg_to_remove_idx = -1;
+                    int cg_to_copy_idx = -1;
                     int custom_dnd_source_index = -1;
                     int custom_dnd_target_index = -1;
                     bool bulk_delete_custom = false;
@@ -13360,8 +13463,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
                                            ImGui::GetStyle().FramePadding.x * 2.0f;
                         float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
 
                         if (ImGui::SmallButton("Bulk Actions...##custom")) {
                             ImGui::OpenPopup("custom_bulk_actions_menu");
@@ -13667,42 +13769,324 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
                         auto &goal = *goals_to_render[i];
-                        int real_i = (int) (&goal - &current_template_data.custom_goals[0]);
+                        int cg_real_i = (int) (&goal - &current_template_data.custom_goals[0]);
+                        ImGui::PushID(&goal);
 
-                        ImGui::PushID(i);
-
-                        // Add some vertical spacing to create a gap
-                        ImGui::Spacing();
-                        //Create a wide, 8-pixel-high invisible button to act as our drop zone
-                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
-
-                        // Drop target for dropping between items
-                        if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
-                                custom_dnd_source_index = *(const int *) payload->Data;
-                                custom_dnd_target_index = i;
+                        const char *label = show_custom_display_names
+                                                ? (goal.display_name[0] ? goal.display_name : goal.root_name)
+                                                : goal.root_name;
+                        if (label[0] == '\0') label = "[New Custom Goal]";
+                        {
+                            bool is_cg_selected = s_custom_selection.find(cg_real_i) != s_custom_selection.end();
+                            if (ImGui::Checkbox("##custom_bulk_sel", &is_cg_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_custom_last_clicked >= 0 && s_custom_last_clicked != cg_real_i) {
+                                    int lo = std::min(s_custom_last_clicked, cg_real_i);
+                                    int hi = std::max(s_custom_last_clicked, cg_real_i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t) k >= current_template_data.custom_goals.size()) continue;
+                                        bool in_filter = false;
+                                        for (const auto *p: goals_to_render) {
+                                            if (p == &current_template_data.custom_goals[k]) {
+                                                in_filter = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!in_filter) continue;
+                                        if (is_cg_selected) s_custom_selection.insert(k);
+                                        else s_custom_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_cg_selected) s_custom_selection.insert(cg_real_i);
+                                    else s_custom_selection.erase(cg_real_i);
+                                }
+                                s_custom_last_clicked = cg_real_i;
                             }
-                            ImGui::EndDragDropTarget();
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple custom goals at once:\n"
+                                         "reordering (drag any selected row), setting the same icon,\n"
+                                         "toggling Hidden, and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
                         }
 
-                        // Draw a separator for visual feedback after the drop zone
-                        ImGui::Separator();
+                        char cg_badge_label[64];
+                        if (goal.sort_order > 0)
+                            snprintf(cg_badge_label, sizeof(cg_badge_label), "%d##cg_badge", goal.sort_order);
+                        else
+                            snprintf(cg_badge_label, sizeof(cg_badge_label), " - ##cg_badge");
 
-                        // Get cursor position to overlay the invisible button later
-                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+                        const char *cg_text_end = strstr(cg_badge_label, "##");
+                        float cg_badge_text_w = ImGui::CalcTextSize(cg_badge_label, cg_text_end).x;
+                        float cg_badge_w = std::max(28.0f, cg_badge_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
-                        ImGui::BeginGroup();
+                        if (ImGui::Button(cg_badge_label, ImVec2(cg_badge_w, 0))) {
+                            if (goal.sort_order > 0) goal.sort_order = 0;
+                            else goal.sort_order = get_next_sort_order(current_template_data.custom_goals);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (goal.sort_order > 0)
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove custom goal sort order");
+                            else
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign custom goal sort order");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // X (Remove) button
+                        if (ImGui::Button("X")) { cg_to_remove_idx = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Copy button
+                        if (ImGui::Button("Copy")) { cg_to_copy_idx = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, selected_custom_index == cg_real_i)) {
+                            selected_custom_index = cg_real_i;
+                        }
+
+                        draw_goal_row_status_tags(
+                            goal.is_hidden, goal.in_2nd_row, false, false,
+                            goal.icon_pos.is_set || goal.text_pos.is_set ||
+                            goal.progress_pos.is_set);
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
                             strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
                             ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
+                            selected_custom_index = cg_real_i;
                             scroll_to_goal_root_name[0] = '\0';
                             scroll_to_align_top = false;
                         }
 
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
+                            if (s_custom_selection.find(cg_real_i) != s_custom_selection.end() &&
+                                s_custom_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int) s_custom_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
+                            ImGui::EndDragDropSource();
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
+                                custom_dnd_source_index = *(const int *) payload->Data;
+                                custom_dnd_target_index = (int) i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
+                        ImGui::PopID();
+                    }
+
+                    if (bulk_delete_custom && !s_custom_selection.empty()) {
+                        std::vector<int> sorted_desc(s_custom_selection.begin(), s_custom_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_custom_index >= 0 &&
+                            selected_custom_index < (int) current_template_data.custom_goals.size()) {
+                            strncpy(selected_root_name_before_op,
+                                    current_template_data.custom_goals[selected_custom_index].root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
+                            clear_goal_links(current_template_data, current_template_data.custom_goals[idx].root_name);
+                            current_template_data.custom_goals.erase(
+                                current_template_data.custom_goals.begin() + idx);
+                        }
+                        selected_custom_index = -1;
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (int gi = 0; gi < (int) current_template_data.custom_goals.size(); gi++) {
+                                if (strcmp(current_template_data.custom_goals[gi].root_name,
+                                           selected_root_name_before_op) == 0) {
+                                    selected_custom_index = gi;
+                                    break;
+                                }
+                            }
+                        }
+                        s_custom_selection.clear();
+                        s_custom_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        cg_to_remove_idx = -1;
+                        cg_to_copy_idx = -1;
+                        custom_dnd_source_index = -1;
+                        custom_dnd_target_index = -1;
+                    }
+
+                    if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1) {
+                        EditorTrackableItem *source_item_ptr = goals_to_render[custom_dnd_source_index];
+                        EditorTrackableItem *target_item_ptr = goals_to_render[custom_dnd_target_index];
+                        int cg_src_real = (int) (source_item_ptr - &current_template_data.custom_goals[0]);
+                        int cg_tgt_real = (int) (target_item_ptr - &current_template_data.custom_goals[0]);
+
+                        if (s_custom_selection.find(cg_src_real) != s_custom_selection.end()) {
+                            char selected_root_name_before_op[192] = {};
+                            if (selected_custom_index >= 0 &&
+                                selected_custom_index < (int) current_template_data.custom_goals.size()) {
+                                strncpy(selected_root_name_before_op,
+                                        current_template_data.custom_goals[selected_custom_index].root_name,
+                                        sizeof(selected_root_name_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.custom_goals, s_custom_selection, cg_tgt_real);
+                            s_custom_last_clicked = -1;
+                            selected_custom_index = -1;
+                            if (selected_root_name_before_op[0] != '\0') {
+                                for (int gi = 0; gi < (int) current_template_data.custom_goals.size(); gi++) {
+                                    if (strcmp(current_template_data.custom_goals[gi].root_name,
+                                               selected_root_name_before_op) == 0) {
+                                        selected_custom_index = gi;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            EditorTrackableItem item_to_move = *source_item_ptr;
+                            current_template_data.custom_goals.erase(
+                                current_template_data.custom_goals.begin() + cg_src_real);
+                            int insert_at = cg_tgt_real;
+                            if (cg_tgt_real > cg_src_real) insert_at--;
+                            current_template_data.custom_goals.insert(
+                                current_template_data.custom_goals.begin() + insert_at, item_to_move);
+                            selected_custom_index = insert_at;
+                            s_custom_selection.clear();
+                            s_custom_last_clicked = -1;
+                        }
+                        save_message_type = MSG_NONE;
+                    }
+
+                    if (cg_to_remove_idx >= 0 && cg_to_remove_idx < (int) goals_to_render.size()) {
+                        auto *ptr = goals_to_render[cg_to_remove_idx];
+                        int actual_idx = (int) (ptr - &current_template_data.custom_goals[0]);
+                        clear_goal_links(current_template_data, ptr->root_name);
+                        current_template_data.custom_goals.erase(
+                            current_template_data.custom_goals.begin() + actual_idx);
+                        if (selected_custom_index == actual_idx) selected_custom_index = -1;
+                        else if (selected_custom_index > actual_idx) selected_custom_index--;
+                        std::set<int> shifted_rm;
+                        for (int idx: s_custom_selection) {
+                            if (idx == actual_idx) continue;
+                            shifted_rm.insert(idx > actual_idx ? idx - 1 : idx);
+                        }
+                        s_custom_selection = shifted_rm;
+                        if (s_custom_last_clicked == actual_idx) s_custom_last_clicked = -1;
+                        else if (s_custom_last_clicked > actual_idx) s_custom_last_clicked--;
+                        save_message_type = MSG_NONE;
+                    } else if (cg_to_copy_idx >= 0 && cg_to_copy_idx < (int) goals_to_render.size()) {
+                        const auto *source_item = goals_to_render[cg_to_copy_idx];
+                        int actual_idx = (int) (source_item - &current_template_data.custom_goals[0]);
+
+                        // Perform a manual, safe copy.
+                        EditorTrackableItem new_item = {};
+                        strncpy(new_item.root_name, source_item->root_name, sizeof(new_item.root_name));
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                        strncpy(new_item.display_name, source_item->display_name, sizeof(new_item.display_name));
+                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
+                        strncpy(new_item.icon_path, source_item->icon_path, sizeof(new_item.icon_path));
+                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
+                        new_item.goal = source_item->goal;
+                        new_item.is_hidden = source_item->is_hidden;
+                        new_item.in_2nd_row = source_item->in_2nd_row;
+                        new_item.icon_pos = source_item->icon_pos;
+                        new_item.text_pos = source_item->text_pos;
+                        new_item.progress_pos = source_item->progress_pos;
+                        new_item.linked_goals = source_item->linked_goals;
+                        new_item.linked_goal_mode = source_item->linked_goal_mode;
+
+                        new_item.sort_order = 0;
+
+                        char base_name[192];
+                        strncpy(base_name, source_item->root_name, sizeof(base_name) - 1);
+                        base_name[sizeof(base_name) - 1] = '\0';
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto &item: current_template_data.custom_goals) {
+                                if (strcmp(item.root_name, new_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+                        strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                        current_template_data.custom_goals.insert(
+                            current_template_data.custom_goals.begin() + actual_idx + 1, new_item);
+                        selected_custom_index = actual_idx + 1;
+                        request_scroll_to_new_goal(new_item.root_name);
+                        std::set<int> shifted_cp;
+                        for (int idx: s_custom_selection) shifted_cp.insert(idx > actual_idx ? idx + 1 : idx);
+                        s_custom_selection = shifted_cp;
+                        if (s_custom_last_clicked > actual_idx) s_custom_last_clicked++;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    ImGui::EndChild();
+
+                    ImGui::SameLine();
+
+                    // ===== Right Pane: Details =====
+                    ImGui::BeginChild("CustomGoalDetailPane", ImVec2(0, 0), true);
+                    if (selected_custom_index >= 0 &&
+                        selected_custom_index < (int) current_template_data.custom_goals.size()) {
+                        auto &goal = current_template_data.custom_goals[selected_custom_index];
+
+                        ImGui::Text("Edit Custom Goal Details");
+
+                        // "Reset All Positions" button
+                        {
+                            bool any_pos_set = goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                               goal.progress_pos.is_set;
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&goal.icon_pos);
+                                    reset_manual_pos(&goal.text_pos);
+                                    reset_manual_pos(&goal.progress_pos);
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this\n"
+                                             "custom goal back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        // Root Name
                         static char focused_cg_root[192] = {};
-                        if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
+                        if (ImGui::InputText("Goal Root Name##CustomGoal", goal.root_name, sizeof(goal.root_name))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemActivated()) {
@@ -13710,11 +14094,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             focused_cg_root[sizeof(focused_cg_root) - 1] = '\0';
                         }
                         if (ImGui::IsItemDeactivatedAfterEdit()) {
-                            propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, focused_cg_root, goal.root_name,
-                                                  nullptr, &current_template_data.stats,
-                                                  &current_template_data.custom_goals,
-                                                  &current_template_data.multi_stage_goals);
+                            if (goal.root_name[0] == '\0') {
+                                strncpy(goal.root_name, focused_cg_root, sizeof(goal.root_name) - 1);
+                                goal.root_name[sizeof(goal.root_name) - 1] = '\0';
+                            } else {
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, focused_cg_root,
+                                                      goal.root_name, nullptr, &current_template_data.stats,
+                                                      &current_template_data.custom_goals,
+                                                      &current_template_data.multi_stage_goals);
+                            }
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -13723,7 +14112,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "This is used to save progress and assign hotkeys.");
                             ImGui::SetTooltip("%s", root_name_tooltip_buffer);
                         }
-                        if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+
+                        // Display Name
+                        if (ImGui::InputText("Display Name##CustomGoal", goal.display_name,
+                                             sizeof(goal.display_name))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -13734,8 +14126,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "of the settings window to configure hotkeys.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
-                        if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
-                            save_message_type = MSG_NONE; // Clear message on new edit
+
+                        // Icon Path + Browse
+                        if (ImGui::InputText("Icon Path##CustomGoal", goal.icon_path, sizeof(goal.icon_path))) {
+                            save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[256];
@@ -13744,7 +14138,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
-                        if (ImGui::Button("Browse##CritIcon")) {
+                        if (ImGui::Button("Browse##CustomGoalIcon")) {
                             char new_path[MAX_PATH_LENGTH];
                             if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                                 strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
@@ -13758,7 +14152,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The icon must be inside the '%s' folder!", get_icons_display_path());
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
-                        if (ImGui::InputInt("Target Value", &goal.goal)) {
+
+                        // Target Value
+                        if (ImGui::InputInt("Target Value##CustomGoal", &goal.goal)) {
                             // No values below -1 allowed
                             if (goal.goal < -1) {
                                 goal.goal = -1;
@@ -13767,7 +14163,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (goal.goal > 0 && !goal.linked_goals.empty()) {
                                 goal.linked_goals.clear();
                             }
-                            save_message_type = MSG_NONE; // Clear message on new edit
+                            save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char target_goal_tooltip_buffer[1024];
@@ -13778,8 +14174,44 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      ">0 = Progress-based counter that completes at this value.");
                             ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
                         }
+                        ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
+
+                        // Hidden + Row 2
+                        if (ImGui::Checkbox("Hidden##CustomGoal", &goal.is_hidden)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[512];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this custom goal will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 2##CustomGoal", &goal.in_2nd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this custom goal to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s).", advancements_label_plural_lower);
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this custom goal to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
                         // Linked goals (only for manual goals: toggle or infinite counter)
                         if (goal.goal <= 0) {
+                            ImGui::Separator();
+
                             char select_btn_id[256];
                             snprintf(select_btn_id, sizeof(select_btn_id),
                                      "Select Goals##CustomGoal_%s", goal.root_name);
@@ -13797,7 +14229,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_msg_index = -1;
                                 goal_selector_msg_stage_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
-                                goal_selector_custom_goal_index = (int) i;
+                                goal_selector_custom_goal_index = selected_custom_index;
                                 snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
                                          goal.root_name);
                                 goal_selector_multi_selections.clear();
@@ -13839,7 +14271,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                 char child_id[256];
                                 snprintf(child_id, sizeof(child_id), "CustomGoalLinkedGoals_%s", goal.root_name);
-                                ImGui::BeginChild(child_id, ImVec2(0, 100), true);
+                                ImGui::BeginChild(child_id, ImVec2(0, 200), true);
                                 int remove_idx = -1;
                                 for (int li = 0; li < (int) goal.linked_goals.size(); li++) {
                                     auto &lg = goal.linked_goals[li];
@@ -13866,133 +14298,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::EndChild();
                             }
-                        } {
-                            bool is_cg_selected = s_custom_selection.find(real_i) != s_custom_selection.end();
-                            if (ImGui::Checkbox("##custom_bulk_sel", &is_cg_selected)) {
-                                bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_custom_last_clicked >= 0 && s_custom_last_clicked != real_i) {
-                                    int lo = std::min(s_custom_last_clicked, real_i);
-                                    int hi = std::max(s_custom_last_clicked, real_i);
-                                    for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t) k >= current_template_data.custom_goals.size()) continue;
-                                        if (is_custom_search_active) {
-                                            const auto &gg = current_template_data.custom_goals[k];
-                                            char gs[32];
-                                            snprintf(gs, sizeof(gs), "%d", gg.goal);
-                                            if (!str_contains_insensitive(gg.display_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(gg.root_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(gg.icon_path, tc_search_buffer) &&
-                                                !(gg.goal != 0 && strstr(gs, tc_search_buffer) != nullptr)) {
-                                                continue;
-                                            }
-                                        }
-                                        if (is_cg_selected) s_custom_selection.insert(k);
-                                        else s_custom_selection.erase(k);
-                                    }
-                                } else {
-                                    if (is_cg_selected) s_custom_selection.insert(real_i);
-                                    else s_custom_selection.erase(real_i);
-                                }
-                                s_custom_last_clicked = real_i;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char sel_tip[320];
-                                snprintf(sel_tip, sizeof(sel_tip),
-                                         "Select for bulk actions on multiple custom goals at once:\n"
-                                         "reordering (drag any selected row), setting the same icon,\n"
-                                         "toggling Hidden, and deletion.\n"
-                                         "Shift+Click to range-select or -deselect.");
-                                ImGui::SetTooltip("%s", sel_tip);
-                            }
-                            ImGui::SameLine();
-                        }
-                        if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[512];
-                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, this custom goal will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the automatic layout.\n"
-                                     "Does not affect the manual layout. Use the per-position\n"
-                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
-                                     "Visibility can be toggled in the main tracker settings.");
-                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
-                        ImGui::SameLine();
-                        if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[256];
-                            if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Force this stat category to display on the 2nd row of the overlay\n"
-                                         "(normally reserved for %s).", advancements_label_plural_lower);
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Force this stat category to display on the 2nd row of the overlay\n"
-                                         "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
+                        ImGui::Separator();
 
-                        ImGui::SameLine();
-
-                        // "Copy" button for custom goals
-                        if (ImGui::Button("Copy")) {
-                            item_to_copy = i;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal:\n%s",
-                                     goal.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-
-                        if (ImGui::Button("Remove")) {
-                            item_to_remove = i;
-                            save_message_type = MSG_NONE; // Clear message on new edit
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal:\n%s", goal.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-
-                        ImGui::SameLine();
-
-                        // --- Sort Badge ---
-                        char badge_label[32];
-                        if (goal.sort_order > 0) {
-                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", goal.sort_order, i);
-                        } else {
-                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
-                        }
-
-                        const char *text_end = strstr(badge_label, "##");
-                        float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
-                        float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
-                            if (goal.sort_order > 0) goal.sort_order = 0;
-                            else goal.sort_order = get_next_sort_order(current_template_data.custom_goals);
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            if (goal.sort_order > 0) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to remove custom goal sort order");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to assign custom goal sort order");
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-
+                        // Layout Coordinates
                         if (render_layout_coordinates_header("custom goal",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  goal.root_name, force_open_header_root_name) == 0)) {
@@ -14008,142 +14318,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      save_message_type, false, true, false, &cg_ctx);
                             }
                         }
-
-                        ImGui::EndGroup();
-
-                        ImGui::SameLine();
-                        // Create an invisible button over the entire group. This is our drag handle.
-                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
-                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
-
-                        // Add the required flag here
-                        if (ImGui::BeginDragDropSource()) {
-                            ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
-                            if (s_custom_selection.find(real_i) != s_custom_selection.end() &&
-                                s_custom_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int) s_custom_selection.size());
-                            } else {
-                                ImGui::Text("Reorder %s", goal.root_name);
-                            }
-                            ImGui::EndDragDropSource();
-                        }
-
-                        ImGui::PopID();
+                    } else {
+                        ImGui::Text("Select a Custom Goal from the list to edit its details.");
                     }
+                    ImGui::EndChild();
 
-                    // Final drop target for end of list
-                    ImGui::InvisibleButton("final_drop_target_custom", ImVec2(-1, 8.0f)); // Added larger drop zone
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
-                            custom_dnd_source_index = *(const int *) payload->Data;
-                            custom_dnd_target_index = current_template_data.custom_goals.size();
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-
-                    if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index !=
-                        custom_dnd_target_index) {
-                        int cg_src_real = -1, cg_tgt_real = -1;
-                        if (custom_dnd_source_index >= 0 && custom_dnd_source_index < (int) goals_to_render.size()) {
-                            cg_src_real = (int) (goals_to_render[custom_dnd_source_index] -
-                                                 &current_template_data.custom_goals[0]);
-                        }
-                        if (custom_dnd_target_index >= 0 && custom_dnd_target_index < (int) goals_to_render.size()) {
-                            cg_tgt_real = (int) (goals_to_render[custom_dnd_target_index] -
-                                                 &current_template_data.custom_goals[0]);
-                        } else {
-                            cg_tgt_real = (int) current_template_data.custom_goals.size();
-                        }
-                        if (cg_src_real >= 0 && s_custom_selection.find(cg_src_real) != s_custom_selection.end()) {
-                            multi_move_selected(current_template_data.custom_goals, s_custom_selection, cg_tgt_real);
-                            s_custom_last_clicked = -1;
-                        } else {
-                            EditorTrackableItem item_to_move = current_template_data.custom_goals[
-                                custom_dnd_source_index];
-                            current_template_data.custom_goals.erase(
-                                current_template_data.custom_goals.begin() + custom_dnd_source_index);
-                            if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
-                            current_template_data.custom_goals.insert(
-                                current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
-                            s_custom_selection.clear();
-                            s_custom_last_clicked = -1;
-                        }
-                        save_message_type = MSG_NONE;
-                    }
-
-                    if (bulk_delete_custom && !s_custom_selection.empty()) {
-                        std::vector<int> sorted_desc(s_custom_selection.begin(), s_custom_selection.end());
-                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                        for (int idx: sorted_desc) {
-                            if (idx < 0 || (size_t) idx >= current_template_data.custom_goals.size()) continue;
-                            clear_goal_links(current_template_data, current_template_data.custom_goals[idx].root_name);
-                            current_template_data.custom_goals.erase(
-                                current_template_data.custom_goals.begin() + idx);
-                        }
-                        s_custom_selection.clear();
-                        s_custom_last_clicked = -1;
-                        save_message_type = MSG_NONE;
-                        item_to_remove = -1;
-                    }
-
-                    if (item_to_remove != -1) {
-                        clear_goal_links(current_template_data,
-                                         current_template_data.custom_goals[item_to_remove].root_name);
-                        current_template_data.custom_goals.erase(
-                            current_template_data.custom_goals.begin() + item_to_remove);
-                        s_custom_selection.clear();
-                        s_custom_last_clicked = -1;
-                        save_message_type = MSG_NONE;
-                    }
-
-                    // Logic to handle the copy action after the loop
-                    if (item_to_copy != -1) {
-                        const auto &source_item = current_template_data.custom_goals[item_to_copy];
-
-                        // Perform a manual, safe copy.
-                        EditorTrackableItem new_item;
-                        strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
-                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
-                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
-                        strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
-                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
-                        new_item.goal = source_item.goal;
-                        new_item.is_hidden = source_item.is_hidden;
-                        new_item.in_2nd_row = source_item.in_2nd_row;
-                        new_item.icon_pos = source_item.icon_pos;
-                        new_item.text_pos = source_item.text_pos;
-                        new_item.progress_pos = source_item.progress_pos;
-
-                        new_item.sort_order = 0;
-
-                        char base_name[192];
-                        strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
-                        base_name[sizeof(base_name) - 1] = '\0';
-                        char new_name[192];
-                        int copy_counter = 1;
-                        while (true) {
-                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                            bool name_exists = false;
-                            for (const auto &item: current_template_data.custom_goals) {
-                                if (strcmp(item.root_name, new_name) == 0) {
-                                    name_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!name_exists) break;
-                            copy_counter++;
-                        }
-                        strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
-                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        current_template_data.custom_goals.insert(
-                            current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
-                        request_scroll_to_new_goal(new_item.root_name);
-                        s_custom_selection.clear();
-                        s_custom_last_clicked = -1;
-                        save_message_type = MSG_NONE;
-                    }
                     ImGui::EndTabItem();
                 }
             } // end custom goals tab scope
@@ -17726,6 +17905,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         else ++it;
                     }
 
+                    auto deco_type_name = [](DecorationType type) {
+                        if (type == DECORATION_TEXT_HEADER) return "Text Header";
+                        if (type == DECORATION_LINE) return "Line";
+                        if (type == DECORATION_ARROW) return "Arrow";
+                        return "Unknown";
+                    };
+
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("DecorationListPane", ImVec2(pane_width, 0), true);
+
                     if (ImGui::Button("Import...##decorations")) {
                         ImGui::OpenPopup("import_decorations_source_popup");
                     }
@@ -17746,135 +17935,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::EndPopup();
                     }
 
-                    // --- Counter for the list (right-aligned on the Import line) ---
-                    {
-                        bool deco_search_active_top = (
-                            current_search_scope == SCOPE_DECORATIONS && tc_search_buffer[0] != '\0');
-                        size_t deco_count_top = 0;
-                        if (!deco_search_active_top) {
-                            deco_count_top = current_template_data.decorations.size();
-                        } else {
-                            for (const auto &deco: current_template_data.decorations) {
-                                const char *type_str = "Unknown";
-                                if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
-                                else if (deco.type == DECORATION_LINE) type_str = "Line";
-                                else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
-                                if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
-                                    str_contains_insensitive(deco.id, tc_search_buffer) ||
-                                    str_contains_insensitive(type_str, tc_search_buffer)) {
-                                    deco_count_top++;
-                                }
-                            }
-                        }
-                        char deco_counter_top[128];
-                        int deco_pos_top = snprintf(deco_counter_top, sizeof(deco_counter_top), "%zu %s",
-                                                    deco_count_top, deco_count_top == 1 ? "Decoration" : "Decorations");
-                        if (!s_deco_selection.empty() && deco_pos_top < (int) sizeof(deco_counter_top)) {
-                            snprintf(deco_counter_top + deco_pos_top, sizeof(deco_counter_top) - deco_pos_top,
-                                     " \xC2\xB7 %d selected", (int) s_deco_selection.size());
-                        }
-                        float deco_tw_top = ImGui::CalcTextSize(deco_counter_top).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - deco_tw_top);
-                        ImGui::TextDisabled("%s", deco_counter_top);
-                    }
-
-                    if (ImGui::Button("Add Text Header")) {
-                        EditorDecorationElement new_elem = {};
-                        new_elem.type = DECORATION_TEXT_HEADER;
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_elem.id, sizeof(new_elem.id), "header_%d", counter);
-                            bool id_exists = false;
-                            for (const auto &deco: current_template_data.decorations) {
-                                if (strcmp(deco.id, new_elem.id) == 0) {
-                                    id_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!id_exists) break;
-                            counter++;
-                        }
-                        snprintf(new_elem.display_text, sizeof(new_elem.display_text), "Header %d", counter);
-                        current_template_data.decorations.push_back(new_elem);
-                        request_scroll_to_new_goal(new_elem.id);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Add a text header decoration to the manual layout.\n"
-                                 "Text headers use the Tracker Font and Tracker Font Size.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::Button("Add Line")) {
-                        EditorDecorationElement new_elem = {};
-                        new_elem.type = DECORATION_LINE;
-                        new_elem.thickness = 2.0f;
-                        new_elem.opacity = 1.0f;
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_elem.id, sizeof(new_elem.id), "line_%d", counter);
-                            bool id_exists = false;
-                            for (const auto &deco: current_template_data.decorations) {
-                                if (strcmp(deco.id, new_elem.id) == 0) {
-                                    id_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!id_exists) break;
-                            counter++;
-                        }
-                        current_template_data.decorations.push_back(new_elem);
-                        request_scroll_to_new_goal(new_elem.id);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Add a line decoration to the manual layout.\n"
-                                 "Lines use the Tracker Font Color with separate opacity.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::Button("Add Arrow")) {
-                        EditorDecorationElement new_elem = {};
-                        new_elem.type = DECORATION_ARROW;
-                        new_elem.thickness = 2.0f;
-                        new_elem.arrowhead_size = 12.0f;
-                        new_elem.opacity_before = (float) ADVANCELY_FADED_ALPHA / 255.0f;
-                        new_elem.opacity_after = 1.0f;
-                        new_elem.bend_count = 0;
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_elem.id, sizeof(new_elem.id), "arrow_%d", counter);
-                            bool id_exists = false;
-                            for (const auto &deco: current_template_data.decorations) {
-                                if (strcmp(deco.id, new_elem.id) == 0) {
-                                    id_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!id_exists) break;
-                            counter++;
-                        }
-                        current_template_data.decorations.push_back(new_elem);
-                        request_scroll_to_new_goal(new_elem.id);
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Add an arrow decoration to the manual layout.\n"
-                                 "Arrows use the Tracker Font Color and can be linked to goals\n"
-                                 "to change opacity based on completion state.\n"
-                                 "An arrow may have up to 16 bends.");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    // --- Sorting Controls (right-aligned on the Add line) ---
+                    // --- Sorting Controls (right-aligned on the Import line) ---
                     bool can_sort_decos2 = false;
                     for (const auto &deco: current_template_data.decorations) {
                         if (deco.sort_order > 0) {
@@ -17912,8 +17973,156 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::EndDisabled();
 
+                    if (ImGui::Button("Add...##decorations")) {
+                        ImGui::OpenPopup("add_decoration_type_popup");
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Add a new decoration to the manual layout.\n"
+                                 "Decorations are only visible while Manual Layout is enabled.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    if (ImGui::BeginPopup("add_decoration_type_popup")) {
+                        if (ImGui::Selectable("...Text Header")) {
+                            EditorDecorationElement new_elem = {};
+                            new_elem.type = DECORATION_TEXT_HEADER;
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_elem.id, sizeof(new_elem.id), "header_%d", counter);
+                                bool id_exists = false;
+                                for (const auto &deco: current_template_data.decorations) {
+                                    if (strcmp(deco.id, new_elem.id) == 0) {
+                                        id_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!id_exists) break;
+                                counter++;
+                            }
+                            snprintf(new_elem.display_text, sizeof(new_elem.display_text), "Header %d", counter);
+                            current_template_data.decorations.push_back(new_elem);
+                            selected_deco_index = (int) current_template_data.decorations.size() - 1;
+                            request_scroll_to_new_goal(new_elem.id);
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Add a text header decoration to the manual layout.\n"
+                                     "Text headers use the Tracker Font and Tracker Font Size.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        if (ImGui::Selectable("...Line")) {
+                            EditorDecorationElement new_elem = {};
+                            new_elem.type = DECORATION_LINE;
+                            new_elem.thickness = 2.0f;
+                            new_elem.opacity = 1.0f;
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_elem.id, sizeof(new_elem.id), "line_%d", counter);
+                                bool id_exists = false;
+                                for (const auto &deco: current_template_data.decorations) {
+                                    if (strcmp(deco.id, new_elem.id) == 0) {
+                                        id_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!id_exists) break;
+                                counter++;
+                            }
+                            current_template_data.decorations.push_back(new_elem);
+                            selected_deco_index = (int) current_template_data.decorations.size() - 1;
+                            request_scroll_to_new_goal(new_elem.id);
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Add a line decoration to the manual layout.\n"
+                                     "Lines use the Tracker Font Color with separate opacity.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        if (ImGui::Selectable("...Arrow")) {
+                            EditorDecorationElement new_elem = {};
+                            new_elem.type = DECORATION_ARROW;
+                            new_elem.thickness = 2.0f;
+                            new_elem.arrowhead_size = 12.0f;
+                            new_elem.opacity_before = (float) ADVANCELY_FADED_ALPHA / 255.0f;
+                            new_elem.opacity_after = 1.0f;
+                            new_elem.bend_count = 0;
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_elem.id, sizeof(new_elem.id), "arrow_%d", counter);
+                                bool id_exists = false;
+                                for (const auto &deco: current_template_data.decorations) {
+                                    if (strcmp(deco.id, new_elem.id) == 0) {
+                                        id_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!id_exists) break;
+                                counter++;
+                            }
+                            current_template_data.decorations.push_back(new_elem);
+                            selected_deco_index = (int) current_template_data.decorations.size() - 1;
+                            request_scroll_to_new_goal(new_elem.id);
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Add an arrow decoration to the manual layout.\n"
+                                     "Arrows use the Tracker Font Color and can be linked to goals\n"
+                                     "to change opacity based on completion state.\n"
+                                     "An arrow may have up to 16 bends.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Show Display Names##deco", &show_deco_display_names);
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s",
+                                          "Show each text header's display text instead of its ID.\n"
+                                          "Lines and arrows have no display text, so they always show their ID.");
+                    }
+
+                    ImGui::Separator();
+
                     bool is_deco_search_active = (
                         current_search_scope == SCOPE_DECORATIONS && tc_search_buffer[0] != '\0');
+
+                    auto deco_matches_search = [&](const EditorDecorationElement &d) {
+                        return str_contains_insensitive(d.display_text, tc_search_buffer) ||
+                               str_contains_insensitive(d.id, tc_search_buffer) ||
+                               str_contains_insensitive(deco_type_name(d.type), tc_search_buffer);
+                    }; {
+                        size_t count_top = 0;
+                        if (!is_deco_search_active) {
+                            count_top = current_template_data.decorations.size();
+                        } else {
+                            for (const auto &deco: current_template_data.decorations) {
+                                if (deco_matches_search(deco)) count_top++;
+                            }
+                        }
+                        char deco_count_text[160];
+                        int deco_pos = snprintf(deco_count_text, sizeof(deco_count_text), "%zu %s",
+                                                count_top, count_top == 1 ? "Decoration" : "Decorations");
+                        if (!s_deco_selection.empty() && deco_pos < (int) sizeof(deco_count_text)) {
+                            snprintf(deco_count_text + deco_pos, sizeof(deco_count_text) - deco_pos,
+                                     " \xC2\xB7 %d selected", (int) s_deco_selection.size());
+                        }
+                        float tw = ImGui::CalcTextSize(deco_count_text).x;
+                        ImGui::SetCursorPosX(
+                            ImGui::GetCursorPosX() + (
+                                ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - tw) *
+                            0.5f);
+                        ImGui::TextDisabled("%s", deco_count_text);
+                    }
 
                     int deco_to_remove = -1;
                     int deco_to_copy = -1;
@@ -17929,8 +18138,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         float ba_desel_w = ImGui::CalcTextSize("Deselect all").x +
                                            ImGui::GetStyle().FramePadding.x * 2.0f;
                         float ba_total_w = ba_btn_w + ba_desel_w + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                                             ImGui::GetContentRegionAvail().x - ba_total_w);
+                        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ba_total_w);
 
                         if (ImGui::SmallButton("Bulk Actions...##deco")) {
                             ImGui::OpenPopup("deco_bulk_actions_menu");
@@ -18001,25 +18209,130 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         auto &deco = current_template_data.decorations[i];
 
                         // SEARCH FILTER
-                        if (is_deco_search_active) {
-                            const char *type_str = "Unknown";
-                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
-                            else if (deco.type == DECORATION_LINE) type_str = "Line";
-                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
-                            if (!str_contains_insensitive(deco.display_text, tc_search_buffer) &&
-                                !str_contains_insensitive(deco.id, tc_search_buffer) &&
-                                !str_contains_insensitive(type_str, tc_search_buffer)) {
-                                continue;
-                            }
-                        }
+                        if (is_deco_search_active && !deco_matches_search(deco)) continue;
 
                         ImGui::PushID((int) i);
 
-                        // Vertical spacing gap
-                        ImGui::Spacing();
+                        const char *label = show_deco_display_names
+                                                ? (deco.display_text[0] ? deco.display_text : deco.id)
+                                                : deco.id;
+                        if (label[0] == '\0') label = "[New Decoration]";
+                        {
+                            bool is_deco_selected = s_deco_selection.find((int) i) != s_deco_selection.end();
+                            if (ImGui::Checkbox("##deco_bulk_sel", &is_deco_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_deco_last_clicked >= 0 && s_deco_last_clicked != (int) i) {
+                                    int lo = std::min(s_deco_last_clicked, (int) i);
+                                    int hi = std::max(s_deco_last_clicked, (int) i);
+                                    for (int k = lo; k <= hi; k++) {
+                                        if (k < 0 || (size_t) k >= current_template_data.decorations.size()) continue;
+                                        if (is_deco_search_active &&
+                                            !deco_matches_search(current_template_data.decorations[k])) {
+                                            continue;
+                                        }
+                                        if (is_deco_selected) s_deco_selection.insert(k);
+                                        else s_deco_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_deco_selected) s_deco_selection.insert((int) i);
+                                    else s_deco_selection.erase((int) i);
+                                }
+                                s_deco_last_clicked = (int) i;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char sel_tip[320];
+                                snprintf(sel_tip, sizeof(sel_tip),
+                                         "Select for bulk actions on multiple decorations at once:\n"
+                                         "reordering (drag any selected row) and deletion.\n"
+                                         "Shift+Click to range-select or -deselect.");
+                                ImGui::SetTooltip("%s", sel_tip);
+                            }
+                            ImGui::SameLine();
+                        }
 
-                        // Drop zone between items
-                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+                        char deco_badge_label[64];
+                        if (deco.sort_order > 0)
+                            snprintf(deco_badge_label, sizeof(deco_badge_label), "%d##deco_badge", deco.sort_order);
+                        else
+                            snprintf(deco_badge_label, sizeof(deco_badge_label), " - ##deco_badge");
+
+                        const char *deco_text_end = strstr(deco_badge_label, "##");
+                        float deco_badge_text_w = ImGui::CalcTextSize(deco_badge_label, deco_text_end).x;
+                        float deco_badge_w = std::max(28.0f,
+                                                      deco_badge_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(deco_badge_label, ImVec2(deco_badge_w, 0))) {
+                            if (deco.sort_order > 0) deco.sort_order = 0;
+                            else deco.sort_order = get_next_sort_order(current_template_data.decorations);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (deco.sort_order > 0)
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove decoration sort order");
+                            else
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign decoration sort order");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // X (Remove) button
+                        if (ImGui::Button("X")) { deco_to_remove = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Copy button
+                        if (ImGui::Button("Copy")) { deco_to_copy = (int) i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, selected_deco_index == (int) i)) {
+                            selected_deco_index = (int) i;
+                        }
+
+                        // Decorations have no Hidden/Row flags, so the row tag carries the element type
+                        // instead, which is what actually distinguishes one decoration from another.
+                        {
+                            EditorRowTag type_tag;
+                            if (deco.type == DECORATION_TEXT_HEADER)
+                                type_tag = {"txt", IM_COL32(150, 200, 255, 255), "Text header decoration"};
+                            else if (deco.type == DECORATION_LINE)
+                                type_tag = {"line", IM_COL32(180, 220, 140, 255), "Line decoration"};
+                            else if (deco.type == DECORATION_ARROW)
+                                type_tag = {"arw", IM_COL32(255, 170, 120, 255), "Arrow decoration"};
+                            else
+                                type_tag = {"?", IM_COL32(200, 200, 200, 255), "Unknown decoration type"};
+                            draw_editor_row_status_tags(&type_tag, 1);
+                        }
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(deco.id, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
+                            selected_deco_index = (int) i;
+                            scroll_to_goal_root_name[0] = '\0';
+                            scroll_to_align_top = false;
+                        }
+
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            ImGui::SetDragDropPayload("DECO_DND", &i, sizeof(int));
+                            if (s_deco_selection.find((int) i) != s_deco_selection.end() &&
+                                s_deco_selection.size() > 1) {
+                                ImGui::Text("Reordering %d selected items", (int) s_deco_selection.size());
+                            } else {
+                                ImGui::Text("Reorder %s", label);
+                            }
+                            ImGui::EndDragDropSource();
+                        }
                         if (ImGui::BeginDragDropTarget()) {
                             if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DECO_DND")) {
                                 deco_dnd_source_index = *(const int *) payload->Data;
@@ -18028,30 +18341,179 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::EndDragDropTarget();
                         }
 
+                        ImGui::PopID();
+                    }
+
+                    if (bulk_delete_decos && !s_deco_selection.empty()) {
+                        std::vector<int> sorted_desc(s_deco_selection.begin(), s_deco_selection.end());
+                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
+                        char selected_id_before_op[64] = {};
+                        if (selected_deco_index >= 0 &&
+                            selected_deco_index < (int) current_template_data.decorations.size()) {
+                            strncpy(selected_id_before_op,
+                                    current_template_data.decorations[selected_deco_index].id,
+                                    sizeof(selected_id_before_op) - 1);
+                        }
+                        for (int idx: sorted_desc) {
+                            if (idx < 0 || (size_t) idx >= current_template_data.decorations.size()) continue;
+                            current_template_data.decorations.erase(
+                                current_template_data.decorations.begin() + idx);
+                        }
+                        selected_deco_index = -1;
+                        if (selected_id_before_op[0] != '\0') {
+                            for (int di = 0; di < (int) current_template_data.decorations.size(); di++) {
+                                if (strcmp(current_template_data.decorations[di].id, selected_id_before_op) == 0) {
+                                    selected_deco_index = di;
+                                    break;
+                                }
+                            }
+                        }
+                        s_deco_selection.clear();
+                        s_deco_last_clicked = -1;
+                        save_message_type = MSG_NONE;
+                        deco_to_remove = -1;
+                        deco_to_copy = -1;
+                        deco_dnd_source_index = -1;
+                        deco_dnd_target_index = -1;
+                    }
+
+                    if (deco_dnd_source_index != -1 && deco_dnd_target_index != -1 &&
+                        deco_dnd_source_index != deco_dnd_target_index) {
+                        if (s_deco_selection.find(deco_dnd_source_index) != s_deco_selection.end()) {
+                            char selected_id_before_op[64] = {};
+                            if (selected_deco_index >= 0 &&
+                                selected_deco_index < (int) current_template_data.decorations.size()) {
+                                strncpy(selected_id_before_op,
+                                        current_template_data.decorations[selected_deco_index].id,
+                                        sizeof(selected_id_before_op) - 1);
+                            }
+                            multi_move_selected(current_template_data.decorations, s_deco_selection,
+                                                deco_dnd_target_index);
+                            s_deco_last_clicked = -1;
+                            selected_deco_index = -1;
+                            if (selected_id_before_op[0] != '\0') {
+                                for (int di = 0; di < (int) current_template_data.decorations.size(); di++) {
+                                    if (strcmp(current_template_data.decorations[di].id, selected_id_before_op) == 0) {
+                                        selected_deco_index = di;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            EditorDecorationElement item_to_move = current_template_data.decorations[
+                                deco_dnd_source_index];
+                            current_template_data.decorations.erase(
+                                current_template_data.decorations.begin() + deco_dnd_source_index);
+                            int insert_at = deco_dnd_target_index;
+                            if (deco_dnd_target_index > deco_dnd_source_index) insert_at--;
+                            current_template_data.decorations.insert(
+                                current_template_data.decorations.begin() + insert_at, item_to_move);
+                            selected_deco_index = insert_at;
+                            s_deco_selection.clear();
+                            s_deco_last_clicked = -1;
+                        }
+                        save_message_type = MSG_NONE;
+                    }
+
+                    if (deco_to_remove != -1) {
+                        current_template_data.decorations.erase(
+                            current_template_data.decorations.begin() + deco_to_remove);
+                        if (selected_deco_index == deco_to_remove) selected_deco_index = -1;
+                        else if (selected_deco_index > deco_to_remove) selected_deco_index--;
+                        std::set<int> shifted_rm;
+                        for (int idx: s_deco_selection) {
+                            if (idx == deco_to_remove) continue;
+                            shifted_rm.insert(idx > deco_to_remove ? idx - 1 : idx);
+                        }
+                        s_deco_selection = shifted_rm;
+                        if (s_deco_last_clicked == deco_to_remove) s_deco_last_clicked = -1;
+                        else if (s_deco_last_clicked > deco_to_remove) s_deco_last_clicked--;
+                        save_message_type = MSG_NONE;
+                    } else if (deco_to_copy != -1) {
+                        const auto &source = current_template_data.decorations[deco_to_copy];
+                        EditorDecorationElement new_elem = {};
+                        new_elem.type = source.type;
+                        strncpy(new_elem.display_text, source.display_text, sizeof(new_elem.display_text));
+                        new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
+                        new_elem.pos = source.pos;
+                        new_elem.pos2 = source.pos2;
+                        new_elem.thickness = source.thickness;
+                        new_elem.opacity = source.opacity;
+                        new_elem.sort_order = 0;
+                        new_elem.linked_goals = source.linked_goals;
+
+                        // Copy arrow-specific fields
+                        if (source.type == DECORATION_ARROW) {
+                            new_elem.arrowhead_size = source.arrowhead_size;
+                            new_elem.bend_count = source.bend_count;
+                            for (int b = 0; b < source.bend_count; b++) {
+                                new_elem.bends[b] = source.bends[b];
+                            }
+                            strncpy(new_elem.start_goal_root, source.start_goal_root,
+                                    sizeof(new_elem.start_goal_root) - 1);
+                            new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
+                            strncpy(new_elem.start_goal_stage, source.start_goal_stage,
+                                    sizeof(new_elem.start_goal_stage) - 1);
+                            new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
+                            strncpy(new_elem.end_goal_root, source.end_goal_root, sizeof(new_elem.end_goal_root) - 1);
+                            new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
+                            strncpy(new_elem.end_goal_stage, source.end_goal_stage,
+                                    sizeof(new_elem.end_goal_stage) - 1);
+                            new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
+                            new_elem.opacity_before = source.opacity_before;
+                            new_elem.opacity_after = source.opacity_after;
+                        }
+
+                        // Generate unique ID
+                        char base_id[64];
+                        strncpy(base_id, source.id, sizeof(base_id) - 1);
+                        base_id[sizeof(base_id) - 1] = '\0';
+                        char new_id[64];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_id);
+                            else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_id, copy_counter);
+                            bool id_exists = false;
+                            for (const auto &d: current_template_data.decorations) {
+                                if (strcmp(d.id, new_id) == 0) {
+                                    id_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!id_exists) break;
+                            copy_counter++;
+                        }
+                        strncpy(new_elem.id, new_id, sizeof(new_elem.id) - 1);
+                        new_elem.id[sizeof(new_elem.id) - 1] = '\0';
+                        current_template_data.decorations.insert(
+                            current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
+                        selected_deco_index = deco_to_copy + 1;
+                        request_scroll_to_new_goal(new_elem.id);
+                        std::set<int> shifted_cp;
+                        for (int idx: s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
+                        s_deco_selection = shifted_cp;
+                        if (s_deco_last_clicked > deco_to_copy) s_deco_last_clicked++;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    ImGui::EndChild();
+
+                    ImGui::SameLine();
+
+                    // ===== Right Pane: Details =====
+                    ImGui::BeginChild("DecorationDetailPane", ImVec2(0, 0), true);
+                    if (selected_deco_index >= 0 &&
+                        selected_deco_index < (int) current_template_data.decorations.size()) {
+                        auto &deco = current_template_data.decorations[selected_deco_index];
+
+                        ImGui::Text("Edit Decoration Details");
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("(Type: %s)", deco_type_name(deco.type));
+
                         ImGui::Separator();
 
-                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
-                        ImGui::BeginGroup();
-
-                        // Scroll to this item when clicked in visual layout
-                        if (scroll_to_goal_root_name[0] != '\0' &&
-                            strcmp(deco.id, scroll_to_goal_root_name) == 0) {
-                            ImGui::SetScrollHereY(scroll_to_align_top ? 0.0f : 0.3f);
-                            scroll_to_goal_root_name[0] = '\0';
-                            scroll_to_align_top = false;
-                        }
-
-                        // Type display (read-only)
-                        {
-                            const char *type_str = "Unknown";
-                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
-                            else if (deco.type == DECORATION_LINE) type_str = "Line";
-                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
-                            ImGui::TextDisabled("Type: %s", type_str);
-                        }
-
                         // ID field
-                        if (ImGui::InputText("ID", deco.id, sizeof(deco.id))) {
+                        if (ImGui::InputText("ID##Decoration", deco.id, sizeof(deco.id))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -18064,7 +18526,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Display text (for text headers)
                         if (deco.type == DECORATION_TEXT_HEADER) {
-                            if (ImGui::InputText("Display Text", deco.display_text, sizeof(deco.display_text))) {
+                            if (ImGui::InputText("Display Text##Decoration", deco.display_text,
+                                                 sizeof(deco.display_text))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18080,15 +18543,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // --- Linked Goals for Text Headers ---
                             ImGui::Text("Linked Goals: %d", (int) deco.linked_goals.size());
                             ImGui::SameLine();
-                            char select_header_goals_btn[64];
+                            char select_header_goals_btn[96];
                             snprintf(select_header_goals_btn, sizeof(select_header_goals_btn),
-                                     "Select Goals##Header%zu", i);
+                                     "Select Goals##Header_%s", deco.id);
                             if (ImGui::Button(select_header_goals_btn)) {
                                 show_goal_selector_popup = true;
                                 focus_goal_selector_search = true;
                                 goal_selector_search_buffer[0] = '\0';
                                 goal_selector_max_selection = 0;
-                                goal_selector_header_deco_index = (int) i;
+                                goal_selector_header_deco_index = selected_deco_index;
                                 goal_selector_counter_index = -1;
                                 goal_selector_stat_cat_index = -1;
                                 goal_selector_stat_crit_index = -1;
@@ -18122,8 +18585,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             // Show list of linked goals
                             if (!deco.linked_goals.empty()) {
-                                char child_id[64];
-                                snprintf(child_id, sizeof(child_id), "HeaderLinkedGoals%zu", i);
+                                char child_id[96];
+                                snprintf(child_id, sizeof(child_id), "HeaderLinkedGoals_%s", deco.id);
                                 ImGui::BeginChild(child_id, ImVec2(0, 200), true);
                                 int remove_idx = -1;
                                 for (int li = 0; li < (int) deco.linked_goals.size(); li++) {
@@ -18156,7 +18619,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Line or Arrow thickness/size fields
                         if (deco.type == DECORATION_LINE || deco.type == DECORATION_ARROW) {
-                            if (ImGui::SliderFloat("Thickness", &deco.thickness, 0.1f, 20.0f, "%.1f px")) {
+                            if (ImGui::SliderFloat("Thickness##Decoration", &deco.thickness, 0.1f, 20.0f, "%.1f px")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18170,7 +18633,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Line-only opacity
                         if (deco.type == DECORATION_LINE) {
-                            if (ImGui::SliderFloat("Opacity", &deco.opacity, 0.01f, 1.0f, "%.2f")) {
+                            if (ImGui::SliderFloat("Opacity##Decoration", &deco.opacity, 0.01f, 1.0f, "%.2f")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18183,7 +18646,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Arrow-specific fields
                         if (deco.type == DECORATION_ARROW) {
-                            if (ImGui::SliderFloat("Arrowhead Size", &deco.arrowhead_size, 2.0f, 100.0f, "%.1f px")) {
+                            if (ImGui::SliderFloat("Arrowhead Size##Decoration", &deco.arrowhead_size, 2.0f, 100.0f,
+                                                   "%.1f px")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18192,6 +18656,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Size of the arrowhead triangle in pixels (before zoom scaling).");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
+
+                            ImGui::Separator();
 
                             // --- Goal Linking ---
                             ImGui::Text("Goal Linking");
@@ -18214,11 +18680,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 ImGui::TextDisabled("%s", preview);
                                 ImGui::SameLine();
-                                char select_btn[64];
-                                snprintf(select_btn, sizeof(select_btn), "Select##start_goal_%zu", i);
+                                char select_btn[96];
+                                snprintf(select_btn, sizeof(select_btn), "Select##start_goal_%s", deco.id);
                                 if (ImGui::Button(select_btn)) {
                                     goal_selector_target = GOAL_SELECT_START;
-                                    goal_selector_deco_index = (int) i;
+                                    goal_selector_deco_index = selected_deco_index;
                                     goal_selector_counter_index = -1;
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
@@ -18247,8 +18713,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                             save_message_type);
                                 if (deco.start_goal_root[0] != '\0') {
                                     ImGui::SameLine();
-                                    char clear_btn[64];
-                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##start_goal_%zu", i);
+                                    char clear_btn[96];
+                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##start_goal_%s", deco.id);
                                     if (ImGui::Button(clear_btn)) {
                                         deco.start_goal_root[0] = '\0';
                                         deco.start_goal_stage[0] = '\0';
@@ -18266,11 +18732,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 ImGui::TextDisabled("%s", preview);
                                 ImGui::SameLine();
-                                char select_btn[64];
-                                snprintf(select_btn, sizeof(select_btn), "Select##end_goal_%zu", i);
+                                char select_btn[96];
+                                snprintf(select_btn, sizeof(select_btn), "Select##end_goal_%s", deco.id);
                                 if (ImGui::Button(select_btn)) {
                                     goal_selector_target = GOAL_SELECT_END;
-                                    goal_selector_deco_index = (int) i;
+                                    goal_selector_deco_index = selected_deco_index;
                                     goal_selector_counter_index = -1;
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
@@ -18300,8 +18766,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                             save_message_type);
                                 if (deco.end_goal_root[0] != '\0') {
                                     ImGui::SameLine();
-                                    char clear_btn[64];
-                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##end_goal_%zu", i);
+                                    char clear_btn[96];
+                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##end_goal_%s", deco.id);
                                     if (ImGui::Button(clear_btn)) {
                                         deco.end_goal_root[0] = '\0';
                                         deco.end_goal_stage[0] = '\0';
@@ -18311,7 +18777,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             // Opacity controls
-                            if (ImGui::SliderFloat("Opacity Before", &deco.opacity_before, 0.0f, 1.0f, "%.2f")) {
+                            if (ImGui::SliderFloat("Opacity Before##Decoration", &deco.opacity_before, 0.0f, 1.0f,
+                                                   "%.2f")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18321,7 +18788,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Default matches the faded alpha of completed goals.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
-                            if (ImGui::SliderFloat("Opacity After", &deco.opacity_after, 0.0f, 1.0f, "%.2f")) {
+                            if (ImGui::SliderFloat("Opacity After##Decoration", &deco.opacity_after, 0.0f, 1.0f,
+                                                   "%.2f")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -18330,97 +18798,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Arrow opacity after the Start Goal is completed.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
-                        } {
-                            bool is_deco_selected = s_deco_selection.find((int) i) != s_deco_selection.end();
-                            if (ImGui::Checkbox("##deco_bulk_sel", &is_deco_selected)) {
-                                bool shift = ImGui::GetIO().KeyShift;
-                                if (shift && s_deco_last_clicked >= 0 && s_deco_last_clicked != (int) i) {
-                                    int lo = std::min(s_deco_last_clicked, (int) i);
-                                    int hi = std::max(s_deco_last_clicked, (int) i);
-                                    for (int k = lo; k <= hi; k++) {
-                                        if (k < 0 || (size_t) k >= current_template_data.decorations.size()) continue;
-                                        if (is_deco_search_active) {
-                                            const auto &dd = current_template_data.decorations[k];
-                                            const char *type_str = "Unknown";
-                                            if (dd.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
-                                            else if (dd.type == DECORATION_LINE) type_str = "Line";
-                                            else if (dd.type == DECORATION_ARROW) type_str = "Arrow";
-                                            if (!str_contains_insensitive(dd.display_text, tc_search_buffer) &&
-                                                !str_contains_insensitive(dd.id, tc_search_buffer) &&
-                                                !str_contains_insensitive(type_str, tc_search_buffer)) {
-                                                continue;
-                                            }
-                                        }
-                                        if (is_deco_selected) s_deco_selection.insert(k);
-                                        else s_deco_selection.erase(k);
-                                    }
-                                } else {
-                                    if (is_deco_selected) s_deco_selection.insert((int) i);
-                                    else s_deco_selection.erase((int) i);
-                                }
-                                s_deco_last_clicked = (int) i;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char sel_tip[320];
-                                snprintf(sel_tip, sizeof(sel_tip),
-                                         "Select for bulk actions on multiple decorations at once:\n"
-                                         "reordering (drag any selected row) and deletion.\n"
-                                         "Shift+Click to range-select or -deselect.");
-                                ImGui::SetTooltip("%s", sel_tip);
-                            }
-                            ImGui::SameLine();
-                        }
-                        if (ImGui::Button("Copy")) {
-                            deco_to_copy = (int) i;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Decoration:\n%s", deco.id);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-
-                        // Remove button
-                        if (ImGui::Button("Remove")) {
-                            deco_to_remove = (int) i;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Decoration:\n%s", deco.id);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        ImGui::SameLine();
-
-                        // --- Sort Badge ---
-                        char badge_label[32];
-                        if (deco.sort_order > 0) {
-                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", deco.sort_order, i);
-                        } else {
-                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
-                        }
-
-                        const char *text_end = strstr(badge_label, "##");
-                        float badge_text_width = ImGui::CalcTextSize(badge_label, text_end).x;
-                        float badge_width = std::max(28.0f, badge_text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
-                            if (deco.sort_order > 0) deco.sort_order = 0;
-                            else deco.sort_order = get_next_sort_order(current_template_data.decorations);
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            if (deco.sort_order > 0) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to remove decoration sort order");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to assign decoration sort order");
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
+                        ImGui::Separator();
 
                         // Layout coordinates (collapsible)
                         if (render_layout_coordinates_header("decoration",
@@ -18507,161 +18887,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      save_message_type);
                             }
                         }
-
-                        ImGui::EndGroup();
-
-                        // Drag-and-drop source overlay
-                        ImGui::SameLine();
-                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
-                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
-
-                        if (ImGui::BeginDragDropSource()) {
-                            ImGui::SetDragDropPayload("DECO_DND", &i, sizeof(int));
-                            if (s_deco_selection.find((int) i) != s_deco_selection.end() &&
-                                s_deco_selection.size() > 1) {
-                                ImGui::Text("Reordering %d selected items", (int) s_deco_selection.size());
-                            } else {
-                                ImGui::Text("Reorder %s", deco.id);
-                            }
-                            ImGui::EndDragDropSource();
-                        }
-
-                        ImGui::PopID();
+                    } else {
+                        ImGui::Text("Select a Decoration from the list to edit its details.");
                     }
-
-                    // Final drop target at end of list
-                    ImGui::InvisibleButton("final_drop_target_decos", ImVec2(-1, 8.0f));
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DECO_DND")) {
-                            deco_dnd_source_index = *(const int *) payload->Data;
-                            deco_dnd_target_index = (int) current_template_data.decorations.size();
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-
-                    if (deco_dnd_source_index != -1 && deco_dnd_target_index != -1 &&
-                        deco_dnd_source_index != deco_dnd_target_index) {
-                        if (s_deco_selection.find(deco_dnd_source_index) != s_deco_selection.end()) {
-                            multi_move_selected(current_template_data.decorations, s_deco_selection,
-                                                deco_dnd_target_index);
-                            s_deco_last_clicked = -1;
-                        } else {
-                            EditorDecorationElement item_to_move = current_template_data.decorations[
-                                deco_dnd_source_index];
-                            current_template_data.decorations.erase(
-                                current_template_data.decorations.begin() + deco_dnd_source_index);
-                            if (deco_dnd_target_index > deco_dnd_source_index) deco_dnd_target_index--;
-                            current_template_data.decorations.insert(
-                                current_template_data.decorations.begin() + deco_dnd_target_index, item_to_move);
-                            std::set<int> shifted_dnd;
-                            for (int idx: s_deco_selection) {
-                                int new_idx = idx;
-                                if (idx == deco_dnd_source_index) new_idx = deco_dnd_target_index;
-                                else {
-                                    if (idx > deco_dnd_source_index) new_idx--;
-                                    if (new_idx >= deco_dnd_target_index) new_idx++;
-                                }
-                                shifted_dnd.insert(new_idx);
-                            }
-                            s_deco_selection = shifted_dnd;
-                            s_deco_last_clicked = -1;
-                        }
-                        save_message_type = MSG_NONE;
-                    }
-
-                    if (bulk_delete_decos && !s_deco_selection.empty()) {
-                        std::vector<int> sorted_desc(s_deco_selection.begin(), s_deco_selection.end());
-                        std::sort(sorted_desc.begin(), sorted_desc.end(), std::greater<int>());
-                        for (int idx: sorted_desc) {
-                            if (idx < 0 || (size_t) idx >= current_template_data.decorations.size()) continue;
-                            current_template_data.decorations.erase(
-                                current_template_data.decorations.begin() + idx);
-                        }
-                        s_deco_selection.clear();
-                        s_deco_last_clicked = -1;
-                        save_message_type = MSG_NONE;
-                        deco_to_remove = -1;
-                    }
-
-                    if (deco_to_remove != -1) {
-                        current_template_data.decorations.erase(
-                            current_template_data.decorations.begin() + deco_to_remove);
-                        std::set<int> shifted_rm;
-                        for (int idx: s_deco_selection) {
-                            if (idx == deco_to_remove) continue;
-                            shifted_rm.insert(idx > deco_to_remove ? idx - 1 : idx);
-                        }
-                        s_deco_selection = shifted_rm;
-                        if (s_deco_last_clicked == deco_to_remove) s_deco_last_clicked = -1;
-                        else if (s_deco_last_clicked > deco_to_remove) s_deco_last_clicked--;
-                        save_message_type = MSG_NONE;
-                    }
-
-                    // Process copy
-                    if (deco_to_copy != -1) {
-                        const auto &source = current_template_data.decorations[deco_to_copy];
-                        EditorDecorationElement new_elem = {};
-                        new_elem.type = source.type;
-                        strncpy(new_elem.display_text, source.display_text, sizeof(new_elem.display_text));
-                        new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
-                        new_elem.pos = source.pos;
-                        new_elem.pos2 = source.pos2;
-                        new_elem.thickness = source.thickness;
-                        new_elem.opacity = source.opacity;
-                        new_elem.sort_order = 0;
-
-                        // Copy arrow-specific fields
-                        if (source.type == DECORATION_ARROW) {
-                            new_elem.arrowhead_size = source.arrowhead_size;
-                            new_elem.bend_count = source.bend_count;
-                            for (int b = 0; b < source.bend_count; b++) {
-                                new_elem.bends[b] = source.bends[b];
-                            }
-                            strncpy(new_elem.start_goal_root, source.start_goal_root,
-                                    sizeof(new_elem.start_goal_root) - 1);
-                            new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
-                            strncpy(new_elem.start_goal_stage, source.start_goal_stage,
-                                    sizeof(new_elem.start_goal_stage) - 1);
-                            new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
-                            strncpy(new_elem.end_goal_root, source.end_goal_root, sizeof(new_elem.end_goal_root) - 1);
-                            new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
-                            strncpy(new_elem.end_goal_stage, source.end_goal_stage,
-                                    sizeof(new_elem.end_goal_stage) - 1);
-                            new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
-                            new_elem.opacity_before = source.opacity_before;
-                            new_elem.opacity_after = source.opacity_after;
-                        }
-
-                        // Generate unique ID
-                        char base_id[64];
-                        strncpy(base_id, source.id, sizeof(base_id) - 1);
-                        base_id[sizeof(base_id) - 1] = '\0';
-                        char new_id[64];
-                        int copy_counter = 1;
-                        while (true) {
-                            if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_id);
-                            else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_id, copy_counter);
-                            bool id_exists = false;
-                            for (const auto &d: current_template_data.decorations) {
-                                if (strcmp(d.id, new_id) == 0) {
-                                    id_exists = true;
-                                    break;
-                                }
-                            }
-                            if (!id_exists) break;
-                            copy_counter++;
-                        }
-                        strncpy(new_elem.id, new_id, sizeof(new_elem.id) - 1);
-                        new_elem.id[sizeof(new_elem.id) - 1] = '\0';
-                        current_template_data.decorations.insert(
-                            current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
-                        request_scroll_to_new_goal(new_elem.id);
-                        std::set<int> shifted_cp;
-                        for (int idx: s_deco_selection) shifted_cp.insert(idx > deco_to_copy ? idx + 1 : idx);
-                        s_deco_selection = shifted_cp;
-                        if (s_deco_last_clicked > deco_to_copy) s_deco_last_clicked++;
-                        save_message_type = MSG_NONE;
-                    }
+                    ImGui::EndChild();
 
                     ImGui::EndTabItem();
                 }

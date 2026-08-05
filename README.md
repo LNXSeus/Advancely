@@ -1050,7 +1050,9 @@ survives that template's automatic updates.
 
 ### Editing a Template
 
-Opening a template reveals a tabbed interface where you can define every goal.
+Opening a template reveals a tabbed interface where you can define every goal. Every tab uses the same split
+layout: the list sits on the left, and selecting an entry opens its fields in the details pane on the right. Each
+list has a `Show Display Names` checkbox to toggle between display names and root names (IDs for decorations).
 
 > **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any
 > GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option,
@@ -1062,12 +1064,14 @@ Opening a template reveals a tabbed interface where you can define every goal.
   with the badge sorting for efficient template creation! You can also drag any row by its handle to move it to a new
   position; if the dragged row is part of a bulk selection, the whole selection moves together preserving its relative
   order.
-* **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, multi-stage goals,
-  and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
+* **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, unlocks, custom
+  goals, multi-stage goals, and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
   detail pane: `rcp` (recipe, advancements only), `H` (hidden from the overlay and automatic tracker layout),
   `R2`/`R3` (forced to the 2nd/3rd overlay row), `multi` (multi-stat category, stats only), `noR1` (sub-stats kept out
   of the 1st overlay row, multi-stats only), and `pos` (has custom manual-layout coordinates). The tags appear in the
   same order as the matching checkboxes in the detail pane. Hover the tags for a tooltip describing the active ones.
+  Decorations have none of those flags, so their rows carry a type tag instead: `txt` (text header), `line`, or `arw`
+  (arrow). The full type name (`Text Header`, `Line`, `Arrow`) is also matched by the editor's search box.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
   selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
@@ -1189,6 +1193,10 @@ active template), so enabling manual positioning never teleports the element.
 
 The **Decorations** tab in the Template Editor allows you to add visual elements to your manual layout that are not
 tied to any game data. These elements are only visible when "Manual Layout" mode is enabled.
+
+Click the `Add...` button above the list and pick the element you want: `...Text Header`, `...Line`, or `...Arrow`.
+The new decoration is appended to the list and selected right away, so its fields open in the details pane on the
+right. Each row is tagged with its type (`txt`, `line`, `arw`) so you can tell them apart at a glance.
 
 * **Text Headers**: Display custom text on the tracker map using the main tracker font and font size. Useful for
   labeling different sections or areas of your layout. Each text header has a position that can be set numerically
