@@ -36,10 +36,13 @@ void delete_directory_recursively(const char *path);
  * @param url_max_len The size of the out_download_url buffer.
  * @param out_html_url A buffer to store the URL to the release page.
  * @param html_url_max_len The size of the out_html_url buffer.
- * @return true if a new version is available, false otherwise or on error.
+ * @param force_latest When true, the latest release's asset and page URLs are reported even if the
+ *                     running version is already up to date (used by the --update command line flag).
+ * @return true if a new version is available (or force_latest resolved a usable asset), false
+ *         otherwise or on error.
 */
 bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
-                       size_t url_max_len, char *out_html_url, size_t html_url_max_len);
+                       size_t url_max_len, char *out_html_url, size_t html_url_max_len, bool force_latest);
 
 /**
 * @brief Progress callback invoked during a download.

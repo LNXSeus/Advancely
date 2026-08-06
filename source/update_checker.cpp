@@ -96,7 +96,7 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, std::str
 }
 
 bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
-                       size_t url_max_len, char *out_html_url, size_t html_url_max_len) {
+                       size_t url_max_len, char *out_html_url, size_t html_url_max_len, bool force_latest) {
     // This function will now use libcurl for all platforms, as it's only for checking the API, not downloading files.
     // The false positive is triggered by the download action itself.
     CURL *curl;
@@ -132,7 +132,7 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                     strncpy(out_latest_version, tag_name_json->valuestring, max_len - 1);
                     out_latest_version[max_len - 1] = '\0';
 
-                    if (compare_version_strings(current_version, out_latest_version) < 0) {
+                    if (compare_version_strings(current_version, out_latest_version) < 0 || force_latest) {
                         is_new_version_available = true;
 
 #if defined(_WIN32)
@@ -174,6 +174,14 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                         if (cJSON_IsString(html_url_json) && (html_url_json->valuestring != nullptr)) {
                             strncpy(out_html_url, html_url_json->valuestring, html_url_max_len - 1);
                             out_html_url[html_url_max_len - 1] = '\0';
+                        }
+
+                        // Without a matching asset there is nothing to download, so don't report an
+                        // update as available.
+                        if (out_download_url[0] == '\0') {
+                            log_message(LOG_ERROR,
+                                        "[UPDATE CHECKER] No matching release asset found for this platform.\n");
+                            is_new_version_available = false;
                         }
                     }
                 }

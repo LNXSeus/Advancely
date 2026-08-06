@@ -512,9 +512,12 @@ some other custom launcher.
 
 Advancely is designed to be easy to maintain. By default, **the tracker will automatically check for new versions on
 startup**. When an update is available, you will be notified with a prompt offering to download and install it for you.
-After you click `Update`, the rest happens automatically: a single progress window walks through the download,
+After you click `Update Now`, the rest happens automatically: a single progress window walks through the download,
 extraction, and restart with no further clicks. This process is designed to be as safe as possible for your custom
 files.
+
+The prompt also offers `View My Templates` to open your local templates folder for backups, `View Official Templates` to
+browse the officially added templates online, and `Later` to skip the update until the next restart.
 
 > **Platform note:** The built-in auto-updater works on Windows, macOS, and the Linux **portable** build. If you
 > installed Advancely from a Linux **package** (`.deb`, `.rpm`, AUR, or NixOS), update it through that installer or your
@@ -1984,16 +1987,17 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 Advancely supports several command-line arguments to customize its behavior. These are particularly useful for package
 maintainers or advanced users who want to override default behaviors.
 
-| Argument                 | Description                                                                                                                                                                          |
-|:-------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar. |
-| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                              |
-| `--use-home-dir`         | **Linux ONLY:** So Advancely uses the users home directory for applicable files that need to be user-writable such as templates, notes and config. Used within the package manager.  |
-| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
-| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
-| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
-| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host.      |
-| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
+| Argument                 | Description                                                                                                                                                                           |
+|:-------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar.  |
+| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                               |
+| `--use-home-dir`         | **Linux ONLY:** So Advancely uses the users home directory for applicable files that need to be user-writable such as templates, notes and config. Used within the package manager.   |
+| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                     |
+| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                              |
+| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.           |
+| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host.       |
+| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                      |
+| `--update`               | Opens the update popup on startup, even when the auto-updater is disabled in the settings or via `--disable-updater`. If you are already on the latest version it offers a reinstall. |
 
 </details>
 

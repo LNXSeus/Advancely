@@ -118,6 +118,7 @@ char g_latest_known_version[64] = "";
 // --- Command Line Globals for Linux packaging, --settings-file <path>, --disable-updater and --use-home-dir ---
 static char g_custom_settings_path[MAX_PATH_LENGTH] = "";
 static bool g_disable_updater = false;
+static bool g_force_update_prompt = false; // --update: run the updater even when already up to date
 
 #if defined(__linux__) // Linux only (--use-home-dir)
 static bool g_use_home_dir = false;
@@ -1674,6 +1675,10 @@ int main(int argc, char *argv[]) {
             // For updated popup
             g_show_release_notes_on_startup = true;
             log_message(LOG_INFO, "[DEBUG] --updated flag DETECTED.\n");
+        } else if (strcmp(argv[i], "--update") == 0) {
+            // Opens the update prompt on startup, even when already on the latest version.
+            g_force_update_prompt = true;
+            printf("[CLI] Update prompt forced via command line.\n");
         } else if (strcmp(argv[i], "--overlay") == 0) {
             // Only running overlay
             is_overlay_mode = true;
@@ -1744,11 +1749,10 @@ int main(int argc, char *argv[]) {
             log_message(LOG_ERROR, "[DEBUG] URL read from file: \"%s\"", release_url_buffer);
 
             if (release_url_buffer[0] != '\0') {
-                show_release_notes_window = true; // Set the flag for the UI loop
                 // DEBUG PRINT 5: Confirm the flag to show the window is being set.
-                log_message(LOG_ERROR, "[DEBUG] URL is valid. show_release_notes_window set to true.\n");
+                log_message(LOG_ERROR, "[DEBUG] URL is valid.\n");
             } else {
-                log_message(LOG_ERROR, "[DEBUG] URL is empty. Window will not be shown.\n");
+                log_message(LOG_ERROR, "[DEBUG] URL is empty, falling back to this version's release page.\n");
             }
         } else {
             // DEBUG PRINT 3 (Failure Case): This is the most likely error when testing manually.
@@ -1756,6 +1760,15 @@ int main(int argc, char *argv[]) {
                 LOG_ERROR,
                 "[DEBUG] FAILED to open 'update_url.txt'. The file does not exist in the current directory.\n");
         }
+
+        // The URL file only exists right after an actual auto-update, so running with --updated by
+        // hand would otherwise show nothing at all. Fall back to this version's release page.
+        if (release_url_buffer[0] == '\0') {
+            snprintf(release_url_buffer, sizeof(release_url_buffer),
+                     "https://github.com/LNXSeus/Advancely/releases/tag/%s", ADVANCELY_VERSION);
+        }
+        show_release_notes_window = true; // Set the flag for the UI loop
+        log_message(LOG_ERROR, "[DEBUG] show_release_notes_window set to true. URL: \"%s\"\n", release_url_buffer);
         // Whether it succeeded or not, delete the flag file and unset the global flag
         remove("update_url.txt");
         g_show_release_notes_on_startup = false;
@@ -2199,12 +2212,14 @@ int main(int argc, char *argv[]) {
         // Check for updates on startup. The check itself is a quick network call; if a newer
         // version exists we stash its details and open the in-loop update modal, which drives
         // the download/extract/restart with a live progress bar (see the render loop).
-        if (app_settings.check_for_updates && !g_disable_updater) {
+        // --update forces the prompt regardless of the setting and of --disable-updater.
+        if ((app_settings.check_for_updates && !g_disable_updater) || g_force_update_prompt) {
             char latest_version_str[64];
             char download_url[256];
             char release_page_url[256];
             if (check_for_updates(ADVANCELY_VERSION, latest_version_str, sizeof(latest_version_str), download_url,
-                                  sizeof(download_url), release_page_url, sizeof(release_page_url))) {
+                                  sizeof(download_url), release_page_url, sizeof(release_page_url),
+                                  g_force_update_prompt)) {
                 strncpy(g_latest_known_version, latest_version_str, sizeof(g_latest_known_version) - 1);
                 g_latest_known_version[sizeof(g_latest_known_version) - 1] = '\0';
 
@@ -4301,7 +4316,12 @@ int main(int argc, char *argv[]) {
                             // Wrap paragraphs at a fixed width so the auto-resized popup stays tidy.
                             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 540.0f);
 
-                            ImGui::TextUnformatted("A new version of Advancely is available!");
+                            if (strcmp(ADVANCELY_VERSION, g_latest_known_version) == 0) {
+                                // Only reachable through --update, which forces the prompt while up to date.
+                                ImGui::TextUnformatted("Advancely is already up to date. You can reinstall it below.");
+                            } else {
+                                ImGui::TextUnformatted("A new version of Advancely is available!");
+                            }
                             ImGui::Spacing();
                             ImGui::Text("Your version:    %s", ADVANCELY_VERSION);
                             ImGui::Text("Latest version:  %s", g_latest_known_version);
@@ -4348,9 +4368,10 @@ int main(int argc, char *argv[]) {
                             ImGui::Spacing();
 
                             ImGui::SeparatorText("Options");
-                            ImGui::BulletText("%s", "Update: Install the new version now.");
-                            ImGui::BulletText("%s", "Templates: Open your local templates folder to make backups.");
-                            ImGui::BulletText("%s", "Official: View official templates online.");
+                            ImGui::BulletText("%s", "Update Now: Install the new version now.");
+                            ImGui::BulletText("%s",
+                                              "View My Templates: Open your local templates folder to make backups.");
+                            ImGui::BulletText("%s", "View Official Templates: View official templates online.");
                             ImGui::BulletText("%s", "Later: Skip updating until the next restart.");
                             ImGui::Spacing();
 
@@ -4365,7 +4386,7 @@ int main(int argc, char *argv[]) {
                             ImGui::Separator();
                             ImGui::Spacing();
 
-                            if (ImGui::Button("Update")) {
+                            if (ImGui::Button("Update Now")) {
                                 // Saved so the post-update run can show the release notes.
                                 FILE *url_file = fopen("update_url.txt", "w");
                                 if (url_file) {
@@ -4399,7 +4420,7 @@ int main(int argc, char *argv[]) {
                             }
 
                             ImGui::SameLine();
-                            if (ImGui::Button("Templates")) {
+                            if (ImGui::Button("View My Templates")) {
                                 char templates_path[MAX_PATH_LENGTH];
                                 snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
                                 update_open_path(templates_path);
@@ -4412,7 +4433,7 @@ int main(int argc, char *argv[]) {
                             }
 
                             ImGui::SameLine();
-                            if (ImGui::Button("Official")) {
+                            if (ImGui::Button("View Official Templates")) {
                                 update_open_path("https://github.com/LNXSeus/Advancely#Officially-Added-Templates");
                             }
                             if (ImGui::IsItemHovered()) {
