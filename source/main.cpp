@@ -4369,6 +4369,7 @@ int main(int argc, char *argv[]) {
 
                             ImGui::SeparatorText("Options");
                             ImGui::BulletText("%s", "Update Now: Install the new version now.");
+                            ImGui::BulletText("%s", "What's New?: View the release notes of the latest version online.");
                             ImGui::BulletText("%s",
                                               "View My Templates: Open your local templates folder to make backups.");
                             ImGui::BulletText("%s", "View Official Templates: View official templates online.");
@@ -4416,6 +4417,19 @@ int main(int argc, char *argv[]) {
                                 char tooltip_buf[128];
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Download and install the new version now.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::Button("What's New?")) {
+                                update_open_path(g_pending_release_url[0] != '\0'
+                                                     ? g_pending_release_url
+                                                     : "https://github.com/LNXSeus/Advancely/releases/latest");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[160];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "View the release notes of the latest version online.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
 

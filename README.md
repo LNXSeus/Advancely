@@ -516,8 +516,9 @@ After you click `Update Now`, the rest happens automatically: a single progress 
 extraction, and restart with no further clicks. This process is designed to be as safe as possible for your custom
 files.
 
-The prompt also offers `View My Templates` to open your local templates folder for backups, `View Official Templates` to
-browse the officially added templates online, and `Later` to skip the update until the next restart.
+The prompt also offers `What's New?` to read the release notes of the latest version before updating, `View My
+Templates` to open your local templates folder for backups, `View Official Templates` to browse the officially added
+templates online, and `Later` to skip the update until the next restart.
 
 > **Platform note:** The built-in auto-updater works on Windows, macOS, and the Linux **portable** build. If you
 > installed Advancely from a Linux **package** (`.deb`, `.rpm`, AUR, or NixOS), update it through that installer or your
