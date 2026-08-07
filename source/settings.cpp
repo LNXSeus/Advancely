@@ -766,7 +766,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     for (int i = 0; i < a->hotkey_count; ++i) {
         if (strcmp(a->hotkeys[i].target_goal, b->hotkeys[i].target_goal) != 0 ||
             strcmp(a->hotkeys[i].increment_key, b->hotkeys[i].increment_key) != 0 ||
-            strcmp(a->hotkeys[i].decrement_key, b->hotkeys[i].decrement_key) != 0) {
+            strcmp(a->hotkeys[i].decrement_key, b->hotkeys[i].decrement_key) != 0 ||
+            a->hotkeys[i].increment_mods != b->hotkeys[i].increment_mods ||
+            a->hotkeys[i].decrement_mods != b->hotkeys[i].decrement_mods ||
+            a->hotkeys[i].is_global != b->hotkeys[i].is_global) {
             return true;
         }
     }
@@ -953,6 +956,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Hotkey duplicate error flag (block Apply when two goals share the same key)
     static bool hotkey_duplicate_error = false;
+
+    // Hotkey global error flag (block Apply when a binding marked Global has no usable modifier)
+    static bool hotkey_global_error = false;
 
     // Account validation error flag (block Apply when UUID is empty or has bad format)
     static bool account_validation_error = false;
@@ -6818,6 +6824,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
         if (ImGui::BeginTabItem("Hotkeys")) {
             hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
+            hotkey_global_error = false;
             ImGui::TextDisabled(
                 "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
             // --- Hotkey Settings ---
@@ -6827,16 +6834,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             static char capturing_target_goal[192] = "";
             static int capturing_slot = -1; // -1 = idle
 
-            // Helper: convert a stored scancode-name (US layout) to a layout-aware
-            // keycap label so EU keyboards display the key the user actually presses.
-            auto display_label_for_key = [](const char *stored) -> std::string {
+            // Helper: convert a stored scancode-name (US layout) plus its modifier mask to a
+            // layout-aware label so EU keyboards display the key the user actually presses.
+            auto display_label_for_key = [](const char *stored, Uint16 mods) -> std::string {
                 if (!stored || stored[0] == '\0' || strcmp(stored, "None") == 0) return "None";
+
+                std::string key_label = stored; // Fallback to whatever we stored
                 SDL_Scancode sc = SDL_GetScancodeFromName(stored);
-                if (sc == SDL_SCANCODE_UNKNOWN) return stored; // Fallback to whatever we stored
-                SDL_Keycode kc = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
-                const char *name = SDL_GetKeyName(kc);
-                if (name && name[0] != '\0') return name;
-                return stored;
+                if (sc != SDL_SCANCODE_UNKNOWN) {
+                    SDL_Keycode kc = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
+                    const char *name = SDL_GetKeyName(kc);
+                    if (name && name[0] != '\0') key_label = name;
+                }
+
+                char mod_prefix[64];
+                hotkey_mods_to_prefix(mods, mod_prefix, sizeof(mod_prefix));
+                return std::string(mod_prefix) + key_label;
             };
 
             // Create a temporary vector of counters to display
@@ -6857,9 +6870,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 // Resolve the new key name (US-layout scancode name, or "None").
                 const char *new_key = "None";
+                Uint16 new_mods = HOTKEY_MOD_NONE;
                 if (captured != 0) {
                     const char *sc_name = SDL_GetScancodeName((SDL_Scancode) captured);
-                    if (sc_name && sc_name[0] != '\0') new_key = sc_name;
+                    if (sc_name && sc_name[0] != '\0') {
+                        new_key = sc_name;
+                        new_mods = (Uint16) SDL_GetAtomicInt(&g_hotkey_captured_mods);
+                    }
                 }
 
                 HotkeyBinding *binding = nullptr;
@@ -6873,13 +6890,16 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // Skip the write entirely if the new value matches the current one,
                 // so binding "None" over an already-None slot doesn't dirty the form.
                 const char *prev_key = "None";
+                Uint16 prev_mods = HOTKEY_MOD_NONE;
                 if (binding) {
                     prev_key = (capturing_slot == 1) ? binding->increment_key : binding->decrement_key;
+                    prev_mods = (capturing_slot == 1) ? binding->increment_mods : binding->decrement_mods;
                 }
 
-                if (strcmp(prev_key, new_key) != 0) {
+                if (strcmp(prev_key, new_key) != 0 || prev_mods != new_mods) {
                     if (!binding && temp_settings.hotkey_count < MAX_HOTKEYS) {
                         binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                        memset(binding, 0, sizeof(*binding));
                         strncpy(binding->target_goal, capturing_target_goal, sizeof(binding->target_goal) - 1);
                         binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
                         strcpy(binding->increment_key, "None");
@@ -6892,6 +6912,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                  : sizeof(binding->decrement_key);
                         strncpy(target, new_key, target_size - 1);
                         target[target_size - 1] = '\0';
+                        if (capturing_slot == 1) {
+                            binding->increment_mods = new_mods;
+                        } else {
+                            binding->decrement_mods = new_mods;
+                        }
                     }
                 }
                 capturing_target_goal[0] = '\0';
@@ -6905,9 +6930,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
                              "IMPORTANT: Hotkeys are remembered between templates.\n"
                              "You might have to restart the settings window for the hotkeys to appear.\n\n"
-                             "Click a button and press a key to bind it. Press Escape, Backspace,\n"
-                             "or Delete during capture to clear the binding back to None.\n"
-                             "Hotkeys only work when tabbed into the tracker.\n"
+                             "Click a button and press a key to bind it. Hold Ctrl, Alt, Shift or\n"
+                             "Super while pressing the key to bind a combination. Press Escape,\n"
+                             "Backspace, or Delete during capture to clear the binding back to None.\n\n"
+                             "Without 'Global', a hotkey only works when tabbed into the tracker.\n"
                              "Maximum of %d hotkeys are supported.",
                              MAX_HOTKEYS);
                     ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
@@ -6925,6 +6951,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                     const char *dec_stored = binding ? binding->decrement_key : "None";
                     const char *inc_stored = binding ? binding->increment_key : "None";
+                    Uint16 dec_mods_stored = binding ? binding->decrement_mods : (Uint16) HOTKEY_MOD_NONE;
+                    Uint16 inc_mods_stored = binding ? binding->increment_mods : (Uint16) HOTKEY_MOD_NONE;
 
                     bool capturing_dec = (capturing_slot == 0 &&
                                           strcmp(capturing_target_goal, counter->root_name) == 0);
@@ -6943,17 +6971,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(dec_btn_label, sizeof(dec_btn_label),
                                  "Press a key...##dec_%s", counter->root_name);
                     } else {
-                        std::string label = display_label_for_key(dec_stored);
+                        std::string label = display_label_for_key(dec_stored, dec_mods_stored);
                         snprintf(dec_btn_label, sizeof(dec_btn_label),
                                  "%s##dec_%s", label.c_str(), counter->root_name);
                     }
-                    if (ImGui::Button(dec_btn_label, ImVec2(140, 0))) {
+                    if (ImGui::Button(dec_btn_label, ImVec2(170, 0))) {
                         // Arm capture for this slot.
                         strncpy(capturing_target_goal, counter->root_name,
                                 sizeof(capturing_target_goal) - 1);
                         capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
                         capturing_slot = 0;
                         SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                         SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
                     }
 
@@ -6966,54 +6995,121 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(inc_btn_label, sizeof(inc_btn_label),
                                  "Press a key...##inc_%s", counter->root_name);
                     } else {
-                        std::string label = display_label_for_key(inc_stored);
+                        std::string label = display_label_for_key(inc_stored, inc_mods_stored);
                         snprintf(inc_btn_label, sizeof(inc_btn_label),
                                  "%s##inc_%s", label.c_str(), counter->root_name);
                     }
-                    if (ImGui::Button(inc_btn_label, ImVec2(140, 0))) {
+                    if (ImGui::Button(inc_btn_label, ImVec2(170, 0))) {
                         strncpy(capturing_target_goal, counter->root_name,
                                 sizeof(capturing_target_goal) - 1);
                         capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
                         capturing_slot = 1;
                         SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                         SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
+                    }
+
+                    // --- Per-binding Global toggle ---
+                    ImGui::SameLine();
+                    bool row_is_global = binding ? binding->is_global : false;
+                    char global_cb_label[256];
+                    snprintf(global_cb_label, sizeof(global_cb_label), "Global##global_%s", counter->root_name);
+                    if (ImGui::Checkbox(global_cb_label, &row_is_global)) {
+                        if (!binding && temp_settings.hotkey_count < MAX_HOTKEYS) {
+                            binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                            memset(binding, 0, sizeof(*binding));
+                            strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+                            binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
+                            strcpy(binding->increment_key, "None");
+                            strcpy(binding->decrement_key, "None");
+                        }
+                        if (binding) binding->is_global = row_is_global;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char global_tooltip_buffer[1024];
+                        snprintf(global_tooltip_buffer, sizeof(global_tooltip_buffer),
+                                 "Off: the hotkey only fires while the Advancely tracker window is focused.\n"
+                                 "Any key works, and other programs keep receiving it normally.\n\n"
+                                 "On: the operating system reserves the key for Advancely, so it fires while you are\n"
+                                 "playing Minecraft. Because the key is taken away from every other program, a global\n"
+                                 "hotkey must include Ctrl, Alt or Super. F13 to F24 are exempt, since no keyboard\n"
+                                 "has those physically and macro pads are the only thing that sends them.\n\n"
+                                 "Default: Off");
+                        ImGui::SetTooltip("%s", global_tooltip_buffer);
+                    }
+
+                    // Explain exactly which slot is unusable rather than a generic complaint.
+                    if (row_is_global && binding) {
+                        char inc_reason[192];
+                        char dec_reason[192];
+                        bool inc_ok = hotkey_global_slot_is_valid(binding->increment_key, binding->increment_mods,
+                                                                  inc_reason, sizeof(inc_reason));
+                        bool dec_ok = hotkey_global_slot_is_valid(binding->decrement_key, binding->decrement_mods,
+                                                                  dec_reason, sizeof(dec_reason));
+                        if (!dec_ok) {
+                            hotkey_global_error = true;
+                            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                               "    Decrement %s", dec_reason);
+                        }
+                        if (!inc_ok) {
+                            hotkey_global_error = true;
+                            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                               "    Increment %s", inc_reason);
+                        }
                     }
                 }
 
                 // --- Duplicate Hotkey Validation ---
-                // Collect all active (non-"None") keys and check for duplicates
+                // Two slots clash only when the key AND the modifiers match, so Ctrl+G and a
+                // bare G are free to live on different goals.
+                auto slot_is_active = [](const char *key) -> bool {
+                    return strcmp(key, "None") != 0;
+                };
+                auto slots_clash = [](const char *key_a, Uint16 mods_a,
+                                      const char *key_b, Uint16 mods_b) -> bool {
+                    return strcmp(key_a, key_b) == 0 && mods_a == mods_b;
+                };
+
                 for (int i = 0; i < temp_settings.hotkey_count && !hotkey_duplicate_error; ++i) {
-                    const char *inc_i = temp_settings.hotkeys[i].increment_key;
-                    const char *dec_i = temp_settings.hotkeys[i].decrement_key;
-                    bool inc_active = (strcmp(inc_i, "None") != 0);
-                    bool dec_active = (strcmp(dec_i, "None") != 0);
+                    const HotkeyBinding *hb_i = &temp_settings.hotkeys[i];
+                    bool inc_active = slot_is_active(hb_i->increment_key);
+                    bool dec_active = slot_is_active(hb_i->decrement_key);
 
                     // Check increment vs decrement within the same binding
-                    if (inc_active && dec_active && strcmp(inc_i, dec_i) == 0) {
+                    if (inc_active && dec_active &&
+                        slots_clash(hb_i->increment_key, hb_i->increment_mods,
+                                    hb_i->decrement_key, hb_i->decrement_mods)) {
                         hotkey_duplicate_error = true;
                         break;
                     }
 
                     // Check against all other bindings
                     for (int j = i + 1; j < temp_settings.hotkey_count; ++j) {
-                        const char *inc_j = temp_settings.hotkeys[j].increment_key;
-                        const char *dec_j = temp_settings.hotkeys[j].decrement_key;
-                        bool inc_j_active = (strcmp(inc_j, "None") != 0);
-                        bool dec_j_active = (strcmp(dec_j, "None") != 0);
+                        const HotkeyBinding *hb_j = &temp_settings.hotkeys[j];
+                        bool inc_j_active = slot_is_active(hb_j->increment_key);
+                        bool dec_j_active = slot_is_active(hb_j->decrement_key);
 
-                        if (inc_active && inc_j_active && strcmp(inc_i, inc_j) == 0) {
+                        if (inc_active && inc_j_active &&
+                            slots_clash(hb_i->increment_key, hb_i->increment_mods,
+                                        hb_j->increment_key, hb_j->increment_mods)) {
                             hotkey_duplicate_error = true;
                             break;
                         }
-                        if (inc_active && dec_j_active && strcmp(inc_i, dec_j) == 0) {
+                        if (inc_active && dec_j_active &&
+                            slots_clash(hb_i->increment_key, hb_i->increment_mods,
+                                        hb_j->decrement_key, hb_j->decrement_mods)) {
                             hotkey_duplicate_error = true;
                             break;
                         }
-                        if (dec_active && inc_j_active && strcmp(dec_i, inc_j) == 0) {
+                        if (dec_active && inc_j_active &&
+                            slots_clash(hb_i->decrement_key, hb_i->decrement_mods,
+                                        hb_j->increment_key, hb_j->increment_mods)) {
                             hotkey_duplicate_error = true;
                             break;
                         }
-                        if (dec_active && dec_j_active && strcmp(dec_i, dec_j) == 0) {
+                        if (dec_active && dec_j_active &&
+                            slots_clash(hb_i->decrement_key, hb_i->decrement_mods,
+                                        hb_j->decrement_key, hb_j->decrement_mods)) {
                             hotkey_duplicate_error = true;
                             break;
                         }
@@ -7025,6 +7121,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
                                        "Error: Two or more goals share the same hotkey. Each key can only be used once.");
                 }
+
+                ImGui::Spacing();
+                ImGui::TextDisabled(
+                    "Note: 'Global' is saved but not delivered yet. OS-level registration lands in a later update;\n"
+                    "until then every hotkey behaves as window-focused.");
             }
 
             ImGui::EndTabItem();
@@ -7127,7 +7228,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
     bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error ||
-                          account_validation_error;
+                          hotkey_global_error || account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -7289,6 +7390,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because two or more goals share the same hotkey.\n"
                      "Each key can only be assigned to one action across all goals.");
+        } else if (hotkey_global_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
+                     "Rebind it while holding Ctrl, Alt or Super, use an F13-F24 key,\n"
+                     "or turn 'Global' back off in the Hotkeys tab.");
         } else if (account_validation_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because the Account tab has invalid settings.\n"
@@ -7442,6 +7548,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled because two or more goals share the same hotkey.\n"
                      "Each key can only be assigned to one action across all goals.");
+        } else if (hotkey_global_error) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
+                     "Rebind it while holding Ctrl, Alt or Super, use an F13-F24 key,\n"
+                     "or turn 'Global' back off in the Hotkeys tab.");
         } else {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Saves all current settings and restarts the application.\n"

@@ -14465,6 +14465,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
             const char *inc_key = "None";
             const char *dec_key = "None";
+            int inc_mods = HOTKEY_MOD_NONE;
+            int dec_mods = HOTKEY_MOD_NONE;
+            bool is_global = false;
 
             // Find the old binding whose target_goal matches this counter's root_name.
             if (cJSON_IsArray(old_hotkeys_array)) {
@@ -14477,6 +14480,15 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
                         cJSON *old_dec_key = cJSON_GetObjectItem(old_hotkey_item, "decrement_key");
                         if (cJSON_IsString(old_inc_key) && old_inc_key->valuestring) inc_key = old_inc_key->valuestring;
                         if (cJSON_IsString(old_dec_key) && old_dec_key->valuestring) dec_key = old_dec_key->valuestring;
+
+                        // Carry the modifier/global fields across too, or this rebuild would
+                        // silently downgrade every global binding back to focus-only.
+                        cJSON *old_inc_mods = cJSON_GetObjectItem(old_hotkey_item, "increment_mods");
+                        cJSON *old_dec_mods = cJSON_GetObjectItem(old_hotkey_item, "decrement_mods");
+                        cJSON *old_is_global = cJSON_GetObjectItem(old_hotkey_item, "is_global");
+                        if (cJSON_IsNumber(old_inc_mods)) inc_mods = old_inc_mods->valueint;
+                        if (cJSON_IsNumber(old_dec_mods)) dec_mods = old_dec_mods->valueint;
+                        if (cJSON_IsBool(old_is_global)) is_global = cJSON_IsTrue(old_is_global);
                         break;
                     }
                 }
@@ -14484,6 +14496,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
             cJSON_AddStringToObject(new_hotkey_obj, "increment_key", inc_key);
             cJSON_AddStringToObject(new_hotkey_obj, "decrement_key", dec_key);
+            cJSON_AddNumberToObject(new_hotkey_obj, "increment_mods", inc_mods);
+            cJSON_AddNumberToObject(new_hotkey_obj, "decrement_mods", dec_mods);
+            cJSON_AddBoolToObject(new_hotkey_obj, "is_global", is_global);
             cJSON_AddItemToArray(new_hotkeys_array, new_hotkey_obj);
         }
     }

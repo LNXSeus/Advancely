@@ -338,11 +338,37 @@ typedef struct {
 
 #define MAX_COOP_ADV_ASSIGNMENTS 1024
 
+// Platform-neutral modifier bits for hotkey bindings. Stored in settings.json as a plain
+// integer so one binding means the same thing on every OS; the label shown in the UI is
+// localized per-platform (Super reads as "Cmd" on macOS, Alt reads as "Option").
+#define HOTKEY_MOD_NONE 0x00u
+#define HOTKEY_MOD_CTRL 0x01u
+#define HOTKEY_MOD_SHIFT 0x02u
+#define HOTKEY_MOD_ALT 0x04u
+#define HOTKEY_MOD_SUPER 0x08u
+
 typedef struct {
     char target_goal[192];
     char increment_key[32];
     char decrement_key[32];
+    Uint16 increment_mods; // HOTKEY_MOD_* bitmask held alongside increment_key.
+    Uint16 decrement_mods; // HOTKEY_MOD_* bitmask held alongside decrement_key.
+    bool is_global; // If true, the OS delivers this binding even when Advancely is not focused.
 } HotkeyBinding;
+
+// Writes a human-readable modifier prefix ("Ctrl+Shift+") into buf, or an empty string when
+// mods is HOTKEY_MOD_NONE. Returns buf so it can be used inline in snprintf calls.
+const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size);
+
+// True for the scancode names "F13" through "F24". These keys are absent from real keyboards
+// and are what macro pads and Stream Decks emit, so they are the one safe exception to the
+// "a global hotkey must carry a modifier" rule.
+bool hotkey_key_is_macro_function_key(const char *key_name);
+
+// Validates a single key/mods pair for use as a global (OS-registered) hotkey. A bare key would
+// be swallowed system-wide, and Shift alone would break capital letters everywhere, so both are
+// rejected. An unbound ("None") slot is always valid. Writes a reason into out_reason on failure.
+bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
 
 // Data structures for settings
 typedef struct {

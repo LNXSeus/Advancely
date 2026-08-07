@@ -229,14 +229,23 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
       custom goals with an `AND` (all must be completed) or `OR` (at least one) mode to have them auto-complete. All progress is saved
       automatically into `settings.json`. _Switching templates will thus ERASE the progress of these custom goals._
         * **Hotkeys**: Use configurable hotkeys to increment or decrement your custom counters. Up to 32 hotkeys are
-          supported. Hotkeys only work when the tracker window is in focus. Each row in the **Hotkeys** settings tab
+          supported. Each row in the **Hotkeys** settings tab
           shows the goal name followed by the `Decr.` and `Incr.` slots. Click a slot's button and press any key to
-          bind it; press `Escape`, `Backspace`, or `Delete` during capture to clear the binding back to `None`. The
+          bind it; press `Escape`, `Backspace`, or `Delete` during capture to clear the binding back to `None`. Hold
+          `Ctrl`, `Alt`, `Shift`, or `Super` while pressing the key to bind a combination. The
           captured key respects your keyboard layout (e.g. on a German `QWERTZ` keyboard the key labeled `Y` will
           bind correctly even though the underlying scancode is `Z`). For custom goals with a target value of `-1`
           (infinite counters), the increment/decrement hotkeys are automatically blocked once the goal's checkbox is
           manually marked complete; the running counter and the completion checkbox are independent so toggling the
           checkbox no longer resets your progress.
+            * **Global**: Each row has a `Global` checkbox. Left off (the default), the hotkey only fires while the
+              Advancely tracker window is focused, any key may be used, and other programs keep receiving that key
+              normally. Switched on, the operating system reserves the key for Advancely so it fires while you are
+              playing Minecraft. Because a global hotkey is taken away from every other program, it must include
+              `Ctrl`, `Alt`, or `Super`; `Shift` on its own is rejected since it would break capital letters
+              system-wide. Keys `F13` through `F24` are exempt from that rule, as no physical keyboard has them and
+              macro pads are the only thing that sends them. `Apply Settings` stays disabled until every `Global` row
+              has a valid combination.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize

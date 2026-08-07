@@ -18,6 +18,21 @@
 #include "imgui_impl_sdl3.h"
 #include "logger.h"
 
+/**
+ * @brief Reduces an SDL modifier state to the platform-neutral HOTKEY_MOD_* mask.
+ *
+ * Left and right variants collapse into one bit, and the lock keys (Caps, Num, Scroll) are
+ * dropped entirely so a binding does not silently stop matching when Num Lock is on.
+ */
+static Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
+    Uint16 mods = HOTKEY_MOD_NONE;
+    if (sdl_mods & SDL_KMOD_CTRL) mods |= HOTKEY_MOD_CTRL;
+    if (sdl_mods & SDL_KMOD_SHIFT) mods |= HOTKEY_MOD_SHIFT;
+    if (sdl_mods & SDL_KMOD_ALT) mods |= HOTKEY_MOD_ALT;
+    if (sdl_mods & SDL_KMOD_GUI) mods |= HOTKEY_MOD_SUPER;
+    return mods;
+}
+
 void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
@@ -53,8 +68,11 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 if (sc == SDL_SCANCODE_ESCAPE || sc == SDL_SCANCODE_BACKSPACE ||
                     sc == SDL_SCANCODE_DELETE) {
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0); // Clear to "None"
+                    SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                 } else {
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, (int) sc);
+                    SDL_SetAtomicInt(&g_hotkey_captured_mods,
+                                     (int) hotkey_mods_from_sdl(SDL_GetModState()));
                 }
                 SDL_SetAtomicInt(&g_hotkey_capture_armed, 0);
                 continue; // do not let the captured key propagate as a hotkey
@@ -138,11 +156,18 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
 
+                        // A binding that carries modifiers must match them exactly, so Ctrl+G and a
+                        // plain G can coexist. A binding with no modifiers stays deliberately lenient
+                        // and fires whatever else is held down, which is how it has always behaved.
+                        Uint16 held_mods = hotkey_mods_from_sdl(SDL_GetModState());
+
                         // Check if the pressed key matches a hotkey
                         int mod_action = -1;
-                        if (event.key.scancode == inc_scancode) {
+                        if (event.key.scancode == inc_scancode &&
+                            (hb->increment_mods == HOTKEY_MOD_NONE || held_mods == hb->increment_mods)) {
                             mod_action = COOP_MOD_INCREMENT;
-                        } else if (event.key.scancode == dec_scancode) {
+                        } else if (event.key.scancode == dec_scancode &&
+                                   (hb->decrement_mods == HOTKEY_MOD_NONE || held_mods == hb->decrement_mods)) {
                             mod_action = COOP_MOD_DECREMENT;
                         }
 

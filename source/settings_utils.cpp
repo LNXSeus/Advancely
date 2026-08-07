@@ -684,6 +684,87 @@ static void generate_display_category_name(const char *category, const char *fla
     }
 }
 
+// ------------------- HOTKEY HELPERS -------------------
+
+const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size) {
+    if (!buf || buf_size == 0) return "";
+    buf[0] = '\0';
+    if (mods == HOTKEY_MOD_NONE) return buf;
+
+#ifdef __APPLE__
+    const char *ctrl_label = "Ctrl";
+    const char *alt_label = "Option";
+    const char *super_label = "Cmd";
+#else
+    const char *ctrl_label = "Ctrl";
+    const char *alt_label = "Alt";
+#ifdef _WIN32
+    const char *super_label = "Win";
+#else
+    const char *super_label = "Super";
+#endif
+#endif
+
+    // Fixed order so the same combo always renders identically, regardless of press order.
+    size_t len = 0;
+    const char *parts[4] = {nullptr, nullptr, nullptr, nullptr};
+    int part_count = 0;
+    if (mods & HOTKEY_MOD_CTRL) parts[part_count++] = ctrl_label;
+    if (mods & HOTKEY_MOD_ALT) parts[part_count++] = alt_label;
+    if (mods & HOTKEY_MOD_SHIFT) parts[part_count++] = "Shift";
+    if (mods & HOTKEY_MOD_SUPER) parts[part_count++] = super_label;
+
+    for (int i = 0; i < part_count; i++) {
+        int written = snprintf(buf + len, buf_size - len, "%s+", parts[i]);
+        if (written <= 0 || (size_t) written >= buf_size - len) break;
+        len += (size_t) written;
+    }
+    return buf;
+}
+
+bool hotkey_key_is_macro_function_key(const char *key_name) {
+    if (!key_name || key_name[0] != 'F') return false;
+    const char *digits = key_name + 1;
+    if (digits[0] == '\0') return false;
+    int number = 0;
+    for (const char *p = digits; *p; p++) {
+        if (*p < '0' || *p > '9') return false;
+        number = number * 10 + (*p - '0');
+        if (number > 24) return false;
+    }
+    return number >= 13 && number <= 24;
+}
+
+bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size) {
+    if (out_reason && reason_size > 0) out_reason[0] = '\0';
+
+    // An unbound slot never blocks anything.
+    if (!key_name || key_name[0] == '\0' || strcmp(key_name, "None") == 0) return true;
+
+    // F13-F24 are safe bare because no other application binds them.
+    if (hotkey_key_is_macro_function_key(key_name)) return true;
+
+    if (mods == HOTKEY_MOD_NONE) {
+        if (out_reason && reason_size > 0) {
+            snprintf(out_reason, reason_size,
+                     "needs a modifier (Ctrl, Alt or Super) because a global hotkey is taken "
+                     "away from every other program");
+        }
+        return false;
+    }
+
+    // Shift on its own would make the plain character unreachable system-wide.
+    if (mods == HOTKEY_MOD_SHIFT) {
+        if (out_reason && reason_size > 0) {
+            snprintf(out_reason, reason_size,
+                     "cannot use Shift on its own; add Ctrl, Alt or Super");
+        }
+        return false;
+    }
+
+    return true;
+}
+
 // ------------------- SETTINGS UTILS -------------------
 
 void settings_set_defaults(AppSettings *settings) {
@@ -717,6 +798,7 @@ void settings_set_defaults(AppSettings *settings) {
         settings->section_order[i] = i;
     }
     settings->hotkey_count = 0;
+    memset(settings->hotkeys, 0, sizeof(settings->hotkeys));
 
     // New visual/general defaults
     settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
@@ -2751,12 +2833,23 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
             if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
                 HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
+                memset(hb, 0, sizeof(*hb));
                 strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
                 hb->target_goal[sizeof(hb->target_goal) - 1] = '\0';
                 strncpy(hb->increment_key, inc_key->valuestring, sizeof(hb->increment_key) - 1);
                 hb->increment_key[sizeof(hb->increment_key) - 1] = '\0';
                 strncpy(hb->decrement_key, dec_key->valuestring, sizeof(hb->decrement_key) - 1);
                 hb->decrement_key[sizeof(hb->decrement_key) - 1] = '\0';
+
+                // Modifier and global fields are optional: settings.json files written before
+                // global hotkeys existed load as unmodified, window-focused bindings.
+                const cJSON *inc_mods = cJSON_GetObjectItem(hotkey_item, "increment_mods");
+                const cJSON *dec_mods = cJSON_GetObjectItem(hotkey_item, "decrement_mods");
+                const cJSON *is_global = cJSON_GetObjectItem(hotkey_item, "is_global");
+                if (cJSON_IsNumber(inc_mods)) hb->increment_mods = (Uint16) inc_mods->valueint;
+                if (cJSON_IsNumber(dec_mods)) hb->decrement_mods = (Uint16) dec_mods->valueint;
+                if (cJSON_IsBool(is_global)) hb->is_global = cJSON_IsTrue(is_global);
+
                 settings->hotkey_count++;
             }
         }
@@ -3540,6 +3633,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
                 cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
                 cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
+                cJSON_AddNumberToObject(hotkey_obj, "increment_mods", hb->increment_mods);
+                cJSON_AddNumberToObject(hotkey_obj, "decrement_mods", hb->decrement_mods);
+                cJSON_AddBoolToObject(hotkey_obj, "is_global", hb->is_global);
                 cJSON_AddItemToArray(hotkeys_array, hotkey_obj);
             }
         }
