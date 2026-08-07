@@ -94,6 +94,8 @@ struct Tracker {
     bool is_hovering_scrollable_list; // Prevents main map zoom when scrolling a list
     bool map_interactions_blocked; // True when another window (settings, editor, welcome, updater, ...) covers the
     // map under the cursor; blocks checkbox toggles and list scrolling so clicks don't pass through.
+    bool tracker_view_focused; // True when keyboard focus sits on the tracker's own view (map/info/controls) or
+    // nowhere at all; gates the SPACE hotkey so it can't fire while settings/editor widgets are being navigated.
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused; // Flag to track if the template creator window has focus.

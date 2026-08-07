@@ -4099,6 +4099,14 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
                         *settings_opened = !(*settings_opened);
                         break;
                     case SDL_SCANCODE_SPACE:
+                        // Only react when the tracker's own view holds keyboard focus. Settings and the
+                        // template editor render into this same SDL window, and there SPACE belongs to the
+                        // widget keyboard nav has selected. IsAnyItemActive() cannot catch that: the
+                        // activation only happens later, while ImGui builds the next frame.
+                        if (!t->tracker_view_focused) {
+                            break;
+                        }
+
                         // Toggle the layout locked state
                         t->layout_locked = !t->layout_locked;
 
@@ -11513,6 +11521,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // the hovered window when nothing (settings/editor/welcome/updater/info/controls/notes) sits over it.
     t->map_interactions_blocked = !ImGui::IsWindowHovered();
 
+    // Keyboard focus gate for the SPACE hotkey. Settings and the template editor live in this same SDL
+    // window, so window-level focus is not enough: SPACE also activates whatever widget keyboard nav has
+    // selected there. Treat "nothing focused" as the tracker view, then OR in the tracker's own windows.
+    ImGuiContext *imgui_ctx = ImGui::GetCurrentContext();
+    t->tracker_view_focused = (imgui_ctx && imgui_ctx->NavWindow == nullptr);
+    t->tracker_view_focused |= ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
     // Snapshot the previous frame's item list (complete) for lookups during multi-drag,
     // then clear the current list so it can be rebuilt as items render this frame.
     s_visual_layout_items_prev.swap(s_visual_layout_items);
@@ -11795,6 +11810,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::Begin(info_window_title, nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
+    t->tracker_view_focused |= ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
     // Set Font Scale for Info Bar CONTENT
     float scale_factor_info = 1.0f; // Declare local scale factor
     if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
@@ -12060,6 +12077,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::Begin("Controls", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
     ImGui::PopStyleVar();
+
+    t->tracker_view_focused |= ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImGui::SetWindowFontScale(scale_factor_controls);
 
