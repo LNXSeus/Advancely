@@ -761,18 +761,37 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         }
     }
 
-    // Compare hotkeys separately
-    if (a->hotkey_count != b->hotkey_count) return true;
-    for (int i = 0; i < a->hotkey_count; ++i) {
-        if (strcmp(a->hotkeys[i].target_goal, b->hotkeys[i].target_goal) != 0 ||
-            strcmp(a->hotkeys[i].increment_key, b->hotkeys[i].increment_key) != 0 ||
-            strcmp(a->hotkeys[i].decrement_key, b->hotkeys[i].decrement_key) != 0 ||
-            a->hotkeys[i].increment_mods != b->hotkeys[i].increment_mods ||
-            a->hotkeys[i].decrement_mods != b->hotkeys[i].decrement_mods ||
-            a->hotkeys[i].is_global != b->hotkeys[i].is_global) {
+    // Compare hotkeys separately, skipping rows that hold no binding at all. A settings.json
+    // written by the template resync contains one row per counter, most of them None/None, and
+    // those must not read as a difference or "Revert Changes" would never go away.
+    auto hotkey_row_is_empty = [](const HotkeyBinding *hb) -> bool {
+        return strcmp(hb->increment_key, "None") == 0 &&
+               strcmp(hb->decrement_key, "None") == 0 &&
+               !hb->is_global;
+    };
+
+    int ia = 0;
+    int ib = 0;
+    for (;;) {
+        while (ia < a->hotkey_count && hotkey_row_is_empty(&a->hotkeys[ia])) ia++;
+        while (ib < b->hotkey_count && hotkey_row_is_empty(&b->hotkeys[ib])) ib++;
+        if (ia >= a->hotkey_count || ib >= b->hotkey_count) break;
+
+        if (strcmp(a->hotkeys[ia].target_goal, b->hotkeys[ib].target_goal) != 0 ||
+            strcmp(a->hotkeys[ia].increment_key, b->hotkeys[ib].increment_key) != 0 ||
+            strcmp(a->hotkeys[ia].decrement_key, b->hotkeys[ib].decrement_key) != 0 ||
+            a->hotkeys[ia].increment_mods != b->hotkeys[ib].increment_mods ||
+            a->hotkeys[ia].decrement_mods != b->hotkeys[ib].decrement_mods ||
+            a->hotkeys[ia].is_global != b->hotkeys[ib].is_global) {
             return true;
         }
+        ia++;
+        ib++;
     }
+    // One side still has a real binding left over that the other does not.
+    while (ia < a->hotkey_count && hotkey_row_is_empty(&a->hotkeys[ia])) ia++;
+    while (ib < b->hotkey_count && hotkey_row_is_empty(&b->hotkeys[ib])) ib++;
+    if ((ia < a->hotkey_count) != (ib < b->hotkey_count)) return true;
 
     return false;
 }
@@ -948,9 +967,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to show a confirmation message when settings are reset
     static bool show_defaults_applied_message = false;
 
-    // Flag to show a warning about hotkeys needing a settings window restart
-    static bool show_hotkey_warning_message = false;
-
     // Co-op error flag (block Apply when host IP/port is invalid)
     static bool coop_host_input_error = false;
 
@@ -959,6 +975,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Hotkey global error flag (block Apply when a binding marked Global has no usable modifier)
     static bool hotkey_global_error = false;
+
+    // Hotkey reserved error flag (block Apply when a binding collides with a built-in shortcut)
+    static bool hotkey_reserved_error = false;
 
     // Account validation error flag (block Apply when UUID is empty or has bad format)
     static bool account_validation_error = false;
@@ -1194,7 +1213,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         pending_preset_progress_path[0] = '\0';
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
-        show_hotkey_warning_message = false;
         show_template_not_found_error = false;
         // Reset co-op tab transient state
         coop_ip_revealed = false;
@@ -6825,6 +6843,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         if (ImGui::BeginTabItem("Hotkeys")) {
             hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
             hotkey_global_error = false;
+            hotkey_reserved_error = false;
             ImGui::TextDisabled(
                 "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
             // --- Hotkey Settings ---
@@ -6928,10 +6947,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char hotkey_settings_tooltip_buffer[1024];
                     snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
-                             "IMPORTANT: Hotkeys are remembered between templates.\n"
-                             "You might have to restart the settings window for the hotkeys to appear.\n\n"
-                             "Click a button and press a key to bind it. Hold Ctrl, Alt, Shift or\n"
-                             "Super while pressing the key to bind a combination. Press Escape,\n"
+                             "IMPORTANT: Hotkeys are remembered between templates.\n\n"
+                             "Click a button and press a key to bind it. Hold Ctrl, Alt or Shift\n"
+                             "while pressing the key to bind a combination. Press Escape,\n"
                              "Backspace, or Delete during capture to clear the binding back to None.\n\n"
                              "Without 'Global', a hotkey only works when tabbed into the tracker.\n"
                              "Maximum of %d hotkeys are supported.",
@@ -7032,32 +7050,56 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Any key works, and other programs keep receiving it normally.\n\n"
                                  "On: the operating system reserves the key for Advancely, so it fires while you are\n"
                                  "playing Minecraft. Because the key is taken away from every other program, a global\n"
-                                 "hotkey must include Ctrl, Alt or Super. F13 to F24 are exempt, since no keyboard\n"
+                                 "hotkey must include Ctrl or Alt. F13 to F24 are exempt, since no keyboard\n"
                                  "has those physically and macro pads are the only thing that sends them.\n\n"
-                                 "Default: Off");
+                                 "Default: %s", DEFAULT_HOTKEY_IS_GLOBAL ? "On" : "Off");
                         ImGui::SetTooltip("%s", global_tooltip_buffer);
                     }
 
                     // Explain exactly which slot is unusable rather than a generic complaint.
-                    if (row_is_global && binding) {
-                        char inc_reason[192];
-                        char dec_reason[192];
-                        bool inc_ok = hotkey_global_slot_is_valid(binding->increment_key, binding->increment_mods,
-                                                                  inc_reason, sizeof(inc_reason));
-                        bool dec_ok = hotkey_global_slot_is_valid(binding->decrement_key, binding->decrement_mods,
-                                                                  dec_reason, sizeof(dec_reason));
-                        if (!dec_ok) {
-                            hotkey_global_error = true;
-                            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
-                                               "    Decrement %s", dec_reason);
-                        }
-                        if (!inc_ok) {
-                            hotkey_global_error = true;
-                            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
-                                               "    Increment %s", inc_reason);
-                        }
+                    // Reserved combinations are checked on every row; the modifier requirement
+                    // only applies once the row is marked Global.
+                    if (binding) {
+                        auto validate_slot = [&](const char *slot_name, const char *key, Uint16 mods) {
+                            char reason[192];
+                            bool bad = false;
+                            if (hotkey_slot_is_reserved(key, mods, reason, sizeof(reason))) {
+                                hotkey_reserved_error = true;
+                                bad = true;
+                            } else if (row_is_global &&
+                                       !hotkey_global_slot_is_valid(key, mods, reason, sizeof(reason))) {
+                                hotkey_global_error = true;
+                                bad = true;
+                            }
+                            if (bad) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                                   "    %s %s", slot_name, reason);
+                            }
+                        };
+                        validate_slot("Decrement", binding->decrement_key, binding->decrement_mods);
+                        validate_slot("Increment", binding->increment_key, binding->increment_mods);
                     }
                 }
+
+                // --- Prune bindings that carry no information ---
+                // Binding a key and then clearing it back to None, or ticking Global and
+                // unticking it again, would otherwise leave a hollow row behind. That row makes
+                // hotkey_count differ from the saved settings, so "Revert Changes" would stay
+                // visible even though nothing actually changed.
+                int kept = 0;
+                for (int i = 0; i < temp_settings.hotkey_count; ++i) {
+                    const HotkeyBinding *hb = &temp_settings.hotkeys[i];
+                    bool is_empty = (strcmp(hb->increment_key, "None") == 0 &&
+                                     strcmp(hb->decrement_key, "None") == 0 &&
+                                     !hb->is_global);
+                    if (is_empty) continue;
+                    if (kept != i) temp_settings.hotkeys[kept] = temp_settings.hotkeys[i];
+                    kept++;
+                }
+                for (int i = kept; i < temp_settings.hotkey_count; ++i) {
+                    memset(&temp_settings.hotkeys[i], 0, sizeof(temp_settings.hotkeys[i]));
+                }
+                temp_settings.hotkey_count = kept;
 
                 // --- Duplicate Hotkey Validation ---
                 // Two slots clash only when the key AND the modifiers match, so Ctrl+G and a
@@ -7228,7 +7270,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
     bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error ||
-                          hotkey_global_error || account_validation_error;
+                          hotkey_global_error || hotkey_reserved_error || account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -7241,7 +7283,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
-        show_hotkey_warning_message = false;
 
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
@@ -7298,19 +7339,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     *force_open_reason = FORCE_OPEN_NONE; // Clear any startup warnings
                 }
 
-                // Hotkey Warning Logic
-                bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
-                                           strcmp(temp_settings.category, saved_settings.category) != 0 ||
-                                           strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
-                bool had_active_hotkeys = false;
-                for (int i = 0; i < saved_settings.hotkey_count; ++i) {
-                    if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
-                        strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
-                        had_active_hotkeys = true;
-                        break;
-                    }
-                }
-
                 // Preserve runtime state that is managed outside the settings UI
                 temp_settings.use_manual_layout = app_settings->use_manual_layout;
 
@@ -7362,11 +7390,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     coop_net_broadcast_template_sync(g_coop_ctx);
                 }
 
-                if (is_template_change && had_active_hotkeys) {
-                    show_hotkey_warning_message = true;
-                } else {
-                    show_applied_message = true;
-                }
+                show_applied_message = true;
             }
         }
     }
@@ -7393,8 +7417,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } else if (hotkey_global_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
-                     "Rebind it while holding Ctrl, Alt or Super, use an F13-F24 key,\n"
+                     "Rebind it while holding Ctrl or Alt, use an F13-F24 key,\n"
                      "or turn 'Global' back off in the Hotkeys tab.");
+        } else if (hotkey_reserved_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled because a hotkey uses a combination Advancely reserves\n"
+                     "for itself. Rebind the highlighted slot in the Hotkeys tab.");
         } else if (account_validation_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because the Account tab has invalid settings.\n"
@@ -7436,12 +7464,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     if (show_applied_message) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Settings Applied!");
-    }
-
-    // Show the hotkey warning message if needed
-    if (show_hotkey_warning_message) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Reopen settings to see updated hotkeys.");
     }
 
     // Show the confirmation message if settings were reset
@@ -7551,8 +7573,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } else if (hotkey_global_error) {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
-                     "Rebind it while holding Ctrl, Alt or Super, use an F13-F24 key,\n"
+                     "Rebind it while holding Ctrl or Alt, use an F13-F24 key,\n"
                      "or turn 'Global' back off in the Hotkeys tab.");
+        } else if (hotkey_reserved_error) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled because a hotkey uses a combination Advancely reserves\n"
+                     "for itself. Rebind the highlighted slot in the Hotkeys tab.");
         } else {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Saves all current settings and restarts the application.\n"

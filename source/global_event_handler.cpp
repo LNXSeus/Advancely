@@ -29,7 +29,6 @@ static Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
     if (sdl_mods & SDL_KMOD_CTRL) mods |= HOTKEY_MOD_CTRL;
     if (sdl_mods & SDL_KMOD_SHIFT) mods |= HOTKEY_MOD_SHIFT;
     if (sdl_mods & SDL_KMOD_ALT) mods |= HOTKEY_MOD_ALT;
-    if (sdl_mods & SDL_KMOD_GUI) mods |= HOTKEY_MOD_SUPER;
     return mods;
 }
 
@@ -156,18 +155,16 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
 
-                        // A binding that carries modifiers must match them exactly, so Ctrl+G and a
-                        // plain G can coexist. A binding with no modifiers stays deliberately lenient
-                        // and fires whatever else is held down, which is how it has always behaved.
+                        // Modifiers must match exactly, including the empty set. Anything looser
+                        // lets a bare "E" binding swallow Alt+E and Ctrl+E as well, because the
+                        // unmodified slot is tested first and would always win.
                         Uint16 held_mods = hotkey_mods_from_sdl(SDL_GetModState());
 
                         // Check if the pressed key matches a hotkey
                         int mod_action = -1;
-                        if (event.key.scancode == inc_scancode &&
-                            (hb->increment_mods == HOTKEY_MOD_NONE || held_mods == hb->increment_mods)) {
+                        if (event.key.scancode == inc_scancode && held_mods == hb->increment_mods) {
                             mod_action = COOP_MOD_INCREMENT;
-                        } else if (event.key.scancode == dec_scancode &&
-                                   (hb->decrement_mods == HOTKEY_MOD_NONE || held_mods == hb->decrement_mods)) {
+                        } else if (event.key.scancode == dec_scancode && held_mods == hb->decrement_mods) {
                             mod_action = COOP_MOD_DECREMENT;
                         }
 

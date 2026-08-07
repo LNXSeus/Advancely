@@ -232,7 +232,9 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
           supported. Each row in the **Hotkeys** settings tab
           shows the goal name followed by the `Decr.` and `Incr.` slots. Click a slot's button and press any key to
           bind it; press `Escape`, `Backspace`, or `Delete` during capture to clear the binding back to `None`. Hold
-          `Ctrl`, `Alt`, `Shift`, or `Super` while pressing the key to bind a combination. The
+          `Ctrl`, `Alt`, or `Shift` while pressing the key to bind a combination; modifiers must then match exactly
+          when you press the hotkey, so a bare `E` and an `Alt+E` can sit on two different goals. `Ctrl+F` cannot be
+          bound at all, since Advancely reserves it for the search box. The
           captured key respects your keyboard layout (e.g. on a German `QWERTZ` keyboard the key labeled `Y` will
           bind correctly even though the underlying scancode is `Z`). For custom goals with a target value of `-1`
           (infinite counters), the increment/decrement hotkeys are automatically blocked once the goal's checkbox is
@@ -242,10 +244,10 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
               Advancely tracker window is focused, any key may be used, and other programs keep receiving that key
               normally. Switched on, the operating system reserves the key for Advancely so it fires while you are
               playing Minecraft. Because a global hotkey is taken away from every other program, it must include
-              `Ctrl`, `Alt`, or `Super`; `Shift` on its own is rejected since it would break capital letters
-              system-wide. Keys `F13` through `F24` are exempt from that rule, as no physical keyboard has them and
-              macro pads are the only thing that sends them. `Apply Settings` stays disabled until every `Global` row
-              has a valid combination.
+              `Ctrl` or `Alt`; `Shift` on its own is rejected since it would break capital letters system-wide,
+              though `Shift` may be added on top of `Ctrl` or `Alt`. Keys `F13` through `F24` are exempt from the
+              modifier rule, as no physical keyboard has them and macro pads are the only thing that sends them.
+              `Apply Settings` stays disabled until every `Global` row has a valid combination.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize

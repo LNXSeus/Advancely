@@ -692,27 +692,18 @@ const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size) {
     if (mods == HOTKEY_MOD_NONE) return buf;
 
 #ifdef __APPLE__
-    const char *ctrl_label = "Ctrl";
     const char *alt_label = "Option";
-    const char *super_label = "Cmd";
 #else
-    const char *ctrl_label = "Ctrl";
     const char *alt_label = "Alt";
-#ifdef _WIN32
-    const char *super_label = "Win";
-#else
-    const char *super_label = "Super";
-#endif
 #endif
 
     // Fixed order so the same combo always renders identically, regardless of press order.
     size_t len = 0;
-    const char *parts[4] = {nullptr, nullptr, nullptr, nullptr};
+    const char *parts[3] = {nullptr, nullptr, nullptr};
     int part_count = 0;
-    if (mods & HOTKEY_MOD_CTRL) parts[part_count++] = ctrl_label;
+    if (mods & HOTKEY_MOD_CTRL) parts[part_count++] = "Ctrl";
     if (mods & HOTKEY_MOD_ALT) parts[part_count++] = alt_label;
     if (mods & HOTKEY_MOD_SHIFT) parts[part_count++] = "Shift";
-    if (mods & HOTKEY_MOD_SUPER) parts[part_count++] = super_label;
 
     for (int i = 0; i < part_count; i++) {
         int written = snprintf(buf + len, buf_size - len, "%s+", parts[i]);
@@ -735,29 +726,42 @@ bool hotkey_key_is_macro_function_key(const char *key_name) {
     return number >= 13 && number <= 24;
 }
 
+bool hotkey_slot_is_reserved(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size) {
+    if (out_reason && reason_size > 0) out_reason[0] = '\0';
+    if (!key_name || key_name[0] == '\0' || strcmp(key_name, "None") == 0) return false;
+
+    // Ctrl+F focuses the tracker's search box in handle_global_events(). That handler is
+    // independent of the counter hotkeys, so binding the same combo would do both at once.
+    // Keep this in sync with the shortcuts handled there.
+    if ((mods & HOTKEY_MOD_CTRL) && strcmp(key_name, "F") == 0) {
+        if (out_reason && reason_size > 0) {
+            snprintf(out_reason, reason_size,
+                     "cannot use Ctrl+F, which Advancely reserves for the search box");
+        }
+        return true;
+    }
+
+    return false;
+}
+
 bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size) {
     if (out_reason && reason_size > 0) out_reason[0] = '\0';
 
     // An unbound slot never blocks anything.
     if (!key_name || key_name[0] == '\0' || strcmp(key_name, "None") == 0) return true;
 
+    if (hotkey_slot_is_reserved(key_name, mods, out_reason, reason_size)) return false;
+
     // F13-F24 are safe bare because no other application binds them.
     if (hotkey_key_is_macro_function_key(key_name)) return true;
 
-    if (mods == HOTKEY_MOD_NONE) {
+    // Shift on its own would make the plain character unreachable system-wide, so Ctrl or Alt
+    // has to be part of the combination. Shift is fine as an addition to either.
+    if ((mods & (HOTKEY_MOD_CTRL | HOTKEY_MOD_ALT)) == 0) {
         if (out_reason && reason_size > 0) {
             snprintf(out_reason, reason_size,
-                     "needs a modifier (Ctrl, Alt or Super) because a global hotkey is taken "
-                     "away from every other program");
-        }
-        return false;
-    }
-
-    // Shift on its own would make the plain character unreachable system-wide.
-    if (mods == HOTKEY_MOD_SHIFT) {
-        if (out_reason && reason_size > 0) {
-            snprintf(out_reason, reason_size,
-                     "cannot use Shift on its own; add Ctrl, Alt or Super");
+                     "needs Ctrl or Alt, because a global hotkey is taken away from every "
+                     "other program");
         }
         return false;
     }

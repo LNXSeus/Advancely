@@ -101,6 +101,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define MAX_COOP_PLAYERS 32 // Maximum number of players in a co-op session
 
 // DEFAULT values
+#define DEFAULT_HOTKEY_IS_GLOBAL false // Hotkeys are window-focused unless explicitly made global
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
 #define DEFAULT_USING_HERMES false
@@ -340,12 +341,13 @@ typedef struct {
 
 // Platform-neutral modifier bits for hotkey bindings. Stored in settings.json as a plain
 // integer so one binding means the same thing on every OS; the label shown in the UI is
-// localized per-platform (Super reads as "Cmd" on macOS, Alt reads as "Option").
+// localized per-platform (Alt reads as "Option" on macOS).
+// Super/Win/Cmd is deliberately absent: window managers commonly swallow it before the
+// application ever sees it, so it cannot be captured reliably.
 #define HOTKEY_MOD_NONE 0x00u
 #define HOTKEY_MOD_CTRL 0x01u
 #define HOTKEY_MOD_SHIFT 0x02u
 #define HOTKEY_MOD_ALT 0x04u
-#define HOTKEY_MOD_SUPER 0x08u
 
 typedef struct {
     char target_goal[192];
@@ -365,9 +367,16 @@ const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size);
 // "a global hotkey must carry a modifier" rule.
 bool hotkey_key_is_macro_function_key(const char *key_name);
 
+// True when a key/mods pair collides with a shortcut Advancely handles itself, in which case
+// binding it would fire both actions at once. Applies to every binding, global or not.
+// Writes an explanation into out_reason when it returns true.
+bool hotkey_slot_is_reserved(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
+
 // Validates a single key/mods pair for use as a global (OS-registered) hotkey. A bare key would
 // be swallowed system-wide, and Shift alone would break capital letters everywhere, so both are
-// rejected. An unbound ("None") slot is always valid. Writes a reason into out_reason on failure.
+// rejected. An unbound ("None") slot is always valid. Reserved combinations are rejected here
+// too, so a global-only caller needs just this one check.
+// Writes a reason into out_reason on failure.
 bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
 
 // Data structures for settings
