@@ -93,6 +93,12 @@ if (WIN32)
             # Windows-specific resource file
             "icon.rc"
     )
+elseif (APPLE)
+    list(APPEND SOURCE_FILES
+            # Carbon-only translation unit for global hotkeys; it cannot be compiled together with
+            # the project headers, so it is a separate file rather than an #ifdef block.
+            "source/global_hotkeys_mac.cpp"
+    )
 endif ()
 
 

@@ -6957,6 +6957,43 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
                 }
 
+                // How 'Global' behaves depends entirely on the OS, so the explanation is written
+                // per-platform rather than describing three systems at once.
+                ImGui::SameLine();
+                ImGui::TextDisabled("(?)");
+                if (ImGui::IsItemHovered()) {
+#ifdef _WIN32
+                    const char *global_os_name = "Windows";
+                    const char *global_os_help =
+                            "Advancely registers the combination with Windows itself, so it fires\n"
+                            "while Minecraft is focused. Windows then reserves it system-wide: no\n"
+                            "other program receives that combination while Advancely is running.\n"
+                            "If another program claimed it first, that row says so and the hotkey\n"
+                            "keeps working as a normal window-focused one.";
+#elif defined(__APPLE__)
+                    const char *global_os_name = "macOS";
+                    const char *global_os_help =
+                            "Advancely registers the combination with the system hotkey API, so it\n"
+                            "fires while Minecraft is focused, and no Accessibility permission\n"
+                            "prompt is needed. macOS then reserves the combination system-wide.\n"
+                            "System shortcuts win: if macOS or another program already owns it,\n"
+                            "that row says so and the hotkey keeps working as a window-focused one.";
+#else
+                    const char *global_os_name = "Linux";
+                    const char *global_os_help =
+                            "Advancely grabs the combination from the X server, so it fires while\n"
+                            "Minecraft is focused. On an X11 session this always works. On a\n"
+                            "Wayland session it works while the focused window is an X11 or\n"
+                            "XWayland window, which Minecraft normally is; Wayland itself offers no\n"
+                            "way for a program to reserve a shortcut. With no X server reachable at\n"
+                            "all, that row says so and the hotkey keeps working as a window-focused one.";
+#endif
+                    char global_support_buffer[1024];
+                    snprintf(global_support_buffer, sizeof(global_support_buffer),
+                             "How 'Global' works on %s:\n\n%s", global_os_name, global_os_help);
+                    ImGui::SetTooltip("%s", global_support_buffer);
+                }
+
                 // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
                 for (const auto &counter: custom_counters) {
                     HotkeyBinding *binding = nullptr;
