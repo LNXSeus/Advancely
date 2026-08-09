@@ -54,6 +54,7 @@ set(SOURCE_FILES
         "source/tracker.cpp"
         "source/overlay.cpp"
         "source/global_event_handler.cpp"
+        "source/global_hotkeys.cpp"
         "source/settings.cpp"
         "source/path_utils.cpp"
         "source/settings_utils.cpp"
@@ -198,8 +199,10 @@ if (WIN32)
     # Link against common Windows libraries needed by SDL and advancely
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version ntdll urlmon ws2_32)
 elseif (APPLE)
-    # On macOS, link against required system frameworks
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")
+    # On macOS, link against required system frameworks.
+    # Carbon is needed for RegisterEventHotKey (global hotkeys); it is the one hotkey API that
+    # works without an Accessibility permission prompt.
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit" "-framework Carbon")
 
     # This block now creates the .app bundle using your custom Info.plist
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES
@@ -217,6 +220,10 @@ elseif (APPLE)
             "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/../Resources/Advancely_Logo_NoText.icns"
             COMMENT "[CMAKE] Manually copying icon to macOS app bundle."
     )
+else ()
+    # Linux: libX11 is dlopen'd at runtime for global hotkeys, so only the dynamic loader is
+    # linked here. No new package dependency - a system without X11 just loses that feature.
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${CMAKE_DL_LIBS})
 endif ()
 # On Linux, find_package usually handles all necessary system library dependencies.
 

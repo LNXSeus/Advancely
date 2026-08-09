@@ -46,6 +46,23 @@ extern char g_latest_known_version[64];
 // Latest Advancely version observed via the startup update check ("" if unknown). Used to gate relay connections to "must be on latest".
 
 /**
+ * @brief Applies a counter hotkey action to a custom goal, whatever delivered the key press.
+ *
+ * Holds every gate and every mutation path in one place so the focus-only SDL key path and the
+ * OS-level global hotkey path stay in lockstep: visual-layout-edit block, the co-op receiver /
+ * host-only / viewer-is-self gates, the infinite-counter completion block, receiver-sends-to-host,
+ * host optimistic mutation + batched persistence, and the singleplayer direct write.
+ *
+ * @param t A pointer to the main tracker struct.
+ * @param app_settings A pointer to the loaded application settings.
+ * @param target_goal_root The root name of the custom goal to modify.
+ * @param mod_action COOP_MOD_INCREMENT or COOP_MOD_DECREMENT.
+ * @return true if the action was applied, false if a gate rejected it or the goal was not found.
+ */
+bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
+                                 const char *target_goal_root, int mod_action);
+
+/**
  * @brief Processes the global SDL event queue.
  *
  * This function polls for all pending SDL events for the current frame and dispatches

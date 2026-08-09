@@ -32,6 +32,105 @@ static Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
     return mods;
 }
 
+bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
+                                 const char *target_goal_root, int mod_action) {
+    if (!t || !app_settings || !target_goal_root || target_goal_root[0] == '\0') return false;
+    if (!t->template_data || !t->template_data->custom_goals) return false;
+
+    // Hotkeys don't work when in visual layout editing mode
+    if (t->is_visual_layout_editing) return false;
+
+    // Co-op: Receivers with host-only custom goals cannot use counter hotkeys
+    bool rcv_in_lobby = (app_settings->network_mode == NETWORK_RECEIVER &&
+                         g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+
+    // Viewer-is-self gate: hotkeys only mutate state when the dropdown shows
+    // your own view or "All Players". Viewing another specific player is read-only.
+    // Track own-UUID specifically (excludes All-Players) so HOST_ONLY can yield to it.
+    bool view_is_self_or_all = true;
+    bool viewing_own_uuid = false;
+    if (app_settings->network_mode != NETWORK_SINGLEPLAYER) {
+        int sel = t->selected_coop_player_idx;
+        if (sel >= 0 && sel < app_settings->coop_player_count) {
+            const char *view_uuid = app_settings->coop_players[sel].uuid;
+            viewing_own_uuid = (app_settings->local_player.uuid[0] != '\0' &&
+                                strcmp(view_uuid, app_settings->local_player.uuid) == 0);
+            view_is_self_or_all = viewing_own_uuid;
+        }
+    }
+    if (!view_is_self_or_all) return false;
+
+    bool coop_hotkeys_blocked = (rcv_in_lobby &&
+                                 app_settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY &&
+                                 !viewing_own_uuid);
+    if (coop_hotkeys_blocked) return false;
+
+    // Find the goal this hotkey is bound to
+    TrackableItem *target_goal = nullptr;
+    for (int j = 0; j < t->template_data->custom_goal_count; j++) {
+        if (strcmp(t->template_data->custom_goals[j]->root_name, target_goal_root) == 0) {
+            target_goal = t->template_data->custom_goals[j];
+            break;
+        }
+    }
+    if (!target_goal) return false;
+
+    // Block increment/decrement on infinite counters (goal == -1) once
+    // the user has manually marked the goal complete. The toggle stays
+    // independent of progress, but accidentally bumping a "completed"
+    // counter is unwanted noise
+    if (target_goal->goal == -1 && target_goal->is_manually_completed) return false;
+
+    // Co-op Receiver: send modification to host (any-player mode, or self-view under host-only).
+    if (rcv_in_lobby &&
+        (app_settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER || viewing_own_uuid)) {
+        CoopCustomGoalModMsg mod = {};
+        snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", target_goal->root_name);
+        mod.parent_root_name[0] = '\0';
+        mod.action = mod_action;
+        snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", app_settings->local_player.uuid);
+        coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+        // Optimistic in-memory mutation for instant feedback,
+        // plus pending-mod registration so the next host
+        // STATE_UPDATE doesn't visually revert the increment
+        // before the host's echo arrives.
+        tracker_apply_mod_to_view(t, &mod);
+        tracker_pending_mod_register(mod.parent_root_name, mod.goal_root_name, 2000);
+        return true;
+    }
+
+    bool host_in_lobby = (app_settings->network_mode == NETWORK_HOST && g_coop_ctx &&
+                          coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING);
+    if (host_in_lobby) {
+        // Host's own hotkey: optimistic view mutation +
+        // queue for batched persistence. Direct settings.json
+        // writes per-keypress stalled the UI while panning.
+        CoopCustomGoalModMsg mod = {};
+        snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", target_goal->root_name);
+        mod.parent_root_name[0] = '\0';
+        mod.action = mod_action;
+        snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", app_settings->local_player.uuid);
+        tracker_apply_mod_to_view(t, &mod);
+        tracker_queue_host_mod(&mod);
+        return true;
+    }
+
+    // Singleplayer: direct in-memory mutation + save.
+    if (mod_action == COOP_MOD_INCREMENT) {
+        target_goal->progress++;
+    } else {
+        target_goal->progress--;
+    }
+    if (target_goal->goal > 0) {
+        target_goal->done = (target_goal->progress >= target_goal->goal);
+    }
+    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+    SDL_SetAtomicInt(&g_game_data_changed, 1);
+    return true;
+}
+
 void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
@@ -104,61 +203,18 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 // Only trigger on initial key press
                 // Defensive check to prevent crash if data is not ready
                 // CUSTOM GOAL HOTKEYS
-                // Hotkeys don't work when in visual layout editing mode
-                // Co-op: Receivers with host-only custom goals cannot use counter hotkeys
-                bool rcv_in_lobby = (app_settings->network_mode == NETWORK_RECEIVER &&
-                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                if (t && t->template_data && t->template_data->custom_goals) {
+                    // Modifiers must match exactly, including the empty set. Anything looser
+                    // lets a bare "E" binding swallow Alt+E and Ctrl+E as well, because the
+                    // unmodified slot is tested first and would always win.
+                    Uint16 held_mods = hotkey_mods_from_sdl(SDL_GetModState());
 
-                // Viewer-is-self gate: hotkeys only mutate state when the dropdown shows
-                // your own view or "All Players". Viewing another specific player is read-only.
-                // Track own-UUID specifically (excludes All-Players) so HOST_ONLY can yield to it.
-                bool view_is_self_or_all = true;
-                bool viewing_own_uuid = false;
-                if (t && app_settings->network_mode != NETWORK_SINGLEPLAYER) {
-                    int sel = t->selected_coop_player_idx;
-                    if (sel >= 0 && sel < app_settings->coop_player_count) {
-                        const char *view_uuid = app_settings->coop_players[sel].uuid;
-                        viewing_own_uuid = (app_settings->local_player.uuid[0] != '\0' &&
-                                            strcmp(view_uuid, app_settings->local_player.uuid) == 0);
-                        view_is_self_or_all = viewing_own_uuid;
-                    }
-                }
-
-                bool coop_hotkeys_blocked = (rcv_in_lobby &&
-                                             app_settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY &&
-                                             !viewing_own_uuid);
-
-                if (t && t->template_data && t->template_data->custom_goals &&
-                    !t->is_visual_layout_editing && !coop_hotkeys_blocked && view_is_self_or_all) {
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
-                        TrackableItem *target_goal = nullptr;
-
-                        // Find the goal this hotkey is bound to
-                        for (int j = 0; j < t->template_data->custom_goal_count; j++) {
-                            if (strcmp(t->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
-                                target_goal = t->template_data->custom_goals[j];
-                                break;
-                            }
-                        }
-                        if (!target_goal) continue;
-
-                        // Block increment/decrement on infinite counters (goal == -1) once
-                        // the user has manually marked the goal complete. The toggle stays
-                        // independent of progress, but accidentally bumping a "completed"
-                        // counter is unwanted noise
-                        if (target_goal->goal == -1 && target_goal->is_manually_completed) {
-                            continue;
-                        }
 
                         // Convert key names from settings to scancodes for comparison
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
-
-                        // Modifiers must match exactly, including the empty set. Anything looser
-                        // lets a bare "E" binding swallow Alt+E and Ctrl+E as well, because the
-                        // unmodified slot is tested first and would always win.
-                        Uint16 held_mods = hotkey_mods_from_sdl(SDL_GetModState());
 
                         // Check if the pressed key matches a hotkey
                         int mod_action = -1;
@@ -168,59 +224,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                             mod_action = COOP_MOD_DECREMENT;
                         }
 
-                        if (mod_action >= 0) {
-                            // Co-op Receiver: send modification to host (any-player mode, or self-view under host-only).
-                            if (rcv_in_lobby &&
-                                (app_settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER ||
-                                 viewing_own_uuid)) {
-                                CoopCustomGoalModMsg mod = {};
-                                snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
-                                         "%s", target_goal->root_name);
-                                mod.parent_root_name[0] = '\0';
-                                mod.action = mod_action;
-                                snprintf(mod.source_uuid, sizeof(mod.source_uuid),
-                                         "%s", app_settings->local_player.uuid);
-                                coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
-                                // Optimistic in-memory mutation for instant feedback,
-                                // plus pending-mod registration so the next host
-                                // STATE_UPDATE doesn't visually revert the increment
-                                // before the host's echo arrives.
-                                tracker_apply_mod_to_view(t, &mod);
-                                tracker_pending_mod_register(mod.parent_root_name,
-                                                             mod.goal_root_name, 2000);
-                            } else {
-                                bool host_in_lobby = (app_settings->network_mode == NETWORK_HOST &&
-                                                      g_coop_ctx &&
-                                                      coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING);
-                                if (host_in_lobby) {
-                                    // Host's own hotkey: optimistic view mutation +
-                                    // queue for batched persistence. Direct settings.json
-                                    // writes per-keypress stalled the UI while panning.
-                                    CoopCustomGoalModMsg mod = {};
-                                    snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
-                                             "%s", target_goal->root_name);
-                                    mod.parent_root_name[0] = '\0';
-                                    mod.action = mod_action;
-                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid),
-                                             "%s", app_settings->local_player.uuid);
-                                    tracker_apply_mod_to_view(t, &mod);
-                                    tracker_queue_host_mod(&mod);
-                                } else {
-                                    // Singleplayer: direct in-memory mutation + save.
-                                    if (mod_action == COOP_MOD_INCREMENT) {
-                                        target_goal->progress++;
-                                    } else {
-                                        target_goal->progress--;
-                                    }
-                                    if (target_goal->goal > 0) {
-                                        target_goal->done = (target_goal->progress >= target_goal->goal);
-                                    }
-                                    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-                                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
-                                    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
-                                    SDL_SetAtomicInt(&g_game_data_changed, 1);
-                                }
-                            }
+                        if (mod_action >= 0 &&
+                            hotkey_apply_counter_action(t, app_settings, hb->target_goal, mod_action)) {
                             break;
                         }
                     }

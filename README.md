@@ -248,6 +248,12 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
               though `Shift` may be added on top of `Ctrl` or `Alt`. Keys `F13` through `F24` are exempt from the
               modifier rule, as no physical keyboard has them and macro pads are the only thing that sends them.
               `Apply Settings` stays disabled until every `Global` row has a valid combination.
+              Global hotkeys work on Windows and macOS, and on Linux under X11 (including a game
+              running through `XWayland`). A Wayland session provides no way for an application to
+              reserve a shortcut, so on a Wayland desktop a `Global` row falls back to firing only
+              while Advancely is focused and the `Hotkeys` tab says so on that row. If another
+              program already owns a combination, that row reports it instead of silently doing
+              nothing.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize
