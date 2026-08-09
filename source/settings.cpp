@@ -33,6 +33,7 @@
 #include "mojang_api.h"
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
+#include "global_hotkeys.h" // For per-row OS registration status in the Hotkeys tab
 #include "path_utils.h" // For path_exists()
 #include "template_scanner.h"
 #include "temp_creator.h"
@@ -7116,6 +7117,29 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         validate_slot("Decrement", binding->decrement_key, binding->decrement_mods);
                         validate_slot("Increment", binding->increment_key, binding->increment_mods);
                     }
+
+                    // Registration status comes from the APPLIED settings, not this form: a row
+                    // just ticked Global is not registered until 'Apply Settings' is clicked. The
+                    // matching binding is found by goal name, since the two arrays can differ.
+                    int applied_idx = -1;
+                    for (int i = 0; i < app_settings->hotkey_count; ++i) {
+                        if (strcmp(app_settings->hotkeys[i].target_goal, counter->root_name) == 0) {
+                            applied_idx = i;
+                            break;
+                        }
+                    }
+                    if (applied_idx >= 0 && app_settings->hotkeys[applied_idx].is_global) {
+                        auto report_slot = [&](const char *slot_name, bool decrement) {
+                            const char *err = global_hotkeys_slot_error(applied_idx, decrement);
+                            if (!err) return;
+                            // Amber, not red: the binding still works, just not globally.
+                            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
+                                               "    %s is not global: %s Window-focused only.",
+                                               slot_name, err);
+                        };
+                        report_slot("Decrement", true);
+                        report_slot("Increment", false);
+                    }
                 }
 
                 // --- Prune bindings that carry no information ---
@@ -7202,9 +7226,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
 
                 ImGui::Spacing();
-                ImGui::TextDisabled(
-                    "Note: 'Global' is saved but not delivered yet. OS-level registration lands in a later update;\n"
-                    "until then every hotkey behaves as window-focused.");
+                if (!global_hotkeys_platform_supported()) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
+                                       "Global hotkeys are unavailable on this system. Every hotkey behaves as window-focused.");
+                } else {
+                    ImGui::TextDisabled(
+                        "Note: 'Global' rows are handed to the operating system when you click 'Apply Settings'.");
+                }
             }
 
             ImGui::EndTabItem();

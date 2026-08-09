@@ -731,6 +731,14 @@ bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, 
     return true;
 }
 
+bool global_hotkeys_slot_is_registered(int hotkey_index, bool decrement) {
+    int slot_id = hotkey_index * 2 + (decrement ? 1 : 0);
+    if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return false;
+    // The X11 backend accepts a registration up front and only discovers a grab conflict on its
+    // listener thread, so a slot counts as registered only while it also has no error to report.
+    return g_gh_registered[slot_id] && global_hotkeys_slot_error(hotkey_index, decrement) == nullptr;
+}
+
 const char *global_hotkeys_slot_error(int hotkey_index, bool decrement) {
     int slot_id = hotkey_index * 2 + (decrement ? 1 : 0);
     if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return nullptr;

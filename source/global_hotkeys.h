@@ -56,6 +56,18 @@ void global_hotkeys_apply(const AppSettings *app_settings);
 bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, bool *out_is_decrement);
 
 /**
+ * @brief Whether the OS is currently delivering this slot.
+ *
+ * The SDL key path uses this to decide whether to skip a binding: a global binding the OS holds
+ * must not also fire from the focused-window path, but one whose registration failed has to keep
+ * working there, since that is the documented fallback.
+ *
+ * @param hotkey_index Index into AppSettings::hotkeys.
+ * @param decrement false for the increment slot, true for the decrement slot.
+ */
+bool global_hotkeys_slot_is_registered(int hotkey_index, bool decrement);
+
+/**
  * @brief The reason a slot is not currently registered, for the Hotkeys tab to show per row.
  *
  * @param hotkey_index Index into AppSettings::hotkeys.

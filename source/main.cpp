@@ -56,6 +56,7 @@ extern "C" {
 #include "overlay.h"
 #include "settings.h"
 #include "global_event_handler.h"
+#include "global_hotkeys.h" // For OS-level hotkey registration
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 #include "logger.h"
@@ -2168,6 +2169,13 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // OS-level hotkeys. Only the tracker process registers them (the overlay process returned
+    // long before this point), and a failure here is never fatal: every binding simply keeps
+    // working as a window-focused hotkey.
+    if (!global_hotkeys_init()) {
+        log_message(LOG_ERROR, "[MAIN] Global hotkeys unavailable; bindings stay window-focused.\n");
+    }
+
     // --- Out-of-bounds window position check ---
     // If a saved window position is off all current displays (e.g. after a
     // monitor was disconnected), reset it and warn the user.
@@ -2709,6 +2717,10 @@ int main(int argc, char *argv[]) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
             }
+
+            // Mirror the current bindings to the OS before polling. Diff-based, so this is a
+            // handful of comparisons on the frames where nothing changed.
+            global_hotkeys_apply(&app_settings);
 
             handle_global_events(tracker, nullptr, &app_settings, &is_running, &settings_opened, &deltaTime);
 
@@ -4616,6 +4628,10 @@ int main(int argc, char *argv[]) {
     }
 
     skin_cache_shutdown();
+
+    // Release every OS-level hotkey before SDL_Quit, so the combinations go back to the system
+    // even when the process is torn down by the auto-updater restart.
+    global_hotkeys_shutdown();
 
     // Shut down co-op networking before SDL_Quit
     coop_net_shutdown(&coop_ctx);

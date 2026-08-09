@@ -9,6 +9,7 @@
 
 
 #include "global_event_handler.h"
+#include "global_hotkeys.h"
 #include "tracker.h"
 #include "overlay.h"
 #include "settings.h"
@@ -138,6 +139,25 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL3_ProcessEvent(&event);
+
+        // An OS-level hotkey arrives as a custom SDL event carrying the binding it belongs to.
+        // The key never reached any window, so none of the focus-based gates below apply; the
+        // action's own gates still do, inside hotkey_apply_counter_action.
+        int global_hotkey_index = -1;
+        bool global_hotkey_is_decrement = false;
+        if (global_hotkeys_decode_event(&event, &global_hotkey_index, &global_hotkey_is_decrement)) {
+            if (global_hotkey_index >= 0 && global_hotkey_index < app_settings->hotkey_count) {
+                const HotkeyBinding *hb = &app_settings->hotkeys[global_hotkey_index];
+                if (hb->is_global) {
+                    hotkey_apply_counter_action(t, app_settings, hb->target_goal,
+                                                global_hotkey_is_decrement
+                                                    ? COOP_MOD_DECREMENT
+                                                    : COOP_MOD_INCREMENT);
+                }
+            }
+            continue;
+        }
+
         // TOP LEVEL QUIT when it's not the X on the settings window
         if (event.type == SDL_EVENT_QUIT) {
             // Check for unsaved changes or active lobby before quitting
@@ -212,15 +232,24 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
 
+                        // A slot the OS is delivering must not fire twice while the tracker happens
+                        // to be focused. One whose registration failed (already owned elsewhere, or
+                        // no X11 at all) is deliberately still handled here, which is the fallback
+                        // the Hotkeys tab promises on that row.
+                        bool inc_handled_by_os = hb->is_global && global_hotkeys_slot_is_registered(i, false);
+                        bool dec_handled_by_os = hb->is_global && global_hotkeys_slot_is_registered(i, true);
+
                         // Convert key names from settings to scancodes for comparison
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
 
                         // Check if the pressed key matches a hotkey
                         int mod_action = -1;
-                        if (event.key.scancode == inc_scancode && held_mods == hb->increment_mods) {
+                        if (!inc_handled_by_os && event.key.scancode == inc_scancode &&
+                            held_mods == hb->increment_mods) {
                             mod_action = COOP_MOD_INCREMENT;
-                        } else if (event.key.scancode == dec_scancode && held_mods == hb->decrement_mods) {
+                        } else if (!dec_handled_by_os && event.key.scancode == dec_scancode &&
+                                   held_mods == hb->decrement_mods) {
                             mod_action = COOP_MOD_DECREMENT;
                         }
 
