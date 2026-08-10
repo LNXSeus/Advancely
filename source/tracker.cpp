@@ -3163,10 +3163,47 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
             int current_progress = 0;
             bool stat_found = false;
 
-            stage_to_check->current_stat_progress = 0;
-
             // Stop checking if we are on the final stage (SUBGOAL_MANUAL), anything that isn't "stat" or "advancement"
             if (stage_to_check->type == SUBGOAL_MANUAL) break;
+
+            // Which player file backs this stage's trigger. A file that failed to parse (a read that
+            // landed mid-write) arrives here as nullptr, and clearing the stage from it would collapse
+            // the goal to an earlier stage until the next successful read - which the compact overlay
+            // then re-pops as a fresh completion. Every other disk-update path bails out on an
+            // unreadable file, so do the same per stage and keep the last known state.
+            bool source_missing = false;
+            switch (stage_to_check->type) {
+                case SUBGOAL_ADVANCEMENT:
+                    source_missing = !player_adv_json;
+                    break;
+                case SUBGOAL_CRITERION:
+                    source_missing = (version >= MC_VERSION_1_12) ? !player_adv_json : !player_stats_json;
+                    break;
+                case SUBGOAL_UNLOCK:
+                    source_missing = !player_unlocks_json;
+                    break;
+                case SUBGOAL_STAT:
+                    source_missing = !player_stats_json;
+                    break;
+                default:
+                    break;
+            }
+            if (source_missing) {
+                // Stat stages re-derive live from current_stat_progress (Hermes keeps it accurate),
+                // every other type falls back to the flag the last successful read stored.
+                bool game_met = (stage_to_check->type == SUBGOAL_STAT)
+                                    ? (stage_to_check->required_progress > 0 &&
+                                       stage_to_check->current_stat_progress >= stage_to_check->required_progress)
+                                    : stage_to_check->game_trigger_met;
+                base_satisfied[j] = game_met ||
+                                    (stage_to_check->linked_goal_count > 0 &&
+                                     check_linked_goals_satisfied(t->template_data, stage_to_check->linked_goals,
+                                                                  stage_to_check->linked_goal_count,
+                                                                  stage_to_check->linked_goal_mode));
+                continue;
+            }
+
+            stage_to_check->current_stat_progress = 0;
 
             switch (stage_to_check->type) {
                 case SUBGOAL_ADVANCEMENT:
