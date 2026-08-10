@@ -438,6 +438,8 @@ static int SDLCALL gh_x_thread_main(void *userdata) {
 
     GhXDisplay *display = gh_XOpenDisplay(nullptr);
     if (!display) {
+        log_message(LOG_ERROR,
+                    "[HOTKEYS] No X11 display; global hotkeys stay window-focused (Wayland session?).\n");
         SDL_SetAtomicInt(&g_gh_x_ready, -1);
         return 0;
     }
@@ -744,14 +746,22 @@ const char *global_hotkeys_slot_error(int hotkey_index, bool decrement) {
     if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return nullptr;
 
 #if !defined(_WIN32) && !defined(__APPLE__)
-    // X11 discovers grab conflicts on its listener thread, so pull the freshest text across.
-    if (g_gh_x_mutex) {
-        SDL_LockMutex(g_gh_x_mutex);
-        if (g_gh_x_error[slot_id][0] != '\0') {
+    // A slot only reaches the X backend once apply() accepted it, so for those the listener thread
+    // is the authority and its entry is copied verbatim, empty included. Copying only non-empty
+    // text would leave a stale conflict on screen after a re-grab cleared it.
+    if (g_gh_registered[slot_id]) {
+        if (SDL_GetAtomicInt(&g_gh_x_ready) == -1) {
+            // The display is opened on the thread, so a missing X server is only knowable after
+            // apply() already accepted the slot. Without this the row would stay silent and, worse,
+            // still count as registered, which makes the SDL key path skip it as well.
+            snprintf(g_gh_slot_error[slot_id], sizeof(g_gh_slot_error[slot_id]),
+                     "No X11 connection (a Wayland session cannot do this).");
+        } else if (g_gh_x_mutex) {
+            SDL_LockMutex(g_gh_x_mutex);
             snprintf(g_gh_slot_error[slot_id], sizeof(g_gh_slot_error[slot_id]), "%s",
                      g_gh_x_error[slot_id]);
+            SDL_UnlockMutex(g_gh_x_mutex);
         }
-        SDL_UnlockMutex(g_gh_x_mutex);
     }
 #endif
 

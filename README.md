@@ -254,7 +254,10 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
               reserve a shortcut, so on a Wayland desktop a `Global` row falls back to firing only
               while Advancely is focused and the `Hotkeys` tab says so on that row. The same applies
               when another program already owns a combination: that row reports it and keeps working
-              as a window-focused hotkey instead of silently doing nothing.
+              as a window-focused hotkey instead of silently doing nothing. Such a conflict can only
+              be reported when the other program reserved the key the same way. Programs that read
+              the keyboard at a lower level, such as `Discord` or macro tools, produce no conflict
+              message at all; Advancely simply takes priority over them while it runs.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize

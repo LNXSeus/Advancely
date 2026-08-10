@@ -6970,7 +6970,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             "while Minecraft is focused. Windows then reserves it system-wide: no\n"
                             "other program receives that combination while Advancely is running.\n"
                             "If another program claimed it first, that row says so and the hotkey\n"
-                            "keeps working as a normal window-focused one.";
+                            "keeps working as a normal window-focused one.\n\n"
+                            "A conflict can only be reported when the other program reserved the\n"
+                            "key the same way. Programs that read the keyboard at a lower level,\n"
+                            "such as Discord or macro tools, cause no conflict message; Advancely\n"
+                            "simply takes priority over them for as long as it is running.";
 #elif defined(__APPLE__)
                     const char *global_os_name = "macOS";
                     const char *global_os_help =
@@ -6978,7 +6982,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             "fires while Minecraft is focused, and no Accessibility permission\n"
                             "prompt is needed. macOS then reserves the combination system-wide.\n"
                             "System shortcuts win: if macOS or another program already owns it,\n"
-                            "that row says so and the hotkey keeps working as a window-focused one.";
+                            "that row says so and the hotkey keeps working as a window-focused one.\n\n"
+                            "A conflict can only be reported when the other program reserved the\n"
+                            "key the same way. Programs that read the keyboard at a lower level,\n"
+                            "such as Discord or macro tools, cause no conflict message; Advancely\n"
+                            "simply takes priority over them for as long as it is running.";
 #else
                     const char *global_os_name = "Linux";
                     const char *global_os_help =
