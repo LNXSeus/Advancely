@@ -251,6 +251,60 @@
 	"lock_category_display_name":	false,
 	"lang_flag":	"",
 	"hotkeys":	[],
+	"app_hotkeys":	{
+		"toggle_visual_editing":	{
+			"key":	"V",
+			"mods":	2
+		},
+		"toggle_template_editor":	{
+			"key":	"E",
+			"mods":	2
+		},
+		"nudge_left":	{
+			"key":	"Left",
+			"mods":	0
+		},
+		"nudge_right":	{
+			"key":	"Right",
+			"mods":	0
+		},
+		"nudge_up":	{
+			"key":	"Up",
+			"mods":	0
+		},
+		"nudge_down":	{
+			"key":	"Down",
+			"mods":	0
+		},
+		"move_left":	{
+			"key":	"A",
+			"mods":	0
+		},
+		"move_right":	{
+			"key":	"D",
+			"mods":	0
+		},
+		"move_up":	{
+			"key":	"W",
+			"mods":	0
+		},
+		"move_down":	{
+			"key":	"S",
+			"mods":	0
+		},
+		"toggle_layout_hidden":	{
+			"key":	"V",
+			"mods":	0
+		},
+		"toggle_goal_hidden":	{
+			"key":	"H",
+			"mods":	0
+		},
+		"overlay_advance":	{
+			"key":	"Space",
+			"mods":	0
+		}
+	},
 	"view_state":	{
 		"pan_x":	0,
 		"pan_y":	0,

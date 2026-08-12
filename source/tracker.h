@@ -123,6 +123,21 @@ struct Tracker {
     ManualPos *visual_deselect_candidate;
     // Item that was already selected when pressed; a plain click (no drag) on release deselects it
 
+    // Keyboard-driven movement of the visual selection. The event handler accumulates the pixels a
+    // hotkey asks for (key repeats included) and the layout editor applies and clears them while
+    // rendering, where the selection and the camera are available.
+    float pending_visual_move_x;
+    float pending_visual_move_y;
+    // Visibility hotkeys pressed on the map this frame. Consumed while the layout editor renders,
+    // where the selection is known.
+    bool visual_toggle_layout_hidden_pressed;
+    bool visual_toggle_goal_hidden_pressed;
+    // Frames left for a pending "Toggle Visual Layout Editor" hotkey press. The template editor owns
+    // the button's conditions and side effects, so the request is handed to it; it opens itself first
+    // if it was closed. The short lifetime bridges the frames a freshly opened editor needs to pick
+    // its template back up, and drops the request when the conditions simply are not met.
+    int toggle_visual_editing_request_ttl;
+
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
     char notes_path[MAX_PATH_LENGTH]; // The dynamic path to the current notes file.
@@ -662,6 +677,35 @@ const CounterLinkedGoal *tracker_get_visual_selected_goals(void);
 
 // Requests the tracker to clear its visual selection on the next frame.
 void tracker_request_clear_visual_selection(void);
+
+// --- Visual Layout Editor -> Template Editor edit requests ---
+// A hotkey pressed on the map can ask the template editor to change the selection, because the
+// editor's copy of the template is the one that gets saved. The tracker only collects what was
+// selected; the editor decides the new values from its own data and applies them.
+typedef enum {
+    VISUAL_EDIT_NONE = 0,
+    VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN, // Per element: the manual layout "Hide" checkbox
+    VISUAL_EDIT_TOGGLE_GOAL_HIDDEN // Per goal: the "Hidden" checkbox (automatic layout + overlay)
+} VisualEditRequest;
+
+typedef struct {
+    CounterLinkedGoal link; // Which goal the element belongs to
+    char element[16]; // "Icon", "Text" or "Progress"; ignored by goal-level requests
+} VisualEditItem;
+
+/**
+ * @brief The edit the visual selection is waiting for, or VISUAL_EDIT_NONE.
+ */
+VisualEditRequest tracker_get_visual_edit_request(void);
+
+int tracker_get_visual_edit_item_count(void);
+
+const VisualEditItem *tracker_get_visual_edit_items(void);
+
+/**
+ * @brief Marks the pending request as handled. Always call this once a request was read.
+ */
+void tracker_clear_visual_edit_request(void);
 
 /**
  * @brief Looks up the position an element currently renders at, in template-editor coordinates.

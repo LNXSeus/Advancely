@@ -63,6 +63,8 @@ struct VisualLayoutItem {
     std::string key{}; // Stable identity (goal_type/parent/root/element) so a selection can survive a
     // template reload, whose freed-and-reallocated ManualPos pointers would otherwise dangle. Empty
     // for duplicate hit-test-only entries that reuse a pointer already keyed elsewhere this frame.
+    std::string element{}; // "Icon", "Text", "Progress", ... Filled alongside key, so only for the
+    // items a visibility hotkey can actually act on.
 };
 
 static std::vector<VisualLayoutItem> s_visual_layout_items;
@@ -123,6 +125,27 @@ int tracker_get_visual_selected_goal_count(void) {
 
 const CounterLinkedGoal *tracker_get_visual_selected_goals(void) {
     return s_visual_selected_goals.data();
+}
+
+// Edit the template editor still has to carry out for the current visual selection.
+static VisualEditRequest s_visual_edit_request = VISUAL_EDIT_NONE;
+static std::vector<VisualEditItem> s_visual_edit_items;
+
+VisualEditRequest tracker_get_visual_edit_request(void) {
+    return s_visual_edit_request;
+}
+
+int tracker_get_visual_edit_item_count(void) {
+    return (int) s_visual_edit_items.size();
+}
+
+const VisualEditItem *tracker_get_visual_edit_items(void) {
+    return s_visual_edit_items.data();
+}
+
+void tracker_clear_visual_edit_request(void) {
+    s_visual_edit_request = VISUAL_EDIT_NONE;
+    s_visual_edit_items.clear();
 }
 
 void tracker_request_clear_visual_selection(void) {
@@ -6520,7 +6543,9 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     // post-reload frame that rematches every item, so only build it in those cases. Building this
     // 512-byte string for every handle every frame was needless per-frame work while layout editing.
     char visual_item_key[512];
-    if (s_visual_remap_after_reload || is_just_clicked || s_visual_selected_items.count(&target_pos) > 0) {
+    bool identify_item = (s_visual_remap_after_reload || is_just_clicked ||
+                          s_visual_selected_items.count(&target_pos) > 0);
+    if (identify_item) {
         snprintf(visual_item_key, sizeof(visual_item_key), "%s\x1f%s\x1f%s\x1f%s",
                  goal_type ? goal_type : "",
                  parent_root_name ? parent_root_name : "",
@@ -6533,7 +6558,8 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     // Register this item for selection rectangle hit-testing
     s_visual_layout_items.push_back({
         item_screen_pos, hit_box_size, &target_pos, link, linkable,
-        visual_item_key
+        visual_item_key,
+        identify_item && element_type ? element_type : ""
     });
 
     // Record this element's hierarchical parent so multi-drag can leave automatic children alone.
@@ -6719,7 +6745,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                          "%s: \"%s\" - %s\nPart of \"%s\"\n\n"
                          "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.\n"
-                         "Arrow keys nudge the selection by 1 pixel.",
+                         "The keys in Settings > Hotkeys move the selection by 1 or 10 pixels.",
                          goal_type, display_name, element_type, parent_display_name,
                          display_x, display_y);
             } else {
@@ -6727,7 +6753,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                          "%s: \"%s\" - %s\n\n"
                          "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.\n"
-                         "Arrow keys nudge the selection by 1 pixel.",
+                         "The keys in Settings > Hotkeys move the selection by 1 or 10 pixels.",
                          goal_type, display_name, element_type,
                          display_x, display_y);
             }
@@ -11685,16 +11711,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
         }
 
-        // Arrow keys nudge the selection 1px (repeats allowed). Goal hotkeys are
-        // already gated off in layout editing, so bound arrow keys won't double-fire.
-        if (!s_visual_selected_items.empty() && !ImGui::IsAnyItemActive()) {
-            float nudge_x = 0.0f, nudge_y = 0.0f;
-            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) nudge_x -= 1.0f;
-            if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) nudge_x += 1.0f;
-            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) nudge_y -= 1.0f;
-            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) nudge_y += 1.0f;
+        // Keyboard movement collected by the event handler this frame (nudge and move hotkeys).
+        // Goal hotkeys are already gated off in layout editing, so bound keys won't double-fire.
+        {
+            float nudge_x = t->pending_visual_move_x;
+            float nudge_y = t->pending_visual_move_y;
+            t->pending_visual_move_x = 0.0f;
+            t->pending_visual_move_y = 0.0f;
 
-            if (nudge_x != 0.0f || nudge_y != 0.0f) {
+            if (!s_visual_selected_items.empty() && (nudge_x != 0.0f || nudge_y != 0.0f)) {
                 for (ManualPos *sel_pos: s_visual_selected_items) {
                     // Keep still-automatic children automatic when an ancestor is selected.
                     if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
@@ -11773,6 +11798,29 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (!already) s_visual_selected_goals.push_back(item.link);
         }
 
+        // --- Visibility hotkeys ---
+        // Only the identity of the selection is collected here. The template editor holds the copy
+        // of the template that gets saved, so it decides the new values and applies them; a request
+        // that is still pending is left alone rather than overwritten.
+        if ((t->visual_toggle_layout_hidden_pressed || t->visual_toggle_goal_hidden_pressed) &&
+            s_visual_edit_request == VISUAL_EDIT_NONE && !s_visual_selected_items.empty()) {
+            s_visual_edit_request = t->visual_toggle_layout_hidden_pressed
+                                        ? VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN
+                                        : VISUAL_EDIT_TOGGLE_GOAL_HIDDEN;
+            s_visual_edit_items.clear();
+            for (const auto &item: s_visual_layout_items) {
+                // Decorations carry neither checkbox, so they are simply skipped.
+                if (!item.linkable || s_visual_selected_items.count(item.pos) == 0) continue;
+                VisualEditItem entry = {};
+                entry.link = item.link;
+                snprintf(entry.element, sizeof(entry.element), "%s", item.element.c_str());
+                s_visual_edit_items.push_back(entry);
+            }
+            if (s_visual_edit_items.empty()) s_visual_edit_request = VISUAL_EDIT_NONE;
+        }
+        t->visual_toggle_layout_hidden_pressed = false;
+        t->visual_toggle_goal_hidden_pressed = false;
+
         // Clear selection when visual editing is disabled
     } else if (!t->is_visual_layout_editing && !s_visual_selected_items.empty()) {
         s_visual_selected_items.clear();
@@ -11780,6 +11828,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->visual_select_rect_active = false;
     } else if (!t->is_visual_layout_editing) {
         s_visual_selected_goals.clear();
+    }
+
+    // Input collected right before layout editing stopped has nothing left to act on.
+    if (!t->is_visual_layout_editing) {
+        t->pending_visual_move_x = 0.0f;
+        t->pending_visual_move_y = 0.0f;
+        t->visual_toggle_layout_hidden_pressed = false;
+        t->visual_toggle_goal_hidden_pressed = false;
+        tracker_clear_visual_edit_request();
     }
 
     // --- Cursor Reveal Ring ---

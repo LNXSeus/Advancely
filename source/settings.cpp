@@ -794,6 +794,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     while (ib < b->hotkey_count && hotkey_row_is_empty(&b->hotkeys[ib])) ib++;
     if ((ia < a->hotkey_count) != (ib < b->hotkey_count)) return true;
 
+    if (app_hotkeys_different(a, b)) return true;
+
     return false;
 }
 
@@ -808,6 +810,12 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->enable_overlay != b->enable_overlay ||
             a->overlay_fps != b->overlay_fps ||
             a->overlay_window.w != b->overlay_window.w ||
+
+            // The overlay's own shortcut, read from its settings copy at startup.
+            strcmp(a->app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE].key,
+                   b->app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE].key) != 0 ||
+            a->app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE].mods !=
+            b->app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE].mods ||
 
             // Config read from the overlay's own copy (mod flags).
             // NOTE: version_str / display_version_str / category_display_name are intentionally
@@ -976,6 +984,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Hotkey global error flag (block Apply when a binding marked Global has no usable modifier)
     static bool hotkey_global_error = false;
+
+    // Advancely shortcut error flag (block Apply when one clashes with another shortcut,
+    // a counter hotkey, or a combination Advancely reserves)
+    static bool hotkey_app_error = false;
 
     // Hotkey reserved error flag (block Apply when a binding collides with a built-in shortcut)
     static bool hotkey_reserved_error = false;
@@ -3443,6 +3455,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of UI Visuals Tab
 
         if (ImGui::BeginTabItem("Overlay")) {
+            // The overlay's advance/speed-up key is rebindable, so every tooltip that mentions it
+            // shows whatever it is currently bound to instead of a hardcoded "SPACE".
+            char overlay_advance_label[96];
+            app_hotkey_display_label(&temp_settings.app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE],
+                                     overlay_advance_label, sizeof(overlay_advance_label));
+
             // General Settings
             ImGui::Text("General");
 
@@ -3572,8 +3590,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
                              "Items continuously scroll across the overlay as a conveyor belt.\n"
                              "Enables the scroll speed, per-row custom speed and auto-freeze options below.\n"
-                             "Hold SPACE while the overlay window is focused to speed up the scroll 5x.\n"
-                             "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                             "Hold %s while the overlay window is focused to speed up the scroll 5x.\n"
+                             "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3585,8 +3603,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
                              "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
                              "After the interval below the overlay cuts to the next page of items (like a book).\n"
-                             "Press SPACE while the overlay window is focused to flip to the next page.\n"
-                             "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                             "Press %s while the overlay window is focused to flip to the next page.\n"
+                             "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3597,10 +3615,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_mode_compact_tooltip_buffer[512];
                     snprintf(overlay_mode_compact_tooltip_buffer, sizeof(overlay_mode_compact_tooltip_buffer),
                              "A tall, compact counter panel that cycles through goal types,\n"
-                             "with completed goals popping out beneath it. Press SPACE while the\n"
+                             "with completed goals popping out beneath it. Press %s while the\n"
                              "overlay window is focused to cycle to the next goal on the panel.\n"
                              "Inspired by Zesskyo.\n"
-                             "Default: %s", overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                             "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_compact_tooltip_buffer);
                 }
                 temp_settings.overlay_render_mode = (OverlayRenderMode) overlay_mode;
@@ -3833,8 +3851,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(page_interval_tooltip_buffer, sizeof(page_interval_tooltip_buffer),
                                  "How long each static page of items is shown before the overlay cuts\n"
                                  "to the next page. A page holds as many items as fit the overlay width.\n"
-                                 "Pressing SPACE while the overlay window is focused cuts to the next page immediately.\n"
-                                 "Default: %.1f s", DEFAULT_OVERLAY_PAGE_INTERVAL);
+                                 "Pressing %s while the overlay window is focused cuts to the next page immediately.\n"
+                                 "Default: %.1f s", overlay_advance_label, DEFAULT_OVERLAY_PAGE_INTERVAL);
                         ImGui::SetTooltip("%s", page_interval_tooltip_buffer);
                     }
 
@@ -4164,9 +4182,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
                                  "How long each selected entry stays on the panel before the\n"
                                  "cycle advances to the next one. With a single entry selected the\n"
-                                 "panel is static. Press SPACE while the overlay window is focused\n"
+                                 "panel is static. Press %s while the overlay window is focused\n"
                                  "to jump to the next goal.\n"
-                                 "Default: %.1f s", DEFAULT_COMPACT_CYCLE_INTERVAL);
+                                 "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
                         ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
                     }
 
@@ -4444,8 +4462,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "(items always appear in the same order as they are on the tracker).\n"
                                  "A scroll speed of 0.0 is static.\n"
                                  "A value of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
-                                 "Holding SPACE while the overlay window is focused speeds up the animation.\n"
-                                 "Default: %.2f", DEFAULT_OVERLAY_SCROLL_SPEED);
+                                 "Holding %s while the overlay window is focused speeds up the animation.\n"
+                                 "Default: %.2f", overlay_advance_label, DEFAULT_OVERLAY_SCROLL_SPEED);
                         ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
                     }
 
@@ -6845,14 +6863,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
             hotkey_global_error = false;
             hotkey_reserved_error = false;
-            ImGui::TextDisabled(
-                "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
+            hotkey_app_error = false;
             // --- Hotkey Settings ---
 
             // Capture state: which goal+slot is currently waiting for a key press.
             // Slot 0 = decrement, Slot 1 = increment.
             static char capturing_target_goal[192] = "";
             static int capturing_slot = -1; // -1 = idle
+
+            // The Advancely-shortcut rows below share the same capture atomics, so only one of the
+            // two can ever be waiting for a key. -1 = idle.
+            static int capturing_app_action = -1;
 
             // Helper: convert a stored scancode-name (US layout) plus its modifier mask to a
             // layout-aware label so EU keyboards display the key the user actually presses.
@@ -6881,6 +6902,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         custom_counters.push_back(item);
                     }
                 }
+            }
+
+            // Explains the missing counter block above Advancely's own shortcuts.
+            if (custom_counters.empty()) {
+                ImGui::TextDisabled(
+                    "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
+                ImGui::Spacing();
             }
 
             // If a capture is in flight and the event handler has reported a scancode,
@@ -7045,6 +7073,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 sizeof(capturing_target_goal) - 1);
                         capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
                         capturing_slot = 0;
+                        capturing_app_action = -1;
                         SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
                         SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                         SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
@@ -7068,6 +7097,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 sizeof(capturing_target_goal) - 1);
                         capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
                         capturing_slot = 1;
+                        capturing_app_action = -1;
                         SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
                         SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                         SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
@@ -7241,6 +7271,185 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::TextDisabled(
                         "Note: 'Global' rows are handed to the operating system when you click 'Apply Settings'.");
                 }
+
+                // Only separate the two blocks when the counter block above actually rendered.
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+            }
+
+            // --- Advancely's own shortcuts ---
+            // Apply a finished capture. Unlike counter hotkeys, only Escape clears a row here, so
+            // Delete and Backspace stay bindable (Delete is a default binding).
+            if (capturing_app_action >= 0 && SDL_GetAtomicInt(&g_hotkey_capture_armed) == 0) {
+                int captured = SDL_GetAtomicInt(&g_hotkey_captured_scancode);
+                AppHotkey *hk = &temp_settings.app_hotkeys[capturing_app_action];
+                if (captured == 0) {
+                    strcpy(hk->key, "None");
+                    hk->mods = HOTKEY_MOD_NONE;
+                } else {
+                    const char *sc_name = SDL_GetScancodeName((SDL_Scancode) captured);
+                    if (sc_name && sc_name[0] != '\0') {
+                        strncpy(hk->key, sc_name, sizeof(hk->key) - 1);
+                        hk->key[sizeof(hk->key) - 1] = '\0';
+                        hk->mods = (Uint16) SDL_GetAtomicInt(&g_hotkey_captured_mods);
+                    }
+                }
+                capturing_app_action = -1;
+            }
+
+            ImGui::Text("Advancely Hotkeys");
+            if (ImGui::IsItemHovered()) {
+                char app_hotkey_tooltip_buffer[1024];
+                snprintf(app_hotkey_tooltip_buffer, sizeof(app_hotkey_tooltip_buffer),
+                         "Shortcuts for Advancely itself, grouped by the window they belong to.\n\n"
+                         "Click a button and press a key to bind it. Hold Ctrl, Alt or Shift while\n"
+                         "pressing the key to bind a combination. Press Escape during capture to\n"
+                         "clear the binding, which turns that shortcut off.\n\n"
+                         "These are always window-focused: unlike the custom counter hotkeys above,\n"
+                         "they cannot be handed to the operating system.\n\n"
+                         "Two shortcuts may share a key as long as they belong to windows or modes\n"
+                         "that are never active at the same time.");
+                ImGui::SetTooltip("%s", app_hotkey_tooltip_buffer);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Reset All Hotkeys")) {
+                app_hotkeys_set_defaults(&temp_settings);
+                capturing_app_action = -1;
+            }
+            if (ImGui::IsItemHovered()) {
+                char reset_all_app_tooltip[256];
+                snprintf(reset_all_app_tooltip, sizeof(reset_all_app_tooltip),
+                         "Puts every shortcut in this list back to its default key.\n"
+                         "Custom counter hotkeys are not affected.");
+                ImGui::SetTooltip("%s", reset_all_app_tooltip);
+            }
+
+            // A shortcut clashes with another binding only when both can fire at the same moment,
+            // so the comparison is gated on overlapping contexts. Counter hotkeys live in the
+            // tracker window, or in every context once the row is marked Global, since the OS then
+            // delivers them regardless of which window has focus.
+            auto app_slot_bound = [](const char *key) -> bool {
+                return key && key[0] != '\0' && strcmp(key, "None") != 0;
+            };
+            auto app_same_combo = [](const char *key_a, Uint16 mods_a,
+                                     const char *key_b, Uint16 mods_b) -> bool {
+                return strcmp(key_a, key_b) == 0 && mods_a == mods_b;
+            };
+
+            AppHotkeyGroup current_group = APP_HOTKEY_GROUP_COUNT;
+            for (int action = 0; action < APP_HOTKEY_COUNT; ++action) {
+                const AppHotkeyDef *def = &APP_HOTKEY_DEFS[action];
+                AppHotkey *hk = &temp_settings.app_hotkeys[action];
+
+                if (def->group != current_group) {
+                    current_group = def->group;
+                    ImGui::Spacing();
+                    ImGui::SeparatorText(APP_HOTKEY_GROUP_NAMES[current_group]);
+                }
+
+                ImGui::Text("%s", def->label);
+                if (ImGui::IsItemHovered()) {
+                    char row_tooltip[1024];
+                    snprintf(row_tooltip, sizeof(row_tooltip), "%s", def->description);
+                    ImGui::SetTooltip("%s", row_tooltip);
+                }
+
+                ImGui::SameLine(300.0f);
+
+                char app_btn_label[256];
+                if (capturing_app_action == action) {
+                    snprintf(app_btn_label, sizeof(app_btn_label), "Press a key...##app_hk_%d", action);
+                } else {
+                    char key_label[96];
+                    app_hotkey_display_label(hk, key_label, sizeof(key_label));
+                    snprintf(app_btn_label, sizeof(app_btn_label), "%s##app_hk_%d", key_label, action);
+                }
+                if (ImGui::Button(app_btn_label, ImVec2(170, 0))) {
+                    capturing_app_action = action;
+                    capturing_slot = -1;
+                    capturing_target_goal[0] = '\0';
+                    SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                    SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
+                    // Armed as 2 so the event handler knows Delete and Backspace are bindable here.
+                    SDL_SetAtomicInt(&g_hotkey_capture_armed, 2);
+                }
+
+                bool is_default = (strcmp(hk->key, def->default_key) == 0 && hk->mods == def->default_mods);
+                if (!is_default) {
+                    ImGui::SameLine();
+                    char reset_label[64];
+                    snprintf(reset_label, sizeof(reset_label), "Reset##app_hk_reset_%d", action);
+                    if (ImGui::SmallButton(reset_label)) {
+                        strncpy(hk->key, def->default_key, sizeof(hk->key) - 1);
+                        hk->key[sizeof(hk->key) - 1] = '\0';
+                        hk->mods = def->default_mods;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        AppHotkey default_hk = {};
+                        strncpy(default_hk.key, def->default_key, sizeof(default_hk.key) - 1);
+                        default_hk.mods = def->default_mods;
+                        char default_label[96];
+                        app_hotkey_display_label(&default_hk, default_label, sizeof(default_label));
+                        char reset_tooltip[192];
+                        snprintf(reset_tooltip, sizeof(reset_tooltip), "Back to the default: %s", default_label);
+                        ImGui::SetTooltip("%s", reset_tooltip);
+                    }
+                }
+
+                if (!app_slot_bound(hk->key)) continue;
+
+                char conflict[256];
+                conflict[0] = '\0';
+
+                char reserved_reason[192];
+                if (hotkey_slot_is_reserved(hk->key, hk->mods, reserved_reason, sizeof(reserved_reason))) {
+                    snprintf(conflict, sizeof(conflict), "%s", reserved_reason);
+                }
+
+                for (int other = 0; other < APP_HOTKEY_COUNT && conflict[0] == '\0'; ++other) {
+                    if (other == action) continue;
+                    const AppHotkey *other_hk = &temp_settings.app_hotkeys[other];
+                    if (!app_slot_bound(other_hk->key)) continue;
+                    if ((APP_HOTKEY_DEFS[other].contexts & def->contexts) == 0) continue;
+                    if (app_same_combo(hk->key, hk->mods, other_hk->key, other_hk->mods)) {
+                        snprintf(conflict, sizeof(conflict), "collides with \"%s\"", APP_HOTKEY_DEFS[other].label);
+                    }
+                }
+
+                for (int k = 0; k < temp_settings.hotkey_count && conflict[0] == '\0'; ++k) {
+                    const HotkeyBinding *hb = &temp_settings.hotkeys[k];
+                    Uint16 counter_contexts = hb->is_global
+                                                  ? (Uint16) APP_HOTKEY_CTX_ALL
+                                                  : (Uint16) APP_HOTKEY_CTX_TRACKER;
+                    if ((counter_contexts & def->contexts) == 0) continue;
+
+                    // Show the counter under the name the user sees in the list above when the
+                    // template is loaded, and fall back to the root name when it is not.
+                    const char *counter_name = hb->target_goal;
+                    for (const auto &counter: custom_counters) {
+                        if (strcmp(counter->root_name, hb->target_goal) == 0) {
+                            counter_name = counter->display_name;
+                            break;
+                        }
+                    }
+
+                    if (app_slot_bound(hb->increment_key) &&
+                        app_same_combo(hk->key, hk->mods, hb->increment_key, hb->increment_mods)) {
+                        snprintf(conflict, sizeof(conflict),
+                                 "collides with the increment hotkey of the counter \"%s\"", counter_name);
+                    } else if (app_slot_bound(hb->decrement_key) &&
+                               app_same_combo(hk->key, hk->mods, hb->decrement_key, hb->decrement_mods)) {
+                        snprintf(conflict, sizeof(conflict),
+                                 "collides with the decrement hotkey of the counter \"%s\"", counter_name);
+                    }
+                }
+
+                if (conflict[0] != '\0') {
+                    hotkey_app_error = true;
+                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", conflict);
+                }
             }
 
             ImGui::EndTabItem();
@@ -7343,7 +7552,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
     bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error ||
-                          hotkey_global_error || hotkey_reserved_error || account_validation_error;
+                          hotkey_global_error || hotkey_reserved_error || hotkey_app_error ||
+                          account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -7496,6 +7706,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because a hotkey uses a combination Advancely reserves\n"
                      "for itself. Rebind the highlighted slot in the Hotkeys tab.");
+        } else if (hotkey_app_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled because an Advancely hotkey collides with another\n"
+                     "hotkey that can fire at the same time. Rebind the highlighted\n"
+                     "row in the Hotkeys tab.");
         } else if (account_validation_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because the Account tab has invalid settings.\n"

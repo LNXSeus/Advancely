@@ -2981,6 +2981,164 @@ static int tc_append_visual_selection(const EditorTemplate &tpl,
     return added;
 }
 
+// The editor-side objects a Visual Layout Editor selection entry points at. Any of them can stay
+// null when the goal no longer exists in the editor's copy of the template.
+struct TcVisualEditTarget {
+    bool *hidden = nullptr; // The goal's "Hidden" checkbox (automatic layout + overlay)
+    ManualPos *icon = nullptr;
+    ManualPos *text = nullptr;
+    ManualPos *progress = nullptr;
+};
+
+static TcVisualEditTarget tc_resolve_visual_edit_target(EditorTemplate &tpl, const CounterLinkedGoal &link) {
+    TcVisualEditTarget out;
+    const char *root = link.root_name;
+    const char *parent = link.parent_root;
+
+    auto fill_item = [&](EditorTrackableItem &item) {
+        out.hidden = &item.is_hidden;
+        out.icon = &item.icon_pos;
+        out.text = &item.text_pos;
+        out.progress = &item.progress_pos;
+    };
+    auto fill_category = [&](EditorTrackableCategory &cat) {
+        out.hidden = &cat.is_hidden;
+        out.icon = &cat.icon_pos;
+        out.text = &cat.text_pos;
+        out.progress = &cat.progress_pos;
+    };
+    // A criterion or sub-stat is identified by its parent, since the same id can exist under
+    // several parents.
+    auto find_in_categories = [&](std::vector<EditorTrackableCategory> &categories) {
+        for (auto &cat: categories) {
+            if (parent[0] == '\0') {
+                if (strcmp(cat.root_name, root) == 0) {
+                    fill_category(cat);
+                    return;
+                }
+                continue;
+            }
+            if (strcmp(cat.root_name, parent) != 0) continue;
+            for (auto &child: cat.criteria) {
+                if (strcmp(child.root_name, root) == 0) {
+                    fill_item(child);
+                    return;
+                }
+            }
+        }
+    };
+
+    switch (link.type) {
+        case LINK_TYPE_ADVANCEMENT:
+            find_in_categories(tpl.advancements);
+            break;
+        case LINK_TYPE_STAT:
+            find_in_categories(tpl.stats);
+            break;
+        case LINK_TYPE_UNLOCK:
+            for (auto &unlock: tpl.unlocks) {
+                if (strcmp(unlock.root_name, root) == 0) {
+                    fill_item(unlock);
+                    break;
+                }
+            }
+            break;
+        case LINK_TYPE_CUSTOM:
+            for (auto &goal: tpl.custom_goals) {
+                if (strcmp(goal.root_name, root) == 0) {
+                    fill_item(goal);
+                    break;
+                }
+            }
+            break;
+        case LINK_TYPE_MULTI_STAGE:
+            for (auto &goal: tpl.multi_stage_goals) {
+                if (strcmp(goal.root_name, root) == 0) {
+                    out.hidden = &goal.is_hidden;
+                    out.icon = &goal.icon_pos;
+                    out.text = &goal.text_pos;
+                    out.progress = &goal.progress_pos;
+                    break;
+                }
+            }
+            break;
+        case LINK_TYPE_COUNTER:
+            for (auto &counter: tpl.counter_goals) {
+                if (strcmp(counter.root_name, root) == 0) {
+                    out.hidden = &counter.is_hidden;
+                    out.icon = &counter.icon_pos;
+                    out.text = &counter.text_pos;
+                    out.progress = &counter.progress_pos;
+                    break;
+                }
+            }
+            break;
+        default:
+            break;
+    }
+    return out;
+}
+
+// What the last visibility hotkey did, shown next to the "Visual Layout Editor" button until the
+// next editor message replaces it or the changes are saved or reverted. Empty when there is
+// nothing to report.
+static char s_visual_edit_message[128] = "";
+
+// Carries out a visibility hotkey pressed in the Visual Layout Editor. The change is made here
+// rather than on the map, because this copy of the template is the one that gets saved.
+// The whole selection ends up in the same state: as long as anything in it is still visible,
+// everything is hidden; once everything is hidden, the hotkey shows it all again.
+// Returns true when a flag actually changed.
+static bool tc_apply_visual_edit_request(EditorTemplate &tpl) {
+    VisualEditRequest request = tracker_get_visual_edit_request();
+    if (request == VISUAL_EDIT_NONE) return false;
+
+    const VisualEditItem *items = tracker_get_visual_edit_items();
+    int count = tracker_get_visual_edit_item_count();
+
+    // Deduplicated, because one goal contributes several selected elements and the icon, text and
+    // progress of one goal all point at the same "Hidden" checkbox.
+    std::vector<bool *> flags;
+    auto remember = [&](bool *flag) {
+        if (!flag) return;
+        if (std::find(flags.begin(), flags.end(), flag) != flags.end()) return;
+        flags.push_back(flag);
+    };
+
+    for (int i = 0; i < count; i++) {
+        TcVisualEditTarget target = tc_resolve_visual_edit_target(tpl, items[i].link);
+        if (request == VISUAL_EDIT_TOGGLE_GOAL_HIDDEN) {
+            remember(target.hidden);
+            continue;
+        }
+        ManualPos *pos = nullptr;
+        if (strcmp(items[i].element, "Icon") == 0) pos = target.icon;
+        else if (strcmp(items[i].element, "Text") == 0) pos = target.text;
+        else if (strcmp(items[i].element, "Progress") == 0) pos = target.progress;
+        if (pos) remember(&pos->is_hidden_in_layout);
+    }
+
+    tracker_clear_visual_edit_request();
+    if (flags.empty()) return false;
+
+    bool any_visible = false;
+    for (bool *flag: flags) {
+        if (!*flag) {
+            any_visible = true;
+            break;
+        }
+    }
+    for (bool *flag: flags) *flag = any_visible;
+
+    // Nothing on the map changes (layout editing forces "Show All"), so this line is the only
+    // feedback the hotkey gives. It names the side that was affected so the two are never mixed up.
+    const char *what = (request == VISUAL_EDIT_TOGGLE_GOAL_HIDDEN)
+                           ? (any_visible ? "Hidden from overlay" : "Shown on overlay")
+                           : (any_visible ? "Hidden from manual layout" : "Shown in manual layout");
+    snprintf(s_visual_edit_message, sizeof(s_visual_edit_message), "%s (%d)", what, (int) flags.size());
+    return true;
+}
+
 // Renders the "Add Selected (N)" button next to a "Select Goals" button. Appends the Visual
 // Layout Editor selection to the given linked-goal list (deduplicated) and clears the
 // selection. Disabled with an explanatory tooltip when nothing is selected.
@@ -3713,6 +3871,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // --- FORCE OPEN DURING VISUAL EDITING ---
     if (t && t->is_visual_layout_editing) {
         *p_open = true;
+    }
+
+    // The "Toggle Visual Layout Editor" hotkey is answered by the button further down, which owns
+    // the conditions and the side effects. That code only runs while this window is open, so a
+    // request arriving with the window closed opens it first and is handled in this same frame.
+    // It also presses "Edit Template" on the way, since the visual editor needs an open template.
+    // The countdown gives the window, the template scan and the load a few frames to catch up, and
+    // makes a request that can never be carried out expire instead of firing much later.
+    bool vis_toggle_requested = (t && t->toggle_visual_editing_request_ttl > 0);
+    if (vis_toggle_requested) {
+        *p_open = true;
+        t->toggle_visual_editing_request_ttl--;
     }
 
     if (!*p_open) {
@@ -4481,6 +4651,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Hide Close Button when in Visual Editor Mode or when there are unsaved changes
     bool hide_close_button = visual_editing_active || editor_has_unsaved_changes;
     bool *window_open_ptr = hide_close_button ? nullptr : p_open;
+    // Pull the editor forward while the hotkey request is in flight, so a window that was already
+    // open but buried behind the tracker is actually seen.
+    if (vis_toggle_requested) ImGui::SetNextWindowFocus();
     ImGui::Begin("Template Editor", window_open_ptr);
 
     if (t) {
@@ -4510,6 +4683,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         current_template_data = saved_template_data;
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
+        s_visual_edit_message[0] = '\0'; // The reverted visibility changes are gone with it
         s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
 
         // Reloading template on revert changes -> matters for visual editor mode
@@ -4983,8 +5157,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     ImGui::SameLine();
 
+    // The visual-editor hotkey presses this button itself when no template is open yet. It always
+    // targets the template applied in Settings, because that is the only one the visual editor can
+    // work on. The same guards as the button apply: an unsaved or active editing session is never
+    // interrupted.
+    bool edit_hotkey_fired = false;
+    if (vis_toggle_requested && !editing_template && !template_switching_disabled) {
+        if (strcmp(creator_version_str, app_settings->version_str) != 0) {
+            // Point the editor at the applied version. The rescan runs at the top of the next
+            // frame, which the request outlives.
+            strncpy(creator_version_str, app_settings->version_str, sizeof(creator_version_str) - 1);
+            creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+            for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+                if (strcmp(VERSION_STRINGS[i], creator_version_str) == 0) {
+                    creator_version_idx = i;
+                    break;
+                }
+            }
+        } else {
+            for (int i = 0; i < discovered_template_count; i++) {
+                if (strcmp(discovered_templates[i].category, app_settings->category) == 0 &&
+                    strcmp(discovered_templates[i].optional_flag, app_settings->optional_flag) == 0) {
+                    selected_template_index = i;
+                    selected_lang_index = -1;
+                    selected_layout_mgmt_index = -1;
+                    edit_hotkey_fired = true;
+                    break;
+                }
+            }
+        }
+    }
+
     ImGui::BeginDisabled(selected_template_index == -1);
-    if (ImGui::Button("Edit Template")) {
+    if (ImGui::Button("Edit Template") || edit_hotkey_fired) {
         editing_template = true;
         show_create_new_view = false;
         show_copy_view = false;
@@ -6301,6 +6506,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // --- END SYNC BLOCK ---
 
+        // Visibility hotkeys pressed on the map act on this copy of the template, so they show up
+        // as unsaved changes exactly like ticking the checkboxes here by hand.
+        if (tc_apply_visual_edit_request(current_template_data)) {
+            save_message_type = MSG_NONE;
+        }
+
         // --- CLICK/DRAG GOAL SELECTION ---
         // Select the clicked or dragged goal in the template editor and switch to its tab.
         // Clicks just select; drags also force-open Layout Coordinates (handled above).
@@ -6732,6 +6943,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 current_template_data = saved_template_data;
                 save_message_type = MSG_NONE; // Clear any existing message
                 status_message[0] = '\0'; // Clear the message text
+                s_visual_edit_message[0] = '\0'; // The reverted visibility changes are gone with it
                 s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
 
                 // Reloading template on revert changes -> matters for visual editor mode
@@ -6795,8 +7007,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves || vis_layout_mismatch;
 
+        // A pending "Toggle Visual Layout Editor" hotkey press acts exactly like clicking the button,
+        // and is ignored while the button is disabled. The window is open by now either way, so the
+        // greyed-out button and its tooltip explain what is missing.
+        bool vis_hotkey_fired = false;
+        if (vis_toggle_requested && !vis_editor_disabled) {
+            vis_hotkey_fired = true;
+            t->toggle_visual_editing_request_ttl = 0;
+        }
+
         const char *vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
         float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+        // Report of the last visibility hotkey, parked immediately left of the button. Saving or
+        // reverting produces a message of its own on the left, which replaces this one.
+        if (save_message_type != MSG_NONE) s_visual_edit_message[0] = '\0';
+        if (s_visual_edit_message[0] != '\0') {
+            float msg_width = ImGui::CalcTextSize(s_visual_edit_message).x;
+            ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - vis_btn_width -
+                            ImGui::GetStyle().ItemSpacing.x - msg_width);
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", s_visual_edit_message);
+        }
 
         // Right-align the button on the same line
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - vis_btn_width);
@@ -6832,7 +7063,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
-            if (ImGui::Button(vis_btn_text)) {
+            if (ImGui::Button(vis_btn_text) || vis_hotkey_fired) {
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
                 if (t->is_visual_layout_editing) {
@@ -6869,9 +7100,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
             if (ImGui::IsItemHovered()) {
+                char vis_hotkey_label[96];
+                app_hotkey_display_label(&app_settings->app_hotkeys[APP_HOTKEY_TOGGLE_VISUAL_EDITING],
+                                         vis_hotkey_label, sizeof(vis_hotkey_label));
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
+                         "Hotkey: %s (configurable in Settings > Hotkeys).\n"
                          "Activating this will automatically turn on 'Manual Layout' mode\n"
                          "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
@@ -6885,7 +7120,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Make sure to always work on your own 'Layout' to keep your custom positions,\n"
-                         "since the default layout of official templates can be overwritten on updates.");
+                         "since the default layout of official templates can be overwritten on updates.",
+                         vis_hotkey_label);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }

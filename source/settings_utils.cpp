@@ -769,6 +769,84 @@ bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_re
     return true;
 }
 
+Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
+    Uint16 mods = HOTKEY_MOD_NONE;
+    if (sdl_mods & SDL_KMOD_CTRL) mods |= HOTKEY_MOD_CTRL;
+    if (sdl_mods & SDL_KMOD_SHIFT) mods |= HOTKEY_MOD_SHIFT;
+    if (sdl_mods & SDL_KMOD_ALT) mods |= HOTKEY_MOD_ALT;
+    return mods;
+}
+
+// ------------------- ADVANCELY APP HOTKEYS -------------------
+
+const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT] = {
+    "Tracker Window",
+    "Visual Layout Editor",
+    "Template Editor",
+    "Overlay Window"
+};
+
+const AppHotkeyDef APP_HOTKEY_DEFS[APP_HOTKEY_COUNT] = {
+#define X(enum_id, json_id, def_key, def_mods, ctx, grp, label, desc) \
+    {json_id, def_key, (Uint16) (def_mods), (Uint16) (ctx), grp, label, desc},
+    APP_HOTKEY_LIST(X)
+#undef X
+};
+
+void app_hotkeys_set_defaults(AppSettings *settings) {
+    if (!settings) return;
+    for (int i = 0; i < APP_HOTKEY_COUNT; i++) {
+        AppHotkey *hk = &settings->app_hotkeys[i];
+        memset(hk, 0, sizeof(*hk));
+        strncpy(hk->key, APP_HOTKEY_DEFS[i].default_key, sizeof(hk->key) - 1);
+        hk->key[sizeof(hk->key) - 1] = '\0';
+        hk->mods = APP_HOTKEY_DEFS[i].default_mods;
+    }
+}
+
+bool app_hotkeys_different(const AppSettings *a, const AppSettings *b) {
+    if (!a || !b) return false;
+    for (int i = 0; i < APP_HOTKEY_COUNT; i++) {
+        if (strcmp(a->app_hotkeys[i].key, b->app_hotkeys[i].key) != 0 ||
+            a->app_hotkeys[i].mods != b->app_hotkeys[i].mods) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool app_hotkey_matches(const AppSettings *settings, AppHotkeyAction action,
+                        SDL_Scancode scancode, Uint16 held_mods) {
+    if (!settings || action < 0 || action >= APP_HOTKEY_COUNT) return false;
+    const AppHotkey *hk = &settings->app_hotkeys[action];
+    if (hk->key[0] == '\0' || strcmp(hk->key, "None") == 0) return false;
+    if (held_mods != hk->mods) return false;
+    return SDL_GetScancodeFromName(hk->key) == scancode;
+}
+
+const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_size) {
+    if (!buf || buf_size == 0) return "";
+    if (!hk || hk->key[0] == '\0' || strcmp(hk->key, "None") == 0) {
+        snprintf(buf, buf_size, "None");
+        return buf;
+    }
+
+    // Stored names are US-layout scancode names. Round-tripping through the active layout shows
+    // the key the user actually has to press on a non-US keyboard.
+    const char *key_label = hk->key;
+    SDL_Scancode sc = SDL_GetScancodeFromName(hk->key);
+    if (sc != SDL_SCANCODE_UNKNOWN) {
+        SDL_Keycode kc = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
+        const char *name = SDL_GetKeyName(kc);
+        if (name && name[0] != '\0') key_label = name;
+    }
+
+    char mod_prefix[64];
+    hotkey_mods_to_prefix(hk->mods, mod_prefix, sizeof(mod_prefix));
+    snprintf(buf, buf_size, "%s%s", mod_prefix, key_label);
+    return buf;
+}
+
 // ------------------- SETTINGS UTILS -------------------
 
 void settings_set_defaults(AppSettings *settings) {
@@ -803,6 +881,7 @@ void settings_set_defaults(AppSettings *settings) {
     }
     settings->hotkey_count = 0;
     memset(settings->hotkeys, 0, sizeof(settings->hotkeys));
+    app_hotkeys_set_defaults(settings);
 
     // New visual/general defaults
     settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
@@ -2859,6 +2938,29 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         }
     }
 
+    // Parse Advancely's own shortcuts. Defaults are already in place, so a settings.json written
+    // before this existed - or one missing a single action - keeps the default for whatever it
+    // does not mention. Unknown ids are ignored so downgrading does not corrupt anything.
+    const cJSON *app_hotkeys_json = cJSON_GetObjectItem(json, "app_hotkeys");
+    if (cJSON_IsObject(app_hotkeys_json)) {
+        for (int i = 0; i < APP_HOTKEY_COUNT; i++) {
+            const cJSON *entry = cJSON_GetObjectItem(app_hotkeys_json, APP_HOTKEY_DEFS[i].json_id);
+            if (!cJSON_IsObject(entry)) continue;
+
+            const cJSON *key = cJSON_GetObjectItem(entry, "key");
+            const cJSON *mods = cJSON_GetObjectItem(entry, "mods");
+            if (cJSON_IsString(key)) {
+                strncpy(settings->app_hotkeys[i].key, key->valuestring, sizeof(settings->app_hotkeys[i].key) - 1);
+                settings->app_hotkeys[i].key[sizeof(settings->app_hotkeys[i].key) - 1] = '\0';
+                // Mods only carry meaning together with the key, so a row that names a key but no
+                // mods is an unmodified binding rather than one inheriting the default's modifiers.
+                settings->app_hotkeys[i].mods = cJSON_IsNumber(mods) ? (Uint16) mods->valueint : (Uint16) HOTKEY_MOD_NONE;
+            }
+        }
+    } else {
+        defaults_were_used = true;
+    }
+
     // Load View State
     const cJSON *view_state_json = cJSON_GetObjectItem(json, "view_state");
     if (view_state_json) {
@@ -3644,6 +3746,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
             }
         }
         cJSON_AddItemToObject(root, "hotkeys", hotkeys_array);
+
+        // Advancely's own shortcuts, keyed by their stable json id so reordering the table
+        // never remaps someone's bindings.
+        cJSON_DeleteItemFromObject(root, "app_hotkeys");
+        cJSON *app_hotkeys_obj = cJSON_CreateObject();
+        for (int i = 0; i < APP_HOTKEY_COUNT; ++i) {
+            cJSON *entry = cJSON_CreateObject();
+            cJSON_AddStringToObject(entry, "key", settings->app_hotkeys[i].key);
+            cJSON_AddNumberToObject(entry, "mods", settings->app_hotkeys[i].mods);
+            cJSON_AddItemToObject(app_hotkeys_obj, APP_HOTKEY_DEFS[i].json_id, entry);
+        }
+        cJSON_AddItemToObject(root, "app_hotkeys", app_hotkeys_obj);
 
         // Save View State
         cJSON *view_state_obj = cJSON_CreateObject();

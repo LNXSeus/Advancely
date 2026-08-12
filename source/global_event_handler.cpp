@@ -19,20 +19,6 @@
 #include "imgui_impl_sdl3.h"
 #include "logger.h"
 
-/**
- * @brief Reduces an SDL modifier state to the platform-neutral HOTKEY_MOD_* mask.
- *
- * Left and right variants collapse into one bit, and the lock keys (Caps, Num, Scroll) are
- * dropped entirely so a binding does not silently stop matching when Num Lock is on.
- */
-static Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
-    Uint16 mods = HOTKEY_MOD_NONE;
-    if (sdl_mods & SDL_KMOD_CTRL) mods |= HOTKEY_MOD_CTRL;
-    if (sdl_mods & SDL_KMOD_SHIFT) mods |= HOTKEY_MOD_SHIFT;
-    if (sdl_mods & SDL_KMOD_ALT) mods |= HOTKEY_MOD_ALT;
-    return mods;
-}
-
 bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
                                  const char *target_goal_root, int mod_action) {
     if (!t || !app_settings || !target_goal_root || target_goal_root[0] == '\0') return false;
@@ -174,8 +160,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
         // Hotkey capture: while the settings dialog is waiting for a binding,
         // consume the next non-modifier key press and report its scancode.
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0 &&
-            SDL_GetAtomicInt(&g_hotkey_capture_armed) == 1) {
+        int capture_armed = SDL_GetAtomicInt(&g_hotkey_capture_armed);
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0 && capture_armed != 0) {
             SDL_Scancode sc = event.key.scancode;
             // Ignore pure modifiers so users can hold shift/ctrl without binding them.
             bool is_pure_modifier = (sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_RSHIFT ||
@@ -183,8 +169,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                      sc == SDL_SCANCODE_LALT || sc == SDL_SCANCODE_RALT ||
                                      sc == SDL_SCANCODE_LGUI || sc == SDL_SCANCODE_RGUI);
             if (!is_pure_modifier) {
-                if (sc == SDL_SCANCODE_ESCAPE || sc == SDL_SCANCODE_BACKSPACE ||
-                    sc == SDL_SCANCODE_DELETE) {
+                // Mode 2 is the Advancely-shortcut capture, where Delete and Backspace have to stay
+                // bindable (Delete is a default binding there), so only Escape clears a row.
+                bool clears_binding = (sc == SDL_SCANCODE_ESCAPE) ||
+                                      (capture_armed != 2 && (sc == SDL_SCANCODE_BACKSPACE ||
+                                                              sc == SDL_SCANCODE_DELETE));
+                if (clears_binding) {
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0); // Clear to "None"
                     SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                 } else {
@@ -259,6 +249,48 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         }
                     }
                 }
+            }
+        }
+
+        // --- Advancely's own shortcuts ---
+        // Key repeats are deliberately let through: holding a movement key keeps moving the visual
+        // selection. Popups and active widgets swallow them, so typing a "w" into a text box never
+        // moves anything.
+        if (event.type == SDL_EVENT_KEY_DOWN && t && t->window &&
+            event.key.windowID == SDL_GetWindowID(t->window) &&
+            !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+            SDL_Scancode sc = event.key.scancode;
+            Uint16 app_mods = hotkey_mods_from_sdl(event.key.mod);
+
+            if (event.key.repeat == 0) {
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, sc, app_mods)) {
+                    // A few frames of grace so the request survives the editor window opening.
+                    t->toggle_visual_editing_request_ttl = 5;
+                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, sc, app_mods)) {
+                    t->temp_creator_window_open = !t->temp_creator_window_open;
+                }
+            }
+
+            // Movement accumulates instead of overwriting, so two directions pressed within one
+            // frame move the selection diagonally.
+            if (t->is_visual_layout_editing) {
+                if (event.key.repeat == 0) {
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, sc, app_mods)) {
+                        t->visual_toggle_layout_hidden_pressed = true;
+                    }
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, sc, app_mods)) {
+                        t->visual_toggle_goal_hidden_pressed = true;
+                    }
+                }
+
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_LEFT, sc, app_mods)) t->pending_visual_move_x -= 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_RIGHT, sc, app_mods)) t->pending_visual_move_x += 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_UP, sc, app_mods)) t->pending_visual_move_y -= 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_DOWN, sc, app_mods)) t->pending_visual_move_y += 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_LEFT, sc, app_mods)) t->pending_visual_move_x -= 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_RIGHT, sc, app_mods)) t->pending_visual_move_x += 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_UP, sc, app_mods)) t->pending_visual_move_y -= 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_DOWN, sc, app_mods)) t->pending_visual_move_y += 10.0f;
             }
         }
 

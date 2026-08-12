@@ -362,6 +362,11 @@ typedef struct {
 // mods is HOTKEY_MOD_NONE. Returns buf so it can be used inline in snprintf calls.
 const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size);
 
+// Reduces an SDL modifier state to the platform-neutral HOTKEY_MOD_* mask. Left and right variants
+// collapse into one bit, and the lock keys (Caps, Num, Scroll) are dropped entirely so a binding
+// does not silently stop matching when Num Lock is on.
+Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods);
+
 // True for the scancode names "F13" through "F24". These keys are absent from real keyboards
 // and are what macro pads and Stream Decks emit, so they are the one safe exception to the
 // "a global hotkey must carry a modifier" rule.
@@ -378,6 +383,118 @@ bool hotkey_slot_is_reserved(const char *key_name, Uint16 mods, char *out_reason
 // too, so a global-only caller needs just this one check.
 // Writes a reason into out_reason on failure.
 bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
+
+// ------------------- ADVANCELY APP HOTKEYS -------------------
+
+// Where an application hotkey is allowed to fire. Two bindings only collide when their contexts
+// overlap, so the same key can mean one thing on the normal tracker map and another one while the
+// Visual Layout Editor is running.
+#define APP_HOTKEY_CTX_TRACKER 0x01u // Tracker map, Visual Layout Editor off. Counter hotkeys live here too.
+#define APP_HOTKEY_CTX_VISUAL 0x02u // Tracker map, Visual Layout Editor on.
+#define APP_HOTKEY_CTX_EDITOR 0x04u // Template editor window.
+#define APP_HOTKEY_CTX_OVERLAY 0x08u // Overlay window.
+#define APP_HOTKEY_CTX_ALL (APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | \
+                            APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_OVERLAY)
+
+// Headings the Hotkeys tab groups the rows under.
+typedef enum {
+    APP_HOTKEY_GROUP_TRACKER = 0,
+    APP_HOTKEY_GROUP_VISUAL,
+    APP_HOTKEY_GROUP_EDITOR,
+    APP_HOTKEY_GROUP_OVERLAY,
+    APP_HOTKEY_GROUP_COUNT
+} AppHotkeyGroup;
+
+extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
+
+// Every configurable Advancely shortcut, in the order the Hotkeys tab lists them.
+// Columns: enum id, settings.json id, default key (US-layout scancode name), default modifiers,
+// contexts it fires in, group heading, UI label, tooltip description.
+// The json id is written to settings.json and must never change once released.
+#define APP_HOTKEY_LIST(X) \
+    X(APP_HOTKEY_TOGGLE_VISUAL_EDITING, "toggle_visual_editing", "V", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Visual Layout Editor", \
+      "Starts or stops visual layout editing, exactly like the button in the template editor.\n" \
+      "From anywhere it opens the template editor, puts the template applied in Settings into\n" \
+      "\"Edit Template\", and starts editing, as long as a valid Minecraft saves folder is tracked.\n" \
+      "An editing session that is already open is never interrupted, so with unsaved changes or a\n" \
+      "different template open the editor just comes to the front with the button greyed out,\n" \
+      "explaining what is missing.") \
+    X(APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, "toggle_template_editor", "E", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Template Editor Window", \
+      "Opens or closes the template editor window.") \
+    X(APP_HOTKEY_NUDGE_LEFT, "nudge_left", "Left", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Nudge Selection Left (1 px)", "Moves every selected element one pixel to the left. Holding repeats.") \
+    X(APP_HOTKEY_NUDGE_RIGHT, "nudge_right", "Right", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Nudge Selection Right (1 px)", "Moves every selected element one pixel to the right. Holding repeats.") \
+    X(APP_HOTKEY_NUDGE_UP, "nudge_up", "Up", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Nudge Selection Up (1 px)", "Moves every selected element one pixel up. Holding repeats.") \
+    X(APP_HOTKEY_NUDGE_DOWN, "nudge_down", "Down", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Nudge Selection Down (1 px)", "Moves every selected element one pixel down. Holding repeats.") \
+    X(APP_HOTKEY_MOVE_LEFT, "move_left", "A", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Move Selection Left (10 px)", "Moves every selected element ten pixels to the left. Holding repeats.") \
+    X(APP_HOTKEY_MOVE_RIGHT, "move_right", "D", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Move Selection Right (10 px)", "Moves every selected element ten pixels to the right. Holding repeats.") \
+    X(APP_HOTKEY_MOVE_UP, "move_up", "W", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Move Selection Up (10 px)", "Moves every selected element ten pixels up. Holding repeats.") \
+    X(APP_HOTKEY_MOVE_DOWN, "move_down", "S", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Move Selection Down (10 px)", "Moves every selected element ten pixels down. Holding repeats.") \
+    X(APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, "toggle_layout_hidden", "V", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Toggle Layout Visibility of Selection", \
+      "Flips the manual layout \"Hide\" checkbox of every selected element (icon, text and\n" \
+      "progress are separate elements).\n" \
+      "If any of them is still visible, all of them are hidden; otherwise all are shown again.\n" \
+      "The change lands in the template editor, so it needs a save like every other edit.\n" \
+      "Layout editing forces \"Show All\", so hidden elements stay on screen while you work.") \
+    X(APP_HOTKEY_TOGGLE_GOAL_HIDDEN, "toggle_goal_hidden", "H", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Toggle Overlay Visibility of Selection", \
+      "Flips the \"Hidden\" checkbox of every goal in the selection, which controls the overlay\n" \
+      "and the automatic layout.\n" \
+      "If any of them is still visible, all of them are hidden; otherwise all are shown again.\n" \
+      "The change lands in the template editor, so it needs a save like every other edit.") \
+    X(APP_HOTKEY_OVERLAY_ADVANCE, "overlay_advance", "Space", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_OVERLAY, APP_HOTKEY_GROUP_OVERLAY, \
+      "Advance / Speed Up", \
+      "Belt mode: hold to scroll faster.\n" \
+      "Page and Compact mode: press to cut to the next page or cycle entry.\n" \
+      "Only fires while the overlay window itself is focused.")
+
+typedef enum {
+#define X(enum_id, ...) enum_id,
+    APP_HOTKEY_LIST(X)
+#undef X
+    APP_HOTKEY_COUNT
+} AppHotkeyAction;
+
+typedef struct {
+    const char *json_id;
+    const char *default_key;
+    Uint16 default_mods;
+    Uint16 contexts;
+    AppHotkeyGroup group;
+    const char *label;
+    const char *description;
+} AppHotkeyDef;
+
+extern const AppHotkeyDef APP_HOTKEY_DEFS[APP_HOTKEY_COUNT];
+
+// One configured binding. "None" (or an empty string) means the action has no key at all.
+typedef struct {
+    char key[32]; // US-layout scancode name, matching how counter hotkeys are stored.
+    Uint16 mods; // HOTKEY_MOD_* bitmask.
+} AppHotkey;
 
 // Data structures for settings
 typedef struct {
@@ -506,6 +623,7 @@ struct AppSettings {
     // --- Hotkeys ---
     int hotkey_count; // The number of active hotkey bindings.
     HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings for custom goals.
+    AppHotkey app_hotkeys[APP_HOTKEY_COUNT]; // Advancely's own shortcuts, indexed by AppHotkeyAction.
 
     // --- General Settings ---
     bool enable_overlay; // If true, the overlay window is created and rendered.
@@ -801,6 +919,38 @@ PathMode settings_get_path_mode_from_string(const char *mode_str);
  * @param settings A pointer to the AppSettings struct to be populated.
  */
 void settings_set_defaults(AppSettings *settings);
+
+/**
+ * @brief Resets every Advancely shortcut to the default from APP_HOTKEY_DEFS.
+ */
+void app_hotkeys_set_defaults(AppSettings *settings);
+
+/**
+ * @brief True when any Advancely shortcut differs between the two settings copies.
+ */
+bool app_hotkeys_different(const AppSettings *a, const AppSettings *b);
+
+/**
+ * @brief True when this action is bound to the given physical key and exact modifier set.
+ *
+ * Modifiers must match exactly, including the empty set, so a bare "V" binding does not also
+ * swallow Shift+V. An unbound ("None") action never matches.
+ *
+ * @param settings  The settings copy holding the bindings.
+ * @param action    The action to test.
+ * @param scancode  The SDL scancode of the pressed key.
+ * @param held_mods HOTKEY_MOD_* bitmask of the modifiers held down.
+ */
+bool app_hotkey_matches(const AppSettings *settings, AppHotkeyAction action,
+                        SDL_Scancode scancode, Uint16 held_mods);
+
+/**
+ * @brief Writes the label shown on a binding's button ("Shift+V", "None") into buf.
+ *
+ * The key part is translated to the user's keyboard layout, so an EU keyboard shows the key
+ * that physically has to be pressed rather than its US name. Returns buf.
+ */
+const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_size);
 
 /**
  * @brief Loads settings from the settings.json file.

@@ -2799,17 +2799,18 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED: *is_running = false;
             break;
         case SDL_EVENT_KEY_DOWN:
-            if (event->key.scancode == SDL_SCANCODE_SPACE) {
+            if (app_hotkey_matches(settings, APP_HOTKEY_OVERLAY_ADVANCE, event->key.scancode,
+                                   hotkey_mods_from_sdl(event->key.mod))) {
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE ||
                     settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {
-                    // Page/Compact mode: SPACE cuts to the next page / cycle entry. Ignore key-repeat
+                    // Page/Compact mode: the key cuts to the next page / cycle entry. Ignore key-repeat
                     // so a single press advances exactly one step (holding does not spam).
                     if (!event->key.repeat) {
                         o->page_index++;
                         o->page_timer = 0.0f;
                     }
                 } else {
-                    // Belt mode: holding SPACE speeds up the scroll.
+                    // Belt mode: holding the key speeds up the scroll.
                     *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
                 }
             }
