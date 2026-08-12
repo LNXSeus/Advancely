@@ -65,6 +65,7 @@ struct VisualLayoutItem {
     // for duplicate hit-test-only entries that reuse a pointer already keyed elsewhere this frame.
     std::string element{}; // "Icon", "Text", "Progress", ... Filled alongside key, so only for the
     // items a visibility hotkey can actually act on.
+    bool is_decoration = false; // link.root_name holds a decoration id rather than a goal
 };
 
 static std::vector<VisualLayoutItem> s_visual_layout_items;
@@ -6527,13 +6528,17 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     } else {
         linkable = false;
     }
-    if (linkable && root_name && root_name[0] != '\0') {
+    // Decorations are no linked-goal targets, but the delete and copy hotkeys still act on them,
+    // so their id is carried in the same field.
+    bool is_decoration = (strcmp(goal_type, "Decoration") == 0);
+    if ((linkable || is_decoration) && root_name && root_name[0] != '\0') {
         strncpy(link.root_name, root_name, sizeof(link.root_name) - 1);
         if (parent_root_name && parent_root_name[0] != '\0') {
             strncpy(link.parent_root, parent_root_name, sizeof(link.parent_root) - 1);
         }
     } else {
         linkable = false;
+        is_decoration = false;
     }
 
     // Stable identity for this draggable element, used to restore the selection across a template
@@ -6559,7 +6564,8 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     s_visual_layout_items.push_back({
         item_screen_pos, hit_box_size, &target_pos, link, linkable,
         visual_item_key,
-        identify_item && element_type ? element_type : ""
+        identify_item && element_type ? element_type : "",
+        is_decoration
     });
 
     // Record this element's hierarchical parent so multi-drag can leave automatic children alone.
@@ -11798,28 +11804,37 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (!already) s_visual_selected_goals.push_back(item.link);
         }
 
-        // --- Visibility hotkeys ---
+        // --- Selection hotkeys ---
         // Only the identity of the selection is collected here. The template editor holds the copy
-        // of the template that gets saved, so it decides the new values and applies them; a request
-        // that is still pending is left alone rather than overwritten.
-        if ((t->visual_toggle_layout_hidden_pressed || t->visual_toggle_goal_hidden_pressed) &&
+        // of the template that gets saved, so it carries the change out; a request that is still
+        // pending is left alone rather than overwritten.
+        VisualEditRequest pressed_request = VISUAL_EDIT_NONE;
+        if (t->visual_toggle_layout_hidden_pressed) pressed_request = VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN;
+        else if (t->visual_toggle_goal_hidden_pressed) pressed_request = VISUAL_EDIT_TOGGLE_GOAL_HIDDEN;
+        else if (t->visual_delete_pressed) pressed_request = VISUAL_EDIT_DELETE;
+        else if (t->visual_copy_pressed) pressed_request = VISUAL_EDIT_COPY;
+
+        if (pressed_request != VISUAL_EDIT_NONE &&
             s_visual_edit_request == VISUAL_EDIT_NONE && !s_visual_selected_items.empty()) {
-            s_visual_edit_request = t->visual_toggle_layout_hidden_pressed
-                                        ? VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN
-                                        : VISUAL_EDIT_TOGGLE_GOAL_HIDDEN;
+            // Only delete and copy reach decorations; the two visibility checkboxes don't exist there.
+            bool decorations_included = (pressed_request == VISUAL_EDIT_DELETE ||
+                                         pressed_request == VISUAL_EDIT_COPY);
             s_visual_edit_items.clear();
             for (const auto &item: s_visual_layout_items) {
-                // Decorations carry neither checkbox, so they are simply skipped.
-                if (!item.linkable || s_visual_selected_items.count(item.pos) == 0) continue;
+                if (s_visual_selected_items.count(item.pos) == 0) continue;
+                if (!item.linkable && !(decorations_included && item.is_decoration)) continue;
                 VisualEditItem entry = {};
                 entry.link = item.link;
                 snprintf(entry.element, sizeof(entry.element), "%s", item.element.c_str());
+                entry.is_decoration = item.is_decoration;
                 s_visual_edit_items.push_back(entry);
             }
-            if (s_visual_edit_items.empty()) s_visual_edit_request = VISUAL_EDIT_NONE;
+            if (!s_visual_edit_items.empty()) s_visual_edit_request = pressed_request;
         }
         t->visual_toggle_layout_hidden_pressed = false;
         t->visual_toggle_goal_hidden_pressed = false;
+        t->visual_delete_pressed = false;
+        t->visual_copy_pressed = false;
 
         // Clear selection when visual editing is disabled
     } else if (!t->is_visual_layout_editing && !s_visual_selected_items.empty()) {
@@ -11836,6 +11851,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->pending_visual_move_y = 0.0f;
         t->visual_toggle_layout_hidden_pressed = false;
         t->visual_toggle_goal_hidden_pressed = false;
+        t->visual_delete_pressed = false;
+        t->visual_copy_pressed = false;
         tracker_clear_visual_edit_request();
     }
 

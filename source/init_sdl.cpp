@@ -88,6 +88,8 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->toggle_visual_editing_request_ttl = 0;
     t->visual_toggle_layout_hidden_pressed = false;
     t->visual_toggle_goal_hidden_pressed = false;
+    t->visual_delete_pressed = false;
+    t->visual_copy_pressed = false;
     t->template_editor_has_unsaved_changes = false;
     t->template_editor_is_editing = false;
     t->settings_has_unsaved_changes = false;

@@ -300,6 +300,14 @@
 			"key":	"H",
 			"mods":	0
 		},
+		"delete_selection":	{
+			"key":	"Delete",
+			"mods":	0
+		},
+		"copy_selection":	{
+			"key":	"C",
+			"mods":	1
+		},
 		"overlay_advance":	{
 			"key":	"Space",
 			"mods":	0

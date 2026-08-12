@@ -464,6 +464,20 @@ extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
       "and the automatic layout.\n" \
       "If any of them is still visible, all of them are hidden; otherwise all are shown again.\n" \
       "The change lands in the template editor, so it needs a save like every other edit.") \
+    X(APP_HOTKEY_DELETE_SELECTION, "delete_selection", "Delete", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Delete Selection", \
+      "Removes every selected goal, criterion, sub-stat and decoration from the template.\n" \
+      "Selecting any part of a goal (icon, text or progress) removes the whole goal.\n" \
+      "The change lands in the template editor, so the map only catches up once you save,\n" \
+      "and \"Revert Changes\" undoes it until then.") \
+    X(APP_HOTKEY_COPY_SELECTION, "copy_selection", "C", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Copy Selection", \
+      "Duplicates every selected goal, criterion, sub-stat and decoration, layout coordinates\n" \
+      "and all, so the copy starts out exactly on top of the original.\n" \
+      "Each copy gets the usual \"_copy\" id, counting up when that one is taken.\n" \
+      "The copies appear in the template editor and show up on the map once you save.") \
     X(APP_HOTKEY_OVERLAY_ADVANCE, "overlay_advance", "Space", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_OVERLAY, APP_HOTKEY_GROUP_OVERLAY, \
       "Advance / Speed Up", \

@@ -3079,22 +3079,296 @@ static TcVisualEditTarget tc_resolve_visual_edit_target(EditorTemplate &tpl, con
     return out;
 }
 
-// What the last visibility hotkey did, shown next to the "Visual Layout Editor" button until the
+// What the last selection hotkey did, shown next to the "Visual Layout Editor" button until the
 // next editor message replaces it or the changes are saved or reverted. Empty when there is
 // nothing to report.
 static char s_visual_edit_message[128] = "";
 
-// Carries out a visibility hotkey pressed in the Visual Layout Editor. The change is made here
-// rather than on the map, because this copy of the template is the one that gets saved.
-// The whole selection ends up in the same state: as long as anything in it is still visible,
-// everything is hidden; once everything is hidden, the hotkey shows it all again.
-// Returns true when a flag actually changed.
-static bool tc_apply_visual_edit_request(EditorTemplate &tpl) {
+// The editor's list selections, handed to operations that remove or insert goals so they can put
+// each selection back on the same goal instead of leaving a dangling pointer or a shifted index.
+struct TcEditorSelection {
+    EditorTrackableCategory *&advancement;
+    EditorTrackableCategory *&stat;
+    EditorMultiStageGoal *&ms_goal;
+    int &unlock_index;
+    int &custom_index;
+    int &counter_index;
+    int &deco_index;
+};
+
+// Builds the "<id>_copy", "<id>_copy2", ... name the editor's Copy buttons use, skipping the ids
+// already taken in that list.
+static void tc_make_copy_id(const char *base, const std::vector<std::string> &taken,
+                            char *out, size_t out_size) {
+    for (int counter = 1;; counter++) {
+        if (counter == 1) snprintf(out, out_size, "%s_copy", base);
+        else snprintf(out, out_size, "%s_copy%d", base, counter);
+
+        bool taken_already = false;
+        for (const auto &name: taken) {
+            if (name == out) {
+                taken_already = true;
+                break;
+            }
+        }
+        if (!taken_already) return;
+    }
+}
+
+// Clears the sort-order badges a duplicate inherits from its children, mirroring what the Copy
+// buttons do. The overloads keep the copy helper generic over the list it works on.
+static void tc_clear_copied_child_badges(EditorTrackableItem &) {
+}
+
+static void tc_clear_copied_child_badges(EditorTrackableCategory &category) {
+    for (auto &criterion: category.criteria) criterion.sort_order = 0;
+}
+
+static void tc_clear_copied_child_badges(EditorMultiStageGoal &goal) {
+    for (auto &stage: goal.stages) stage.sort_order = 0;
+}
+
+static void tc_clear_copied_child_badges(EditorCounterGoal &) {
+}
+
+// Removes or duplicates everything a Delete or Copy hotkey selected on the map. Goals are looked
+// up by name for every single operation, because each erase and insert invalidates the pointers
+// and indices into these lists.
+// Returns how many goals and decorations were affected.
+static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelection selection,
+                                             const std::vector<VisualEditItem> &targets, bool copying) {
+    // Remember the selections by name so they can be restored once the lists settle.
+    char sel_adv[192] = "", sel_stat[192] = "", sel_ms[192] = "";
+    char sel_unlock[192] = "", sel_custom[192] = "", sel_counter[192] = "", sel_deco[64] = "";
+    if (selection.advancement) snprintf(sel_adv, sizeof(sel_adv), "%s", selection.advancement->root_name);
+    if (selection.stat) snprintf(sel_stat, sizeof(sel_stat), "%s", selection.stat->root_name);
+    if (selection.ms_goal) snprintf(sel_ms, sizeof(sel_ms), "%s", selection.ms_goal->root_name);
+    if (selection.unlock_index >= 0 && selection.unlock_index < (int) tpl.unlocks.size())
+        snprintf(sel_unlock, sizeof(sel_unlock), "%s", tpl.unlocks[selection.unlock_index].root_name);
+    if (selection.custom_index >= 0 && selection.custom_index < (int) tpl.custom_goals.size())
+        snprintf(sel_custom, sizeof(sel_custom), "%s", tpl.custom_goals[selection.custom_index].root_name);
+    if (selection.counter_index >= 0 && selection.counter_index < (int) tpl.counter_goals.size())
+        snprintf(sel_counter, sizeof(sel_counter), "%s", tpl.counter_goals[selection.counter_index].root_name);
+    if (selection.deco_index >= 0 && selection.deco_index < (int) tpl.decorations.size())
+        snprintf(sel_deco, sizeof(sel_deco), "%s", tpl.decorations[selection.deco_index].id);
+
+    auto erase_by_root = [](auto &list, const char *root) -> bool {
+        for (size_t i = 0; i < list.size(); i++) {
+            if (strcmp(list[i].root_name, root) != 0) continue;
+            list.erase(list.begin() + (long) i);
+            return true;
+        }
+        return false;
+    };
+    // The duplicate keeps everything the original has, layout coordinates included, and lands
+    // directly behind it in the list.
+    auto copy_by_root = [](auto &list, const char *root) -> bool {
+        for (size_t i = 0; i < list.size(); i++) {
+            if (strcmp(list[i].root_name, root) != 0) continue;
+
+            std::vector<std::string> taken;
+            taken.reserve(list.size());
+            for (const auto &entry: list) taken.push_back(entry.root_name);
+
+            auto duplicate = list[i];
+            duplicate.sort_order = 0;
+            tc_clear_copied_child_badges(duplicate);
+
+            char new_root[192];
+            tc_make_copy_id(root, taken, new_root, sizeof(new_root));
+            snprintf(duplicate.root_name, sizeof(duplicate.root_name), "%s", new_root);
+
+            list.insert(list.begin() + (long) i + 1, duplicate);
+            return true;
+        }
+        return false;
+    };
+    // Criteria and sub-stats live inside their parent, so they are only ever unique within it.
+    auto handle_child = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item) -> bool {
+        for (auto &category: categories) {
+            if (strcmp(category.root_name, item.link.parent_root) != 0) continue;
+            if (copying) return copy_by_root(category.criteria, item.link.root_name);
+            for (const auto &child: category.criteria) {
+                if (strcmp(child.root_name, item.link.root_name) == 0) {
+                    clear_goal_links(tpl, child.root_name);
+                    break;
+                }
+            }
+            return erase_by_root(category.criteria, item.link.root_name);
+        }
+        return false;
+    };
+    auto handle_parent = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item) -> bool {
+        if (copying) return copy_by_root(categories, item.link.root_name);
+        for (const auto &category: categories) {
+            if (strcmp(category.root_name, item.link.root_name) != 0) continue;
+            // Arrows pointing at the goal or any of its criteria would dangle otherwise.
+            clear_goal_links(tpl, category.root_name);
+            for (const auto &child: category.criteria) clear_goal_links(tpl, child.root_name);
+            break;
+        }
+        return erase_by_root(categories, item.link.root_name);
+    };
+    auto handle_flat = [&](auto &list, const char *root) -> bool {
+        if (copying) return copy_by_root(list, root);
+        clear_goal_links(tpl, root);
+        return erase_by_root(list, root);
+    };
+
+    int affected = 0;
+    for (const auto &item: targets) {
+        if (item.is_decoration) {
+            bool done = false;
+            for (size_t i = 0; i < tpl.decorations.size(); i++) {
+                if (strcmp(tpl.decorations[i].id, item.link.root_name) != 0) continue;
+                if (copying) {
+                    std::vector<std::string> taken;
+                    taken.reserve(tpl.decorations.size());
+                    for (const auto &deco: tpl.decorations) taken.push_back(deco.id);
+
+                    EditorDecorationElement duplicate = tpl.decorations[i];
+                    duplicate.sort_order = 0;
+                    char new_id[64];
+                    tc_make_copy_id(tpl.decorations[i].id, taken, new_id, sizeof(new_id));
+                    snprintf(duplicate.id, sizeof(duplicate.id), "%s", new_id);
+                    tpl.decorations.insert(tpl.decorations.begin() + (long) i + 1, duplicate);
+                } else {
+                    tpl.decorations.erase(tpl.decorations.begin() + (long) i);
+                }
+                done = true;
+                break;
+            }
+            if (done) affected++;
+            continue;
+        }
+
+        bool has_parent = (item.link.parent_root[0] != '\0');
+        bool done = false;
+        switch (item.link.type) {
+            case LINK_TYPE_ADVANCEMENT:
+                done = has_parent ? handle_child(tpl.advancements, item) : handle_parent(tpl.advancements, item);
+                break;
+            case LINK_TYPE_STAT:
+                done = has_parent ? handle_child(tpl.stats, item) : handle_parent(tpl.stats, item);
+                break;
+            case LINK_TYPE_UNLOCK:
+                done = handle_flat(tpl.unlocks, item.link.root_name);
+                break;
+            case LINK_TYPE_CUSTOM:
+                done = handle_flat(tpl.custom_goals, item.link.root_name);
+                break;
+            case LINK_TYPE_MULTI_STAGE:
+                done = handle_flat(tpl.multi_stage_goals, item.link.root_name);
+                break;
+            case LINK_TYPE_COUNTER:
+                done = handle_flat(tpl.counter_goals, item.link.root_name);
+                break;
+            default:
+                break;
+        }
+        if (done) affected++;
+    }
+
+    if (affected == 0) return 0;
+
+    // Restore the selections. A goal that was just deleted simply loses its selection.
+    selection.advancement = nullptr;
+    selection.stat = nullptr;
+    selection.ms_goal = nullptr;
+    selection.unlock_index = -1;
+    selection.custom_index = -1;
+    selection.counter_index = -1;
+    selection.deco_index = -1;
+    for (auto &advancement: tpl.advancements) {
+        if (strcmp(advancement.root_name, sel_adv) == 0) {
+            selection.advancement = &advancement;
+            break;
+        }
+    }
+    for (auto &stat: tpl.stats) {
+        if (strcmp(stat.root_name, sel_stat) == 0) {
+            selection.stat = &stat;
+            break;
+        }
+    }
+    for (auto &goal: tpl.multi_stage_goals) {
+        if (strcmp(goal.root_name, sel_ms) == 0) {
+            selection.ms_goal = &goal;
+            break;
+        }
+    }
+    for (int i = 0; i < (int) tpl.unlocks.size(); i++) {
+        if (strcmp(tpl.unlocks[i].root_name, sel_unlock) == 0) {
+            selection.unlock_index = i;
+            break;
+        }
+    }
+    for (int i = 0; i < (int) tpl.custom_goals.size(); i++) {
+        if (strcmp(tpl.custom_goals[i].root_name, sel_custom) == 0) {
+            selection.custom_index = i;
+            break;
+        }
+    }
+    for (int i = 0; i < (int) tpl.counter_goals.size(); i++) {
+        if (strcmp(tpl.counter_goals[i].root_name, sel_counter) == 0) {
+            selection.counter_index = i;
+            break;
+        }
+    }
+    for (int i = 0; i < (int) tpl.decorations.size(); i++) {
+        if (strcmp(tpl.decorations[i].id, sel_deco) == 0) {
+            selection.deco_index = i;
+            break;
+        }
+    }
+    return affected;
+}
+
+// Carries out a hotkey pressed in the Visual Layout Editor. The change is made here rather than on
+// the map, because this copy of the template is the one that gets saved.
+// For the two visibility hotkeys the whole selection ends up in the same state: as long as anything
+// in it is still visible, everything is hidden; once everything is hidden, they are shown again.
+// Returns true when something actually changed.
+static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection selection) {
     VisualEditRequest request = tracker_get_visual_edit_request();
     if (request == VISUAL_EDIT_NONE) return false;
 
     const VisualEditItem *items = tracker_get_visual_edit_items();
     int count = tracker_get_visual_edit_item_count();
+
+    if (request == VISUAL_EDIT_DELETE || request == VISUAL_EDIT_COPY) {
+        bool copying = (request == VISUAL_EDIT_COPY);
+
+        // One goal contributes an icon, a text and a progress element, so the same goal would
+        // otherwise be deleted twice or copied three times.
+        std::vector<VisualEditItem> unique_targets;
+        for (int i = 0; i < count; i++) {
+            bool already = false;
+            for (const auto &seen: unique_targets) {
+                if (seen.is_decoration == items[i].is_decoration &&
+                    seen.link.type == items[i].link.type &&
+                    strcmp(seen.link.root_name, items[i].link.root_name) == 0 &&
+                    strcmp(seen.link.parent_root, items[i].link.parent_root) == 0) {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already) unique_targets.push_back(items[i]);
+        }
+
+        tracker_clear_visual_edit_request();
+        int affected = tc_apply_visual_structure_request(tpl, selection, unique_targets, copying);
+        if (affected == 0) return false;
+
+        snprintf(s_visual_edit_message, sizeof(s_visual_edit_message),
+                 copying ? "Copied %d, save to see them" : "Deleted %d, save to apply", affected);
+        if (!copying) {
+            // The deleted goals are still on the map until the next save, so leaving them selected
+            // would invite a second Delete that silently does nothing.
+            tracker_request_clear_visual_selection();
+        }
+        return true;
+    }
 
     // Deduplicated, because one goal contributes several selected elements and the icon, text and
     // progress of one goal all point at the same "Hidden" checkbox.
@@ -6506,10 +6780,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // --- END SYNC BLOCK ---
 
-        // Visibility hotkeys pressed on the map act on this copy of the template, so they show up
-        // as unsaved changes exactly like ticking the checkboxes here by hand.
-        if (tc_apply_visual_edit_request(current_template_data)) {
-            save_message_type = MSG_NONE;
+        // Hotkeys pressed on the map act on this copy of the template, so they show up as unsaved
+        // changes exactly like using the checkboxes and buttons here by hand.
+        {
+            TcEditorSelection hotkey_selection{
+                selected_advancement, selected_stat, selected_ms_goal,
+                selected_unlock_index, selected_custom_index, selected_counter_index, selected_deco_index
+            };
+            if (tc_apply_visual_edit_request(current_template_data, hotkey_selection)) {
+                save_message_type = MSG_NONE;
+            }
         }
 
         // --- CLICK/DRAG GOAL SELECTION ---

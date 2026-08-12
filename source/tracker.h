@@ -132,6 +132,8 @@ struct Tracker {
     // where the selection is known.
     bool visual_toggle_layout_hidden_pressed;
     bool visual_toggle_goal_hidden_pressed;
+    bool visual_delete_pressed;
+    bool visual_copy_pressed;
     // Frames left for a pending "Toggle Visual Layout Editor" hotkey press. The template editor owns
     // the button's conditions and side effects, so the request is handed to it; it opens itself first
     // if it was closed. The short lifetime bridges the frames a freshly opened editor needs to pick
@@ -685,12 +687,15 @@ void tracker_request_clear_visual_selection(void);
 typedef enum {
     VISUAL_EDIT_NONE = 0,
     VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN, // Per element: the manual layout "Hide" checkbox
-    VISUAL_EDIT_TOGGLE_GOAL_HIDDEN // Per goal: the "Hidden" checkbox (automatic layout + overlay)
+    VISUAL_EDIT_TOGGLE_GOAL_HIDDEN, // Per goal: the "Hidden" checkbox (automatic layout + overlay)
+    VISUAL_EDIT_DELETE, // Remove the selected goals and decorations from the template
+    VISUAL_EDIT_COPY // Duplicate them, coordinates included, under a "_copy" id
 } VisualEditRequest;
 
 typedef struct {
     CounterLinkedGoal link; // Which goal the element belongs to
     char element[16]; // "Icon", "Text" or "Progress"; ignored by goal-level requests
+    bool is_decoration; // True when link.root_name is a decoration id instead of a goal
 } VisualEditItem;
 
 /**
