@@ -41,6 +41,9 @@ extern SDL_AtomicInt g_hotkey_captured_scancode;
 // Settings hotkey capture: SDL_Scancode written by event handler (0 = cleared/escape)
 extern SDL_AtomicInt g_hotkey_captured_mods;
 // Settings hotkey capture: HOTKEY_MOD_* bitmask of the modifiers held when the key was pressed
+extern SDL_AtomicInt g_hotkey_captured_keycode;
+// Settings hotkey capture: SDL_Keycode of the same key press (0 = cleared/escape). The Advancely
+// shortcuts bind the keycap rather than the physical key, so they read this instead of the scancode.
 extern ForceOpenReason g_force_open_reason; // Flag to force settings open on invalid path
 extern char g_latest_known_version[64];
 // Latest Advancely version observed via the startup update check ("" if unknown). Used to gate relay connections to "must be on latest".

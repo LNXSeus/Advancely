@@ -6485,6 +6485,42 @@ static ImVec2 get_anchor_screen_pos(AnchorPoint anchor, ImVec2 item_screen_pos, 
     return ImVec2(item_screen_pos.x + hit_box_size.x * ax, item_screen_pos.y + hit_box_size.y * ay);
 }
 
+/**
+ * @brief Points the template editor at the goal an element on the map belongs to.
+ *
+ * Criteria and sub-stats hand over their parent, since that is what the editor's list selects, with
+ * the child kept alongside so the editor can scroll to it inside the parent.
+ */
+static void visual_set_editor_target(Tracker *t, const char *goal_type, const char *root_name,
+                                     const char *parent_root_name) {
+    if (!t || !goal_type) return;
+
+    if (parent_root_name && parent_root_name[0] != '\0') {
+        strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
+        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+        if (root_name && root_name[0] != '\0') {
+            strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
+            t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
+        } else {
+            t->visual_drag_child_root_name[0] = '\0';
+        }
+        if (strcmp(goal_type, "Sub-Stat") == 0) {
+            strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
+        } else if (strcmp(goal_type, "Achievement") == 0) {
+            strncpy(t->visual_drag_goal_type, "Achievement", sizeof(t->visual_drag_goal_type) - 1);
+        } else {
+            strncpy(t->visual_drag_goal_type, "Advancement", sizeof(t->visual_drag_goal_type) - 1);
+        }
+        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+    } else if (root_name && root_name[0] != '\0') {
+        strncpy(t->visual_drag_root_name, root_name, sizeof(t->visual_drag_root_name) - 1);
+        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+        strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
+        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+        t->visual_drag_child_root_name[0] = '\0';
+    }
+}
+
 // Helper function to handle Visual Layout Drag-and-Drop editing
 static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 item_screen_pos, ImVec2 hit_box_size,
                                           ManualPos &target_pos, const char *goal_type,
@@ -6600,30 +6636,16 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         }
 
         // Signal the editor to select this goal (without opening Layout Coordinates)
-        if (parent_root_name && parent_root_name[0] != '\0') {
-            strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
-            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
-            if (root_name && root_name[0] != '\0') {
-                strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
-                t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
-            } else {
-                t->visual_drag_child_root_name[0] = '\0';
-            }
-            if (strcmp(goal_type, "Sub-Stat") == 0) {
-                strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
-            } else if (strcmp(goal_type, "Achievement") == 0) {
-                strncpy(t->visual_drag_goal_type, "Achievement", sizeof(t->visual_drag_goal_type) - 1);
-            } else {
-                strncpy(t->visual_drag_goal_type, "Advancement", sizeof(t->visual_drag_goal_type) - 1);
-            }
-            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
-        } else if (root_name && root_name[0] != '\0') {
-            strncpy(t->visual_drag_root_name, root_name, sizeof(t->visual_drag_root_name) - 1);
-            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
-            strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
-            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
-            t->visual_drag_child_root_name[0] = '\0';
-        }
+        visual_set_editor_target(t, goal_type, root_name, parent_root_name);
+        t->visual_layout_just_clicked = true;
+    }
+
+    // Right-clicking an element shows it in the template editor without touching the map selection,
+    // so a group stays selected while single goals are inspected. Right-dragging pans the map, so
+    // only a press that never turned into a drag counts as a click here.
+    if (is_hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
+        !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Right)) {
+        visual_set_editor_target(t, goal_type, root_name, parent_root_name);
         t->visual_layout_just_clicked = true;
     }
 
@@ -6641,30 +6663,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
         // Communicate the dragged goal's identity to the template editor
         // For criteria/sub-stats, select the parent goal instead
-        if (parent_root_name && parent_root_name[0] != '\0') {
-            strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
-            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
-            if (root_name && root_name[0] != '\0') {
-                strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
-                t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
-            } else {
-                t->visual_drag_child_root_name[0] = '\0';
-            }
-            if (strcmp(goal_type, "Sub-Stat") == 0) {
-                strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
-            } else if (strcmp(goal_type, "Achievement") == 0) {
-                strncpy(t->visual_drag_goal_type, "Achievement", sizeof(t->visual_drag_goal_type) - 1);
-            } else {
-                strncpy(t->visual_drag_goal_type, "Advancement", sizeof(t->visual_drag_goal_type) - 1);
-            }
-            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
-        } else if (root_name && root_name[0] != '\0') {
-            strncpy(t->visual_drag_root_name, root_name, sizeof(t->visual_drag_root_name) - 1);
-            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
-            strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
-            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
-            t->visual_drag_child_root_name[0] = '\0';
-        }
+        visual_set_editor_target(t, goal_type, root_name, parent_root_name);
 
         // If this is the very first time dragging it, reverse-engineer its current
         // procedural screen position back into World X/Y coordinates!

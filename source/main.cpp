@@ -68,6 +68,7 @@ extern "C" {
 
 // ImGUI imports
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h" // For the Ctrl+Tab window-switcher configuration
 #include "imgui/imgui_impl_sdl3.h"
 #include "imgui/imgui_impl_sdlrenderer3.h"
 
@@ -112,6 +113,7 @@ SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC wi
 SDL_AtomicInt g_hotkey_capture_armed;
 SDL_AtomicInt g_hotkey_captured_scancode;
 SDL_AtomicInt g_hotkey_captured_mods;
+SDL_AtomicInt g_hotkey_captured_keycode;
 
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
@@ -2320,6 +2322,13 @@ int main(int argc, char *argv[]) {
         ImGuiIO &io = ImGui::GetIO();
         (void) io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+
+        // Ctrl+Tab selects the next goal in the template editor, so ImGui's own window switcher
+        // must not claim the same combination and pop up over it.
+        if (ImGuiContext *imgui_context = ImGui::GetCurrentContext()) {
+            imgui_context->ConfigNavWindowingKeyNext = 0;
+            imgui_context->ConfigNavWindowingKeyPrev = 0;
+        }
 
         ImGui::StyleColorsDark(); // Or ImGui::StyleColorsClassic()
 

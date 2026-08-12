@@ -2799,7 +2799,7 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED: *is_running = false;
             break;
         case SDL_EVENT_KEY_DOWN:
-            if (app_hotkey_matches(settings, APP_HOTKEY_OVERLAY_ADVANCE, event->key.scancode,
+            if (app_hotkey_matches(settings, APP_HOTKEY_OVERLAY_ADVANCE, event->key.key,
                                    hotkey_mods_from_sdl(event->key.mod))) {
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE ||
                     settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {

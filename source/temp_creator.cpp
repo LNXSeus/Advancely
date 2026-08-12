@@ -3115,6 +3115,18 @@ static void tc_make_copy_id(const char *base, const std::vector<std::string> &ta
     }
 }
 
+// Where the "next/previous goal" hotkeys should land in a list of `count` visible entries: the
+// neighbour of the current entry, the first (or last) one when nothing is selected yet, and a stop
+// at either end rather than a wrap-around. Returns -1 when there is nothing to select.
+static int tc_step_list_index(int current, int count, bool forward) {
+    if (count <= 0) return -1;
+    if (current < 0) return forward ? 0 : count - 1;
+    int next = current + (forward ? 1 : -1);
+    if (next < 0) return 0;
+    if (next >= count) return count - 1;
+    return next;
+}
+
 // Clears the sort-order badges a duplicate inherits from its children, mirroring what the Copy
 // buttons do. The overloads keep the copy helper generic over the list it works on.
 static void tc_clear_copied_child_badges(EditorTrackableItem &) {
@@ -3137,7 +3149,8 @@ static void tc_clear_copied_child_badges(EditorCounterGoal &) {
 // Returns how many goals and decorations were affected.
 static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelection selection,
                                              const std::vector<VisualEditItem> &targets, bool copying) {
-    // Remember the selections by name so they can be restored once the lists settle.
+    // Remember the selections by name so they can be restored once the lists settle. Copying
+    // overwrites these with the duplicates, so the editor lands on what was just created.
     char sel_adv[192] = "", sel_stat[192] = "", sel_ms[192] = "";
     char sel_unlock[192] = "", sel_custom[192] = "", sel_counter[192] = "", sel_deco[64] = "";
     if (selection.advancement) snprintf(sel_adv, sizeof(sel_adv), "%s", selection.advancement->root_name);
@@ -3161,8 +3174,9 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         return false;
     };
     // The duplicate keeps everything the original has, layout coordinates included, and lands
-    // directly behind it in the list.
-    auto copy_by_root = [](auto &list, const char *root) -> bool {
+    // directly behind it in the list. The id it ended up with is written to out_new_root, which the
+    // caller uses to select the duplicate instead of the original.
+    auto copy_by_root = [](auto &list, const char *root, char *out_new_root, size_t out_size) -> bool {
         for (size_t i = 0; i < list.size(); i++) {
             if (strcmp(list[i].root_name, root) != 0) continue;
 
@@ -3179,15 +3193,23 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
             snprintf(duplicate.root_name, sizeof(duplicate.root_name), "%s", new_root);
 
             list.insert(list.begin() + (long) i + 1, duplicate);
+            if (out_new_root && out_size > 0) snprintf(out_new_root, out_size, "%s", new_root);
             return true;
         }
         return false;
     };
     // Criteria and sub-stats live inside their parent, so they are only ever unique within it.
-    auto handle_child = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item) -> bool {
+    // Copying one leaves the parent selected, since that is where the duplicate lives.
+    auto handle_child = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item,
+                            char *out_selected, size_t out_size) -> bool {
         for (auto &category: categories) {
             if (strcmp(category.root_name, item.link.parent_root) != 0) continue;
-            if (copying) return copy_by_root(category.criteria, item.link.root_name);
+            if (copying) {
+                char ignored[192];
+                if (!copy_by_root(category.criteria, item.link.root_name, ignored, sizeof(ignored))) return false;
+                if (out_selected && out_size > 0) snprintf(out_selected, out_size, "%s", category.root_name);
+                return true;
+            }
             for (const auto &child: category.criteria) {
                 if (strcmp(child.root_name, item.link.root_name) == 0) {
                     clear_goal_links(tpl, child.root_name);
@@ -3198,8 +3220,9 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         }
         return false;
     };
-    auto handle_parent = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item) -> bool {
-        if (copying) return copy_by_root(categories, item.link.root_name);
+    auto handle_parent = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item,
+                             char *out_selected, size_t out_size) -> bool {
+        if (copying) return copy_by_root(categories, item.link.root_name, out_selected, out_size);
         for (const auto &category: categories) {
             if (strcmp(category.root_name, item.link.root_name) != 0) continue;
             // Arrows pointing at the goal or any of its criteria would dangle otherwise.
@@ -3209,8 +3232,8 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         }
         return erase_by_root(categories, item.link.root_name);
     };
-    auto handle_flat = [&](auto &list, const char *root) -> bool {
-        if (copying) return copy_by_root(list, root);
+    auto handle_flat = [&](auto &list, const char *root, char *out_selected, size_t out_size) -> bool {
+        if (copying) return copy_by_root(list, root, out_selected, out_size);
         clear_goal_links(tpl, root);
         return erase_by_root(list, root);
     };
@@ -3232,6 +3255,7 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
                     tc_make_copy_id(tpl.decorations[i].id, taken, new_id, sizeof(new_id));
                     snprintf(duplicate.id, sizeof(duplicate.id), "%s", new_id);
                     tpl.decorations.insert(tpl.decorations.begin() + (long) i + 1, duplicate);
+                    snprintf(sel_deco, sizeof(sel_deco), "%s", new_id);
                 } else {
                     tpl.decorations.erase(tpl.decorations.begin() + (long) i);
                 }
@@ -3246,22 +3270,26 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         bool done = false;
         switch (item.link.type) {
             case LINK_TYPE_ADVANCEMENT:
-                done = has_parent ? handle_child(tpl.advancements, item) : handle_parent(tpl.advancements, item);
+                done = has_parent
+                           ? handle_child(tpl.advancements, item, sel_adv, sizeof(sel_adv))
+                           : handle_parent(tpl.advancements, item, sel_adv, sizeof(sel_adv));
                 break;
             case LINK_TYPE_STAT:
-                done = has_parent ? handle_child(tpl.stats, item) : handle_parent(tpl.stats, item);
+                done = has_parent
+                           ? handle_child(tpl.stats, item, sel_stat, sizeof(sel_stat))
+                           : handle_parent(tpl.stats, item, sel_stat, sizeof(sel_stat));
                 break;
             case LINK_TYPE_UNLOCK:
-                done = handle_flat(tpl.unlocks, item.link.root_name);
+                done = handle_flat(tpl.unlocks, item.link.root_name, sel_unlock, sizeof(sel_unlock));
                 break;
             case LINK_TYPE_CUSTOM:
-                done = handle_flat(tpl.custom_goals, item.link.root_name);
+                done = handle_flat(tpl.custom_goals, item.link.root_name, sel_custom, sizeof(sel_custom));
                 break;
             case LINK_TYPE_MULTI_STAGE:
-                done = handle_flat(tpl.multi_stage_goals, item.link.root_name);
+                done = handle_flat(tpl.multi_stage_goals, item.link.root_name, sel_ms, sizeof(sel_ms));
                 break;
             case LINK_TYPE_COUNTER:
-                done = handle_flat(tpl.counter_goals, item.link.root_name);
+                done = handle_flat(tpl.counter_goals, item.link.root_name, sel_counter, sizeof(sel_counter));
                 break;
             default:
                 break;
@@ -3271,7 +3299,8 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
 
     if (affected == 0) return 0;
 
-    // Restore the selections. A goal that was just deleted simply loses its selection.
+    // Apply the selections: the duplicates after a copy, the previous selection otherwise. A goal
+    // that was just deleted simply loses its selection.
     selection.advancement = nullptr;
     selection.stat = nullptr;
     selection.ms_goal = nullptr;
@@ -4943,10 +4972,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         focus_tc_search_box = true;
     }
 
-    // Handle Ctrl+Z / Cmd+Z to revert changes
-    if (t && t->is_temp_creator_focused && editor_has_unsaved_changes && !ImGui::IsAnyItemActive() &&
-        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
-        ImGui::IsKeyPressed(ImGuiKey_Z)) {
+    // Revert changes (Ctrl+Z / Cmd+Z by default, rebindable in Settings > Hotkeys)
+    if (t && t->editor_revert_pressed && t->is_temp_creator_focused && editor_has_unsaved_changes) {
         // Capture the current selection by root_name before the copy-assignment below
         // invalidates the pointers, so the same goal stays open after reverting.
         char prev_adv[192] = "", prev_stat[192] = "", prev_ms[192] = "";
@@ -4988,11 +5015,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Handle Ctrl+S / Cmd+S to save
-    if (t && t->is_temp_creator_focused && editing_template &&
-        !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) &&
-        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
-        ImGui::IsKeyPressed(ImGuiKey_S)) {
+    // Save (Ctrl+S / Cmd+S by default, rebindable in Settings > Hotkeys)
+    if (t && t->editor_save_pressed && t->is_temp_creator_focused && editing_template) {
         // Finalize any active field first (its deactivation callback runs this frame), then save
         // next frame so pending rename propagation lands before the saved snapshot is taken.
         ImGui::ClearActiveID();
@@ -8445,6 +8469,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
+                    // The "next/previous goal" hotkeys step through the list exactly as it is shown,
+                    // search filter included. The row loop below picks the request up, selects that
+                    // entry and scrolls it into view.
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !advancements_to_render.empty()) {
+                        int current = -1;
+                        for (int i = 0; i < (int) advancements_to_render.size(); i++) {
+                            if (advancements_to_render[i] == selected_advancement) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) advancements_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(advancements_to_render[next]->root_name);
+                    }
+
                     for (size_t i = 0; i < advancements_to_render.size(); ++i) {
                         auto &advancement = *advancements_to_render[i];
                         int adv_real_i = (int) (&advancement - &current_template_data.advancements[0]);
@@ -11013,6 +11054,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
+                    // Step through the list on screen (see the advancements tab for the details).
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !stats_to_render.empty()) {
+                        int current = -1;
+                        for (int i = 0; i < (int) stats_to_render.size(); i++) {
+                            if (stats_to_render[i] == selected_stat) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) stats_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(stats_to_render[next]->root_name);
+                    }
+
                     for (size_t i = 0; i < stats_to_render.size(); i++) {
                         auto &stat = *stats_to_render[i];
                         int stat_real_i = (int) (&stat - &current_template_data.stats[0]);
@@ -13363,6 +13419,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
+                    // Step through the list on screen (see the advancements tab for the details).
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !unlocks_to_render.empty()) {
+                        const EditorTrackableItem *selected_ptr = nullptr;
+                        if (selected_unlock_index >= 0 &&
+                            selected_unlock_index < (int) current_template_data.unlocks.size()) {
+                            selected_ptr = &current_template_data.unlocks[selected_unlock_index];
+                        }
+                        int current = -1;
+                        for (int i = 0; i < (int) unlocks_to_render.size(); i++) {
+                            if (unlocks_to_render[i] == selected_ptr) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) unlocks_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(unlocks_to_render[next]->root_name);
+                    }
+
                     for (size_t i = 0; i < unlocks_to_render.size(); ++i) {
                         auto &unlock = *unlocks_to_render[i];
                         int unl_real_i = (int) (&unlock - &current_template_data.unlocks[0]);
@@ -14281,6 +14357,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(tip, sizeof(tip), "Clear the custom goal selection.");
                             ImGui::SetTooltip("%s", tip);
                         }
+                    }
+
+                    // Step through the list on screen (see the advancements tab for the details).
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !goals_to_render.empty()) {
+                        const EditorTrackableItem *selected_ptr = nullptr;
+                        if (selected_custom_index >= 0 &&
+                            selected_custom_index < (int) current_template_data.custom_goals.size()) {
+                            selected_ptr = &current_template_data.custom_goals[selected_custom_index];
+                        }
+                        int current = -1;
+                        for (int i = 0; i < (int) goals_to_render.size(); i++) {
+                            if (goals_to_render[i] == selected_ptr) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) goals_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(goals_to_render[next]->root_name);
                     }
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
@@ -15556,6 +15652,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(tip, sizeof(tip), "Clear the multi-stage goal selection.");
                             ImGui::SetTooltip("%s", tip);
                         }
+                    }
+
+                    // Step through the list on screen (see the advancements tab for the details).
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !goals_to_render.empty()) {
+                        int current = -1;
+                        for (int i = 0; i < (int) goals_to_render.size(); i++) {
+                            if (goals_to_render[i] == selected_ms_goal) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) goals_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(goals_to_render[next]->root_name);
                     }
 
                     for (size_t i = 0; i < goals_to_render.size(); ++i) {
@@ -17893,6 +18004,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
 
+                    // Step through the list on screen (see the advancements tab for the details).
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed) &&
+                        !counters_to_render.empty()) {
+                        const EditorCounterGoal *selected_ptr = nullptr;
+                        if (selected_counter_index >= 0 &&
+                            selected_counter_index < (int) current_template_data.counter_goals.size()) {
+                            selected_ptr = &current_template_data.counter_goals[selected_counter_index];
+                        }
+                        int current = -1;
+                        for (int i = 0; i < (int) counters_to_render.size(); i++) {
+                            if (counters_to_render[i] == selected_ptr) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) counters_to_render.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) request_scroll_to_new_goal(counters_to_render[next]->root_name);
+                    }
+
                     for (size_t i = 0; i < counters_to_render.size(); ++i) {
                         auto &counter = *counters_to_render[i];
                         int ctr_real_i = (int) (&counter - &current_template_data.counter_goals[0]);
@@ -18718,6 +18849,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char tip[128];
                             snprintf(tip, sizeof(tip), "Clear the decoration selection.");
                             ImGui::SetTooltip("%s", tip);
+                        }
+                    }
+
+                    // Step through the list on screen (see the advancements tab for the details).
+                    // Decorations render straight from the template with the filter applied inline,
+                    // so the visible order is collected here.
+                    if (t && (t->editor_next_goal_pressed || t->editor_prev_goal_pressed)) {
+                        std::vector<int> visible_decos;
+                        for (int i = 0; i < (int) current_template_data.decorations.size(); i++) {
+                            if (is_deco_search_active && !deco_matches_search(current_template_data.decorations[i]))
+                                continue;
+                            visible_decos.push_back(i);
+                        }
+                        int current = -1;
+                        for (int i = 0; i < (int) visible_decos.size(); i++) {
+                            if (visible_decos[i] == selected_deco_index) {
+                                current = i;
+                                break;
+                            }
+                        }
+                        int next = tc_step_list_index(current, (int) visible_decos.size(),
+                                                      t->editor_next_goal_pressed);
+                        if (next >= 0) {
+                            request_scroll_to_new_goal(current_template_data.decorations[visible_decos[next]].id);
                         }
                     }
 

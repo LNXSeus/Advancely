@@ -90,6 +90,12 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->visual_toggle_goal_hidden_pressed = false;
     t->visual_delete_pressed = false;
     t->visual_copy_pressed = false;
+    t->editor_save_pressed = false;
+    t->editor_revert_pressed = false;
+    t->settings_apply_pressed = false;
+    t->settings_revert_pressed = false;
+    t->editor_next_goal_pressed = false;
+    t->editor_prev_goal_pressed = false;
     t->template_editor_has_unsaved_changes = false;
     t->template_editor_is_editing = false;
     t->settings_has_unsaved_changes = false;

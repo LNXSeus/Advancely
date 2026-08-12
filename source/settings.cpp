@@ -1313,11 +1313,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Communicate settings unsaved state to tracker for quit confirmation popup
     if (t) t->settings_has_unsaved_changes = has_unsaved_changes;
 
-    // Revert Changes -> Ctrl+Z / Cmd+Z hotkey logic
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && has_unsaved_changes && !
-        ImGui::IsAnyItemActive() &&
-        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
-        ImGui::IsKeyPressed(ImGuiKey_Z)) {
+    // Revert Changes (Ctrl+Z / Cmd+Z by default, rebindable in the Hotkeys tab)
+    if (t && t->settings_revert_pressed && has_unsaved_changes &&
+        ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
         memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
         coop_identity_status_msg[0] = '\0';
         coop_identity_status_is_error = false;
@@ -7282,15 +7280,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // Apply a finished capture. Unlike counter hotkeys, only Escape clears a row here, so
             // Delete and Backspace stay bindable (Delete is a default binding).
             if (capturing_app_action >= 0 && SDL_GetAtomicInt(&g_hotkey_capture_armed) == 0) {
-                int captured = SDL_GetAtomicInt(&g_hotkey_captured_scancode);
+                // The keycap, not the physical key: these bindings are named ones like Ctrl+Z, and
+                // they should stay on the key that carries that letter on any keyboard layout.
+                int captured = SDL_GetAtomicInt(&g_hotkey_captured_keycode);
                 AppHotkey *hk = &temp_settings.app_hotkeys[capturing_app_action];
                 if (captured == 0) {
                     strcpy(hk->key, "None");
                     hk->mods = HOTKEY_MOD_NONE;
                 } else {
-                    const char *sc_name = SDL_GetScancodeName((SDL_Scancode) captured);
-                    if (sc_name && sc_name[0] != '\0') {
-                        strncpy(hk->key, sc_name, sizeof(hk->key) - 1);
+                    const char *key_name = SDL_GetKeyName((SDL_Keycode) captured);
+                    if (key_name && key_name[0] != '\0') {
+                        strncpy(hk->key, key_name, sizeof(hk->key) - 1);
                         hk->key[sizeof(hk->key) - 1] = '\0';
                         hk->mods = (Uint16) SDL_GetAtomicInt(&g_hotkey_captured_mods);
                     }
@@ -7308,6 +7308,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "clear the binding, which turns that shortcut off.\n\n"
                          "These are always window-focused: unlike the custom counter hotkeys above,\n"
                          "they cannot be handed to the operating system.\n\n"
+                         "They follow the letter printed on the key, so Ctrl+Z is the same keycap on\n"
+                         "every keyboard layout. The counter hotkeys above bind the physical key instead.\n\n"
                          "Two shortcuts may share a key as long as they belong to windows or modes\n"
                          "that are never active at the same time.");
                 ImGui::SetTooltip("%s", app_hotkey_tooltip_buffer);
@@ -7336,6 +7338,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             auto app_same_combo = [](const char *key_a, Uint16 mods_a,
                                      const char *key_b, Uint16 mods_b) -> bool {
                 return strcmp(key_a, key_b) == 0 && mods_a == mods_b;
+            };
+            // Counter hotkeys store the physical key while the shortcuts below store the keycap, so
+            // one of the two has to be translated before they can be compared. Without it a real
+            // clash on a non-US layout would go unnoticed, and an imaginary one would be reported.
+            auto counter_key_as_keycap = [](const char *stored, char *buf, size_t buf_size) -> const char * {
+                snprintf(buf, buf_size, "%s", stored ? stored : "");
+                SDL_Scancode sc = SDL_GetScancodeFromName(buf);
+                if (sc == SDL_SCANCODE_UNKNOWN) return buf;
+                const char *name = SDL_GetKeyName(SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false));
+                if (name && name[0] != '\0') snprintf(buf, buf_size, "%s", name);
+                return buf;
             };
 
             AppHotkeyGroup current_group = APP_HOTKEY_GROUP_COUNT;
@@ -7371,6 +7384,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     capturing_slot = -1;
                     capturing_target_goal[0] = '\0';
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                    SDL_SetAtomicInt(&g_hotkey_captured_keycode, 0);
                     SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                     // Armed as 2 so the event handler knows Delete and Backspace are bindable here.
                     SDL_SetAtomicInt(&g_hotkey_capture_armed, 2);
@@ -7422,7 +7436,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     const HotkeyBinding *hb = &temp_settings.hotkeys[k];
                     Uint16 counter_contexts = hb->is_global
                                                   ? (Uint16) APP_HOTKEY_CTX_ALL
-                                                  : (Uint16) APP_HOTKEY_CTX_TRACKER;
+                                                  : (Uint16) APP_HOTKEY_CTX_COUNTER_HOTKEYS;
                     if ((counter_contexts & def->contexts) == 0) continue;
 
                     // Show the counter under the name the user sees in the list above when the
@@ -7435,12 +7449,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                     }
 
+                    char inc_keycap[64];
+                    char dec_keycap[64];
+                    counter_key_as_keycap(hb->increment_key, inc_keycap, sizeof(inc_keycap));
+                    counter_key_as_keycap(hb->decrement_key, dec_keycap, sizeof(dec_keycap));
+
                     if (app_slot_bound(hb->increment_key) &&
-                        app_same_combo(hk->key, hk->mods, hb->increment_key, hb->increment_mods)) {
+                        app_same_combo(hk->key, hk->mods, inc_keycap, hb->increment_mods)) {
                         snprintf(conflict, sizeof(conflict),
                                  "collides with the increment hotkey of the counter \"%s\"", counter_name);
                     } else if (app_slot_bound(hb->decrement_key) &&
-                               app_same_combo(hk->key, hk->mods, hb->decrement_key, hb->decrement_mods)) {
+                               app_same_combo(hk->key, hk->mods, dec_keycap, hb->decrement_mods)) {
                         snprintf(conflict, sizeof(conflict),
                                  "collides with the decrement hotkey of the counter \"%s\"", counter_name);
                     }
@@ -7541,9 +7560,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
     // Start of Bottom Buttons
 
-    const bool ctrl_s_pressed = !ImGui::IsAnyItemActive() &&
-                                (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
-                                ImGui::IsKeyPressed(ImGuiKey_S);
+    // Apply Settings (Ctrl+S / Cmd+S by default, rebindable in the Hotkeys tab)
+    const bool ctrl_s_pressed = (t && t->settings_apply_pressed);
     const bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive();
     const bool window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     const bool no_popup_open = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);

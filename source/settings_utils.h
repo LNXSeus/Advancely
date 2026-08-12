@@ -389,18 +389,25 @@ bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_re
 // Where an application hotkey is allowed to fire. Two bindings only collide when their contexts
 // overlap, so the same key can mean one thing on the normal tracker map and another one while the
 // Visual Layout Editor is running.
-#define APP_HOTKEY_CTX_TRACKER 0x01u // Tracker map, Visual Layout Editor off. Counter hotkeys live here too.
+#define APP_HOTKEY_CTX_TRACKER 0x01u // Tracker map, Visual Layout Editor off.
 #define APP_HOTKEY_CTX_VISUAL 0x02u // Tracker map, Visual Layout Editor on.
 #define APP_HOTKEY_CTX_EDITOR 0x04u // Template editor window.
-#define APP_HOTKEY_CTX_OVERLAY 0x08u // Overlay window.
-#define APP_HOTKEY_CTX_ALL (APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | \
-                            APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_OVERLAY)
+#define APP_HOTKEY_CTX_SETTINGS 0x08u // Settings window.
+#define APP_HOTKEY_CTX_OVERLAY 0x10u // Overlay window.
+#define APP_HOTKEY_CTX_ALL (APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR | \
+                            APP_HOTKEY_CTX_SETTINGS | APP_HOTKEY_CTX_OVERLAY)
+
+// The settings and template editor windows live inside the tracker window, and a counter hotkey
+// fires there as long as no text field has focus. Only visual layout editing switches them off.
+#define APP_HOTKEY_CTX_COUNTER_HOTKEYS (APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_EDITOR | \
+                                        APP_HOTKEY_CTX_SETTINGS)
 
 // Headings the Hotkeys tab groups the rows under.
 typedef enum {
     APP_HOTKEY_GROUP_TRACKER = 0,
     APP_HOTKEY_GROUP_VISUAL,
     APP_HOTKEY_GROUP_EDITOR,
+    APP_HOTKEY_GROUP_SETTINGS,
     APP_HOTKEY_GROUP_OVERLAY,
     APP_HOTKEY_GROUP_COUNT
 } AppHotkeyGroup;
@@ -478,6 +485,35 @@ extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
       "and all, so the copy starts out exactly on top of the original.\n" \
       "Each copy gets the usual \"_copy\" id, counting up when that one is taken.\n" \
       "The copies appear in the template editor and show up on the map once you save.") \
+    X(APP_HOTKEY_EDITOR_NEXT_GOAL, "editor_next_goal", "Tab", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Select Next Goal in List", \
+      "Moves the selection one entry down in the list of the open tab, following the search\n" \
+      "filter and stopping at the last entry. Holding repeats.") \
+    X(APP_HOTKEY_EDITOR_PREV_GOAL, "editor_prev_goal", "Tab", HOTKEY_MOD_CTRL | HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Select Previous Goal in List", \
+      "Moves the selection one entry up in the list of the open tab, following the search\n" \
+      "filter and stopping at the first entry. Holding repeats.") \
+    X(APP_HOTKEY_EDITOR_SAVE, "editor_save", "S", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Save Template", \
+      "Saves the template open in the editor, like the \"Save\" button.\n" \
+      "Pressing Enter with the editor focused saves as well and is not configurable.") \
+    X(APP_HOTKEY_EDITOR_REVERT, "editor_revert", "Z", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Revert Changes", \
+      "Discards the editor's unsaved changes and reloads the last saved state,\n" \
+      "like the \"Revert Changes\" button.") \
+    X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
+      "Apply Settings", \
+      "Applies the settings, like the \"Apply Settings\" button.\n" \
+      "Pressing Enter with the settings window focused applies as well and is not configurable.") \
+    X(APP_HOTKEY_SETTINGS_REVERT, "settings_revert", "Z", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
+      "Revert Changes", \
+      "Puts every setting back to the last applied state, like the \"Revert Changes\" button.") \
     X(APP_HOTKEY_OVERLAY_ADVANCE, "overlay_advance", "Space", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_OVERLAY, APP_HOTKEY_GROUP_OVERLAY, \
       "Advance / Speed Up", \
@@ -505,8 +541,11 @@ typedef struct {
 extern const AppHotkeyDef APP_HOTKEY_DEFS[APP_HOTKEY_COUNT];
 
 // One configured binding. "None" (or an empty string) means the action has no key at all.
+// Unlike the counter hotkeys, which store the physical key (a US-layout scancode name), these store
+// the key as it is labeled on the user's keyboard. Ctrl+Z stays Ctrl+Z on a QWERTZ layout instead of
+// wandering to the key next to it, which is what matters for shortcuts everybody knows by name.
 typedef struct {
-    char key[32]; // US-layout scancode name, matching how counter hotkeys are stored.
+    char key[32]; // SDL key name, layout-dependent (SDL_GetKeyName / SDL_GetKeyFromName).
     Uint16 mods; // HOTKEY_MOD_* bitmask.
 } AppHotkey;
 
@@ -945,24 +984,21 @@ void app_hotkeys_set_defaults(AppSettings *settings);
 bool app_hotkeys_different(const AppSettings *a, const AppSettings *b);
 
 /**
- * @brief True when this action is bound to the given physical key and exact modifier set.
+ * @brief True when this action is bound to the given key and exact modifier set.
  *
  * Modifiers must match exactly, including the empty set, so a bare "V" binding does not also
  * swallow Shift+V. An unbound ("None") action never matches.
  *
  * @param settings  The settings copy holding the bindings.
  * @param action    The action to test.
- * @param scancode  The SDL scancode of the pressed key.
+ * @param key       The SDL keycode of the pressed key, straight from the key event.
  * @param held_mods HOTKEY_MOD_* bitmask of the modifiers held down.
  */
 bool app_hotkey_matches(const AppSettings *settings, AppHotkeyAction action,
-                        SDL_Scancode scancode, Uint16 held_mods);
+                        SDL_Keycode key, Uint16 held_mods);
 
 /**
- * @brief Writes the label shown on a binding's button ("Shift+V", "None") into buf.
- *
- * The key part is translated to the user's keyboard layout, so an EU keyboard shows the key
- * that physically has to be pressed rather than its US name. Returns buf.
+ * @brief Writes the label shown on a binding's button ("Shift+V", "None") into buf. Returns buf.
  */
 const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_size);
 

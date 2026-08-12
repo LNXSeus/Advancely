@@ -308,6 +308,30 @@
 			"key":	"C",
 			"mods":	1
 		},
+		"editor_next_goal":	{
+			"key":	"Tab",
+			"mods":	1
+		},
+		"editor_prev_goal":	{
+			"key":	"Tab",
+			"mods":	3
+		},
+		"editor_save":	{
+			"key":	"S",
+			"mods":	1
+		},
+		"editor_revert":	{
+			"key":	"Z",
+			"mods":	1
+		},
+		"settings_apply":	{
+			"key":	"S",
+			"mods":	1
+		},
+		"settings_revert":	{
+			"key":	"Z",
+			"mods":	1
+		},
 		"overlay_advance":	{
 			"key":	"Space",
 			"mods":	0

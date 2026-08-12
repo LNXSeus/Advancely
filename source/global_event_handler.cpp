@@ -123,6 +123,18 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
     // create one event out of tracker->event and overlay->event
     SDL_Event event;
 
+    // One-shot hotkeys for the windows that render later this frame. Clearing them here, before any
+    // event is read, means a press nobody picks up is gone by the next frame instead of firing into
+    // a window that only opens later.
+    if (t) {
+        t->editor_save_pressed = false;
+        t->editor_revert_pressed = false;
+        t->settings_apply_pressed = false;
+        t->settings_revert_pressed = false;
+        t->editor_next_goal_pressed = false;
+        t->editor_prev_goal_pressed = false;
+    }
+
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL3_ProcessEvent(&event);
 
@@ -176,9 +188,11 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                                               sc == SDL_SCANCODE_DELETE));
                 if (clears_binding) {
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0); // Clear to "None"
+                    SDL_SetAtomicInt(&g_hotkey_captured_keycode, 0);
                     SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
                 } else {
                     SDL_SetAtomicInt(&g_hotkey_captured_scancode, (int) sc);
+                    SDL_SetAtomicInt(&g_hotkey_captured_keycode, (int) event.key.key);
                     SDL_SetAtomicInt(&g_hotkey_captured_mods,
                                      (int) hotkey_mods_from_sdl(SDL_GetModState()));
                 }
@@ -259,14 +273,44 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         if (event.type == SDL_EVENT_KEY_DOWN && t && t->window &&
             event.key.windowID == SDL_GetWindowID(t->window) &&
             !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
-            SDL_Scancode sc = event.key.scancode;
+            // The keycode, not the scancode: these bindings follow the keycap, so Ctrl+Z stays on
+            // the key labeled Z no matter the keyboard layout.
+            SDL_Keycode key = event.key.key;
             Uint16 app_mods = hotkey_mods_from_sdl(event.key.mod);
 
+            // Save, apply and revert. Which window acts on them is decided where they are consumed,
+            // by the same focus and enabled checks the buttons themselves use.
             if (event.key.repeat == 0) {
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, sc, app_mods)) {
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_SAVE, key, app_mods)) {
+                    t->editor_save_pressed = true;
+                }
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_REVERT, key, app_mods)) {
+                    t->editor_revert_pressed = true;
+                }
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_APPLY, key, app_mods)) {
+                    t->settings_apply_pressed = true;
+                }
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_REVERT, key, app_mods)) {
+                    t->settings_revert_pressed = true;
+                }
+            }
+
+            // Editor list navigation repeats, so holding the key walks through the list. It belongs
+            // to the template editor alone, so unlike the others it is gated on its focus here.
+            if (t->is_temp_creator_focused) {
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_NEXT_GOAL, key, app_mods)) {
+                    t->editor_next_goal_pressed = true;
+                }
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_PREV_GOAL, key, app_mods)) {
+                    t->editor_prev_goal_pressed = true;
+                }
+            }
+
+            if (event.key.repeat == 0) {
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, key, app_mods)) {
                     // A few frames of grace so the request survives the editor window opening.
                     t->toggle_visual_editing_request_ttl = 5;
-                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, sc, app_mods)) {
+                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, key, app_mods)) {
                     t->temp_creator_window_open = !t->temp_creator_window_open;
                 }
             }
@@ -275,28 +319,28 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             // frame move the selection diagonally.
             if (t->is_visual_layout_editing) {
                 if (event.key.repeat == 0) {
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, sc, app_mods)) {
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, key, app_mods)) {
                         t->visual_toggle_layout_hidden_pressed = true;
                     }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, sc, app_mods)) {
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, key, app_mods)) {
                         t->visual_toggle_goal_hidden_pressed = true;
                     }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_DELETE_SELECTION, sc, app_mods)) {
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_DELETE_SELECTION, key, app_mods)) {
                         t->visual_delete_pressed = true;
                     }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_COPY_SELECTION, sc, app_mods)) {
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_COPY_SELECTION, key, app_mods)) {
                         t->visual_copy_pressed = true;
                     }
                 }
 
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_LEFT, sc, app_mods)) t->pending_visual_move_x -= 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_RIGHT, sc, app_mods)) t->pending_visual_move_x += 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_UP, sc, app_mods)) t->pending_visual_move_y -= 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_DOWN, sc, app_mods)) t->pending_visual_move_y += 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_LEFT, sc, app_mods)) t->pending_visual_move_x -= 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_RIGHT, sc, app_mods)) t->pending_visual_move_x += 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_UP, sc, app_mods)) t->pending_visual_move_y -= 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_DOWN, sc, app_mods)) t->pending_visual_move_y += 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_LEFT, key, app_mods)) t->pending_visual_move_x -= 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_RIGHT, key, app_mods)) t->pending_visual_move_x += 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_UP, key, app_mods)) t->pending_visual_move_y -= 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_DOWN, key, app_mods)) t->pending_visual_move_y += 1.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_LEFT, key, app_mods)) t->pending_visual_move_x -= 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_RIGHT, key, app_mods)) t->pending_visual_move_x += 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_UP, key, app_mods)) t->pending_visual_move_y -= 10.0f;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_DOWN, key, app_mods)) t->pending_visual_move_y += 10.0f;
             }
         }
 

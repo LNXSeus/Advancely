@@ -134,6 +134,15 @@ struct Tracker {
     bool visual_toggle_goal_hidden_pressed;
     bool visual_delete_pressed;
     bool visual_copy_pressed;
+    // Save/apply/revert hotkeys, consumed by whichever window owns them. They are cleared at the
+    // start of every event poll, so one that nobody picks up cannot fire a frame later.
+    bool editor_save_pressed;
+    bool editor_revert_pressed;
+    bool settings_apply_pressed;
+    bool settings_revert_pressed;
+    // Template editor list navigation, consumed by the tab that is open.
+    bool editor_next_goal_pressed;
+    bool editor_prev_goal_pressed;
     // Frames left for a pending "Toggle Visual Layout Editor" hotkey press. The template editor owns
     // the button's conditions and side effects, so the request is handed to it; it opens itself first
     // if it was closed. The short lifetime bridges the frames a freshly opened editor needs to pick

@@ -693,15 +693,17 @@ const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size) {
 
 #ifdef __APPLE__
     const char *alt_label = "Option";
+    const char *ctrl_label = "Cmd"; // Command triggers these bindings on macOS, so it is what we name
 #else
     const char *alt_label = "Alt";
+    const char *ctrl_label = "Ctrl";
 #endif
 
     // Fixed order so the same combo always renders identically, regardless of press order.
     size_t len = 0;
     const char *parts[3] = {nullptr, nullptr, nullptr};
     int part_count = 0;
-    if (mods & HOTKEY_MOD_CTRL) parts[part_count++] = "Ctrl";
+    if (mods & HOTKEY_MOD_CTRL) parts[part_count++] = ctrl_label;
     if (mods & HOTKEY_MOD_ALT) parts[part_count++] = alt_label;
     if (mods & HOTKEY_MOD_SHIFT) parts[part_count++] = "Shift";
 
@@ -772,6 +774,11 @@ bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_re
 Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
     Uint16 mods = HOTKEY_MOD_NONE;
     if (sdl_mods & SDL_KMOD_CTRL) mods |= HOTKEY_MOD_CTRL;
+#ifdef __APPLE__
+    // Command is what macOS uses where the other systems use Control, and the shortcuts here have
+    // always accepted it, so it maps onto the same bit rather than one of its own.
+    if (sdl_mods & SDL_KMOD_GUI) mods |= HOTKEY_MOD_CTRL;
+#endif
     if (sdl_mods & SDL_KMOD_SHIFT) mods |= HOTKEY_MOD_SHIFT;
     if (sdl_mods & SDL_KMOD_ALT) mods |= HOTKEY_MOD_ALT;
     return mods;
@@ -783,6 +790,7 @@ const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT] = {
     "Tracker Window",
     "Visual Layout Editor",
     "Template Editor",
+    "Settings Window",
     "Overlay Window"
 };
 
@@ -816,12 +824,12 @@ bool app_hotkeys_different(const AppSettings *a, const AppSettings *b) {
 }
 
 bool app_hotkey_matches(const AppSettings *settings, AppHotkeyAction action,
-                        SDL_Scancode scancode, Uint16 held_mods) {
+                        SDL_Keycode key, Uint16 held_mods) {
     if (!settings || action < 0 || action >= APP_HOTKEY_COUNT) return false;
     const AppHotkey *hk = &settings->app_hotkeys[action];
     if (hk->key[0] == '\0' || strcmp(hk->key, "None") == 0) return false;
     if (held_mods != hk->mods) return false;
-    return SDL_GetScancodeFromName(hk->key) == scancode;
+    return SDL_GetKeyFromName(hk->key) == key;
 }
 
 const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_size) {
@@ -831,19 +839,10 @@ const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_
         return buf;
     }
 
-    // Stored names are US-layout scancode names. Round-tripping through the active layout shows
-    // the key the user actually has to press on a non-US keyboard.
-    const char *key_label = hk->key;
-    SDL_Scancode sc = SDL_GetScancodeFromName(hk->key);
-    if (sc != SDL_SCANCODE_UNKNOWN) {
-        SDL_Keycode kc = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
-        const char *name = SDL_GetKeyName(kc);
-        if (name && name[0] != '\0') key_label = name;
-    }
-
+    // The stored name already is the keycap the user presses, so it needs no translation.
     char mod_prefix[64];
     hotkey_mods_to_prefix(hk->mods, mod_prefix, sizeof(mod_prefix));
-    snprintf(buf, buf_size, "%s%s", mod_prefix, key_label);
+    snprintf(buf, buf_size, "%s%s", mod_prefix, hk->key);
     return buf;
 }
 
