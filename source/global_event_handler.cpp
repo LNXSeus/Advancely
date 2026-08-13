@@ -306,12 +306,25 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 }
             }
 
+            // Template editing is off limits during a co-op session, which is why the Settings button
+            // that opens the editor is disabled then. These two hotkeys open it as well, so they obey
+            // the same rule. Only opening is blocked: closing the editor or leaving the visual editor
+            // stays possible whatever the lobby is doing.
+            CoopNetState app_hotkey_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool coop_session_active = (app_hotkey_net_state == COOP_NET_LISTENING ||
+                                        app_hotkey_net_state == COOP_NET_CONNECTED ||
+                                        app_hotkey_net_state == COOP_NET_CONNECTING);
+
             if (event.key.repeat == 0) {
                 if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, key, app_mods)) {
-                    // A few frames of grace so the request survives the editor window opening.
-                    t->toggle_visual_editing_request_ttl = 5;
+                    if (!coop_session_active || t->is_visual_layout_editing) {
+                        // A few frames of grace so the request survives the editor window opening.
+                        t->toggle_visual_editing_request_ttl = 5;
+                    }
                 } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, key, app_mods)) {
-                    t->temp_creator_window_open = !t->temp_creator_window_open;
+                    if (!coop_session_active || t->temp_creator_window_open) {
+                        t->temp_creator_window_open = !t->temp_creator_window_open;
+                    }
                 }
             }
 

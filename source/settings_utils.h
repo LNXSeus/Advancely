@@ -427,11 +427,13 @@ extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
       "\"Edit Template\", and starts editing, as long as a valid Minecraft saves folder is tracked.\n" \
       "An editing session that is already open is never interrupted, so with unsaved changes or a\n" \
       "different template open the editor just comes to the front with the button greyed out,\n" \
-      "explaining what is missing.") \
+      "explaining what is missing.\n" \
+      "Does nothing during a Co-op session, where template editing is disabled.") \
     X(APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, "toggle_template_editor", "E", HOTKEY_MOD_SHIFT, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_TRACKER, \
       "Toggle Template Editor Window", \
-      "Opens or closes the template editor window.") \
+      "Opens or closes the template editor window.\n" \
+      "Cannot open it during a Co-op session, where template editing is disabled.") \
     X(APP_HOTKEY_NUDGE_LEFT, "nudge_left", "Left", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
       "Nudge Selection Left (1 px)", "Moves every selected element one pixel to the left. Holding repeats.") \
