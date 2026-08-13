@@ -105,6 +105,7 @@ SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to 
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
+SDL_AtomicInt g_template_preview_changed;
 SDL_AtomicInt g_settings_resync_from_app;
 // Signal that an app-initiated change (e.g. Template Creator deleting the in-use template/language/layout)
 // wrote straight into app_settings; the open Settings window should re-seed its editing buffers WITHOUT
@@ -2473,6 +2474,7 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_game_data_changed, 1);
         SDL_SetAtomicInt(&g_apply_button_clicked, 0);
         SDL_SetAtomicInt(&g_templates_changed, 0);
+        SDL_SetAtomicInt(&g_template_preview_changed, 0);
 
         // HARDCODED SETTINGS DIRECTORY WATCHER
         // We only watch the default config directory if we are NOT using a custom file.
@@ -2955,6 +2957,16 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+
+            // The template editor changed its unsaved template while the Visual Layout Editor is open,
+            // or dropped the preview again. Only the template data has to be rebuilt: paths, settings
+            // and the file watchers are all unaffected, so this deliberately skips the heavy
+            // g_settings_changed path below and just reparses.
+            if (SDL_SetAtomicInt(&g_template_preview_changed, 0) == 1) {
+                tracker_reinit_template(tracker, &app_settings);
+                // The rebuilt goals start out empty, so read the player's progress back into them.
+                SDL_SetAtomicInt(&g_needs_update, 1);
+            }
 
             // Check if settings.json has been modified (by UI or external editor)
             // Single point of truth for tracker data, triggered by "Apply" button

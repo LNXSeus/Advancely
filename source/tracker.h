@@ -721,6 +721,39 @@ const VisualEditItem *tracker_get_visual_edit_items(void);
  */
 void tracker_clear_visual_edit_request(void);
 
+// --- Live template preview (Template Editor -> Tracker) ---
+// While the Visual Layout Editor is open the editor can hand the tracker its unsaved template, so
+// structural edits (copy, delete) show up on the map immediately instead of only after a save. The
+// override replaces the three files the tracker would otherwise read; everything downstream of the
+// parse is unchanged, which is what keeps the two copies of the template consistent.
+
+/**
+ * @brief Makes the tracker parse these JSON trees instead of the template/lang/layout files.
+ *
+ * Takes ownership of all three (lang and layout may be nullptr). Replaces any previous override.
+ * The caller still has to trigger a reload for the change to take effect.
+ */
+void tracker_set_live_template_override(cJSON *template_json, cJSON *lang_json, cJSON *layout_json);
+
+/**
+ * @brief Drops the override so the next reload reads the files on disk again.
+ */
+void tracker_clear_live_template_override(void);
+
+/**
+ * @brief True while an override is set, i.e. the map may be showing unsaved template data.
+ */
+bool tracker_has_live_template_override(void);
+
+/**
+ * @brief Selects exactly these goals on the map as soon as they exist there.
+ *
+ * Used after a Copy, whose duplicates only appear once the map has reloaded. Every element of a
+ * matched goal is selected (icon, text, progress, or all points of a decoration), so the `element`
+ * field is ignored. Replaces the current selection; identities that never turn up are dropped.
+ */
+void tracker_request_visual_selection(const VisualEditItem *items, int count);
+
 /**
  * @brief Looks up the position an element currently renders at, in template-editor coordinates.
  *

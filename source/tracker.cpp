@@ -153,6 +153,49 @@ void tracker_request_clear_visual_selection(void) {
     s_visual_clear_selection_requested = true;
 }
 
+// Goals the template editor asked to be selected, waiting for the frame in which they exist on the
+// map. A Copy sets this: the duplicates are only there once the preview (or a save) has reloaded.
+static std::vector<VisualEditItem> s_visual_pending_selection;
+
+void tracker_request_visual_selection(const VisualEditItem *items, int count) {
+    s_visual_pending_selection.clear();
+    if (!items || count <= 0) return;
+    s_visual_pending_selection.assign(items, items + count);
+}
+
+// Unsaved template handed over by the template editor. While these are set, tracker_load_and_parse_data
+// parses copies of them instead of reading the template/lang/layout files, so the map shows the editor's
+// in-memory state. Cleared when the editor saves, reverts or closes.
+static cJSON *s_live_template_json = nullptr;
+static cJSON *s_live_lang_json = nullptr;
+static cJSON *s_live_layout_json = nullptr;
+
+void tracker_set_live_template_override(cJSON *template_json, cJSON *lang_json, cJSON *layout_json) {
+    tracker_clear_live_template_override();
+    s_live_template_json = template_json;
+    s_live_lang_json = lang_json;
+    s_live_layout_json = layout_json;
+}
+
+void tracker_clear_live_template_override(void) {
+    if (s_live_template_json) {
+        cJSON_Delete(s_live_template_json);
+        s_live_template_json = nullptr;
+    }
+    if (s_live_lang_json) {
+        cJSON_Delete(s_live_lang_json);
+        s_live_lang_json = nullptr;
+    }
+    if (s_live_layout_json) {
+        cJSON_Delete(s_live_layout_json);
+        s_live_layout_json = nullptr;
+    }
+}
+
+bool tracker_has_live_template_override(void) {
+    return s_live_template_json != nullptr;
+}
+
 // Two linked-goal identities refer to the same goal when type, root, parent, and stage all match.
 static bool visual_link_same(const CounterLinkedGoal &a, const CounterLinkedGoal &b) {
     return a.type == b.type &&
@@ -11704,6 +11747,33 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             s_visual_remap_after_reload = false;
         }
 
+        // A Copy asked for its duplicates to be selected. They exist as soon as the map has reloaded,
+        // which is this frame, so the selection moves off the originals and onto the new goals. Runs
+        // after the remap above on purpose: the request is newer than the selection it replaces.
+        if (!s_visual_pending_selection.empty()) {
+            std::unordered_set<ManualPos *> matched;
+            for (const auto &item: s_visual_layout_items) {
+                for (const auto &wanted: s_visual_pending_selection) {
+                    if (item.is_decoration != wanted.is_decoration) continue;
+                    // Every point of a decoration (both ends and each bend) carries its id, so
+                    // matching on that alone selects the whole thing.
+                    bool same = item.is_decoration
+                                    ? strcmp(item.link.root_name, wanted.link.root_name) == 0
+                                    : (item.linkable && visual_link_same(item.link, wanted.link));
+                    if (same) {
+                        matched.insert(item.pos);
+                        break;
+                    }
+                }
+            }
+            // Only give up the current selection once the new goals are actually on the map, so a
+            // request that arrives a frame early doesn't leave the user with nothing selected.
+            if (!matched.empty()) {
+                s_visual_selected_items = matched;
+                s_visual_pending_selection.clear();
+            }
+        }
+
         // Draw highlight around selected items
         for (const auto &item: s_visual_layout_items) {
             if (s_visual_selected_items.count(item.pos) > 0) {
@@ -11853,6 +11923,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->visual_delete_pressed = false;
         t->visual_copy_pressed = false;
         tracker_clear_visual_edit_request();
+        // Duplicates that never made it onto the map must not select themselves much later.
+        s_visual_pending_selection.clear();
     }
 
     // --- Cursor Reveal Ring ---
@@ -14270,9 +14342,28 @@ static void tracker_apply_layout_overlay(TemplateData *td, cJSON *layout_json) {
 }
 
 bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
-    log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
+    // The template editor's unsaved copy wins over the files while the Visual Layout Editor is open.
+    // Duplicated rather than consumed, because the override has to survive every reload until the
+    // editor drops it, while everything parsed here is deleted at the end of this function.
+    bool using_live_override = tracker_has_live_template_override();
 
-    cJSON *template_json = cJSON_from_file(t->advancement_template_path);
+    if (using_live_override) {
+        log_message(LOG_INFO, "[TRACKER] Loading unsaved template preview from the template editor.\n");
+    } else {
+        log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
+    }
+
+    cJSON *template_json = using_live_override
+                               ? cJSON_Duplicate(s_live_template_json, 1)
+                               : cJSON_from_file(t->advancement_template_path);
+
+    // A failed duplicate must not fall through into the "template file missing" recovery below,
+    // which would reset the user's settings to the defaults over a preview that never loaded.
+    if (using_live_override && !template_json) {
+        log_message(LOG_ERROR, "[TRACKER] Could not copy the unsaved template preview. Using the file instead.\n");
+        using_live_override = false;
+        template_json = cJSON_from_file(t->advancement_template_path);
+    }
 
     if (!template_json) {
         // --- TEMPLATE NOT FOUND & RECOVERY LOGIC ---
@@ -14344,7 +14435,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     }
 
     // Declare lang_json as a local variable, this prevents memory leaks
-    cJSON *lang_json = cJSON_from_file(t->lang_path);
+    cJSON *lang_json = using_live_override
+                           ? (s_live_lang_json ? cJSON_Duplicate(s_live_lang_json, 1) : nullptr)
+                           : cJSON_from_file(t->lang_path);
     if (!lang_json) {
         // Handle case where lang file might still be missing for some reason
         lang_json = cJSON_CreateObject();
@@ -14353,7 +14446,9 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     // Optional separate manual-layout file. When present it is authoritative for positions
     // and decorations; when absent, positions/decorations fall back to the template (inline),
     // preserving backwards compatibility. NULL simply means "no layout file".
-    cJSON *layout_json = cJSON_from_file(t->layout_path);
+    cJSON *layout_json = using_live_override
+                             ? (s_live_layout_json ? cJSON_Duplicate(s_live_layout_json, 1) : nullptr)
+                             : cJSON_from_file(t->layout_path);
 
     // Load settings.json to check for custom progress
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
@@ -14621,7 +14716,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         cJSON_Delete(new_hotkeys_array);
     }
 
-    if (save_needed) {
+    // An unsaved preview must not reach settings.json: goals that only exist in the editor would
+    // leave orphaned custom_progress and hotkey entries behind the moment the user reverts.
+    if (save_needed && using_live_override) {
+        log_message(LOG_INFO, "[TRACKER] Unsaved template preview: skipping the settings.json sync.\n");
+    } else if (save_needed) {
         log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
         // Atomically write the synchronized settings back to the file.
         if (!cJSON_write_to_file_atomic(get_settings_file_path(), settings_root)) {
@@ -14663,6 +14762,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 void tracker_free(Tracker **tracker, AppSettings *settings) {
     if (tracker && *tracker) {
         Tracker *t = *tracker;
+
+        tracker_clear_live_template_override();
 
         // Save view state to settings and write to disk before destroying data
         if (settings) {

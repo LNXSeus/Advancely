@@ -2544,9 +2544,11 @@ static void strip_inline_layout_from_template(cJSON *root) {
     cJSON_DeleteItemFromObject(root, "decorations");
 }
 
-static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
-                                      const std::string &lang_flag, const std::string &layout_flag,
-                                      EditorTemplate &editor_data, char *status_message_buffer) {
+// Builds the three file paths a template writes to, so the save path and the live preview always
+// agree on which files the editor's state corresponds to. Any of the outputs may be nullptr.
+static void build_editor_template_paths(const char *version, const DiscoveredTemplate &template_info,
+                                        const std::string &lang_flag, const std::string &layout_flag,
+                                        char *out_template, char *out_lang, char *out_layout) {
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
     version_filename[sizeof(version_filename) - 1] = '\0';
@@ -2556,28 +2558,34 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
 
-    char template_path[MAX_PATH_LENGTH];
-    snprintf(template_path, sizeof(template_path), "%s.json", base_path_str);
+    if (out_template) snprintf(out_template, MAX_PATH_LENGTH, "%s.json", base_path_str);
 
-    char lang_path[MAX_PATH_LENGTH];
-    char lang_suffix[70];
-    if (!lang_flag.empty()) {
-        snprintf(lang_suffix, sizeof(lang_suffix), "_%s", lang_flag.c_str());
-    } else {
-        lang_suffix[0] = '\0';
+    if (out_lang) {
+        char lang_suffix[70];
+        if (!lang_flag.empty()) {
+            snprintf(lang_suffix, sizeof(lang_suffix), "_%s", lang_flag.c_str());
+        } else {
+            lang_suffix[0] = '\0';
+        }
+        snprintf(out_lang, MAX_PATH_LENGTH, "%s_lang%s.json", base_path_str, lang_suffix);
     }
-    snprintf(lang_path, sizeof(lang_path), "%s_lang%s.json", base_path_str, lang_suffix);
 
     // Separate layout file (selected flag) used when this template stores its layout outside the template.
-    char layout_path[MAX_PATH_LENGTH];
-    char layout_suffix[70];
-    if (!layout_flag.empty()) {
-        snprintf(layout_suffix, sizeof(layout_suffix), "_%s", layout_flag.c_str());
-    } else {
-        layout_suffix[0] = '\0';
+    if (out_layout) {
+        char layout_suffix[70];
+        if (!layout_flag.empty()) {
+            snprintf(layout_suffix, sizeof(layout_suffix), "_%s", layout_flag.c_str());
+        } else {
+            layout_suffix[0] = '\0';
+        }
+        snprintf(out_layout, MAX_PATH_LENGTH, "%s_layout%s.json", base_path_str, layout_suffix);
     }
-    snprintf(layout_path, sizeof(layout_path), "%s_layout%s.json", base_path_str, layout_suffix);
+}
 
+// Serializes the editor's template into the JSON that gets written to the template file. Sections the
+// editor doesn't own are preserved by starting from the file on disk. Split out from the save so the
+// live preview can hand the tracker exactly what a save would produce, without writing anything.
+static cJSON *build_editor_template_json(const EditorTemplate &editor_data, const char *template_path) {
     // Read the existing file to preserve sections we aren't editing yet
     cJSON *root = cJSON_from_file(template_path);
     if (!root) {
@@ -2604,55 +2612,14 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     // inline positions/decorations from the template before writing so the two never diverge.
     strip_inline_layout_from_template(root);
 
-    // Write the modified JSON object back to the file
-    FILE *file = fopen(template_path, "w");
-    if (file) {
-        char *json_str = cJSON_Print(root);
-        if (json_str) {
-            fputs(json_str, file);
-            free(json_str);
-        }
-        fclose(file);
-        // No message here, returns true on success
-    } else {
-        snprintf(status_message_buffer, 256, "Error: Failed to open template file for writing.");
-        cJSON_Delete(root);
-        return false;
-    }
+    return root;
+}
 
-    cJSON_Delete(root);
-
-    // Write the manual-layout file when the template has any layout data (positions or
-    // decorations), pruned to the goals that actually exist. When there is none, remove any
-    // existing layout file so nothing stale is left behind. This auto-creates the _layout file
-    // on save without a separate "split" step.
-    {
-        cJSON *layout_json = build_editor_layout_json(editor_data);
-        cJSON *layout_deco = cJSON_GetObjectItem(layout_json, "decorations");
-        bool has_layout_data = cJSON_GetArraySize(layout_json) > 1 ||
-                               (layout_deco && cJSON_GetArraySize(layout_deco) > 0);
-        if (has_layout_data) {
-            FILE *layout_file = fopen(layout_path, "w");
-            if (layout_file) {
-                char *layout_str = cJSON_Print(layout_json);
-                if (layout_str) {
-                    fputs(layout_str, layout_file);
-                    free(layout_str);
-                }
-                fclose(layout_file);
-            } else {
-                snprintf(status_message_buffer, 256, "Error: Failed to open layout file for writing.");
-                cJSON_Delete(layout_json);
-                return false;
-            }
-        } else {
-            remove(layout_path); // no layout data: drop any stale layout file
-        }
-        cJSON_Delete(layout_json);
-    }
-
-
-    // SAVE LANG FILE WITH SPECIFIC ORDER
+// Builds the language file contents for the editor's template, in the same order a save writes them.
+// Split out from the save so the live preview can hand the tracker the display names of goals that
+// only exist in memory.
+static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
+    // LANG FILE WITH SPECIFIC ORDER
     cJSON *lang_json = cJSON_CreateObject();
 
     // 0. Display Category (only written when non-empty so absence falls back to auto-naming)
@@ -2734,6 +2701,108 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
             cJSON_AddStringToObject(lang_json, deco_lang_key, deco.display_text);
         }
     }
+
+    return lang_json;
+}
+
+// Hands the tracker the editor's unsaved template, so structural edits made on the map (a Ctrl+C
+// duplicate, a Delete) show up there immediately instead of only after a save. What is handed over is
+// exactly what a save would write, so the map can never drift from the file the user ends up with.
+static void tc_push_live_template_preview(const char *version, const DiscoveredTemplate &template_info,
+                                          const std::string &lang_flag, const std::string &layout_flag,
+                                          const EditorTemplate &editor_data) {
+    char template_path[MAX_PATH_LENGTH];
+    build_editor_template_paths(version, template_info, lang_flag, layout_flag,
+                                template_path, nullptr, nullptr);
+
+    cJSON *template_json = build_editor_template_json(editor_data, template_path);
+    cJSON *lang_json = build_editor_lang_json(editor_data);
+
+    // Mirror the save: a layout without any positions or decorations writes no layout file at all,
+    // so the preview hands over nothing either instead of an empty (and therefore authoritative,
+    // everything-back-to-automatic) layout.
+    cJSON *layout_json = build_editor_layout_json(editor_data);
+    cJSON *layout_deco = cJSON_GetObjectItem(layout_json, "decorations");
+    bool has_layout_data = cJSON_GetArraySize(layout_json) > 1 ||
+                           (layout_deco && cJSON_GetArraySize(layout_deco) > 0);
+    if (!has_layout_data) {
+        cJSON_Delete(layout_json);
+        layout_json = nullptr;
+    }
+
+    tracker_set_live_template_override(template_json, lang_json, layout_json);
+    SDL_SetAtomicInt(&g_template_preview_changed, 1);
+}
+
+// Puts the map back on the files on disk. Does nothing when no preview is active, so every exit path
+// (Save, Revert, leaving the visual editor) can call it without causing a needless reload.
+// trigger_reload is false when the caller already triggers one of its own.
+static void tc_drop_live_template_preview(bool trigger_reload) {
+    if (!tracker_has_live_template_override()) return;
+    tracker_clear_live_template_override();
+    if (trigger_reload) SDL_SetAtomicInt(&g_template_preview_changed, 1);
+}
+
+static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
+                                      const std::string &lang_flag, const std::string &layout_flag,
+                                      EditorTemplate &editor_data, char *status_message_buffer) {
+    char template_path[MAX_PATH_LENGTH];
+    char lang_path[MAX_PATH_LENGTH];
+    char layout_path[MAX_PATH_LENGTH];
+    build_editor_template_paths(version, template_info, lang_flag, layout_flag,
+                                template_path, lang_path, layout_path);
+
+    cJSON *root = build_editor_template_json(editor_data, template_path);
+
+    // Write the modified JSON object back to the file
+    FILE *file = fopen(template_path, "w");
+    if (file) {
+        char *json_str = cJSON_Print(root);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
+        fclose(file);
+        // No message here, returns true on success
+    } else {
+        snprintf(status_message_buffer, 256, "Error: Failed to open template file for writing.");
+        cJSON_Delete(root);
+        return false;
+    }
+
+    cJSON_Delete(root);
+
+    // Write the manual-layout file when the template has any layout data (positions or
+    // decorations), pruned to the goals that actually exist. When there is none, remove any
+    // existing layout file so nothing stale is left behind. This auto-creates the _layout file
+    // on save without a separate "split" step.
+    {
+        cJSON *layout_json = build_editor_layout_json(editor_data);
+        cJSON *layout_deco = cJSON_GetObjectItem(layout_json, "decorations");
+        bool has_layout_data = cJSON_GetArraySize(layout_json) > 1 ||
+                               (layout_deco && cJSON_GetArraySize(layout_deco) > 0);
+        if (has_layout_data) {
+            FILE *layout_file = fopen(layout_path, "w");
+            if (layout_file) {
+                char *layout_str = cJSON_Print(layout_json);
+                if (layout_str) {
+                    fputs(layout_str, layout_file);
+                    free(layout_str);
+                }
+                fclose(layout_file);
+            } else {
+                snprintf(status_message_buffer, 256, "Error: Failed to open layout file for writing.");
+                cJSON_Delete(layout_json);
+                return false;
+            }
+        } else {
+            remove(layout_path); // no layout data: drop any stale layout file
+        }
+        cJSON_Delete(layout_json);
+    }
+
+
+    cJSON *lang_json = build_editor_lang_json(editor_data);
 
     FILE *lang_file = fopen(lang_path, "w");
     if (lang_file) {
@@ -3165,6 +3234,18 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
     if (selection.deco_index >= 0 && selection.deco_index < (int) tpl.decorations.size())
         snprintf(sel_deco, sizeof(sel_deco), "%s", tpl.decorations[selection.deco_index].id);
 
+    // Identities of the duplicates, handed to the map afterwards so a Copy lands its selection on the
+    // new goals instead of leaving it on the originals they came from.
+    std::vector<VisualEditItem> map_selection;
+    auto remember_copy = [&](LinkedGoalType type, const char *root, const char *parent, bool is_decoration) {
+        VisualEditItem entry = {};
+        entry.link.type = type;
+        snprintf(entry.link.root_name, sizeof(entry.link.root_name), "%s", root);
+        if (parent) snprintf(entry.link.parent_root, sizeof(entry.link.parent_root), "%s", parent);
+        entry.is_decoration = is_decoration;
+        map_selection.push_back(entry);
+    };
+
     auto erase_by_root = [](auto &list, const char *root) -> bool {
         for (size_t i = 0; i < list.size(); i++) {
             if (strcmp(list[i].root_name, root) != 0) continue;
@@ -3205,9 +3286,11 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         for (auto &category: categories) {
             if (strcmp(category.root_name, item.link.parent_root) != 0) continue;
             if (copying) {
-                char ignored[192];
-                if (!copy_by_root(category.criteria, item.link.root_name, ignored, sizeof(ignored))) return false;
+                char new_child_root[192];
+                if (!copy_by_root(category.criteria, item.link.root_name, new_child_root, sizeof(new_child_root)))
+                    return false;
                 if (out_selected && out_size > 0) snprintf(out_selected, out_size, "%s", category.root_name);
+                remember_copy(item.link.type, new_child_root, category.root_name, false);
                 return true;
             }
             for (const auto &child: category.criteria) {
@@ -3222,7 +3305,11 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
     };
     auto handle_parent = [&](std::vector<EditorTrackableCategory> &categories, const VisualEditItem &item,
                              char *out_selected, size_t out_size) -> bool {
-        if (copying) return copy_by_root(categories, item.link.root_name, out_selected, out_size);
+        if (copying) {
+            if (!copy_by_root(categories, item.link.root_name, out_selected, out_size)) return false;
+            remember_copy(item.link.type, out_selected, nullptr, false);
+            return true;
+        }
         for (const auto &category: categories) {
             if (strcmp(category.root_name, item.link.root_name) != 0) continue;
             // Arrows pointing at the goal or any of its criteria would dangle otherwise.
@@ -3232,8 +3319,13 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
         }
         return erase_by_root(categories, item.link.root_name);
     };
-    auto handle_flat = [&](auto &list, const char *root, char *out_selected, size_t out_size) -> bool {
-        if (copying) return copy_by_root(list, root, out_selected, out_size);
+    auto handle_flat = [&](auto &list, const VisualEditItem &item, char *out_selected, size_t out_size) -> bool {
+        const char *root = item.link.root_name;
+        if (copying) {
+            if (!copy_by_root(list, root, out_selected, out_size)) return false;
+            remember_copy(item.link.type, out_selected, nullptr, false);
+            return true;
+        }
         clear_goal_links(tpl, root);
         return erase_by_root(list, root);
     };
@@ -3256,6 +3348,7 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
                     snprintf(duplicate.id, sizeof(duplicate.id), "%s", new_id);
                     tpl.decorations.insert(tpl.decorations.begin() + (long) i + 1, duplicate);
                     snprintf(sel_deco, sizeof(sel_deco), "%s", new_id);
+                    remember_copy(LINK_TYPE_ANY, new_id, nullptr, true);
                 } else {
                     tpl.decorations.erase(tpl.decorations.begin() + (long) i);
                 }
@@ -3280,16 +3373,16 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
                            : handle_parent(tpl.stats, item, sel_stat, sizeof(sel_stat));
                 break;
             case LINK_TYPE_UNLOCK:
-                done = handle_flat(tpl.unlocks, item.link.root_name, sel_unlock, sizeof(sel_unlock));
+                done = handle_flat(tpl.unlocks, item, sel_unlock, sizeof(sel_unlock));
                 break;
             case LINK_TYPE_CUSTOM:
-                done = handle_flat(tpl.custom_goals, item.link.root_name, sel_custom, sizeof(sel_custom));
+                done = handle_flat(tpl.custom_goals, item, sel_custom, sizeof(sel_custom));
                 break;
             case LINK_TYPE_MULTI_STAGE:
-                done = handle_flat(tpl.multi_stage_goals, item.link.root_name, sel_ms, sizeof(sel_ms));
+                done = handle_flat(tpl.multi_stage_goals, item, sel_ms, sizeof(sel_ms));
                 break;
             case LINK_TYPE_COUNTER:
-                done = handle_flat(tpl.counter_goals, item.link.root_name, sel_counter, sizeof(sel_counter));
+                done = handle_flat(tpl.counter_goals, item, sel_counter, sizeof(sel_counter));
                 break;
             default:
                 break;
@@ -3298,6 +3391,11 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
     }
 
     if (affected == 0) return 0;
+
+    // Hand the duplicates to the map, which selects them on the first frame they render.
+    if (!map_selection.empty()) {
+        tracker_request_visual_selection(map_selection.data(), (int) map_selection.size());
+    }
 
     // Apply the selections: the duplicates after a copy, the previous selection otherwise. A goal
     // that was just deleted simply loses its selection.
@@ -3357,8 +3455,12 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
 // the map, because this copy of the template is the one that gets saved.
 // For the two visibility hotkeys the whole selection ends up in the same state: as long as anything
 // in it is still visible, everything is hidden; once everything is hidden, they are shown again.
-// Returns true when something actually changed.
-static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection selection) {
+// Returns true when something actually changed. out_structural reports whether goals were added or
+// removed, which is what the map has to be told about; the visibility hotkeys change nothing there,
+// because layout editing shows everything anyway.
+static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection selection,
+                                         bool &out_structural) {
+    out_structural = false;
     VisualEditRequest request = tracker_get_visual_edit_request();
     if (request == VISUAL_EDIT_NONE) return false;
 
@@ -3388,12 +3490,12 @@ static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection 
         tracker_clear_visual_edit_request();
         int affected = tc_apply_visual_structure_request(tpl, selection, unique_targets, copying);
         if (affected == 0) return false;
+        out_structural = true;
 
         snprintf(s_visual_edit_message, sizeof(s_visual_edit_message),
-                 copying ? "Copied %d, save to see them" : "Deleted %d, save to apply", affected);
+                 copying ? "Copied %d, save to keep" : "Deleted %d, save to keep", affected);
         if (!copying) {
-            // The deleted goals are still on the map until the next save, so leaving them selected
-            // would invite a second Delete that silently does nothing.
+            // The deleted goals leave the map on the next reload, so their selection goes with them.
             tracker_request_clear_visual_selection();
         }
         return true;
@@ -3722,6 +3824,11 @@ static bool validate_and_save_template(const char *creator_version_str,
                 write_pending_lang_imports(creator_version_str, selected_template_info, *pending_lang_imports);
                 pending_lang_imports->clear();
             }
+
+            // The files now hold what the preview was showing, so the map goes back to reading them.
+            // The reload below already covers the active template; only a template the tracker isn't
+            // on needs one of its own (and can't have a preview in the first place).
+            tc_drop_live_template_preview(!is_active_template);
 
             if (is_active_template) {
                 // Signal the main loop to reload the tracker data
@@ -4196,6 +4303,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // remembered (the editing_template state below persists for the next open).
             t->template_editor_is_editing = false;
         }
+        // A preview of unsaved goals must never outlive the window that owns it.
+        tc_drop_live_template_preview(true);
         was_open_last_frame = false;
         return;
     }
@@ -4819,6 +4928,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         t->template_editor_is_editing = editing_template;
     }
 
+    // The unsaved-template preview belongs to the Visual Layout Editor. Whenever that is not running
+    // (stopped, template closed, another template opened), the map goes back to the files on disk.
+    // One check here covers every one of those exits instead of a drop at each of them.
+    if (!(t && editing_template && t->is_visual_layout_editing)) {
+        tc_drop_live_template_preview(true);
+    }
+
     // While editing, the editor owns the applied template: force the tracker + Settings dropdowns
     // (which are disabled while editing) to follow whatever template/language/layout is open here.
     if (t && editing_template) {
@@ -4991,6 +5107,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                    strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                    strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+        // The editor is back on the last saved state, which is what the files hold, so any preview of
+        // unsaved goals goes with it.
+        tc_drop_live_template_preview(!is_active_template);
         if (is_active_template) {
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
@@ -6811,8 +6930,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 selected_advancement, selected_stat, selected_ms_goal,
                 selected_unlock_index, selected_custom_index, selected_counter_index, selected_deco_index
             };
-            if (tc_apply_visual_edit_request(current_template_data, hotkey_selection)) {
+            bool visual_edit_was_structural = false;
+            if (tc_apply_visual_edit_request(current_template_data, hotkey_selection,
+                                             visual_edit_was_structural)) {
                 save_message_type = MSG_NONE;
+                // Goals appear or vanish on the map right away, so a duplicate can be moved and a
+                // deletion undone without having to save first.
+                if (visual_edit_was_structural) {
+                    tc_push_live_template_preview(creator_version_str, selected_template_info,
+                                                  selected_lang_flag, selected_layout_flag,
+                                                  current_template_data);
+                }
             }
         }
 
@@ -7255,6 +7383,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                            strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                            strcmp(selected_template_info.optional_flag,
                                                   app_settings->optional_flag) == 0);
+                // The editor is back on the last saved state, which is what the files hold, so any
+                // preview of unsaved goals goes with it.
+                tc_drop_live_template_preview(!is_active_template);
                 if (is_active_template) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
