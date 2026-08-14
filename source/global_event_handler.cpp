@@ -66,7 +66,10 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
     // the user has manually marked the goal complete. The toggle stays
     // independent of progress, but accidentally bumping a "completed"
     // counter is unwanted noise
-    if (target_goal->goal == -1 && target_goal->is_manually_completed) return false;
+    if (target_goal->goal == -1 && target_goal->is_manually_completed &&
+        mod_action != COOP_MOD_TOGGLE) {
+        return false;
+    }
 
     // Co-op Receiver: send modification to host (any-player mode, or self-view under host-only).
     if (rcv_in_lobby &&
@@ -103,13 +106,24 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
     }
 
     // Singleplayer: direct in-memory mutation + save.
-    if (mod_action == COOP_MOD_INCREMENT) {
-        target_goal->progress++;
+    if (mod_action == COOP_MOD_TOGGLE) {
+        // Mirrors clicking the goal on the map. Clearing the flag drops "done" as well; the re-read
+        // triggered below puts it back when linked goals still satisfy the goal on their own.
+        target_goal->is_manually_completed = !target_goal->is_manually_completed;
+        target_goal->done = target_goal->is_manually_completed;
+        // For goal == -1 (infinite counter) the running count stays independent of the checkbox.
+        if (target_goal->goal != -1) {
+            target_goal->progress = target_goal->done ? 1 : 0;
+        }
     } else {
-        target_goal->progress--;
-    }
-    if (target_goal->goal > 0) {
-        target_goal->done = (target_goal->progress >= target_goal->goal);
+        if (mod_action == COOP_MOD_INCREMENT) {
+            target_goal->progress++;
+        } else {
+            target_goal->progress--;
+        }
+        if (target_goal->goal > 0) {
+            target_goal->done = (target_goal->progress >= target_goal->goal);
+        }
     }
     SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
@@ -142,15 +156,15 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         // The key never reached any window, so none of the focus-based gates below apply; the
         // action's own gates still do, inside hotkey_apply_counter_action.
         int global_hotkey_index = -1;
-        bool global_hotkey_is_decrement = false;
-        if (global_hotkeys_decode_event(&event, &global_hotkey_index, &global_hotkey_is_decrement)) {
+        HotkeySlot global_hotkey_slot = HOTKEY_SLOT_INCREMENT;
+        if (global_hotkeys_decode_event(&event, &global_hotkey_index, &global_hotkey_slot)) {
             if (global_hotkey_index >= 0 && global_hotkey_index < app_settings->hotkey_count) {
                 const HotkeyBinding *hb = &app_settings->hotkeys[global_hotkey_index];
                 if (hb->is_global) {
-                    hotkey_apply_counter_action(t, app_settings, hb->target_goal,
-                                                global_hotkey_is_decrement
-                                                    ? COOP_MOD_DECREMENT
-                                                    : COOP_MOD_INCREMENT);
+                    int global_mod_action = COOP_MOD_INCREMENT;
+                    if (global_hotkey_slot == HOTKEY_SLOT_DECREMENT) global_mod_action = COOP_MOD_DECREMENT;
+                    else if (global_hotkey_slot == HOTKEY_SLOT_TOGGLE) global_mod_action = COOP_MOD_TOGGLE;
+                    hotkey_apply_counter_action(t, app_settings, hb->target_goal, global_mod_action);
                 }
             }
             continue;
@@ -240,12 +254,17 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         // to be focused. One whose registration failed (already owned elsewhere, or
                         // no X11 at all) is deliberately still handled here, which is the fallback
                         // the Hotkeys tab promises on that row.
-                        bool inc_handled_by_os = hb->is_global && global_hotkeys_slot_is_registered(i, false);
-                        bool dec_handled_by_os = hb->is_global && global_hotkeys_slot_is_registered(i, true);
+                        bool inc_handled_by_os = hb->is_global &&
+                                                 global_hotkeys_slot_is_registered(i, HOTKEY_SLOT_INCREMENT);
+                        bool dec_handled_by_os = hb->is_global &&
+                                                 global_hotkeys_slot_is_registered(i, HOTKEY_SLOT_DECREMENT);
+                        bool tog_handled_by_os = hb->is_global &&
+                                                 global_hotkeys_slot_is_registered(i, HOTKEY_SLOT_TOGGLE);
 
                         // Convert key names from settings to scancodes for comparison
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
+                        SDL_Scancode tog_scancode = SDL_GetScancodeFromName(hb->toggle_key);
 
                         // Check if the pressed key matches a hotkey
                         int mod_action = -1;
@@ -255,6 +274,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         } else if (!dec_handled_by_os && event.key.scancode == dec_scancode &&
                                    held_mods == hb->decrement_mods) {
                             mod_action = COOP_MOD_DECREMENT;
+                        } else if (!tog_handled_by_os && event.key.scancode == tog_scancode &&
+                                   held_mods == hb->toggle_mods) {
+                            mod_action = COOP_MOD_TOGGLE;
                         }
 
                         if (mod_action >= 0 &&

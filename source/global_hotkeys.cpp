@@ -655,9 +655,9 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
         const HotkeyBinding *hb = &app_settings->hotkeys[i];
         if (!hb->is_global) continue;
 
-        for (int half = 0; half < 2; half++) {
-            const char *key_name = half == 0 ? hb->increment_key : hb->decrement_key;
-            Uint16 mods = half == 0 ? hb->increment_mods : hb->decrement_mods;
+        for (int slot = 0; slot < HOTKEY_SLOT_COUNT; slot++) {
+            const char *key_name = hotkey_binding_slot_key(hb, (HotkeySlot) slot);
+            Uint16 mods = hotkey_binding_slot_mods(hb, (HotkeySlot) slot);
             if (key_name[0] == '\0' || strcmp(key_name, "None") == 0) continue;
 
             char reason[128];
@@ -666,7 +666,7 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
             SDL_Scancode sc = SDL_GetScancodeFromName(key_name);
             if (sc == SDL_SCANCODE_UNKNOWN) continue;
 
-            int slot_id = i * 2 + half;
+            int slot_id = i * HOTKEY_SLOT_COUNT + slot;
             wanted[slot_id].active = true;
             wanted[slot_id].scancode = sc;
             wanted[slot_id].mods = mods;
@@ -717,32 +717,33 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
         } else {
             snprintf(g_gh_slot_error[i], sizeof(g_gh_slot_error[i]), "%s", reason);
             log_message(LOG_ERROR, "[HOTKEYS] Global binding %d (%s) failed: %s\n",
-                        i / 2, (i % 2) == 0 ? "increment" : "decrement", reason);
+                        i / HOTKEY_SLOT_COUNT,
+                        hotkey_slot_name((HotkeySlot) (i % HOTKEY_SLOT_COUNT)), reason);
         }
     }
 }
 
-bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, bool *out_is_decrement) {
+bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, HotkeySlot *out_slot) {
     if (!event || g_gh_event_type == 0 || event->type != g_gh_event_type) return false;
 
     int slot_id = (int) event->user.code;
     if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return false;
 
-    if (out_hotkey_index) *out_hotkey_index = slot_id / 2;
-    if (out_is_decrement) *out_is_decrement = (slot_id % 2) == 1;
+    if (out_hotkey_index) *out_hotkey_index = slot_id / HOTKEY_SLOT_COUNT;
+    if (out_slot) *out_slot = (HotkeySlot) (slot_id % HOTKEY_SLOT_COUNT);
     return true;
 }
 
-bool global_hotkeys_slot_is_registered(int hotkey_index, bool decrement) {
-    int slot_id = hotkey_index * 2 + (decrement ? 1 : 0);
+bool global_hotkeys_slot_is_registered(int hotkey_index, HotkeySlot slot) {
+    int slot_id = hotkey_index * HOTKEY_SLOT_COUNT + (int) slot;
     if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return false;
     // The X11 backend accepts a registration up front and only discovers a grab conflict on its
     // listener thread, so a slot counts as registered only while it also has no error to report.
-    return g_gh_registered[slot_id] && global_hotkeys_slot_error(hotkey_index, decrement) == nullptr;
+    return g_gh_registered[slot_id] && global_hotkeys_slot_error(hotkey_index, slot) == nullptr;
 }
 
-const char *global_hotkeys_slot_error(int hotkey_index, bool decrement) {
-    int slot_id = hotkey_index * 2 + (decrement ? 1 : 0);
+const char *global_hotkeys_slot_error(int hotkey_index, HotkeySlot slot) {
+    int slot_id = hotkey_index * HOTKEY_SLOT_COUNT + (int) slot;
     if (slot_id < 0 || slot_id >= GLOBAL_HOTKEY_MAX_SLOTS) return nullptr;
 
 #if !defined(_WIN32) && !defined(__APPLE__)

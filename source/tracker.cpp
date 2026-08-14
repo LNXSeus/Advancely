@@ -14663,46 +14663,73 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        if (item && (item->goal > 0 || item->goal == -1)) {
-            // It's a counter
+        if (!item) continue;
+
+        // Counters (target above 0 or infinite) own the increment/decrement pair and always get a
+        // row. Plain custom goals (target 0) own the toggle, and there can be far more of those
+        // than MAX_HOTKEYS, so they only get a row once they actually carry a binding.
+        bool is_counter = (item->goal > 0 || item->goal == -1);
+        cJSON *old_binding = nullptr;
+        if (cJSON_IsArray(old_hotkeys_array)) {
+            cJSON *old_hotkey_item = nullptr;
+            cJSON_ArrayForEach(old_hotkey_item, old_hotkeys_array) {
+                cJSON *old_target = cJSON_GetObjectItem(old_hotkey_item, "target_goal");
+                if (cJSON_IsString(old_target) && old_target->valuestring &&
+                    strcmp(old_target->valuestring, item->root_name) == 0) {
+                    old_binding = old_hotkey_item;
+                    break;
+                }
+            }
+        }
+
+        bool toggle_row_wanted = false;
+        if (!is_counter && old_binding) {
+            cJSON *old_tog_key = cJSON_GetObjectItem(old_binding, "toggle_key");
+            cJSON *old_is_global = cJSON_GetObjectItem(old_binding, "is_global");
+            bool tog_bound = cJSON_IsString(old_tog_key) && old_tog_key->valuestring &&
+                             strcmp(old_tog_key->valuestring, "None") != 0 &&
+                             old_tog_key->valuestring[0] != '\0';
+            toggle_row_wanted = tog_bound || (cJSON_IsBool(old_is_global) && cJSON_IsTrue(old_is_global));
+        }
+
+        if (is_counter || toggle_row_wanted) {
             cJSON *new_hotkey_obj = cJSON_CreateObject();
             cJSON_AddStringToObject(new_hotkey_obj, "target_goal", item->root_name);
 
             const char *inc_key = "None";
             const char *dec_key = "None";
+            const char *tog_key = "None";
             int inc_mods = HOTKEY_MOD_NONE;
             int dec_mods = HOTKEY_MOD_NONE;
+            int tog_mods = HOTKEY_MOD_NONE;
             bool is_global = false;
 
-            // Find the old binding whose target_goal matches this counter's root_name.
-            if (cJSON_IsArray(old_hotkeys_array)) {
-                cJSON *old_hotkey_item = nullptr;
-                cJSON_ArrayForEach(old_hotkey_item, old_hotkeys_array) {
-                    cJSON *old_target = cJSON_GetObjectItem(old_hotkey_item, "target_goal");
-                    if (cJSON_IsString(old_target) && old_target->valuestring &&
-                        strcmp(old_target->valuestring, item->root_name) == 0) {
-                        cJSON *old_inc_key = cJSON_GetObjectItem(old_hotkey_item, "increment_key");
-                        cJSON *old_dec_key = cJSON_GetObjectItem(old_hotkey_item, "decrement_key");
-                        if (cJSON_IsString(old_inc_key) && old_inc_key->valuestring) inc_key = old_inc_key->valuestring;
-                        if (cJSON_IsString(old_dec_key) && old_dec_key->valuestring) dec_key = old_dec_key->valuestring;
+            if (old_binding) {
+                cJSON *old_inc_key = cJSON_GetObjectItem(old_binding, "increment_key");
+                cJSON *old_dec_key = cJSON_GetObjectItem(old_binding, "decrement_key");
+                cJSON *old_tog_key = cJSON_GetObjectItem(old_binding, "toggle_key");
+                if (cJSON_IsString(old_inc_key) && old_inc_key->valuestring) inc_key = old_inc_key->valuestring;
+                if (cJSON_IsString(old_dec_key) && old_dec_key->valuestring) dec_key = old_dec_key->valuestring;
+                if (cJSON_IsString(old_tog_key) && old_tog_key->valuestring) tog_key = old_tog_key->valuestring;
 
-                        // Carry the modifier/global fields across too, or this rebuild would
-                        // silently downgrade every global binding back to focus-only.
-                        cJSON *old_inc_mods = cJSON_GetObjectItem(old_hotkey_item, "increment_mods");
-                        cJSON *old_dec_mods = cJSON_GetObjectItem(old_hotkey_item, "decrement_mods");
-                        cJSON *old_is_global = cJSON_GetObjectItem(old_hotkey_item, "is_global");
-                        if (cJSON_IsNumber(old_inc_mods)) inc_mods = old_inc_mods->valueint;
-                        if (cJSON_IsNumber(old_dec_mods)) dec_mods = old_dec_mods->valueint;
-                        if (cJSON_IsBool(old_is_global)) is_global = cJSON_IsTrue(old_is_global);
-                        break;
-                    }
-                }
+                // Carry the modifier/global fields across too, or this rebuild would
+                // silently downgrade every global binding back to focus-only.
+                cJSON *old_inc_mods = cJSON_GetObjectItem(old_binding, "increment_mods");
+                cJSON *old_dec_mods = cJSON_GetObjectItem(old_binding, "decrement_mods");
+                cJSON *old_tog_mods = cJSON_GetObjectItem(old_binding, "toggle_mods");
+                cJSON *old_is_global = cJSON_GetObjectItem(old_binding, "is_global");
+                if (cJSON_IsNumber(old_inc_mods)) inc_mods = old_inc_mods->valueint;
+                if (cJSON_IsNumber(old_dec_mods)) dec_mods = old_dec_mods->valueint;
+                if (cJSON_IsNumber(old_tog_mods)) tog_mods = old_tog_mods->valueint;
+                if (cJSON_IsBool(old_is_global)) is_global = cJSON_IsTrue(old_is_global);
             }
 
             cJSON_AddStringToObject(new_hotkey_obj, "increment_key", inc_key);
             cJSON_AddStringToObject(new_hotkey_obj, "decrement_key", dec_key);
+            cJSON_AddStringToObject(new_hotkey_obj, "toggle_key", tog_key);
             cJSON_AddNumberToObject(new_hotkey_obj, "increment_mods", inc_mods);
             cJSON_AddNumberToObject(new_hotkey_obj, "decrement_mods", dec_mods);
+            cJSON_AddNumberToObject(new_hotkey_obj, "toggle_mods", tog_mods);
             cJSON_AddBoolToObject(new_hotkey_obj, "is_global", is_global);
             cJSON_AddItemToArray(new_hotkeys_array, new_hotkey_obj);
         }

@@ -14,9 +14,9 @@
 
 #include "settings_utils.h" // For AppSettings, MAX_HOTKEYS
 
-// Every binding owns two OS-level slots: one for its increment key, one for its decrement key.
-// A slot id is (hotkey_index * 2) + (decrement ? 1 : 0), which is what travels in the SDL event.
-#define GLOBAL_HOTKEY_MAX_SLOTS (MAX_HOTKEYS * 2)
+// Every binding owns one OS-level slot per HotkeySlot: increment, decrement and toggle.
+// A slot id is (hotkey_index * HOTKEY_SLOT_COUNT) + slot, which is what travels in the SDL event.
+#define GLOBAL_HOTKEY_MAX_SLOTS (MAX_HOTKEYS * HOTKEY_SLOT_COUNT)
 
 /**
  * @brief Prepares OS-level hotkey delivery. Call once, from the main thread, after SDL_Init.
@@ -50,10 +50,10 @@ void global_hotkeys_apply(const AppSettings *app_settings);
  *
  * @param event The polled SDL event.
  * @param out_hotkey_index Receives the index into AppSettings::hotkeys.
- * @param out_is_decrement Receives true for the decrement slot, false for the increment slot.
+ * @param out_slot Receives which of the binding's slots fired.
  * @return true if the event was ours, false otherwise (outputs untouched).
  */
-bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, bool *out_is_decrement);
+bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, HotkeySlot *out_slot);
 
 /**
  * @brief Whether the OS is currently delivering this slot.
@@ -63,18 +63,18 @@ bool global_hotkeys_decode_event(const SDL_Event *event, int *out_hotkey_index, 
  * working there, since that is the documented fallback.
  *
  * @param hotkey_index Index into AppSettings::hotkeys.
- * @param decrement false for the increment slot, true for the decrement slot.
+ * @param slot Which of the binding's slots to ask about.
  */
-bool global_hotkeys_slot_is_registered(int hotkey_index, bool decrement);
+bool global_hotkeys_slot_is_registered(int hotkey_index, HotkeySlot slot);
 
 /**
  * @brief The reason a slot is not currently registered, for the Hotkeys tab to show per row.
  *
  * @param hotkey_index Index into AppSettings::hotkeys.
- * @param decrement false for the increment slot, true for the decrement slot.
+ * @param slot Which of the binding's slots to ask about.
  * @return A human-readable reason, or nullptr when the slot is registered or intentionally unused.
  */
-const char *global_hotkeys_slot_error(int hotkey_index, bool decrement);
+const char *global_hotkeys_slot_error(int hotkey_index, HotkeySlot slot);
 
 /**
  * @brief False when this build/session cannot deliver global hotkeys at all (e.g. a Wayland

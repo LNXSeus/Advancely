@@ -766,9 +766,11 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     // written by the template resync contains one row per counter, most of them None/None, and
     // those must not read as a difference or "Revert Changes" would never go away.
     auto hotkey_row_is_empty = [](const HotkeyBinding *hb) -> bool {
-        return strcmp(hb->increment_key, "None") == 0 &&
-               strcmp(hb->decrement_key, "None") == 0 &&
-               !hb->is_global;
+        for (int slot = 0; slot < HOTKEY_SLOT_COUNT; ++slot) {
+            const char *key = hotkey_binding_slot_key(hb, (HotkeySlot) slot);
+            if (key[0] != '\0' && strcmp(key, "None") != 0) return false;
+        }
+        return !hb->is_global;
     };
 
     int ia = 0;
@@ -781,8 +783,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         if (strcmp(a->hotkeys[ia].target_goal, b->hotkeys[ib].target_goal) != 0 ||
             strcmp(a->hotkeys[ia].increment_key, b->hotkeys[ib].increment_key) != 0 ||
             strcmp(a->hotkeys[ia].decrement_key, b->hotkeys[ib].decrement_key) != 0 ||
+            strcmp(a->hotkeys[ia].toggle_key, b->hotkeys[ib].toggle_key) != 0 ||
             a->hotkeys[ia].increment_mods != b->hotkeys[ib].increment_mods ||
             a->hotkeys[ia].decrement_mods != b->hotkeys[ib].decrement_mods ||
+            a->hotkeys[ia].toggle_mods != b->hotkeys[ib].toggle_mods ||
             a->hotkeys[ia].is_global != b->hotkeys[ib].is_global) {
             return true;
         }
@@ -6865,7 +6869,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // --- Hotkey Settings ---
 
             // Capture state: which goal+slot is currently waiting for a key press.
-            // Slot 0 = decrement, Slot 1 = increment.
+            // The slot is a HotkeySlot value, or -1 while nothing is being captured.
             static char capturing_target_goal[192] = "";
             static int capturing_slot = -1; // -1 = idle
 
@@ -6891,21 +6895,26 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 return std::string(mod_prefix) + key_label;
             };
 
-            // Create a temporary vector of counters to display
+            // Custom goals split by what a hotkey can do to them: counters take increment and
+            // decrement keys, plain goals (target value 0) take a single toggle key.
             std::vector<TrackableItem *> custom_counters;
+            std::vector<TrackableItem *> custom_toggles;
             if (t && t->template_data) {
                 for (int i = 0; i < t->template_data->custom_goal_count; ++i) {
                     TrackableItem *item = t->template_data->custom_goals[i];
-                    if (item && (item->goal > 0 || item->goal == -1)) {
+                    if (!item) continue;
+                    if (item->goal > 0 || item->goal == -1) {
                         custom_counters.push_back(item);
+                    } else {
+                        custom_toggles.push_back(item);
                     }
                 }
             }
 
-            // Explains the missing counter block above Advancely's own shortcuts.
-            if (custom_counters.empty()) {
+            // Explains the missing custom goal block above Advancely's own shortcuts.
+            if (custom_counters.empty() && custom_toggles.empty()) {
                 ImGui::TextDisabled(
-                    "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
+                    "Select a template with custom goals to adjust their hotkeys here.");
                 ImGui::Spacing();
             }
 
@@ -6933,14 +6942,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                 }
 
+                HotkeySlot captured_slot = (HotkeySlot) capturing_slot;
+
                 // Skip the write entirely if the new value matches the current one,
                 // so binding "None" over an already-None slot doesn't dirty the form.
-                const char *prev_key = "None";
-                Uint16 prev_mods = HOTKEY_MOD_NONE;
-                if (binding) {
-                    prev_key = (capturing_slot == 1) ? binding->increment_key : binding->decrement_key;
-                    prev_mods = (capturing_slot == 1) ? binding->increment_mods : binding->decrement_mods;
-                }
+                const char *prev_key = binding ? hotkey_binding_slot_key(binding, captured_slot) : "None";
+                Uint16 prev_mods = binding ? hotkey_binding_slot_mods(binding, captured_slot) : (Uint16) HOTKEY_MOD_NONE;
 
                 if (strcmp(prev_key, new_key) != 0 || prev_mods != new_mods) {
                     if (!binding && temp_settings.hotkey_count < MAX_HOTKEYS) {
@@ -6950,27 +6957,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
                         strcpy(binding->increment_key, "None");
                         strcpy(binding->decrement_key, "None");
+                        strcpy(binding->toggle_key, "None");
                     }
                     if (binding) {
-                        char *target = (capturing_slot == 1) ? binding->increment_key : binding->decrement_key;
-                        size_t target_size = (capturing_slot == 1)
-                                                 ? sizeof(binding->increment_key)
-                                                 : sizeof(binding->decrement_key);
-                        strncpy(target, new_key, target_size - 1);
-                        target[target_size - 1] = '\0';
-                        if (capturing_slot == 1) {
-                            binding->increment_mods = new_mods;
-                        } else {
-                            binding->decrement_mods = new_mods;
+                        char *target = binding->increment_key;
+                        Uint16 *target_mods = &binding->increment_mods;
+                        if (captured_slot == HOTKEY_SLOT_DECREMENT) {
+                            target = binding->decrement_key;
+                            target_mods = &binding->decrement_mods;
+                        } else if (captured_slot == HOTKEY_SLOT_TOGGLE) {
+                            target = binding->toggle_key;
+                            target_mods = &binding->toggle_mods;
                         }
+                        // All three key buffers are the same size, so one bound works for each.
+                        strncpy(target, new_key, sizeof(binding->increment_key) - 1);
+                        target[sizeof(binding->increment_key) - 1] = '\0';
+                        *target_mods = new_mods;
                     }
                 }
                 capturing_target_goal[0] = '\0';
                 capturing_slot = -1;
             }
 
-            if (!custom_counters.empty()) {
-                ImGui::Text("Hotkey Settings for Custom Counters");
+            if (!custom_counters.empty() || !custom_toggles.empty()) {
+                ImGui::Text("Hotkey Settings for Custom Goals");
                 if (ImGui::IsItemHovered()) {
                     char hotkey_settings_tooltip_buffer[1024];
                     snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
@@ -6978,6 +6988,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Click a button and press a key to bind it. Hold Ctrl, Alt or Shift\n"
                              "while pressing the key to bind a combination. Press Escape,\n"
                              "Backspace, or Delete during capture to clear the binding back to None.\n\n"
+                             "Counters get an increment and a decrement key, custom goals with a\n"
+                             "target value of 0 get a single key that ticks them on and off.\n\n"
                              "Without 'Global', a hotkey only works when tabbed into the tracker.\n"
                              "Maximum of %d hotkeys are supported.",
                              MAX_HOTKEYS);
@@ -7029,92 +7041,87 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", global_support_buffer);
                 }
 
-                // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
-                for (const auto &counter: custom_counters) {
+                // One row per custom goal. Counters show the decrement and increment slots, plain
+                // goals show the toggle slot, and everything else about the row is identical.
+                auto render_goal_hotkey_row = [&](const TrackableItem *goal, bool is_counter) {
                     HotkeyBinding *binding = nullptr;
                     for (int i = 0; i < temp_settings.hotkey_count; ++i) {
-                        if (strcmp(temp_settings.hotkeys[i].target_goal, counter->root_name) == 0) {
+                        if (strcmp(temp_settings.hotkeys[i].target_goal, goal->root_name) == 0) {
                             binding = &temp_settings.hotkeys[i];
                             break;
                         }
                     }
 
-                    const char *dec_stored = binding ? binding->decrement_key : "None";
-                    const char *inc_stored = binding ? binding->increment_key : "None";
-                    Uint16 dec_mods_stored = binding ? binding->decrement_mods : (Uint16) HOTKEY_MOD_NONE;
-                    Uint16 inc_mods_stored = binding ? binding->increment_mods : (Uint16) HOTKEY_MOD_NONE;
+                    // Creating the row lazily keeps untouched goals out of settings.json, which
+                    // matters because a template can hold far more goals than MAX_HOTKEYS.
+                    auto ensure_binding = [&]() {
+                        if (binding || temp_settings.hotkey_count >= MAX_HOTKEYS) return;
+                        binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                        memset(binding, 0, sizeof(*binding));
+                        strncpy(binding->target_goal, goal->root_name, sizeof(binding->target_goal) - 1);
+                        binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
+                        strcpy(binding->increment_key, "None");
+                        strcpy(binding->decrement_key, "None");
+                        strcpy(binding->toggle_key, "None");
+                    };
 
-                    bool capturing_dec = (capturing_slot == 0 &&
-                                          strcmp(capturing_target_goal, counter->root_name) == 0);
-                    bool capturing_inc = (capturing_slot == 1 &&
-                                          strcmp(capturing_target_goal, counter->root_name) == 0);
-
-                    ImGui::Text("%s", counter->display_name);
+                    ImGui::Text("%s", goal->display_name);
                     ImGui::SameLine();
 
-                    // --- Decrement first, then Increment (per UX request) ---
-                    ImGui::TextDisabled("Decr.");
-                    ImGui::SameLine();
+                    auto render_slot_button = [&](HotkeySlot slot, const char *caption, const char *id_prefix) {
+                        ImGui::TextDisabled("%s", caption);
+                        ImGui::SameLine();
 
-                    char dec_btn_label[256];
-                    if (capturing_dec) {
-                        snprintf(dec_btn_label, sizeof(dec_btn_label),
-                                 "Press a key...##dec_%s", counter->root_name);
+                        bool capturing_here = (capturing_slot == (int) slot &&
+                                               strcmp(capturing_target_goal, goal->root_name) == 0);
+
+                        char btn_label[256];
+                        if (capturing_here) {
+                            snprintf(btn_label, sizeof(btn_label),
+                                     "Press a key...##%s_%s", id_prefix, goal->root_name);
+                        } else {
+                            std::string label = display_label_for_key(
+                                binding ? hotkey_binding_slot_key(binding, slot) : "None",
+                                binding ? hotkey_binding_slot_mods(binding, slot) : (Uint16) HOTKEY_MOD_NONE);
+                            snprintf(btn_label, sizeof(btn_label),
+                                     "%s##%s_%s", label.c_str(), id_prefix, goal->root_name);
+                        }
+                        if (ImGui::Button(btn_label, ImVec2(170, 0))) {
+                            // Arm capture for this slot.
+                            strncpy(capturing_target_goal, goal->root_name,
+                                    sizeof(capturing_target_goal) - 1);
+                            capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
+                            capturing_slot = (int) slot;
+                            capturing_app_action = -1;
+                            SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                            SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
+                            SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
+                        }
+                    };
+
+                    if (is_counter) {
+                        // --- Decrement first, then Increment (per UX request) ---
+                        render_slot_button(HOTKEY_SLOT_DECREMENT, "Decr.", "dec");
+                        ImGui::SameLine();
+                        render_slot_button(HOTKEY_SLOT_INCREMENT, "Incr.", "inc");
                     } else {
-                        std::string label = display_label_for_key(dec_stored, dec_mods_stored);
-                        snprintf(dec_btn_label, sizeof(dec_btn_label),
-                                 "%s##dec_%s", label.c_str(), counter->root_name);
-                    }
-                    if (ImGui::Button(dec_btn_label, ImVec2(170, 0))) {
-                        // Arm capture for this slot.
-                        strncpy(capturing_target_goal, counter->root_name,
-                                sizeof(capturing_target_goal) - 1);
-                        capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
-                        capturing_slot = 0;
-                        capturing_app_action = -1;
-                        SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
-                        SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
-                        SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
-                    }
-
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("Incr.");
-                    ImGui::SameLine();
-
-                    char inc_btn_label[256];
-                    if (capturing_inc) {
-                        snprintf(inc_btn_label, sizeof(inc_btn_label),
-                                 "Press a key...##inc_%s", counter->root_name);
-                    } else {
-                        std::string label = display_label_for_key(inc_stored, inc_mods_stored);
-                        snprintf(inc_btn_label, sizeof(inc_btn_label),
-                                 "%s##inc_%s", label.c_str(), counter->root_name);
-                    }
-                    if (ImGui::Button(inc_btn_label, ImVec2(170, 0))) {
-                        strncpy(capturing_target_goal, counter->root_name,
-                                sizeof(capturing_target_goal) - 1);
-                        capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
-                        capturing_slot = 1;
-                        capturing_app_action = -1;
-                        SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
-                        SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
-                        SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
+                        render_slot_button(HOTKEY_SLOT_TOGGLE, "Toggle", "tog");
+                        if (ImGui::IsItemHovered()) {
+                            char toggle_tooltip_buffer[512];
+                            snprintf(toggle_tooltip_buffer, sizeof(toggle_tooltip_buffer),
+                                     "This goal has a target value of 0, so it is a plain checkbox.\n"
+                                     "The key ticks it on and off, exactly like clicking it on the map.");
+                            ImGui::SetTooltip("%s", toggle_tooltip_buffer);
+                        }
                     }
 
                     // --- Per-binding Global toggle ---
                     ImGui::SameLine();
                     bool row_is_global = binding ? binding->is_global : false;
                     char global_cb_label[256];
-                    snprintf(global_cb_label, sizeof(global_cb_label), "Global##global_%s", counter->root_name);
+                    snprintf(global_cb_label, sizeof(global_cb_label), "Global##global_%s", goal->root_name);
                     if (ImGui::Checkbox(global_cb_label, &row_is_global)) {
-                        if (!binding && temp_settings.hotkey_count < MAX_HOTKEYS) {
-                            binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
-                            memset(binding, 0, sizeof(*binding));
-                            strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
-                            binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
-                            strcpy(binding->increment_key, "None");
-                            strcpy(binding->decrement_key, "None");
-                        }
+                        ensure_binding();
                         if (binding) binding->is_global = row_is_global;
                     }
                     if (ImGui::IsItemHovered()) {
@@ -7134,7 +7141,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     // Reserved combinations are checked on every row; the modifier requirement
                     // only applies once the row is marked Global.
                     if (binding) {
-                        auto validate_slot = [&](const char *slot_name, const char *key, Uint16 mods) {
+                        auto validate_slot = [&](HotkeySlot slot) {
+                            const char *key = hotkey_binding_slot_key(binding, slot);
+                            Uint16 mods = hotkey_binding_slot_mods(binding, slot);
                             char reason[192];
                             bool bad = false;
                             if (hotkey_slot_is_reserved(key, mods, reason, sizeof(reason))) {
@@ -7147,11 +7156,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                             if (bad) {
                                 ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
-                                                   "    %s %s", slot_name, reason);
+                                                   "    %s %s", hotkey_slot_name(slot), reason);
                             }
                         };
-                        validate_slot("Decrement", binding->decrement_key, binding->decrement_mods);
-                        validate_slot("Increment", binding->increment_key, binding->increment_mods);
+                        if (is_counter) {
+                            validate_slot(HOTKEY_SLOT_DECREMENT);
+                            validate_slot(HOTKEY_SLOT_INCREMENT);
+                        } else {
+                            validate_slot(HOTKEY_SLOT_TOGGLE);
+                        }
                     }
 
                     // Registration status comes from the APPLIED settings, not this form: a row
@@ -7159,24 +7172,46 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     // matching binding is found by goal name, since the two arrays can differ.
                     int applied_idx = -1;
                     for (int i = 0; i < app_settings->hotkey_count; ++i) {
-                        if (strcmp(app_settings->hotkeys[i].target_goal, counter->root_name) == 0) {
+                        if (strcmp(app_settings->hotkeys[i].target_goal, goal->root_name) == 0) {
                             applied_idx = i;
                             break;
                         }
                     }
                     if (applied_idx >= 0 && app_settings->hotkeys[applied_idx].is_global) {
-                        auto report_slot = [&](const char *slot_name, bool decrement) {
-                            const char *err = global_hotkeys_slot_error(applied_idx, decrement);
+                        auto report_slot = [&](HotkeySlot slot) {
+                            const char *err = global_hotkeys_slot_error(applied_idx, slot);
                             if (!err) return;
                             // Amber, not red: the binding still works, just not globally.
                             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
                                                "    %s is not global: %s Window-focused only.",
-                                               slot_name, err);
+                                               hotkey_slot_name(slot), err);
                         };
-                        report_slot("Decrement", true);
-                        report_slot("Increment", false);
+                        if (is_counter) {
+                            report_slot(HOTKEY_SLOT_DECREMENT);
+                            report_slot(HOTKEY_SLOT_INCREMENT);
+                        } else {
+                            report_slot(HOTKEY_SLOT_TOGGLE);
+                        }
+                    }
+                };
+
+                // Loop through the goals provided by the LIVE TEMPLATE to build the UI rows
+                if (!custom_counters.empty()) {
+                    ImGui::Spacing();
+                    ImGui::SeparatorText("Counters");
+                    for (const auto &counter: custom_counters) {
+                        render_goal_hotkey_row(counter, true);
                     }
                 }
+
+                if (!custom_toggles.empty()) {
+                    ImGui::Spacing();
+                    ImGui::SeparatorText("Toggles (Target Value 0)");
+                    for (const auto &toggle_goal: custom_toggles) {
+                        render_goal_hotkey_row(toggle_goal, false);
+                    }
+                }
+                ImGui::Spacing();
 
                 // --- Prune bindings that carry no information ---
                 // Binding a key and then clearing it back to None, or ticking Global and
@@ -7186,9 +7221,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 int kept = 0;
                 for (int i = 0; i < temp_settings.hotkey_count; ++i) {
                     const HotkeyBinding *hb = &temp_settings.hotkeys[i];
-                    bool is_empty = (strcmp(hb->increment_key, "None") == 0 &&
-                                     strcmp(hb->decrement_key, "None") == 0 &&
-                                     !hb->is_global);
+                    bool is_empty = !hb->is_global;
+                    for (int slot = 0; slot < HOTKEY_SLOT_COUNT && is_empty; ++slot) {
+                        const char *key = hotkey_binding_slot_key(hb, (HotkeySlot) slot);
+                        if (key[0] != '\0' && strcmp(key, "None") != 0) is_empty = false;
+                    }
                     if (is_empty) continue;
                     if (kept != i) temp_settings.hotkeys[kept] = temp_settings.hotkeys[i];
                     kept++;
@@ -7202,53 +7239,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // Two slots clash only when the key AND the modifiers match, so Ctrl+G and a
                 // bare G are free to live on different goals.
                 auto slot_is_active = [](const char *key) -> bool {
-                    return strcmp(key, "None") != 0;
-                };
-                auto slots_clash = [](const char *key_a, Uint16 mods_a,
-                                      const char *key_b, Uint16 mods_b) -> bool {
-                    return strcmp(key_a, key_b) == 0 && mods_a == mods_b;
+                    return key[0] != '\0' && strcmp(key, "None") != 0;
                 };
 
-                for (int i = 0; i < temp_settings.hotkey_count && !hotkey_duplicate_error; ++i) {
-                    const HotkeyBinding *hb_i = &temp_settings.hotkeys[i];
-                    bool inc_active = slot_is_active(hb_i->increment_key);
-                    bool dec_active = slot_is_active(hb_i->decrement_key);
+                // Every bound slot of every binding, flattened, so each pair is compared once.
+                int total_slots = temp_settings.hotkey_count * HOTKEY_SLOT_COUNT;
+                for (int a = 0; a < total_slots && !hotkey_duplicate_error; ++a) {
+                    const HotkeyBinding *hb_a = &temp_settings.hotkeys[a / HOTKEY_SLOT_COUNT];
+                    HotkeySlot slot_a = (HotkeySlot) (a % HOTKEY_SLOT_COUNT);
+                    const char *key_a = hotkey_binding_slot_key(hb_a, slot_a);
+                    if (!slot_is_active(key_a)) continue;
+                    Uint16 mods_a = hotkey_binding_slot_mods(hb_a, slot_a);
 
-                    // Check increment vs decrement within the same binding
-                    if (inc_active && dec_active &&
-                        slots_clash(hb_i->increment_key, hb_i->increment_mods,
-                                    hb_i->decrement_key, hb_i->decrement_mods)) {
-                        hotkey_duplicate_error = true;
-                        break;
-                    }
-
-                    // Check against all other bindings
-                    for (int j = i + 1; j < temp_settings.hotkey_count; ++j) {
-                        const HotkeyBinding *hb_j = &temp_settings.hotkeys[j];
-                        bool inc_j_active = slot_is_active(hb_j->increment_key);
-                        bool dec_j_active = slot_is_active(hb_j->decrement_key);
-
-                        if (inc_active && inc_j_active &&
-                            slots_clash(hb_i->increment_key, hb_i->increment_mods,
-                                        hb_j->increment_key, hb_j->increment_mods)) {
-                            hotkey_duplicate_error = true;
-                            break;
-                        }
-                        if (inc_active && dec_j_active &&
-                            slots_clash(hb_i->increment_key, hb_i->increment_mods,
-                                        hb_j->decrement_key, hb_j->decrement_mods)) {
-                            hotkey_duplicate_error = true;
-                            break;
-                        }
-                        if (dec_active && inc_j_active &&
-                            slots_clash(hb_i->decrement_key, hb_i->decrement_mods,
-                                        hb_j->increment_key, hb_j->increment_mods)) {
-                            hotkey_duplicate_error = true;
-                            break;
-                        }
-                        if (dec_active && dec_j_active &&
-                            slots_clash(hb_i->decrement_key, hb_i->decrement_mods,
-                                        hb_j->decrement_key, hb_j->decrement_mods)) {
+                    for (int b = a + 1; b < total_slots; ++b) {
+                        const HotkeyBinding *hb_b = &temp_settings.hotkeys[b / HOTKEY_SLOT_COUNT];
+                        HotkeySlot slot_b = (HotkeySlot) (b % HOTKEY_SLOT_COUNT);
+                        const char *key_b = hotkey_binding_slot_key(hb_b, slot_b);
+                        if (!slot_is_active(key_b)) continue;
+                        if (strcmp(key_a, key_b) == 0 &&
+                            mods_a == hotkey_binding_slot_mods(hb_b, slot_b)) {
                             hotkey_duplicate_error = true;
                             break;
                         }
@@ -7270,7 +7279,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         "Note: 'Global' rows are handed to the operating system when you click 'Apply Settings'.");
                 }
 
-                // Only separate the two blocks when the counter block above actually rendered.
+                // Only separate the two blocks when the custom goal block above actually rendered.
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -7352,6 +7361,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             };
 
             AppHotkeyGroup current_group = APP_HOTKEY_GROUP_COUNT;
+            // Each group folds away behind its own header, collapsed by default so the tab opens
+            // as a short list of windows instead of every shortcut at once.
+            bool group_open = false;
             for (int action = 0; action < APP_HOTKEY_COUNT; ++action) {
                 const AppHotkeyDef *def = &APP_HOTKEY_DEFS[action];
                 AppHotkey *hk = &temp_settings.app_hotkeys[action];
@@ -7359,39 +7371,49 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (def->group != current_group) {
                     current_group = def->group;
                     ImGui::Spacing();
-                    ImGui::SeparatorText(APP_HOTKEY_GROUP_NAMES[current_group]);
+                    group_open = ImGui::CollapsingHeader(APP_HOTKEY_GROUP_NAMES[current_group]);
+                    if (ImGui::IsItemHovered()) {
+                        char group_tooltip[1024];
+                        snprintf(group_tooltip, sizeof(group_tooltip), "%s",
+                                 APP_HOTKEY_GROUP_TOOLTIPS[current_group]);
+                        ImGui::SetTooltip("%s", group_tooltip);
+                    }
                 }
 
-                ImGui::Text("%s", def->label);
-                if (ImGui::IsItemHovered()) {
-                    char row_tooltip[1024];
-                    snprintf(row_tooltip, sizeof(row_tooltip), "%s", def->description);
-                    ImGui::SetTooltip("%s", row_tooltip);
-                }
+                // Only the rendering is skipped while a group is folded away. The conflict checks
+                // below still run, so a clash hidden behind a closed header keeps blocking Apply.
+                if (group_open) {
+                    ImGui::Text("%s", def->label);
+                    if (ImGui::IsItemHovered()) {
+                        char row_tooltip[1024];
+                        snprintf(row_tooltip, sizeof(row_tooltip), "%s", def->description);
+                        ImGui::SetTooltip("%s", row_tooltip);
+                    }
 
-                ImGui::SameLine(300.0f);
+                    ImGui::SameLine(300.0f);
 
-                char app_btn_label[256];
-                if (capturing_app_action == action) {
-                    snprintf(app_btn_label, sizeof(app_btn_label), "Press a key...##app_hk_%d", action);
-                } else {
-                    char key_label[96];
-                    app_hotkey_display_label(hk, key_label, sizeof(key_label));
-                    snprintf(app_btn_label, sizeof(app_btn_label), "%s##app_hk_%d", key_label, action);
-                }
-                if (ImGui::Button(app_btn_label, ImVec2(170, 0))) {
-                    capturing_app_action = action;
-                    capturing_slot = -1;
-                    capturing_target_goal[0] = '\0';
-                    SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
-                    SDL_SetAtomicInt(&g_hotkey_captured_keycode, 0);
-                    SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
-                    // Armed as 2 so the event handler knows Delete and Backspace are bindable here.
-                    SDL_SetAtomicInt(&g_hotkey_capture_armed, 2);
+                    char app_btn_label[256];
+                    if (capturing_app_action == action) {
+                        snprintf(app_btn_label, sizeof(app_btn_label), "Press a key...##app_hk_%d", action);
+                    } else {
+                        char key_label[96];
+                        app_hotkey_display_label(hk, key_label, sizeof(key_label));
+                        snprintf(app_btn_label, sizeof(app_btn_label), "%s##app_hk_%d", key_label, action);
+                    }
+                    if (ImGui::Button(app_btn_label, ImVec2(170, 0))) {
+                        capturing_app_action = action;
+                        capturing_slot = -1;
+                        capturing_target_goal[0] = '\0';
+                        SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_captured_keycode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_captured_mods, HOTKEY_MOD_NONE);
+                        // Armed as 2 so the event handler knows Delete and Backspace are bindable here.
+                        SDL_SetAtomicInt(&g_hotkey_capture_armed, 2);
+                    }
                 }
 
                 bool is_default = (strcmp(hk->key, def->default_key) == 0 && hk->mods == def->default_mods);
-                if (!is_default) {
+                if (group_open && !is_default) {
                     ImGui::SameLine();
                     char reset_label[64];
                     snprintf(reset_label, sizeof(reset_label), "Reset##app_hk_reset_%d", action);
@@ -7439,35 +7461,48 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                   : (Uint16) APP_HOTKEY_CTX_COUNTER_HOTKEYS;
                     if ((counter_contexts & def->contexts) == 0) continue;
 
-                    // Show the counter under the name the user sees in the list above when the
+                    // Show the goal under the name the user sees in the list above when the
                     // template is loaded, and fall back to the root name when it is not.
-                    const char *counter_name = hb->target_goal;
+                    const char *goal_name = hb->target_goal;
                     for (const auto &counter: custom_counters) {
                         if (strcmp(counter->root_name, hb->target_goal) == 0) {
-                            counter_name = counter->display_name;
+                            goal_name = counter->display_name;
                             break;
                         }
                     }
+                    if (goal_name == hb->target_goal) {
+                        for (const auto &toggle_goal: custom_toggles) {
+                            if (strcmp(toggle_goal->root_name, hb->target_goal) == 0) {
+                                goal_name = toggle_goal->display_name;
+                                break;
+                            }
+                        }
+                    }
 
-                    char inc_keycap[64];
-                    char dec_keycap[64];
-                    counter_key_as_keycap(hb->increment_key, inc_keycap, sizeof(inc_keycap));
-                    counter_key_as_keycap(hb->decrement_key, dec_keycap, sizeof(dec_keycap));
+                    for (int slot = 0; slot < HOTKEY_SLOT_COUNT && conflict[0] == '\0'; ++slot) {
+                        const char *stored = hotkey_binding_slot_key(hb, (HotkeySlot) slot);
+                        if (!app_slot_bound(stored)) continue;
 
-                    if (app_slot_bound(hb->increment_key) &&
-                        app_same_combo(hk->key, hk->mods, inc_keycap, hb->increment_mods)) {
-                        snprintf(conflict, sizeof(conflict),
-                                 "collides with the increment hotkey of the counter \"%s\"", counter_name);
-                    } else if (app_slot_bound(hb->decrement_key) &&
-                               app_same_combo(hk->key, hk->mods, dec_keycap, hb->decrement_mods)) {
-                        snprintf(conflict, sizeof(conflict),
-                                 "collides with the decrement hotkey of the counter \"%s\"", counter_name);
+                        char keycap[64];
+                        counter_key_as_keycap(stored, keycap, sizeof(keycap));
+                        if (app_same_combo(hk->key, hk->mods, keycap,
+                                           hotkey_binding_slot_mods(hb, (HotkeySlot) slot))) {
+                            char slot_word[32];
+                            snprintf(slot_word, sizeof(slot_word), "%s",
+                                     hotkey_slot_name((HotkeySlot) slot));
+                            for (char *c = slot_word; *c != '\0'; ++c) *c = (char) tolower((unsigned char) *c);
+                            snprintf(conflict, sizeof(conflict),
+                                     "collides with the %s hotkey of the custom goal \"%s\"",
+                                     slot_word, goal_name);
+                        }
                     }
                 }
 
                 if (conflict[0] != '\0') {
                     hotkey_app_error = true;
-                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", conflict);
+                    if (group_open) {
+                        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", conflict);
+                    }
                 }
             }
 

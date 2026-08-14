@@ -353,10 +353,30 @@ typedef struct {
     char target_goal[192];
     char increment_key[32];
     char decrement_key[32];
+    char toggle_key[32]; // Only used by custom goals with a target value of 0 (plain checkboxes).
     Uint16 increment_mods; // HOTKEY_MOD_* bitmask held alongside increment_key.
     Uint16 decrement_mods; // HOTKEY_MOD_* bitmask held alongside decrement_key.
+    Uint16 toggle_mods; // HOTKEY_MOD_* bitmask held alongside toggle_key.
     bool is_global; // If true, the OS delivers this binding even when Advancely is not focused.
 } HotkeyBinding;
+
+// The three keys a binding can carry. A counter uses increment and decrement, a plain custom goal
+// uses the toggle, and no goal ever uses both kinds, so they share one binding row.
+typedef enum {
+    HOTKEY_SLOT_INCREMENT = 0,
+    HOTKEY_SLOT_DECREMENT,
+    HOTKEY_SLOT_TOGGLE,
+    HOTKEY_SLOT_COUNT
+} HotkeySlot;
+
+// The stored key name of one slot, always a valid string ("None" when unbound).
+const char *hotkey_binding_slot_key(const HotkeyBinding *hb, HotkeySlot slot);
+
+// The modifier mask of one slot.
+Uint16 hotkey_binding_slot_mods(const HotkeyBinding *hb, HotkeySlot slot);
+
+// "Increment", "Decrement" or "Toggle", for messages that name the offending slot.
+const char *hotkey_slot_name(HotkeySlot slot);
 
 // Writes a human-readable modifier prefix ("Ctrl+Shift+") into buf, or an empty string when
 // mods is HOTKEY_MOD_NONE. Returns buf so it can be used inline in snprintf calls.
@@ -405,14 +425,17 @@ bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_re
 // Headings the Hotkeys tab groups the rows under.
 typedef enum {
     APP_HOTKEY_GROUP_TRACKER = 0,
-    APP_HOTKEY_GROUP_VISUAL,
-    APP_HOTKEY_GROUP_EDITOR,
     APP_HOTKEY_GROUP_SETTINGS,
     APP_HOTKEY_GROUP_OVERLAY,
+    APP_HOTKEY_GROUP_EDITOR,
+    APP_HOTKEY_GROUP_VISUAL,
     APP_HOTKEY_GROUP_COUNT
 } AppHotkeyGroup;
 
 extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
+
+// What the collapsing header of each group explains on hover.
+extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
 
 // Every configurable Advancely shortcut, in the order the Hotkeys tab lists them.
 // Columns: enum id, settings.json id, default key (US-layout scancode name), default modifiers,
@@ -434,6 +457,41 @@ extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
       "Toggle Template Editor Window", \
       "Opens or closes the template editor window.\n" \
       "Cannot open it during a Co-op session, where template editing is disabled.") \
+    X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
+      "Apply Settings", \
+      "Applies the settings, like the \"Apply Settings\" button.\n" \
+      "Pressing Enter with the settings window focused applies as well and is not configurable.") \
+    X(APP_HOTKEY_SETTINGS_REVERT, "settings_revert", "Z", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
+      "Revert Changes", \
+      "Puts every setting back to the last applied state, like the \"Revert Changes\" button.") \
+    X(APP_HOTKEY_OVERLAY_ADVANCE, "overlay_advance", "Space", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_OVERLAY, APP_HOTKEY_GROUP_OVERLAY, \
+      "Advance / Speed Up", \
+      "Belt mode: hold to scroll faster.\n" \
+      "Page and Compact mode: press to cut to the next page or cycle entry.\n" \
+      "Only fires while the overlay window itself is focused.") \
+    X(APP_HOTKEY_EDITOR_NEXT_GOAL, "editor_next_goal", "Tab", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Select Next Goal in List", \
+      "Moves the selection one entry down in the list of the open tab, following the search\n" \
+      "filter and stopping at the last entry. Holding repeats.") \
+    X(APP_HOTKEY_EDITOR_PREV_GOAL, "editor_prev_goal", "Tab", HOTKEY_MOD_CTRL | HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Select Previous Goal in List", \
+      "Moves the selection one entry up in the list of the open tab, following the search\n" \
+      "filter and stopping at the first entry. Holding repeats.") \
+    X(APP_HOTKEY_EDITOR_SAVE, "editor_save", "S", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Save Template", \
+      "Saves the template open in the editor, like the \"Save\" button.\n" \
+      "Pressing Enter with the editor focused saves as well and is not configurable.") \
+    X(APP_HOTKEY_EDITOR_REVERT, "editor_revert", "Z", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      "Revert Changes", \
+      "Discards the editor's unsaved changes and reloads the last saved state,\n" \
+      "like the \"Revert Changes\" button.") \
     X(APP_HOTKEY_NUDGE_LEFT, "nudge_left", "Left", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
       "Nudge Selection Left (1 px)", "Moves every selected element one pixel to the left. Holding repeats.") \
@@ -486,42 +544,7 @@ extern const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT];
       "Duplicates every selected goal, criterion, sub-stat and decoration, layout coordinates\n" \
       "and all, so the copy starts out exactly on top of the original.\n" \
       "Each copy gets the usual \"_copy\" id, counting up when that one is taken.\n" \
-      "The copies appear in the template editor and show up on the map once you save.") \
-    X(APP_HOTKEY_EDITOR_NEXT_GOAL, "editor_next_goal", "Tab", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
-      "Select Next Goal in List", \
-      "Moves the selection one entry down in the list of the open tab, following the search\n" \
-      "filter and stopping at the last entry. Holding repeats.") \
-    X(APP_HOTKEY_EDITOR_PREV_GOAL, "editor_prev_goal", "Tab", HOTKEY_MOD_CTRL | HOTKEY_MOD_SHIFT, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
-      "Select Previous Goal in List", \
-      "Moves the selection one entry up in the list of the open tab, following the search\n" \
-      "filter and stopping at the first entry. Holding repeats.") \
-    X(APP_HOTKEY_EDITOR_SAVE, "editor_save", "S", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
-      "Save Template", \
-      "Saves the template open in the editor, like the \"Save\" button.\n" \
-      "Pressing Enter with the editor focused saves as well and is not configurable.") \
-    X(APP_HOTKEY_EDITOR_REVERT, "editor_revert", "Z", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
-      "Revert Changes", \
-      "Discards the editor's unsaved changes and reloads the last saved state,\n" \
-      "like the \"Revert Changes\" button.") \
-    X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
-      "Apply Settings", \
-      "Applies the settings, like the \"Apply Settings\" button.\n" \
-      "Pressing Enter with the settings window focused applies as well and is not configurable.") \
-    X(APP_HOTKEY_SETTINGS_REVERT, "settings_revert", "Z", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
-      "Revert Changes", \
-      "Puts every setting back to the last applied state, like the \"Revert Changes\" button.") \
-    X(APP_HOTKEY_OVERLAY_ADVANCE, "overlay_advance", "Space", HOTKEY_MOD_NONE, \
-      APP_HOTKEY_CTX_OVERLAY, APP_HOTKEY_GROUP_OVERLAY, \
-      "Advance / Speed Up", \
-      "Belt mode: hold to scroll faster.\n" \
-      "Page and Compact mode: press to cut to the next page or cycle entry.\n" \
-      "Only fires while the overlay window itself is focused.")
+      "The copies appear in the template editor and show up on the map once you save.")
 
 typedef enum {
 #define X(enum_id, ...) enum_id,

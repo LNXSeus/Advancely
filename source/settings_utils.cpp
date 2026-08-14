@@ -686,6 +686,35 @@ static void generate_display_category_name(const char *category, const char *fla
 
 // ------------------- HOTKEY HELPERS -------------------
 
+const char *hotkey_binding_slot_key(const HotkeyBinding *hb, HotkeySlot slot) {
+    if (!hb) return "None";
+    switch (slot) {
+        case HOTKEY_SLOT_INCREMENT: return hb->increment_key;
+        case HOTKEY_SLOT_DECREMENT: return hb->decrement_key;
+        case HOTKEY_SLOT_TOGGLE: return hb->toggle_key;
+        default: return "None";
+    }
+}
+
+Uint16 hotkey_binding_slot_mods(const HotkeyBinding *hb, HotkeySlot slot) {
+    if (!hb) return HOTKEY_MOD_NONE;
+    switch (slot) {
+        case HOTKEY_SLOT_INCREMENT: return hb->increment_mods;
+        case HOTKEY_SLOT_DECREMENT: return hb->decrement_mods;
+        case HOTKEY_SLOT_TOGGLE: return hb->toggle_mods;
+        default: return HOTKEY_MOD_NONE;
+    }
+}
+
+const char *hotkey_slot_name(HotkeySlot slot) {
+    switch (slot) {
+        case HOTKEY_SLOT_INCREMENT: return "Increment";
+        case HOTKEY_SLOT_DECREMENT: return "Decrement";
+        case HOTKEY_SLOT_TOGGLE: return "Toggle";
+        default: return "";
+    }
+}
+
 const char *hotkey_mods_to_prefix(Uint16 mods, char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return "";
     buf[0] = '\0';
@@ -788,10 +817,30 @@ Uint16 hotkey_mods_from_sdl(SDL_Keymod sdl_mods) {
 
 const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT] = {
     "Tracker Window",
-    "Visual Layout Editor",
-    "Template Editor",
     "Settings Window",
-    "Overlay Window"
+    "Overlay Window",
+    "Template Editor",
+    "Visual Layout Editor"
+};
+
+const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT] = {
+    // Tracker Window
+    "Shortcuts that work on the main tracker window, the one showing the map of goals.\n"
+    "They also fire while the settings or template editor windows are focused, so the\n"
+    "editor can be opened and closed from anywhere.",
+    // Settings Window
+    "Shortcuts for this settings window. They only fire while it is focused, which is why\n"
+    "they may reuse keys the template editor already claims.",
+    // Overlay Window
+    "Shortcuts for the streaming overlay. They only fire while the overlay window itself is\n"
+    "focused, never from the tracker, so OBS captures are never disturbed by a stray key.",
+    // Template Editor
+    "Shortcuts for the template editor window, covering list navigation, saving and reverting.\n"
+    "They only fire while the editor is focused.",
+    // Visual Layout Editor
+    "Shortcuts for visual layout editing, where goals are dragged around the map by hand.\n"
+    "They only fire while an editing session is running, so plain letters like W, A, S and D\n"
+    "are safe to use here."
 };
 
 const AppHotkeyDef APP_HOTKEY_DEFS[APP_HOTKEY_COUNT] = {
@@ -2922,14 +2971,23 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 hb->increment_key[sizeof(hb->increment_key) - 1] = '\0';
                 strncpy(hb->decrement_key, dec_key->valuestring, sizeof(hb->decrement_key) - 1);
                 hb->decrement_key[sizeof(hb->decrement_key) - 1] = '\0';
+                strcpy(hb->toggle_key, "None");
 
-                // Modifier and global fields are optional: settings.json files written before
-                // global hotkeys existed load as unmodified, window-focused bindings.
+                // Modifier, toggle and global fields are optional: settings.json files written
+                // before those existed load as unmodified, window-focused counter bindings.
+                const cJSON *tog_key = cJSON_GetObjectItem(hotkey_item, "toggle_key");
+                if (cJSON_IsString(tog_key) && tog_key->valuestring) {
+                    strncpy(hb->toggle_key, tog_key->valuestring, sizeof(hb->toggle_key) - 1);
+                    hb->toggle_key[sizeof(hb->toggle_key) - 1] = '\0';
+                }
+
                 const cJSON *inc_mods = cJSON_GetObjectItem(hotkey_item, "increment_mods");
                 const cJSON *dec_mods = cJSON_GetObjectItem(hotkey_item, "decrement_mods");
+                const cJSON *tog_mods = cJSON_GetObjectItem(hotkey_item, "toggle_mods");
                 const cJSON *is_global = cJSON_GetObjectItem(hotkey_item, "is_global");
                 if (cJSON_IsNumber(inc_mods)) hb->increment_mods = (Uint16) inc_mods->valueint;
                 if (cJSON_IsNumber(dec_mods)) hb->decrement_mods = (Uint16) dec_mods->valueint;
+                if (cJSON_IsNumber(tog_mods)) hb->toggle_mods = (Uint16) tog_mods->valueint;
                 if (cJSON_IsBool(is_global)) hb->is_global = cJSON_IsTrue(is_global);
 
                 settings->hotkey_count++;
@@ -3738,8 +3796,11 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
                 cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
                 cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
+                cJSON_AddStringToObject(hotkey_obj, "toggle_key",
+                                        hb->toggle_key[0] != '\0' ? hb->toggle_key : "None");
                 cJSON_AddNumberToObject(hotkey_obj, "increment_mods", hb->increment_mods);
                 cJSON_AddNumberToObject(hotkey_obj, "decrement_mods", hb->decrement_mods);
+                cJSON_AddNumberToObject(hotkey_obj, "toggle_mods", hb->toggle_mods);
                 cJSON_AddBoolToObject(hotkey_obj, "is_global", hb->is_global);
                 cJSON_AddItemToArray(hotkeys_array, hotkey_obj);
             }

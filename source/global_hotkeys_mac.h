@@ -18,7 +18,7 @@
 
 // Slot capacity is fixed here rather than derived from MAX_HOTKEYS, since settings_utils.h cannot
 // be included alongside Carbon. global_hotkeys.cpp static-asserts that the two still agree.
-#define GH_MAC_MAX_SLOTS 64
+#define GH_MAC_MAX_SLOTS 96
 
 // Modifier bits, mirroring HOTKEY_MOD_* without depending on that header. The caller translates.
 #define GH_MAC_MOD_CTRL 0x01u
