@@ -6366,7 +6366,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         trim_room_code(cleaned, sizeof(cleaned));
                                         char decoded_ip[64];
                                         int decoded_port;
-                                        if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip),
+                                        if (coop_decode_room_code(cleaned, decoded_ip, sizeof(decoded_ip),
                                                                   &decoded_port)) {
                                             if (g_coop_ctx) {
                                                 coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
