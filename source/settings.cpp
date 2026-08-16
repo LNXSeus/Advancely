@@ -6249,6 +6249,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                          coop_relay_room_code_recv,
                                                          sizeof(coop_relay_room_code_recv),
                                                          ImGuiInputTextFlags_CharsUppercase);
+                                trim_room_code(coop_relay_room_code_recv, sizeof(coop_relay_room_code_recv));
+                                
                                 if (ImGui::IsItemHovered()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
@@ -6359,6 +6361,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         snprintf(coop_room_code_error, sizeof(coop_room_code_error),
                                                  "Clipboard is empty.");
                                     } else {
+                                        char cleaned[256];
+                                        snprintf(cleaned, sizeof(cleaned), "%s", clipboard);
+                                        trim_room_code(cleaned, sizeof(cleaned));
                                         char decoded_ip[64];
                                         int decoded_port;
                                         if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip),
