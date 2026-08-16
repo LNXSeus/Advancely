@@ -110,3 +110,18 @@ void format_time_since_update(float total_seconds, char *output, size_t max_len,
         snprintf(output, max_len, "%d%ss ago", seconds, sp);
     }
 }
+
+void trim_room_code(char *buf, size_t buf_size);
+{
+    if (!buf || buf_size == 0) return;
+
+    size_t out = 0;
+    for (size_t i = 0; buf[i] != '\0' && out < buf_size - 1; i++) {
+        unsigned char c = (unsigned char)buf[i];
+
+        if (!isspace(c)) {
+            buf[out++] = (char)c;
+        }
+    }
+    buf[out] = '\0';
+}
