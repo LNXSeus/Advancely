@@ -197,7 +197,12 @@ static Uint16 gh_mods_to_mac_bits(Uint16 mods) {
 }
 
 static bool gh_platform_init(void) {
-    return gh_mac_backend_init(gh_push_slot_event);
+    if (!gh_mac_backend_init(gh_push_slot_event)) {
+        log_message(LOG_ERROR, "[HOTKEYS] macOS refused the Carbon hotkey handler; "
+                    "global hotkeys are disabled.\n");
+        return false;
+    }
+    return true;
 }
 
 static bool gh_platform_runtime_ok(void) {
@@ -429,6 +434,16 @@ static void gh_x_sync_grabs(GhXDisplay *display, GhXWindow root) {
     gh_XSetErrorHandler(prev_handler);
 
     SDL_LockMutex(g_gh_x_mutex);
+    // Every slot is re-grabbed whenever any one of them changes, so a failure is only worth a log
+    // line the first time it appears. Without this, editing one binding would re-report every
+    // conflict that is already on screen. Windows and macOS get the same message from apply().
+    for (int i = 0; i < GLOBAL_HOTKEY_MAX_SLOTS; i++) {
+        if (errors[i][0] != '\0' && strcmp(errors[i], g_gh_x_error[i]) != 0) {
+            log_message(LOG_ERROR, "[HOTKEYS] Global binding %d (%s) failed: %s\n",
+                        i / HOTKEY_SLOT_COUNT,
+                        hotkey_slot_name((HotkeySlot) (i % HOTKEY_SLOT_COUNT)), errors[i]);
+        }
+    }
     memcpy(g_gh_x_error, errors, sizeof(errors));
     SDL_UnlockMutex(g_gh_x_mutex);
 }
@@ -496,7 +511,7 @@ static bool gh_platform_init(void) {
     g_gh_x_lib = dlopen("libX11.so.6", RTLD_LAZY);
     if (!g_gh_x_lib) g_gh_x_lib = dlopen("libX11.so", RTLD_LAZY);
     if (!g_gh_x_lib) {
-        log_message(LOG_INFO, "[HOTKEYS] libX11 not available; global hotkeys are disabled.\n");
+        log_message(LOG_ERROR, "[HOTKEYS] libX11 not available; global hotkeys are disabled.\n");
         return false;
     }
 

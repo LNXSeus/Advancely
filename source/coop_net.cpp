@@ -1151,7 +1151,7 @@ static int SDLCALL host_thread_func(void *data) {
                 }
 
                 if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_HEARTBEAT, nullptr, 0)) {
-                    log_message(LOG_INFO, "[COOP NET] Failed to send heartbeat to %s.\n",
+                    log_message(LOG_ERROR, "[COOP NET] Failed to send heartbeat to %s.\n",
                                 ctx->clients[i].label);
                     // Best-effort DISCONNECT — the socket is already failing writes,
                     // so this may not arrive, but it costs nothing to try.
