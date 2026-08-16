@@ -21,6 +21,8 @@
 #define GH_MAC_MAX_SLOTS 96
 
 // Modifier bits, mirroring HOTKEY_MOD_* without depending on that header. The caller translates.
+// GH_MAC_MOD_CTRL means Command on macOS, which is how the Hotkeys tab labels it and how the key
+// capture records it; the physical Control key is registered alongside it as a second form.
 #define GH_MAC_MOD_CTRL 0x01u
 #define GH_MAC_MOD_SHIFT 0x02u
 #define GH_MAC_MOD_ALT 0x04u

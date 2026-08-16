@@ -18,7 +18,12 @@
 
 #define GH_MAC_SIGNATURE 0x41445643u // 'ADVC', spelled out so -Wmultichar stays quiet.
 
+// GH_MAC_MOD_CTRL stands for Command here, which is what the Hotkeys tab names it and what
+// hotkey_mods_from_sdl() records, but that function also accepts the physical Control key for the
+// same bit. A second registration per slot keeps both keys working system-wide, so the key that
+// created the binding is always the key that triggers it.
 static EventHotKeyRef g_gh_mac_refs[GH_MAC_MAX_SLOTS];
+static EventHotKeyRef g_gh_mac_refs_control[GH_MAC_MAX_SLOTS];
 static EventHandlerRef g_gh_mac_handler = nullptr;
 static GhMacHotkeyCallback g_gh_mac_callback = nullptr;
 
@@ -170,7 +175,7 @@ bool gh_mac_backend_register(int slot_id, SDL_Scancode scancode, Uint16 mods,
     }
 
     UInt32 mac_mods = 0;
-    if (mods & GH_MAC_MOD_CTRL) mac_mods |= controlKey;
+    if (mods & GH_MAC_MOD_CTRL) mac_mods |= cmdKey;
     if (mods & GH_MAC_MOD_SHIFT) mac_mods |= shiftKey;
     if (mods & GH_MAC_MOD_ALT) mac_mods |= optionKey;
 
@@ -185,6 +190,17 @@ bool gh_mac_backend_register(int slot_id, SDL_Scancode scancode, Uint16 mods,
         return false;
     }
     g_gh_mac_refs[slot_id] = ref;
+
+    // The Control variant is a bonus, not a requirement: macOS reserves several Control combos for
+    // its own text editing, so a refusal here leaves the Command form working and stays silent.
+    if (mods & GH_MAC_MOD_CTRL) {
+        UInt32 control_mods = (mac_mods & ~(UInt32) cmdKey) | controlKey;
+        EventHotKeyRef control_ref = nullptr;
+        if (RegisterEventHotKey(vk, control_mods, hk_id, GetApplicationEventTarget(), 0,
+                                &control_ref) == noErr && control_ref) {
+            g_gh_mac_refs_control[slot_id] = control_ref;
+        }
+    }
     return true;
 }
 
@@ -193,5 +209,9 @@ void gh_mac_backend_unregister(int slot_id) {
     if (g_gh_mac_refs[slot_id]) {
         UnregisterEventHotKey(g_gh_mac_refs[slot_id]);
         g_gh_mac_refs[slot_id] = nullptr;
+    }
+    if (g_gh_mac_refs_control[slot_id]) {
+        UnregisterEventHotKey(g_gh_mac_refs_control[slot_id]);
+        g_gh_mac_refs_control[slot_id] = nullptr;
     }
 }
