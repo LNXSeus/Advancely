@@ -986,9 +986,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Hotkey duplicate error flag (block Apply when two goals share the same key)
     static bool hotkey_duplicate_error = false;
 
-    // Hotkey global error flag (block Apply when a binding marked Global has no usable modifier)
-    static bool hotkey_global_error = false;
-
     // Advancely shortcut error flag (block Apply when one clashes with another shortcut,
     // a counter hotkey, or a combination Advancely reserves)
     static bool hotkey_app_error = false;
@@ -6863,7 +6860,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
         if (ImGui::BeginTabItem("Hotkeys")) {
             hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
-            hotkey_global_error = false;
             hotkey_reserved_error = false;
             hotkey_app_error = false;
             // --- Hotkey Settings ---
@@ -7130,32 +7126,29 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Off: the hotkey only fires while the Advancely tracker window is focused.\n"
                                  "Any key works, and other programs keep receiving it normally.\n\n"
                                  "On: the operating system reserves the key for Advancely, so it fires while you are\n"
-                                 "playing Minecraft. Because the key is taken away from every other program, a global\n"
-                                 "hotkey must include Ctrl or Alt. F13 to F24 are exempt, since no keyboard\n"
-                                 "has those physically and macro pads are the only thing that sends them.\n\n"
+                                 "playing Minecraft. Because the key is taken away from every other program, Ctrl or\n"
+                                 "Alt is strongly recommended. A bare key is allowed, but it also fires while you type\n"
+                                 "in chat or a text field. F13 to F24 are the exception, since no keyboard has those\n"
+                                 "physically and macro pads are the only thing that sends them.\n\n"
                                  "Default: %s", DEFAULT_HOTKEY_IS_GLOBAL ? "On" : "Off");
                         ImGui::SetTooltip("%s", global_tooltip_buffer);
                     }
 
-                    // Explain exactly which slot is unusable rather than a generic complaint.
-                    // Reserved combinations are checked on every row; the modifier requirement
-                    // only applies once the row is marked Global.
+                    // Explain exactly which slot is at fault rather than a generic complaint.
+                    // Reserved combinations block Apply; a global row without a modifier only
+                    // earns an amber warning, since it does work.
                     if (binding) {
                         auto validate_slot = [&](HotkeySlot slot) {
                             const char *key = hotkey_binding_slot_key(binding, slot);
                             Uint16 mods = hotkey_binding_slot_mods(binding, slot);
                             char reason[192];
-                            bool bad = false;
                             if (hotkey_slot_is_reserved(key, mods, reason, sizeof(reason))) {
                                 hotkey_reserved_error = true;
-                                bad = true;
-                            } else if (row_is_global &&
-                                       !hotkey_global_slot_is_valid(key, mods, reason, sizeof(reason))) {
-                                hotkey_global_error = true;
-                                bad = true;
-                            }
-                            if (bad) {
                                 ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                                   "    %s %s", hotkey_slot_name(slot), reason);
+                            } else if (row_is_global &&
+                                       hotkey_global_slot_is_bare(key, mods, reason, sizeof(reason))) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
                                                    "    %s %s", hotkey_slot_name(slot), reason);
                             }
                         };
@@ -7456,8 +7449,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 for (int k = 0; k < temp_settings.hotkey_count && conflict[0] == '\0'; ++k) {
                     const HotkeyBinding *hb = &temp_settings.hotkeys[k];
+                    // hotkey_apply_counter_action() refuses to run while the Visual Layout Editor
+                    // is open, so a goal hotkey can never collide with its shortcuts, global or
+                    // not. That is what keeps the editor's plain W, A, S and D usable.
                     Uint16 counter_contexts = hb->is_global
-                                                  ? (Uint16) APP_HOTKEY_CTX_ALL
+                                                  ? (Uint16) (APP_HOTKEY_CTX_ALL & ~APP_HOTKEY_CTX_VISUAL)
                                                   : (Uint16) APP_HOTKEY_CTX_COUNTER_HOTKEYS;
                     if ((counter_contexts & def->contexts) == 0) continue;
 
@@ -7605,7 +7601,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
     bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error ||
-                          hotkey_global_error || hotkey_reserved_error || hotkey_app_error ||
+                          hotkey_reserved_error || hotkey_app_error ||
                           account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
@@ -7750,11 +7746,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because two or more goals share the same hotkey.\n"
                      "Each key can only be assigned to one action across all goals.");
-        } else if (hotkey_global_error) {
-            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
-                     "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
-                     "Rebind it while holding Ctrl or Alt, use an F13-F24 key,\n"
-                     "or turn 'Global' back off in the Hotkeys tab.");
         } else if (hotkey_reserved_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because a hotkey uses a combination Advancely reserves\n"
@@ -7911,11 +7902,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled because two or more goals share the same hotkey.\n"
                      "Each key can only be assigned to one action across all goals.");
-        } else if (hotkey_global_error) {
-            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
-                     "Disabled because a hotkey marked 'Global' has no usable modifier.\n"
-                     "Rebind it while holding Ctrl or Alt, use an F13-F24 key,\n"
-                     "or turn 'Global' back off in the Hotkeys tab.");
         } else if (hotkey_reserved_error) {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled because a hotkey uses a combination Advancely reserves\n"

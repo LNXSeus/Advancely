@@ -688,12 +688,11 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
         }
     }
 
+    bool slot_changed[GLOBAL_HOTKEY_MAX_SLOTS];
     bool changed = false;
     for (int i = 0; i < GLOBAL_HOTKEY_MAX_SLOTS; i++) {
-        if (!gh_slot_equal(&g_gh_slots[i], &wanted[i])) {
-            changed = true;
-            break;
-        }
+        slot_changed[i] = !gh_slot_equal(&g_gh_slots[i], &wanted[i]);
+        if (slot_changed[i]) changed = true;
     }
     if (!changed) return;
 
@@ -711,8 +710,12 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
         return;
     }
 
+    // Everything that changed is released before anything new is claimed. The same key routinely
+    // moves from one slot to another, because pruning an emptied binding shifts every later
+    // binding down, and claiming it while its old slot still holds it makes the OS refuse the
+    // whole batch as "already registered".
     for (int i = 0; i < GLOBAL_HOTKEY_MAX_SLOTS; i++) {
-        if (gh_slot_equal(&g_gh_slots[i], &wanted[i])) continue;
+        if (!slot_changed[i]) continue;
 
         if (g_gh_registered[i]) {
             gh_platform_unregister(i);
@@ -722,8 +725,10 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
         // is reported once instead of being retried on every frame.
         g_gh_slots[i] = wanted[i];
         g_gh_slot_error[i][0] = '\0';
+    }
 
-        if (!wanted[i].active) continue;
+    for (int i = 0; i < GLOBAL_HOTKEY_MAX_SLOTS; i++) {
+        if (!slot_changed[i] || !wanted[i].active) continue;
 
         char reason[128];
         reason[0] = '\0';

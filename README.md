@@ -243,12 +243,16 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
             * **Global**: Each row has a `Global` checkbox. Left off (the default), the hotkey only fires while the
               Advancely tracker window is focused, any key may be used, and other programs keep receiving that key
               normally. Switched on, the operating system reserves the key for Advancely so it fires while you are
-              playing Minecraft. Because a global hotkey is taken away from every other program, it must include
-              `Ctrl` or `Alt`; `Shift` on its own is rejected since it would break capital letters system-wide,
-              though `Shift` may be added on top of `Ctrl` or `Alt`. Keys `F13` through `F24` are exempt from the
-              modifier rule, as no physical keyboard has them and macro pads are the only thing that sends them.
-              `Apply Settings` stays disabled until every `Global` row has a valid combination, and
-              a row is handed to the operating system when you click `Apply Settings`.
+              playing Minecraft. Because a global hotkey is taken away from every other program, `Ctrl` or `Alt`
+              (`Cmd` or `Option` on macOS) is strongly recommended; `Shift` alone does not help, since the bare key
+              stays reachable and keeps triggering the goal. A single key without them is still allowed and never
+              blocks `Apply Settings`, but the row shows an amber warning: a single key is riskier than a
+              combination, since no other program receives it while Advancely runs and the goal also changes while
+              you type in chat or any text field. Keys `F13` through `F24` never warn, as no physical keyboard has
+              them and macro pads are the only thing that sends them. A row is handed to the operating system when
+              you click `Apply Settings`. The Visual Layout Editor's own shortcuts are never affected, since goal
+              hotkeys do nothing while it is open, so its plain `W`/`A`/`S`/`D` stay free for `Global` goal
+              hotkeys too.
               Global hotkeys work on Windows and macOS, and on Linux under X11 (including a game
               running through `XWayland`). A Wayland session provides no way for an application to
               reserve a shortcut, so on a Wayland desktop a `Global` row falls back to firing only
@@ -1499,6 +1503,8 @@ Two shortcuts may share a key when they belong to windows or modes that are neve
 the template editor and the settings window can both use `Ctrl+S`. Anything that could fire twice at once, including a
 clash with a custom goal hotkey, is highlighted in red and blocks `Apply Settings` until it is resolved. Collapsing a
 group hides its rows but never its conflicts, so a clash still blocks `Apply Settings` from behind a closed header.
+Visual Layout Editor shortcuts are the exception to the custom goal check: goal hotkeys are switched off while that
+editor is open, so its rows can reuse their keys freely, `Global` ones included.
 
 | Group                    | Default                    | Action                                                                                                                                                                     |
 |--------------------------|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

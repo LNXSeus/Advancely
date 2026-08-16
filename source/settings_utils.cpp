@@ -783,20 +783,34 @@ bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_re
 
     if (hotkey_slot_is_reserved(key_name, mods, out_reason, reason_size)) return false;
 
-    // F13-F24 are safe bare because no other application binds them.
-    if (hotkey_key_is_macro_function_key(key_name)) return true;
+    // A missing modifier is allowed, it is only worth a warning. See
+    // hotkey_global_slot_is_bare().
+    return true;
+}
 
-    // Shift on its own would make the plain character unreachable system-wide, so Ctrl or Alt
-    // has to be part of the combination. Shift is fine as an addition to either.
-    if ((mods & (HOTKEY_MOD_CTRL | HOTKEY_MOD_ALT)) == 0) {
-        if (out_reason && reason_size > 0) {
-            snprintf(out_reason, reason_size,
-                     "needs Ctrl or Alt, because a global hotkey is taken away from every "
-                     "other program");
-        }
-        return false;
+bool hotkey_global_slot_is_bare(const char *key_name, Uint16 mods, char *out_warning, size_t warning_size) {
+    if (out_warning && warning_size > 0) out_warning[0] = '\0';
+
+    if (!key_name || key_name[0] == '\0' || strcmp(key_name, "None") == 0) return false;
+
+    // F13-F24 are safe bare because no other application binds them and no keyboard sends them
+    // by accident.
+    if (hotkey_key_is_macro_function_key(key_name)) return false;
+
+    // Shift on its own does not help: it still leaves the plain character reachable by the key
+    // alone, so the binding keeps swallowing it everywhere.
+    if ((mods & (HOTKEY_MOD_CTRL | HOTKEY_MOD_ALT)) != 0) return false;
+
+    if (out_warning && warning_size > 0) {
+#ifdef __APPLE__
+        const char *mod_names = "Cmd or Option";
+#else
+        const char *mod_names = "Ctrl or Alt";
+#endif
+        snprintf(out_warning, warning_size,
+                 "has no %s: a single key is riskier than a combination, it also fires while you type.",
+                 mod_names);
     }
-
     return true;
 }
 

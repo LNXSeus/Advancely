@@ -397,12 +397,17 @@ bool hotkey_key_is_macro_function_key(const char *key_name);
 // Writes an explanation into out_reason when it returns true.
 bool hotkey_slot_is_reserved(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
 
-// Validates a single key/mods pair for use as a global (OS-registered) hotkey. A bare key would
-// be swallowed system-wide, and Shift alone would break capital letters everywhere, so both are
-// rejected. An unbound ("None") slot is always valid. Reserved combinations are rejected here
-// too, so a global-only caller needs just this one check.
+// Validates a single key/mods pair for use as a global (OS-registered) hotkey. An unbound ("None")
+// slot is always valid. Reserved combinations are rejected here too, so a global-only caller needs
+// just this one check. A missing modifier does not fail: see hotkey_global_slot_is_bare().
 // Writes a reason into out_reason on failure.
 bool hotkey_global_slot_is_valid(const char *key_name, Uint16 mods, char *out_reason, size_t reason_size);
+
+// True when a bound slot would be registered globally without Ctrl or Alt. Such a binding works,
+// but it takes the bare key away from every other program and keeps firing while you type, so the
+// UI warns about it instead of blocking it. F13-F24 are exempt.
+// Writes the warning text into out_warning when it returns true.
+bool hotkey_global_slot_is_bare(const char *key_name, Uint16 mods, char *out_warning, size_t warning_size);
 
 // ------------------- ADVANCELY APP HOTKEYS -------------------
 
