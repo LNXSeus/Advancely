@@ -4428,16 +4428,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Disabled because the overlay background is not transparent.\n"
                                      "Fading needs real transparency to fade into. Over a solid background\n"
                                      "the half-faded pixels blend with the background color and a color key\n"
-                                     "filter leaves them behind as a ghost.\n"
-                                     "Check Transparent next to the Overlay Background Color to unlock this.\n"
+                                     "filter leaves them behind as a ghost, so no fade is applied right now.\n"
+                                     "Check Transparent next to the Overlay\n"
+                                     "Background Color to unlock this again.\n"
                                      "Default: %s", DEFAULT_COMPACT_STACK_FADE_ENABLED ? "On" : "Off");
                         }
                         ImGui::SetTooltip("%s", compact_stack_fade_tooltip_buffer);
                     }
 
-                    if (temp_settings.overlay_transparent && temp_settings.compact_stack_fade_enabled) {
+                    if (temp_settings.compact_stack_fade_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(150.0f);
+                        ImGui::BeginDisabled(!temp_settings.overlay_transparent);
                         if (ImGui::DragFloat("##compact_stack_fade_time", &temp_settings.compact_stack_fade_time, 0.01f,
                                              COMPACT_STACK_FADE_TIME_MIN, COMPACT_STACK_FADE_TIME_MAX, "%.2f s")) {
                             if (temp_settings.compact_stack_fade_time < COMPACT_STACK_FADE_TIME_MIN)
@@ -4445,7 +4447,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_stack_fade_time > COMPACT_STACK_FADE_TIME_MAX)
                                 temp_settings.compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MAX;
                         }
-                        if (ImGui::IsItemHovered()) {
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_stack_fade_time_tooltip_buffer[512];
                             snprintf(compact_stack_fade_time_tooltip_buffer,
                                      sizeof(compact_stack_fade_time_tooltip_buffer),
