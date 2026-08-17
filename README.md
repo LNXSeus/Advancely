@@ -2140,6 +2140,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[Duncan](https://linktr.ee/DuncanRuns)**: Creator of the `Hermes` mod and important coop tester.
 * **[Magnissima](https://www.twitch.tv/magnissima)**: Created amazing `1.16.1` `all_blocks` and `_coop` templates.
 * **[kittymmeow](https://www.twitch.tv/kittymmeow)**: Created an amazing half_done background.
+* **[The64thRealm](https://www.youtube.com/@the64threalm)**: Polished coop relay room code handling to correct excessive spacing when pasting it in.
 
 </details>
 
