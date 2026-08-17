@@ -200,6 +200,8 @@
 		"compact_stack_max_lines":	6,
 		"compact_stack_hold_time":	60,
 		"compact_stack_rise_time":	0.25,
+		"compact_stack_fade_enabled":	false,
+		"compact_stack_fade_time":	1.2,
 		"compact_pop_icon_size":	36,
 		"compact_stack_shared_icon_size":	24,
 		"compact_stack_face_size":	20,

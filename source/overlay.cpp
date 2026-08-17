@@ -1128,14 +1128,18 @@ static AccountType overlay_coop_account_type(const Overlay *o, const char *uuid)
     return ACCOUNT_ONLINE;
 }
 
-// Draw an 8x8 player face texture (nearest-neighbour, full opacity) into a square slot.
-static void compact_draw_face(Overlay *o, const char *uuid, AccountType acc, float fx, float fy, float sz) {
+// Draw an 8x8 player face texture (nearest-neighbour) into a square slot. Faces come from a shared
+// cache, so a fading line restores full opacity afterwards instead of leaving its alpha behind.
+static void compact_draw_face(Overlay *o, const char *uuid, AccountType acc, float fx, float fy, float sz,
+                              Uint8 alpha = 255) {
     if (!uuid || !uuid[0]) return;
     SDL_Texture *tex = skin_cache_get_face(uuid, acc);
     if (!tex) return;
     SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureAlphaMod(tex, alpha);
     SDL_FRect d = {snap_px(fx), snap_px(fy), sz, sz};
     SDL_RenderTexture(o->renderer, tex, nullptr, &d);
+    SDL_SetTextureAlphaMod(tex, 255);
 }
 
 // One active on-screen pop-out group. Criterion / sub-stat completions are 2-line groups (the parent
@@ -1152,6 +1156,8 @@ struct CompactPopGroup {
     float hold_left; // seconds until it disappears
     float anim_y; // current top Y (lerps toward the settled slot)
     bool placed; // anim_y initialised
+    bool fading; // leaving: frozen in place, drawn with a falling alpha, out of the layout flow
+    float fade_left; // seconds of fade remaining (only meaningful while fading)
 };
 
 struct CompactStackEngine {
@@ -1296,7 +1302,7 @@ static void compact_marked_line(char *buf, size_t buf_sz, const char *box, bool 
 
 // Draws one square icon of a stack line at full opacity (never alpha-blended - OBS chroma keying can't
 // respect partial alpha). Handles both a static .png and an animated .gif, from the overlay's caches.
-static void compact_draw_icon(Overlay *o, const char *path, float ix, float iy, float sz) {
+static void compact_draw_icon(Overlay *o, const char *path, float ix, float iy, float sz, Uint8 alpha = 255) {
     if (!path || !path[0]) return;
     SDL_Texture *tex = nullptr;
     AnimatedTexture *anim = nullptr;
@@ -1307,7 +1313,7 @@ static void compact_draw_icon(Overlay *o, const char *path, float ix, float iy, 
         tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
                                      &o->texture_cache_capacity, path, SDL_SCALEMODE_NEAREST);
     SDL_FRect d = {snap_px(ix), snap_px(iy), sz, sz};
-    if (tex || anim) render_texture_with_alpha(o->renderer, tex, anim, &d, 255);
+    if (tex || anim) render_texture_with_alpha(o->renderer, tex, anim, &d, alpha);
 }
 
 // FNV-1a over every poppable goal's root_name(s), so the stack reseeds (and clears) only when the
@@ -1410,7 +1416,11 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             g.item_text = item_text ? item_text : "";
             g.item_shared = item_shared;
             g.face_uuid = face_uuid ? face_uuid : "";
-            if (enc > old) g.hold_left = settings->compact_stack_hold_time; // only a real increment refreshes the hold
+            if (enc > old) {
+                g.hold_left = settings->compact_stack_hold_time; // only a real increment refreshes the hold
+                g.fading = false; // a fresh increment pulls a fading line back into the stack
+                g.fade_left = 0.0f;
+            }
             return;
         }
         if (enc <= old) return; // not showing: only appear on a real increase
@@ -1427,6 +1437,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         g.hold_left = settings->compact_stack_hold_time;
         g.anim_y = 0.0f;
         g.placed = false;
+        g.fading = false;
+        g.fade_left = 0.0f;
         eng.groups.insert(eng.groups.begin(), g); // newest on top
     };
 
@@ -1690,32 +1702,60 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     float line_h = line_box + COMPACT_POP_LINE_GAP;
     int max_lines = settings->compact_stack_max_lines;
 
-    // Expire by hold: a group whose hold has run out just disappears (no slide-off). Iterate back to
-    // front so erasing doesn't skip entries.
+    // A fade needs real alpha to fade into, so it only runs on a transparent overlay. Over a solid
+    // background the half-faded pixels would blend with the background color and survive a color key
+    // filter as a ghost, which is why the setting is locked in the UI without transparency too.
+    bool fade_on = settings->overlay_transparent && settings->compact_stack_fade_enabled;
+    float fade_time = settings->compact_stack_fade_time;
+    if (fade_time <= 0.0f) fade_time = COMPACT_STACK_FADE_TIME_MIN;
+
+    // A leaving group either disappears at once or, with the fade on, freezes where it is and fades
+    // out. Fading groups are out of the layout flow and out of the line budget below, so the stack
+    // drains (and the window height stays bounded) exactly as it does without the fade.
+    auto retire = [&](int i) {
+        if (fade_on) {
+            eng.groups[i].fading = true;
+            eng.groups[i].fade_left = fade_time;
+        } else {
+            eng.groups.erase(eng.groups.begin() + i);
+        }
+    };
+
+    // Expire by hold, then run the fade of anything already leaving. Iterate back to front so erasing
+    // doesn't skip entries.
     for (int i = (int) eng.groups.size() - 1; i >= 0; i--) {
-        eng.groups[i].hold_left -= dt;
-        if (eng.groups[i].hold_left <= 0.0f) eng.groups.erase(eng.groups.begin() + i);
+        CompactPopGroup &g = eng.groups[i];
+        if (g.fading) {
+            g.fade_left -= dt;
+            if (g.fade_left <= 0.0f) eng.groups.erase(eng.groups.begin() + i);
+            continue;
+        }
+        g.hold_left -= dt;
+        if (g.hold_left <= 0.0f) retire(i);
     }
 
-    // Overflow: while more than the line budget is on-screen, drop the oldest (bottom) group
-    // immediately. A 2-line group counts as 2 lines.
+    // Overflow: while more than the line budget is on-screen, drop the oldest (bottom) group.
+    // A 2-line group counts as 2 lines.
     for (;;) {
         int lines = 0, oldest = -1;
         for (int i = 0; i < (int) eng.groups.size(); i++) {
+            if (eng.groups[i].fading) continue; // already leaving, no longer holds a slot
             lines += eng.groups[i].two_line ? 2 : 1;
             oldest = i;
         }
         if (lines <= max_lines || oldest < 0) break;
-        eng.groups.erase(eng.groups.begin() + oldest);
+        retire(oldest);
     }
 
     if (eng.groups.empty()) return;
 
     // Layout: settle groups top-to-bottom from stack_top; a fresh group starts hidden behind the
-    // panel bottom and slides down into place (the only animation - removal is instant).
+    // panel bottom and slides down into place. Removal is instant unless the fade is on, in which
+    // case the leaving group drops out of this flow and fades where it stands.
     float y = stack_top;
     float rise = settings->compact_stack_rise_time;
     for (auto &g: eng.groups) {
+        if (g.fading) continue; // frozen where it was, the lines below close the gap over it
         float gh = (g.two_line ? 2.0f : 1.0f) * line_h;
         float target = y;
         y += gh;
@@ -1744,7 +1784,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     // its left, and the text is right-aligned to the face slot's left.
     float stack_right = stack_x + panel_w;
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
-                         const std::string &shared_icon, const std::string &face_uuid, bool draw_face) {
+                         const std::string &shared_icon, const std::string &face_uuid, bool draw_face,
+                         Uint8 alpha) {
         // Only the line that draws the face reserves its slot, so the text shifts only when a head
         // actually displays (a two-line group's parent passes draw_face = false and stays flush).
         bool show_face = faces_on && draw_face && !face_uuid.empty();
@@ -1754,12 +1795,12 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                            ? (stack_right - icon_size - face_slot)
                            : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
         float icon_y = ly + (line_box - icon_size) / 2.0f;
-        compact_draw_icon(o, icon.c_str(), icon_x, icon_y, icon_size);
+        compact_draw_icon(o, icon.c_str(), icon_x, icon_y, icon_size, alpha);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
-            compact_draw_icon(o, shared_icon.c_str(), icon_x, icon_y, settings->compact_stack_shared_icon_size);
+            compact_draw_icon(o, shared_icon.c_str(), icon_x, icon_y, settings->compact_stack_shared_icon_size, alpha);
         if (show_face) {
             AccountType acc = overlay_coop_account_type(o, face_uuid.c_str());
-            compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly + (line_box - face_size) / 2.0f, face_size);
+            compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly + (line_box - face_size) / 2.0f, face_size, alpha);
         }
         if (!text.empty()) {
             SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
@@ -1770,19 +1811,33 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                                    ? (stack_right - icon_size - face_slot - COMPACT_POP_TEXT_GAP - tw)
                                    : (stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP);
                 SDL_FRect d = {snap_px(text_x), snap_px(ly + (line_box - th) / 2.0f), tw, th};
+                // Cached texture, so full opacity goes back on afterwards for every other user of it.
+                SDL_SetTextureAlphaMod(tt, alpha);
                 SDL_RenderTexture(o->renderer, tt, nullptr, &d);
+                SDL_SetTextureAlphaMod(tt, 255);
             }
         }
     };
-    for (auto &g: eng.groups) {
+    auto draw_group = [&](CompactPopGroup &g) {
+        Uint8 alpha = 255;
+        if (g.fading) {
+            float f = g.fade_left / fade_time;
+            if (f < 0.0f) f = 0.0f;
+            else if (f > 1.0f) f = 1.0f;
+            alpha = (Uint8) (f * 255.0f);
+        }
         if (g.two_line) {
             // The face rides the item (completed) line; the parent line reserves the slot but shows none.
-            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, g.face_uuid, false);
-            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon, g.face_uuid, true);
+            draw_line(g.parent_icon, g.parent_text, g.anim_y, false, g.parent_icon, g.face_uuid, false, alpha);
+            draw_line(g.item_icon, g.item_text, g.anim_y + line_h, g.item_shared, g.parent_icon, g.face_uuid, true,
+                      alpha);
         } else {
-            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon, g.face_uuid, true);
+            draw_line(g.item_icon, g.item_text, g.anim_y, g.item_shared, g.parent_icon, g.face_uuid, true, alpha);
         }
-    }
+    };
+    // Fading groups first so the lines sliding up to close the gap pass over the ghost, not under it.
+    for (auto &g: eng.groups) if (g.fading) draw_group(g);
+    for (auto &g: eng.groups) if (!g.fading) draw_group(g);
     SDL_SetRenderClipRect(o->renderer, nullptr);
 }
 

@@ -996,6 +996,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
     settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
     settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
+    settings->compact_stack_fade_enabled = DEFAULT_COMPACT_STACK_FADE_ENABLED;
+    settings->compact_stack_fade_time = DEFAULT_COMPACT_STACK_FADE_TIME;
     settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
     settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
     settings->compact_stack_face_size = DEFAULT_COMPACT_STACK_FACE_SIZE;
@@ -2232,6 +2234,26 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *compact_stack_fade_on = cJSON_GetObjectItem(visual_settings, "compact_stack_fade_enabled");
+        if (compact_stack_fade_on && cJSON_IsBool(compact_stack_fade_on)) {
+            settings->compact_stack_fade_enabled = cJSON_IsTrue(compact_stack_fade_on);
+        } else {
+            settings->compact_stack_fade_enabled = DEFAULT_COMPACT_STACK_FADE_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_stack_fade = cJSON_GetObjectItem(visual_settings, "compact_stack_fade_time");
+        if (compact_stack_fade && cJSON_IsNumber(compact_stack_fade)) {
+            settings->compact_stack_fade_time = (float) compact_stack_fade->valuedouble;
+            if (settings->compact_stack_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                settings->compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+            if (settings->compact_stack_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                settings->compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+        } else {
+            settings->compact_stack_fade_time = DEFAULT_COMPACT_STACK_FADE_TIME;
+            defaults_were_used = true;
+        }
+
         const cJSON *compact_pop_icon = cJSON_GetObjectItem(visual_settings, "compact_pop_icon_size");
         if (compact_pop_icon && cJSON_IsNumber(compact_pop_icon)) {
             settings->compact_pop_icon_size = (float) compact_pop_icon->valuedouble;
@@ -2743,6 +2765,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_stack_max_lines = DEFAULT_COMPACT_STACK_MAX_LINES;
         settings->compact_stack_hold_time = DEFAULT_COMPACT_STACK_HOLD_TIME;
         settings->compact_stack_rise_time = DEFAULT_COMPACT_STACK_RISE_TIME;
+        settings->compact_stack_fade_enabled = DEFAULT_COMPACT_STACK_FADE_ENABLED;
+        settings->compact_stack_fade_time = DEFAULT_COMPACT_STACK_FADE_TIME;
         settings->compact_pop_icon_size = DEFAULT_COMPACT_POP_ICON_SIZE;
         settings->compact_stack_shared_icon_size = DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE;
         settings->compact_stack_face_size = DEFAULT_COMPACT_STACK_FACE_SIZE;
@@ -3584,6 +3608,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_rise_time");
         cJSON_AddItemToObject(visuals_obj, "compact_stack_rise_time",
                               cJSON_CreateNumber(settings->compact_stack_rise_time));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_fade_enabled");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_fade_enabled",
+                              cJSON_CreateBool(settings->compact_stack_fade_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_stack_fade_time");
+        cJSON_AddItemToObject(visuals_obj, "compact_stack_fade_time",
+                              cJSON_CreateNumber(settings->compact_stack_fade_time));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_pop_icon_size");
         cJSON_AddItemToObject(visuals_obj, "compact_pop_icon_size",
                               cJSON_CreateNumber(settings->compact_pop_icon_size));

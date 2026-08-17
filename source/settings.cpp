@@ -626,6 +626,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_stack_max_lines != b->compact_stack_max_lines ||
         a->compact_stack_hold_time != b->compact_stack_hold_time ||
         a->compact_stack_rise_time != b->compact_stack_rise_time ||
+        a->compact_stack_fade_enabled != b->compact_stack_fade_enabled ||
+        a->compact_stack_fade_time != b->compact_stack_fade_time ||
         a->compact_pop_icon_size != b->compact_pop_icon_size ||
         a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
         a->compact_stack_face_size != b->compact_stack_face_size ||
@@ -874,6 +876,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->compact_stack_max_lines != b->compact_stack_max_lines ||
             a->compact_stack_hold_time != b->compact_stack_hold_time ||
             a->compact_stack_rise_time != b->compact_stack_rise_time ||
+            a->compact_stack_fade_enabled != b->compact_stack_fade_enabled ||
+            a->compact_stack_fade_time != b->compact_stack_fade_time ||
             a->compact_pop_icon_size != b->compact_pop_icon_size ||
             a->compact_stack_shared_icon_size != b->compact_stack_shared_icon_size ||
             a->compact_stack_face_size != b->compact_stack_face_size ||
@@ -3613,11 +3617,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     overlay_mode = OVERLAY_RENDER_MODE_COMPACT;
                 }
                 if (ImGui::IsItemHovered()) {
-                    char overlay_mode_compact_tooltip_buffer[512];
+                    char overlay_mode_compact_tooltip_buffer[768];
                     snprintf(overlay_mode_compact_tooltip_buffer, sizeof(overlay_mode_compact_tooltip_buffer),
                              "A tall, compact counter panel that cycles through goal types,\n"
                              "with completed goals popping out beneath it. Press %s while the\n"
                              "overlay window is focused to cycle to the next goal on the panel.\n"
+                             "Meant to be used with the Hermes mod, so the pop-outs appear the\n"
+                             "moment a goal completes: install the mod and check\n"
+                             "'Using Hermes Mod (Live Tracking)' in the Paths & Templates tab.\n"
                              "Inspired by Zesskyo.\n"
                              "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_compact_tooltip_buffer);
@@ -4401,6 +4408,52 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "place in the stack. 0 shows it instantly (no slide).\n"
                                  "Default: %.2f s", DEFAULT_COMPACT_STACK_RISE_TIME);
                         ImGui::SetTooltip("%s", compact_stack_rise_tooltip_buffer);
+                    }
+
+                    // A fade needs real alpha to fade into, which only a transparent overlay has. On a
+                    // solid background the half-faded pixels blend with the key color and survive the
+                    // color key filter as a ghost, so the fade stays locked until Transparent is on.
+                    ImGui::BeginDisabled(!temp_settings.overlay_transparent);
+                    ImGui::Checkbox("Fade Out", &temp_settings.compact_stack_fade_enabled);
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char compact_stack_fade_tooltip_buffer[768];
+                        if (temp_settings.overlay_transparent) {
+                            snprintf(compact_stack_fade_tooltip_buffer, sizeof(compact_stack_fade_tooltip_buffer),
+                                     "Fade a pop-out out when it leaves the stack instead of removing it\n"
+                                     "instantly. The lines below it move up while it fades.\n"
+                                     "Default: %s", DEFAULT_COMPACT_STACK_FADE_ENABLED ? "On" : "Off");
+                        } else {
+                            snprintf(compact_stack_fade_tooltip_buffer, sizeof(compact_stack_fade_tooltip_buffer),
+                                     "Disabled because the overlay background is not transparent.\n"
+                                     "Fading needs real transparency to fade into. Over a solid background\n"
+                                     "the half-faded pixels blend with the background color and a color key\n"
+                                     "filter leaves them behind as a ghost.\n"
+                                     "Check Transparent next to the Overlay Background Color to unlock this.\n"
+                                     "Default: %s", DEFAULT_COMPACT_STACK_FADE_ENABLED ? "On" : "Off");
+                        }
+                        ImGui::SetTooltip("%s", compact_stack_fade_tooltip_buffer);
+                    }
+
+                    if (temp_settings.overlay_transparent && temp_settings.compact_stack_fade_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f);
+                        if (ImGui::DragFloat("##compact_stack_fade_time", &temp_settings.compact_stack_fade_time, 0.01f,
+                                             COMPACT_STACK_FADE_TIME_MIN, COMPACT_STACK_FADE_TIME_MAX, "%.2f s")) {
+                            if (temp_settings.compact_stack_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                                temp_settings.compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+                            if (temp_settings.compact_stack_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                                temp_settings.compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_stack_fade_time_tooltip_buffer[512];
+                            snprintf(compact_stack_fade_time_tooltip_buffer,
+                                     sizeof(compact_stack_fade_time_tooltip_buffer),
+                                     "How long the fade-out takes. The Hold Time runs first, then the line\n"
+                                     "fades for this long before it is gone.\n"
+                                     "Default: %.2f s", DEFAULT_COMPACT_STACK_FADE_TIME);
+                            ImGui::SetTooltip("%s", compact_stack_fade_time_tooltip_buffer);
+                        }
                     }
 
                     if (ImGui::DragFloat("Pop Icon Size", &temp_settings.compact_pop_icon_size, 0.5f,

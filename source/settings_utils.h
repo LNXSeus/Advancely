@@ -190,6 +190,10 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_STACK_RISE_TIME 0.25f // Seconds a pop-out takes to slide into place
 #define COMPACT_STACK_RISE_TIME_MIN 0.0f
 #define COMPACT_STACK_RISE_TIME_MAX 5.0f
+#define DEFAULT_COMPACT_STACK_FADE_ENABLED false // Pop-outs disappear instantly unless the fade is turned on
+#define DEFAULT_COMPACT_STACK_FADE_TIME 1.2f // Seconds a leaving pop-out takes to fade out
+#define COMPACT_STACK_FADE_TIME_MIN 0.1f
+#define COMPACT_STACK_FADE_TIME_MAX 15.0f
 #define DEFAULT_COMPACT_POP_ICON_SIZE 36.0f // Pop-out line icon size
 #define COMPACT_POP_ICON_SIZE_MIN 8.0f
 #define COMPACT_POP_ICON_SIZE_MAX 96.0f
@@ -772,6 +776,8 @@ struct AppSettings {
     int compact_stack_max_lines; // Line budget for the stack below the panel (a 2-line group uses 2).
     float compact_stack_hold_time; // Seconds a pop-out holds before it leaves the stack.
     float compact_stack_rise_time; // Seconds a pop-out takes to slide into place.
+    bool compact_stack_fade_enabled; // Fade leaving pop-outs out instead of removing them instantly.
+    float compact_stack_fade_time; // Seconds the fade-out takes. Only used when the fade is enabled.
     float compact_pop_icon_size; // Pop-out line icon size.
     float compact_stack_shared_icon_size; // Shared-parent overlay icon size on a pop-out line.
     float compact_stack_face_size; // Co-op contributor face size on a pop-out line.
