@@ -259,7 +259,7 @@
 	"multi_stage_goal.ms_goal:thunder.stage.final":	"Gewitter Fertig!",
 	"multi_stage_goal.ms_goal:egap.display_name":	"Verz. Goldapf.",
 	"multi_stage_goal.ms_goal:egap.stage.1":	"",
-	"multi_stage_goal.ms_goal:egap.stage.final":	"Verz. Goldapf. da",
+	"multi_stage_goal.ms_goal:egap.stage.final":	"Gefunden",
 	"multi_stage_goal.ms_goal:bees.display_name":	"",
 	"multi_stage_goal.ms_goal:bees.stage.1":	"Nest setzen",
 	"multi_stage_goal.ms_goal:bees.stage.2":	"Honig ernten",
