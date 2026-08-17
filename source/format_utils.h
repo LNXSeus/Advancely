@@ -46,6 +46,8 @@ void format_time(long long ticks, char *output, size_t max_len, bool unit_spacin
  */
 void format_time_since_update(float total_seconds, char *output, size_t max_len, bool unit_spacing);
 
+void trim_room_code(char *buf, size_t buf_size);
+
 #ifdef __cplusplus
 }
 #endif
