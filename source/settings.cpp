@@ -704,6 +704,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 
         memcmp(&a->tracker_bg_color, &b->tracker_bg_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
+        a->overlay_transparent != b->overlay_transparent ||
         memcmp(&a->text_color, &b->text_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
 
@@ -921,6 +922,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_progress_font_size != b->overlay_progress_font_size ||
             a->overlay_row_font_size != b->overlay_row_font_size ||
             memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
+            a->overlay_transparent != b->overlay_transparent || // Window creation flag, needs a fresh window.
             memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
             strcmp(a->adv_bg_path, b->adv_bg_path) != 0 ||
             strcmp(a->adv_bg_half_done_path, b->adv_bg_half_done_path) != 0 ||
@@ -5002,20 +5004,51 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 // Conditionally display overlay background color picker
                 if (temp_settings.enable_overlay) {
+                    ImGui::BeginDisabled(temp_settings.overlay_transparent);
                     if (ImGui::ColorEdit3("Overlay Background Color", overlay_bg)) {
                         temp_settings.overlay_bg_color = {
                             (Uint8) (overlay_bg[0] * 255), (Uint8) (overlay_bg[1] * 255), (Uint8) (overlay_bg[2] * 255),
                             (Uint8) (overlay_bg[3] * 255)
                         };
                     }
-                    if (ImGui::IsItemHovered()) {
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char overlay_bg_tooltip_buffer[1024];
-                        snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
-                                 "Configure the color of the overlay background.\n"
-                                 "This is the color you'll need to color key in your streaming software (e.g., OBS).\n"
-                                 "Good settings to start within the color key filter: Similarity: 1, Smoothness: 210.\n"
-                                 "Default: Blue (0, 80, 255)");
+                        if (temp_settings.overlay_transparent) {
+                            snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
+                                     "Disabled because Transparent is checked.\n"
+                                     "A transparent overlay has no background color to key out, so this picker\n"
+                                     "has no effect. Uncheck Transparent to color key again.\n"
+                                     "Default: (%d, %d, %d)", DEFAULT_OVERLAY_BG_COLOR.r,
+                                     DEFAULT_OVERLAY_BG_COLOR.g, DEFAULT_OVERLAY_BG_COLOR.b);
+                        } else {
+                            snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
+                                     "Configure the color of the overlay background.\n"
+                                     "This is the color you'll need to color key in your streaming software (e.g., OBS).\n"
+                                     "Good settings to start within the color key filter: Similarity: 1, Smoothness: 210.\n"
+                                     "Default: (%d, %d, %d)", DEFAULT_OVERLAY_BG_COLOR.r,
+                                     DEFAULT_OVERLAY_BG_COLOR.g, DEFAULT_OVERLAY_BG_COLOR.b);
+                        }
                         ImGui::SetTooltip("%s", overlay_bg_tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Transparent", &temp_settings.overlay_transparent);
+                    if (ImGui::IsItemHovered()) {
+                        char overlay_transparent_tooltip_buffer[1024];
+                        snprintf(overlay_transparent_tooltip_buffer, sizeof(overlay_transparent_tooltip_buffer),
+                                 "Renders the overlay window with a transparent background instead of a\n"
+                                 "solid color. Changing this restarts the overlay.\n"
+#ifdef _WIN32
+                                 "Capture the overlay with an OBS 'Game Capture' source set to 'Capture\n"
+                                 "specific window', and enable 'Allow Transparency' on it.\n"
+#elif defined(__APPLE__)
+                                 "Capture the overlay with an OBS 'Window Capture' source.\n"
+#else
+                                 "Keep a compositor running, otherwise the background turns black.\n"
+#endif
+                                 "Default: %s", DEFAULT_OVERLAY_TRANSPARENT ? "On" : "Off");
+                        ImGui::SetTooltip("%s", overlay_transparent_tooltip_buffer);
                     }
                 }
 

@@ -3122,9 +3122,20 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
 }
 
 void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
-    SDL_SetRenderDrawColor(o->renderer, settings->overlay_bg_color.r, settings->overlay_bg_color.g,
-                           settings->overlay_bg_color.b, settings->overlay_bg_color.a);
-    SDL_RenderClear(o->renderer);
+    if (settings->overlay_transparent) {
+        // SDL_RenderClear honors the draw blend mode on several backends, so clearing to a zero
+        // alpha with the default BLEND mode would keep the previous frame instead of wiping it.
+        SDL_BlendMode previous_blend_mode = SDL_BLENDMODE_NONE;
+        SDL_GetRenderDrawBlendMode(o->renderer, &previous_blend_mode);
+        SDL_SetRenderDrawBlendMode(o->renderer, SDL_BLENDMODE_NONE);
+        SDL_SetRenderDrawColor(o->renderer, 0, 0, 0, 0);
+        SDL_RenderClear(o->renderer);
+        SDL_SetRenderDrawBlendMode(o->renderer, previous_blend_mode);
+    } else {
+        SDL_SetRenderDrawColor(o->renderer, settings->overlay_bg_color.r, settings->overlay_bg_color.g,
+                               settings->overlay_bg_color.b, settings->overlay_bg_color.a);
+        SDL_RenderClear(o->renderer);
+    }
 
     // Compact render mode replaces the top info bar and the 3-row layout entirely.
     if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT) {

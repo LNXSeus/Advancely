@@ -1085,6 +1085,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Default colors
     settings->tracker_bg_color = DEFAULT_TRACKER_BG_COLOR;
     settings->overlay_bg_color = DEFAULT_OVERLAY_BG_COLOR;
+    settings->overlay_transparent = DEFAULT_OVERLAY_TRANSPARENT;
     settings->text_color = DEFAULT_TEXT_COLOR;
     settings->overlay_text_color = DEFAULT_OVERLAY_TEXT_COLOR;
 
@@ -1786,6 +1787,15 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         if (load_color(visual_settings, "overlay_bg_color", &settings->overlay_bg_color, &DEFAULT_OVERLAY_BG_COLOR))
             defaults_were_used = true;
+
+        const cJSON *overlay_transparent_json = cJSON_GetObjectItem(visual_settings, "overlay_transparent");
+        if (overlay_transparent_json && cJSON_IsBool(overlay_transparent_json)) {
+            settings->overlay_transparent = cJSON_IsTrue(overlay_transparent_json);
+        } else {
+            settings->overlay_transparent = DEFAULT_OVERLAY_TRANSPARENT;
+            defaults_were_used = true;
+        }
+
         if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
             defaults_were_used = true;
         if (load_color(visual_settings, "overlay_text_color", &settings->overlay_text_color,
@@ -3416,6 +3426,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     if (context == SAVE_CONTEXT_ALL) {
         save_color(visuals_obj, "tracker_bg_color", &settings->tracker_bg_color);
         save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_transparent");
+        cJSON_AddItemToObject(visuals_obj, "overlay_transparent", cJSON_CreateBool(settings->overlay_transparent));
+
         save_color(visuals_obj, "text_color", &settings->text_color);
         save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
 

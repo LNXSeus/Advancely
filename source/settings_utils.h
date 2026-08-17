@@ -119,6 +119,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW_FREEZE_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Frozen items left-aligned by default
 #define DEFAULT_GOAL_HIDING_MODE HIDE_ONLY_TEMPLATE_HIDDEN
 #define DEFAULT_INVERT_HIDING_MODE false
+#define DEFAULT_OVERLAY_TRANSPARENT false // Color keying stays the default, transparency is opt-in
 #define DEFAULT_PRINT_DEBUG_STATUS false
 
 // Overlay Settings
@@ -851,6 +852,7 @@ struct AppSettings {
     // --- Colors ---
     ColorRGBA tracker_bg_color; // Background color for the main tracker window.
     ColorRGBA overlay_bg_color; // Background color for the overlay window.
+    bool overlay_transparent; // If true, the overlay window uses a transparent buffer instead of a background color.
     ColorRGBA text_color; // Global text color for UI elements.
     ColorRGBA overlay_text_color; // Text color for the overlay window.
 

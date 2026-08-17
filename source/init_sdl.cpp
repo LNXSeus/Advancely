@@ -109,7 +109,13 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 
 
 bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
-    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    Uint64 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+    // A transparent buffer can only be requested at creation time, which is why toggling the
+    // setting restarts the overlay process.
+    if (settings->overlay_transparent) {
+        window_flags |= SDL_WINDOW_TRANSPARENT;
+    }
 
     // Compact mode auto-fits its window to a small counter panel. The window is created at the saved
     // (belt/page) width here, so create it hidden and let overlay_new size it before showing it,

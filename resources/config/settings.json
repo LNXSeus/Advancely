@@ -73,6 +73,7 @@
 			"b":	255,
 			"a":	255
 		},
+		"overlay_transparent":	false,
 		"text_color":	{
 			"r":	255,
 			"g":	255,

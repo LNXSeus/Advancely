@@ -256,7 +256,7 @@
 	"multi_stage_goal.ms_goal:thunder.display_name":	"Trident",
 	"multi_stage_goal.ms_goal:thunder.stage.1":	"Obtain",
 	"multi_stage_goal.ms_goal:thunder.stage.2":	"Need Thunder",
-	"multi_stage_goal.ms_goal:thunder.stage.final":	"Thunder Done!",
+	"multi_stage_goal.ms_goal:thunder.stage.final":	"Done!",
 	"multi_stage_goal.ms_goal:egap.display_name":	"God Apple",
 	"multi_stage_goal.ms_goal:egap.stage.1":	"",
 	"multi_stage_goal.ms_goal:egap.stage.final":	"Obtained",
