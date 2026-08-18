@@ -949,6 +949,10 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
         t->coop_latched_frozen_pending[i] = false;
     }
     t->template_data->frozen_ticks_pending = false;
+    t->template_data->speedrunigt_ms = 0;
+    t->speedrunigt_last_ms = 0;
+    t->speedrunigt_last_save_ticks = 0;
+    t->speedrunigt_stalled = false;
 
     // Reset custom goals
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
@@ -1209,6 +1213,7 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
     t->template_data->frozen_play_time_ticks = 0;
     t->template_data->run_completed = false;
     t->template_data->frozen_ticks_pending = false;
+    t->template_data->speedrunigt_ms = 0;
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
 
@@ -1311,6 +1316,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
     t->template_data->frozen_play_time_ticks = 0;
     t->template_data->run_completed = false;
     t->template_data->frozen_ticks_pending = false;
+    t->template_data->speedrunigt_ms = 0;
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *ach = t->template_data->advancements[i];
@@ -3692,16 +3698,141 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
 }
 
 /**
- * @brief Re-latches a provisional frozen IGT once the game writes a newer play time.
+ * @brief Pulls "final_igt" out of the head of a SpeedrunIGT record.json.
+ *
+ * The key sits in the first few lines of the file, so the whole record (which can carry large
+ * timeline and advancement arrays) never has to be parsed. Returns false when the key is missing
+ * from the chunk or when the number is cut off by the end of it, in which case the caller falls
+ * back to a full JSON parse.
+ *
+ * @param head A NUL-terminated chunk from the start of the file.
+ * @param out_ms Receives the final IGT in milliseconds.
+ * @return True when a usable final IGT was extracted.
+ */
+static bool speedrunigt_parse_record_head(const char *head, long long *out_ms) {
+    const char *igt = strstr(head, "\"final_igt\"");
+    if (!igt) return false;
+
+    igt = strchr(igt, ':');
+    if (!igt) return false;
+    igt++;
+
+    char *end = nullptr;
+    long long value = strtoll(igt, &end, 10);
+    if (!end || end == igt || value <= 0) return false;
+
+    // The number must be followed by a delimiter inside the chunk, otherwise it was truncated.
+    while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+    if (*end != ',' && *end != '}') return false;
+
+    *out_ms = value;
+    return true;
+}
+
+/**
+ * @brief Reads the in-game time recorded by the SpeedrunIGT mod for the current world.
+ *
+ * SpeedrunIGT writes "<world>/speedrunigt/record.json" with a millisecond-precise "final_igt",
+ * which is more accurate than the play time in the stats file (ticks only resolve to 50 ms).
+ * Reading it is allowed by paragraph A.8.14 of the Minecraft Speedrunning rules. The mod rewrites
+ * the record whenever the game saves and again when its own timer stops, so this is read on every
+ * progress rebuild and the value simply follows the file.
+ *
+ * @param t The tracker, used for the saves path and current world name.
+ * @param out_ms Receives the final IGT in milliseconds.
+ * @return True when a record with a usable final IGT was found.
+ */
+static bool tracker_read_speedrunigt_final_ms(const Tracker *t, long long *out_ms) {
+    if (!t || !out_ms) return false;
+    if (t->saves_path[0] == '\0' || t->world_name[0] == '\0') return false;
+
+    char record_path[MAX_PATH_LENGTH * 2];
+    snprintf(record_path, sizeof(record_path), "%s/%s/speedrunigt/record.json", t->saves_path, t->world_name);
+
+    FILE *file = fopen(record_path, "rb");
+    if (!file) return false; // SpeedrunIGT isn't installed, or hasn't written a record for this world
+
+    char head[8192];
+    size_t read_len = fread(head, 1, sizeof(head) - 1, file);
+    fclose(file);
+    head[read_len] = '\0';
+
+    if (speedrunigt_parse_record_head(head, out_ms)) return true;
+
+    // Unusual key order or a very long header: fall back to parsing the whole record.
+    cJSON *record = cJSON_from_file(record_path);
+    if (!record) return false;
+
+    bool success = false;
+    const cJSON *final_igt = cJSON_GetObjectItem(record, "final_igt");
+    if (cJSON_IsNumber(final_igt) && final_igt->valuedouble > 0) {
+        *out_ms = (long long) final_igt->valuedouble;
+        success = true;
+    }
+
+    cJSON_Delete(record);
+    return success;
+}
+
+/**
+ * @brief Refreshes both IGT sources: SpeedrunIGT's record and a provisional frozen tick count.
  *
  * Called by every path that rebuilds progress from the save files. A run that completes on a
  * live Hermes event freezes against the play time of the PREVIOUS save, because Hermes events
  * carry no IGT. The first save afterwards (the run-ending pause) reports a higher play time,
  * which is the real final time. Re-reads of an unchanged file report the same play time and are
  * ignored, so the value only ever moves once.
+ *
+ * SpeedrunIGT's millisecond-precise IGT is also picked up here, whenever the mod's record.json
+ * exists. It is re-read on every rebuild, because the mod rewrites the record on each game save
+ * and again when its own timer stops, and it then replaces the tick count for every IGT display
+ * (live and frozen alike). Without the mod, the tick counts are used as before.
+ *
+ * The mod's timer can stop before the tracked template is complete (a different category, for
+ * example). That shows up as a game save whose play time moved on while final_igt didn't, and the
+ * display falls back to the stats file from there, freezing on it as usual when the run completes.
+ * A record.json that moves again (or a world change) hands the display straight back to the mod.
  */
-static void tracker_consume_pending_frozen_igt(TemplateData *td) {
-    if (!td || !td->frozen_ticks_pending) return;
+static void tracker_refresh_igt(Tracker *t) {
+    if (!t || !t->template_data) return;
+    TemplateData *td = t->template_data;
+
+    long long igt_ms = 0;
+    if (!tracker_read_speedrunigt_final_ms(t, &igt_ms)) {
+        // No record for this world: nothing to follow and nothing to stall on.
+        if (td->speedrunigt_ms > 0) {
+            log_message(LOG_INFO, "[TRACKER] SpeedrunIGT record gone, falling back to the stats play time.\n");
+        }
+        t->speedrunigt_last_ms = 0;
+        t->speedrunigt_last_save_ticks = td->play_time_ticks;
+        t->speedrunigt_stalled = false;
+        td->speedrunigt_ms = 0;
+    } else {
+        if (igt_ms != t->speedrunigt_last_ms) {
+            // The mod's timer moved, so follow it (again).
+            if (t->speedrunigt_stalled) {
+                log_message(LOG_INFO, "[TRACKER] SpeedrunIGT record moved again, using its IGT.\n");
+            } else if (t->speedrunigt_last_ms == 0) {
+                log_message(LOG_INFO, "[TRACKER] SpeedrunIGT record found, using its IGT (%lld ms).\n", igt_ms);
+            }
+            t->speedrunigt_stalled = false;
+            t->speedrunigt_last_ms = igt_ms;
+            t->speedrunigt_last_save_ticks = td->play_time_ticks;
+        } else if (td->play_time_ticks > t->speedrunigt_last_save_ticks) {
+            // A game save landed without record.json moving: the mod stopped its own timer.
+            if (!t->speedrunigt_stalled) {
+                log_message(LOG_INFO,
+                            "[TRACKER] SpeedrunIGT timer stopped at %lld ms while the run continues, "
+                            "falling back to the stats play time.\n", igt_ms);
+            }
+            t->speedrunigt_stalled = true;
+            t->speedrunigt_last_save_ticks = td->play_time_ticks;
+        }
+
+        td->speedrunigt_ms = t->speedrunigt_stalled ? 0 : igt_ms;
+    }
+
+    if (!td->frozen_ticks_pending) return;
     if (td->play_time_ticks > td->frozen_play_time_ticks) {
         td->frozen_play_time_ticks = td->play_time_ticks;
         td->frozen_ticks_pending = false;
@@ -4071,6 +4202,9 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
         t->coop_latched_frozen_ticks[i] = 0;
         t->coop_latched_frozen_pending[i] = false;
     }
+    t->speedrunigt_last_ms = 0;
+    t->speedrunigt_last_save_ticks = 0;
+    t->speedrunigt_stalled = false;
 
 
     // Explicitly initialize all members
@@ -4246,6 +4380,7 @@ static void coop_reset_template_progress(TemplateData *td) {
     td->play_time_ticks = 0;
     td->frozen_play_time_ticks = 0;
     td->run_completed = false;
+    td->speedrunigt_ms = 0;
     td->overall_progress_percentage = 0.0f;
     // frozen_ticks_pending is deliberately NOT cleared: a Hermes-completed run sets it outside
     // the merge cycle, and it has to survive this reset to reach the per-view latch below.
@@ -5137,7 +5272,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         } while (changed && ++guard < 32);
     }
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
-    tracker_consume_pending_frozen_igt(t->template_data);
+    tracker_refresh_igt(t);
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -5679,7 +5814,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         t->template_data->frozen_ticks_pending = t->coop_latched_frozen_pending[0];
     }
     tracker_calculate_overall_progress(t, version, settings);
-    tracker_consume_pending_frozen_igt(t->template_data);
+    tracker_refresh_igt(t);
     t->coop_latched_run_completed[0] = t->template_data->run_completed;
     t->coop_latched_frozen_ticks[0] = t->template_data->frozen_play_time_ticks;
     t->coop_latched_frozen_pending[0] = t->template_data->frozen_ticks_pending;
@@ -5788,7 +5923,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
         }
     }
     tracker_calculate_overall_progress(t, version, settings);
-    tracker_consume_pending_frozen_igt(t->template_data);
+    tracker_refresh_igt(t);
     if (slot >= 0 && slot < MAX_COOP_PLAYERS + 1) {
         t->coop_latched_run_completed[slot] = t->template_data->run_completed;
         t->coop_latched_frozen_ticks[slot] = t->template_data->frozen_play_time_ticks;
@@ -5829,7 +5964,7 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
     }
 
     tracker_calculate_overall_progress(t, version, settings);
-    tracker_consume_pending_frozen_igt(t->template_data);
+    tracker_refresh_igt(t);
     cJSON_Delete(settings_json);
 }
 
@@ -12033,8 +12168,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     long long display_ticks = (is_run_complete && settings->igt_freeze_on_completion)
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
-    format_time(display_ticks, formatted_time, sizeof(formatted_time),
-                settings->igt_unit_spacing, settings->igt_always_show_ms);
+    format_igt(display_ticks, t->template_data->speedrunigt_ms, formatted_time, sizeof(formatted_time),
+               settings->igt_unit_spacing, settings->igt_always_show_ms);
 
     if (is_run_complete) {
         snprintf(info_buffer, sizeof(info_buffer),
@@ -13627,10 +13762,14 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
 
     // This is the live path: progress changed between game saves, so the play time frozen by the
     // call above is the one from the last save, not the one the run actually ended on. Mark it
-    // provisional so the next save re-latches it (see tracker_consume_pending_frozen_igt).
+    // provisional so the next save re-latches it (see tracker_refresh_igt).
     if (!was_completed && t->template_data->run_completed && settings->using_hermes) {
         t->template_data->frozen_ticks_pending = true;
     }
+
+    // Also try SpeedrunIGT's record right away; if the mod hasn't written it yet, the
+    // save-driven rebuilds keep retrying.
+    tracker_refresh_igt(t);
 }
 
 
@@ -14939,8 +15078,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     char formatted_time[64];
     char formatted_update_time[64];
 
-    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time),
-                settings->igt_unit_spacing, settings->igt_always_show_ms);
+    format_igt(t->template_data->play_time_ticks, t->template_data->speedrunigt_ms, formatted_time,
+               sizeof(formatted_time), settings->igt_unit_spacing, settings->igt_always_show_ms);
 
     // Format the time since last update (snapped to 5s intervals like the overlay)
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
@@ -15055,8 +15194,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     long long display_ticks = (is_run_complete && settings->igt_freeze_on_completion)
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
-    format_time(display_ticks, formatted_time, sizeof(formatted_time),
-                settings->igt_unit_spacing, settings->igt_always_show_ms);
+    format_igt(display_ticks, t->template_data->speedrunigt_ms, formatted_time, sizeof(formatted_time),
+               settings->igt_unit_spacing, settings->igt_always_show_ms);
 
 
     log_message(LOG_INFO, "============================================================\n");

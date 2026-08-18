@@ -188,6 +188,15 @@ struct Tracker {
     long long coop_latched_frozen_ticks[MAX_COOP_PLAYERS + 1];
     bool coop_latched_frozen_pending[MAX_COOP_PLAYERS + 1];
 
+    // SpeedrunIGT stall detection. The mod's final_igt stops moving once ITS run is over, which
+    // can happen before the tracked template counts as complete (a different category, for
+    // example). When a game save arrives (the stats play time moved) without final_igt having
+    // moved with it, the mod's timer is treated as stopped and the stats file takes over again -
+    // including the freeze on completion - until record.json moves once more or the world changes.
+    long long speedrunigt_last_ms; // final_igt as of the last comparison
+    long long speedrunigt_last_save_ticks; // stats play time as of the last comparison
+    bool speedrunigt_stalled; // true while the mod's timer is considered stopped
+
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
     ImFont *tracker_font; // ImGui font for the main tracker grid display. Loaded from tracker_font_name.

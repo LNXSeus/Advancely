@@ -494,6 +494,7 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
     target->advancement_goal_count = incoming.advancement_goal_count;
     target->play_time_ticks = incoming.play_time_ticks;
     target->frozen_play_time_ticks = incoming.frozen_play_time_ticks;
+    target->speedrunigt_ms = incoming.speedrunigt_ms;
     target->run_completed = incoming.run_completed;
     target->host_time_since_last_update = incoming.host_time_since_last_update;
 

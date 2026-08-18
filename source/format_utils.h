@@ -38,6 +38,37 @@ void format_category_string(const char *input, char *output, size_t max_len);
 void format_time(long long ticks, char *output, size_t max_len, bool unit_spacing, bool always_show_ms);
 
 /**
+ * @brief Formats a time in milliseconds into the same human-readable string as format_time().
+ *
+ * Used for the exact final time reported by the SpeedrunIGT mod, which is millisecond-precise
+ * instead of being quantized to the 50 ms of a Minecraft tick.
+ *
+ * @param millis The total number of milliseconds.
+ * @param output The buffer to write the formatted time string to.
+ * @param max_len The size of the output buffer.
+ * @param unit_spacing If true, a space is inserted before every unit suffix (e.g. "02 m 04 s").
+ * @param always_show_ms If true, milliseconds are appended even when the time exceeds one minute.
+ */
+void format_time_ms(long long millis, char *output, size_t max_len, bool unit_spacing, bool always_show_ms);
+
+/**
+ * @brief Formats an in-game time, preferring the SpeedrunIGT mod's millisecond-precise value.
+ *
+ * Every IGT Advancely displays goes through this. The tick count the game writes to the stats
+ * file only resolves to 50 ms, so whenever SpeedrunIGT's record.json supplied a time it is used
+ * instead and the ticks are just the fallback.
+ *
+ * @param ticks The fallback time in Minecraft ticks (20 ticks per second).
+ * @param speedrunigt_ms The time from SpeedrunIGT's record.json in milliseconds, or 0 if unavailable.
+ * @param output The buffer to write the formatted time string to.
+ * @param max_len The size of the output buffer.
+ * @param unit_spacing If true, a space is inserted before every unit suffix (e.g. "02 m 04 s").
+ * @param always_show_ms If true, milliseconds are appended even when the time exceeds one minute.
+ */
+void format_igt(long long ticks, long long speedrunigt_ms, char *output, size_t max_len, bool unit_spacing,
+                bool always_show_ms);
+
+/**
  * @brief Formats a duration in seconds into a Hh Mm Ss string.
  * @param total_seconds The total number of seconds.
  * @param output The buffer to write the formatted time string to.

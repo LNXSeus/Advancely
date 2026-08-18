@@ -3659,6 +3659,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Freezes the IGT at the final time once the run is completed, in the\n"
                              "tracker info window, the debug print output and the overlay.\n"
                              "When off, those timers keep counting up like the tracker window title.\n"
+                             "With the SpeedrunIGT mod every IGT is millisecond precise instead of\n"
+                             "stepping in 50 ms game ticks.\n"
                              "Default: %s", DEFAULT_IGT_FREEZE_ON_COMPLETION ? "On" : "Off");
                     ImGui::SetTooltip("%s", igt_freeze_tooltip_buffer);
                 }
@@ -3676,11 +3678,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 ImGui::SameLine();
                 ImGui::Checkbox("IGT Always Show ms", &temp_settings.igt_always_show_ms);
                 if (ImGui::IsItemHovered()) {
-                    char igt_ms_tooltip_buffer[256];
+                    char igt_ms_tooltip_buffer[384];
                     snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
                              "Always shows milliseconds in the IGT display,\n"
                              "even when the time exceeds one minute.\n"
                              "Example: \"02m 04.500s\" instead of \"02m 04s\".\n"
+                             "Times from the stats file step in 50 ms game ticks; only times\n"
+                             "read from the SpeedrunIGT mod are millisecond exact.\n"
                              "Default: Off");
                     ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
                 }

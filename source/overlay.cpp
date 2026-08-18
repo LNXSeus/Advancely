@@ -2379,8 +2379,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         long long compact_ticks = settings->igt_freeze_on_completion
                                       ? td->frozen_play_time_ticks
                                       : td->play_time_ticks;
-        format_time(compact_ticks, count_buf, sizeof(count_buf), settings->igt_unit_spacing,
-                    settings->igt_always_show_ms);
+        format_igt(compact_ticks, td->speedrunigt_ms, count_buf, sizeof(count_buf),
+                   settings->igt_unit_spacing, settings->igt_always_show_ms);
         int lwm = 0, cwm = 0;
         TTF_MeasureString(label_font, label_buf, 0, 0, &lwm, nullptr);
         TTF_MeasureString(count_font, count_buf, 0, 0, &cwm, nullptr);
@@ -3236,8 +3236,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             long long final_ticks = settings->igt_freeze_on_completion
                                         ? t->template_data->frozen_play_time_ticks
                                         : t->template_data->play_time_ticks;
-            format_time(final_ticks, formatted_time, sizeof(formatted_time),
-                        settings->igt_unit_spacing, settings->igt_always_show_ms);
+            format_igt(final_ticks, t->template_data->speedrunigt_ms, formatted_time, sizeof(formatted_time),
+                       settings->igt_unit_spacing, settings->igt_always_show_ms);
             snprintf(info_buffer, sizeof(info_buffer),
                      "*** RUN COMPLETED! ***%sFinal Time: %s%sDonate (mentioning 'Advancely') to be featured!",
                      segment_sep, formatted_time, segment_sep);
@@ -3284,8 +3284,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             if (settings->overlay_show_igt) {
                 char formatted_time[64];
-                format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time),
-                            settings->igt_unit_spacing, settings->igt_always_show_ms);
+                format_igt(t->template_data->play_time_ticks, t->template_data->speedrunigt_ms, formatted_time,
+                           sizeof(formatted_time), settings->igt_unit_spacing, settings->igt_always_show_ms);
                 snprintf(temp_chunk, sizeof(temp_chunk), "%s IGT", formatted_time);
                 add_component(temp_chunk);
             }

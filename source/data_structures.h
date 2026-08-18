@@ -627,6 +627,11 @@ struct TemplateData {
     // frozen above came from the previous game save. The first save that reports a higher play
     // time re-latches the real final time and clears this.
     bool frozen_ticks_pending;
+    // IGT in milliseconds, read from the SpeedrunIGT mod's "<world>/speedrunigt/record.json".
+    // The mod rewrites that file on every game save and when its own timer stops, and it is
+    // millisecond-precise instead of being rounded to a 50 ms game tick, so it is preferred
+    // over the tick counts above for every IGT Advancely displays. 0 when the mod isn't in use.
+    long long speedrunigt_ms;
 
     // Taking snapshot for legacy versions when world is changed to track changes per world
     long long playtime_snapshot; // Stores playtime at world load for legacy versions

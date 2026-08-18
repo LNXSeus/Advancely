@@ -39,9 +39,24 @@ void format_category_string(const char *input, char *output, size_t max_len) {
 }
 
 void format_time(long long ticks, char *output, size_t max_len, bool unit_spacing, bool always_show_ms) {
+    format_time_ms(ticks * 50, output, max_len, unit_spacing, always_show_ms);
+}
+
+void format_igt(long long ticks, long long speedrunigt_ms, char *output, size_t max_len, bool unit_spacing,
+                bool always_show_ms) {
+    if (speedrunigt_ms > 0) {
+        format_time_ms(speedrunigt_ms, output, max_len, unit_spacing, always_show_ms);
+    } else {
+        format_time(ticks, output, max_len, unit_spacing, always_show_ms);
+    }
+}
+
+void format_time_ms(long long millis, char *output, size_t max_len, bool unit_spacing, bool always_show_ms) {
     if (!output || max_len == 0) return;
 
-    long long total_seconds = ticks / 20;
+    if (millis < 0) millis = 0;
+
+    long long total_seconds = millis / 1000;
     long long days_total = total_seconds / 86400;
     long long years = days_total / 365;
     long long days = days_total % 365;
@@ -49,7 +64,7 @@ void format_time(long long ticks, char *output, size_t max_len, bool unit_spacin
     long long hours = (total_seconds % 86400) / 3600;
     long long minutes = (total_seconds % 3600) / 60;
     long long seconds = total_seconds % 60;
-    long long milliseconds = (ticks % 20) * 50;
+    long long milliseconds = millis % 1000;
 
     // Spacing inserted between number and unit when unit_spacing is on
     const char *sp = unit_spacing ? " " : "";
