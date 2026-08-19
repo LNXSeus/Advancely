@@ -9,6 +9,7 @@
 
 #include "logger.h"
 #include "settings_utils.h" // Include the full header for the AppSettings definition
+#include "profiler.h" // For counting log calls per second while profiling
 #include <cstdio>
 #include <ctime>
 #include <SDL3/SDL_mutex.h>
@@ -62,6 +63,8 @@ void log_message(LogLevel level, const char *format, ...) {
     if (level == LOG_INFO && (g_app_settings == nullptr || !g_app_settings->print_debug_status)) {
         return;
     }
+
+    profiler_note_log();
 
     // Buffer to hold the formatted message
     char message[4096];

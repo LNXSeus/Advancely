@@ -1529,7 +1529,7 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 
 | Group                    | Default                    | Action                                                                                                                                                                     |
 |--------------------------|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Tracker Window**       | `Shift+V`                  | Toggle the Visual Layout Editor. Opens the template editor and puts the applied template into `Edit Template` first if needed, as long as a valid saves folder is tracked. |
+| **Tracker Window**       | `Shift+V`                  | Toggle the Visual Layout Editor. Opens the template editor and puts the applied template into `Edit Template` first if needed. |
 |                          | `Shift+E`                  | Toggle the Template Editor window.                                                                                                                                         |
 | **Settings Window**      | `Ctrl+S`                   | Apply Settings.                                                                                                                                                            |
 |                          | `Ctrl+Z`                   | Revert Changes.                                                                                                                                                            |
@@ -2036,11 +2036,8 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares
   on the overlay within the first row or being invisible on the tracker). Checking the `advancely_log.txt` or
   `advancely_overlay_log.txt` file will tell you about incompatible images.
-0,
 * To fix this, re-save the images in a standard format or use ImageMagick (recursive):
   `for /r %i in (*.png) do magick mogrify -define png:format=png32 -interlace none -strip -depth 8 "%i"`.
-* **Frame drops when no saves folder**: Whenever Advancely is set to track the active instance, 
-but no instance is open, it might hook onto a different java process and unsuccessfully try to locate a saves folder from it.
 
 </details>
 
@@ -2086,17 +2083,72 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 Advancely supports several command-line arguments to customize its behavior. These are particularly useful for package
 maintainers or advanced users who want to override default behaviors.
 
-| Argument                 | Description                                                                                                                                                                           |
-|:-------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar.  |
-| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                               |
-| `--use-home-dir`         | **Linux ONLY:** So Advancely uses the users home directory for applicable files that need to be user-writable such as templates, notes and config. Used within the package manager.   |
-| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                     |
-| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                              |
-| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.           |
-| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host.       |
-| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                      |
-| `--update`               | Opens the update popup on startup, even when the auto-updater is disabled in the settings or via `--disable-updater`. If you are already on the latest version it offers a reinstall. |
+| Argument                 | Description                                                                                                                                                                                       |
+|:-------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar.              |
+| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                                           |
+| `--use-home-dir`         | **Linux ONLY:** So Advancely uses the users home directory for applicable files that need to be user-writable such as templates, notes and config. Used within the package manager.               |
+| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                                 |
+| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                                          |
+| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.                       |
+| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely server, prints the result, and exits. Useful for verifying server connectivity from a host.                   |
+| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                                  |
+| `--update`               | Opens the update popup on startup, even when the auto-updater is disabled in the settings or via `--disable-updater`. If you are already on the latest version it offers a reinstall.             |
+| `--profiler [seconds]`   | Measures where the tracker window spends each frame and writes a running report to `advancely_profile_log.txt`. The optional number sets the report interval in seconds (default `5`). See below. |
+
+### The `--profiler` flag
+
+`--profiler` turns on Advancely's built-in frame profiler. It is a diagnostic tool for answering "why does the tracker
+feel slow right now?" with measurements instead of guesses, and it is the fastest way to give me something useful when
+you report a performance problem.
+
+Run it from a terminal, optionally with a report interval:
+
+```
+Advancely.exe --profiler        # writes a report every 5 seconds (default)
+Advancely.exe --profiler 1      # writes a report every second, for short/bursty problems
+Advancely.exe --profiler 30     # writes a report every 30 seconds, for long unattended sessions
+```
+
+**What it produces.** A report is appended to `advancely_profile_log.txt` (next to `advancely_log.txt`) once per
+interval. The file is overwritten on each launch. Each report starts with a summary line and is followed by every
+measured section of the frame, sorted by total cost:
+
+```
+[PROFILE] 61.3 fps | work avg 5.78 ms | work max 15.50 ms | slow frames 0/307 | log calls 0
+[PROFILE]   sdl_render_draw_data      295.91 ms/s     4.827 ms/call  max   14.38 ms     61.3 calls/s
+[PROFILE]   tracker_render_gui         15.18 ms/s     0.248 ms/call  max    0.64 ms     61.3 calls/s
+[PROFILE]   Advancements               12.36 ms/s     0.202 ms/call  max    0.49 ms     61.3 calls/s
+[PROFILE]   <unaccounted>               0.39 ms/s (frame work not covered by any zone)
+```
+
+**How to read it:**
+
+* **`fps`** is the frame rate actually achieved over the interval.
+* **`work avg` / `work max`** are how long the tracker spent *doing work* per frame, excluding the sleep the frame
+  limiter adds to hold your configured FPS. This is the number that matters: if `work avg` approaches your frame
+  budget (16.7 ms at 60 FPS) the tracker is saturated, even when `fps` still looks fine.
+* **`slow frames`** counts frames whose work exceeded 16.7 ms, out of the total frames in the interval. A handful is
+  normal; a large fraction means visible stutter.
+* **`log calls`** counts log messages written during the interval. Errors are always logged, so a non-zero value while
+  `Print Debug Status` is off means something is going wrong repeatedly.
+* **`ms/s`** is how many milliseconds that section consumed per second of runtime, which is the honest measure of what
+  is eating your frame budget. **`ms/call`** is its average cost each time it ran, **`max`** is its single worst run in
+  the interval, and **`calls/s`** is how often it ran.
+* **`<unaccounted>`** is framework that no measured section covers. If it is large, the cost is somewhere that is not
+  instrumented yet.
+
+Sections cover the whole frame: rendering (`sdl_render_draw_data`, `sdl_render_present`, `tracker_render_gui`, plus one
+entry per map section such as `Advancements` or `Statistics`), input and hotkeys, co-op networking, the overlay IPC
+write, path detection (`get_saves_path`), and the heavy operations that read your game files or reload the template
+(`tracker_update_full`, `settings_changed_reinit`).
+
+**Cost when it is off:** none worth measuring. Every measurement point is a single boolean check when the flag is
+absent, so shipping builds are unaffected, and you never need to remove the flag "for performance".
+
+**When reporting a performance issue**, run with `--profiler`, reproduce the slowdown for a minute or two, then attach
+`advancely_profile_log.txt`. If the problem depends on some condition (Minecraft open vs closed, a specific template,
+the overlay enabled), capture both states in the same run so the two can be compared directly.
 
 </details>
 

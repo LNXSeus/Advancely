@@ -7427,20 +7427,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                    strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                    strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
 
-        // Check if saves path is a valid Minecraft saves folder (not a stale/unrelated path)
-        bool vis_has_valid_saves = t->saves_path[0] != '\0' && path_exists(t->saves_path);
-        if (vis_has_valid_saves) {
-            size_t vis_sp_len = strlen(t->saves_path);
-            if (vis_sp_len > 0 && t->saves_path[vis_sp_len - 1] == '/') vis_sp_len--;
-            vis_has_valid_saves = (vis_sp_len >= 6 && strncmp(t->saves_path + vis_sp_len - 6, "/saves", 6) == 0);
-        }
-
         // The visual editor reloads the tracker from disk using settings.layout_flag, so the editor's
         // selected layout must match the one active in Settings or it would edit a different file than
         // the map shows. (Only guard when starting: never block the "Stop" button mid-session.)
         bool vis_layout_mismatch = !t->is_visual_layout_editing && (selected_layout_flag != app_settings->layout_flag);
 
-        bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves || vis_layout_mismatch;
+        bool vis_editor_disabled = !is_active_template || vis_layout_mismatch;
 
         // A pending "Toggle Visual Layout Editor" hotkey press acts exactly like clicking the button,
         // and is ignored while the button is disabled. The window is open by now either way, so the
@@ -7477,11 +7469,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "You must apply this template in the main Settings window\n"
                              "to use the visual map editor.");
-                } else if (!vis_has_valid_saves) {
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "No valid Minecraft saves folder is currently being tracked.\n"
-                             "The visual layout editor requires an active world to function properly.\n"
-                             "Make sure Minecraft is running or check your saves path in Settings.");
                 } else {
                     char editor_layout_name[80];
                     char settings_layout_name[80];

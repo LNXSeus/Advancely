@@ -57,6 +57,7 @@ extern "C" {
 #include "settings.h"
 #include "global_event_handler.h"
 #include "global_hotkeys.h" // For OS-level hotkey registration
+#include "profiler.h" // For --profiler frame timing
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 #include "logger.h"
@@ -1664,6 +1665,8 @@ int main(int argc, char *argv[]) {
     // This communicates with the build.yml file, where the gtimeout or timeout are
     bool is_test_mode = false;
     bool is_overlay_mode = false;
+    bool is_profiling = false;
+    float profile_interval = 5.0f;
 
     // MODIFIED: Robust Argument Parsing Loop
     for (int i = 1; i < argc; i++) {
@@ -1688,6 +1691,15 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--overlay") == 0) {
             // Only running overlay
             is_overlay_mode = true;
+        } else if (strcmp(argv[i], "--profiler") == 0) {
+            // Per-frame timing breakdown written to advancely_profile_log.txt.
+            // Optional argument: report interval in seconds (default 5).
+            is_profiling = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                profile_interval = (float) atof(argv[i + 1]);
+                i++;
+            }
+            printf("[CLI] Frame profiling enabled (report every %.2fs).\n", (double) profile_interval);
         } else if (strcmp(argv[i], "--disable-updater") == 0) {
             // Temporarily disables updater
             g_disable_updater = true;
@@ -2531,6 +2543,8 @@ int main(int argc, char *argv[]) {
         Uint32 last_frame_time = SDL_GetTicks();
         float frame_target_time = 1000.0f / app_settings.fps;
 
+        profiler_init(is_profiling, profile_interval);
+
         // Co-op template mismatch popup state
         bool coop_template_mismatch = false;
         char coop_mismatch_msg[512] = {};
@@ -2586,6 +2600,8 @@ int main(int argc, char *argv[]) {
 
         // Unified MAIN TRACKER LOOP -------------------------------------------------
         while (is_running) {
+            profiler_frame_begin();
+
             // Check for timed shutdown in test mode
             if (is_test_mode) {
                 if (SDL_GetTicks() - test_mode_start_time >= 5000) {
@@ -2672,6 +2688,7 @@ int main(int argc, char *argv[]) {
             // When an instance is actively being tracked, poll every 2s to react quickly
             // to instance switches. When no Minecraft process is running, back off to
             // every 10s to avoid hammering the process table for nothing.
+            PROFILE_BEGIN(instance_poll, "instance_poll");
             if (app_settings.path_mode == PATH_MODE_INSTANCE) {
                 static float time_since_instance_check = 0.0f;
                 static bool last_instance_found = false; // Track whether we found an instance last time
@@ -2706,38 +2723,22 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-
-            // Auto-cancel the Visual Layout Editor if the tracked saves folder stops being valid
-            // (e.g. Minecraft was closed and no saves folder is being tracked anymore). This runs
-            // every frame so it reacts in real time, regardless of whether the template editor
-            // window is open, focused, or collapsed. Uses the same saves-validity check as the
-            // template editor's "Visual Layout Editor" button and the Settings warning.
-            if (tracker->is_visual_layout_editing) {
-                bool vle_valid_saves = tracker->saves_path[0] != '\0' && path_exists(tracker->saves_path);
-                if (vle_valid_saves) {
-                    size_t sp_len = strlen(tracker->saves_path);
-                    if (sp_len > 0 && tracker->saves_path[sp_len - 1] == '/') sp_len--;
-                    vle_valid_saves = (sp_len >= 6 && strncmp(tracker->saves_path + sp_len - 6, "/saves", 6) == 0);
-                }
-                if (!vle_valid_saves) {
-                    log_message(LOG_INFO,
-                                "[MAIN] Visual Layout Editor auto-cancelled: no valid saves folder is being tracked.\n");
-                    tracker->is_visual_layout_editing = false;
-                    app_settings.goal_hiding_mode = tracker->pre_visual_edit_hiding_mode;
-                    app_settings.use_manual_layout = tracker->pre_visual_edit_use_manual_layout;
-                    settings_save(&app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
-                    SDL_SetAtomicInt(&g_settings_changed, 1);
-                }
-            }
+            PROFILE_END(instance_poll);
 
             // Mirror the current bindings to the OS before polling. Diff-based, so this is a
             // handful of comparisons on the frames where nothing changed.
+            PROFILE_BEGIN(hotkeys_apply, "global_hotkeys_apply");
             global_hotkeys_apply(&app_settings);
+            PROFILE_END(hotkeys_apply);
 
+            PROFILE_BEGIN(events, "handle_global_events");
             handle_global_events(tracker, nullptr, &app_settings, &is_running, &settings_opened, &deltaTime);
+            PROFILE_END(events);
 
             // Tick co-op networking (lightweight per-frame check)
+            PROFILE_BEGIN(coop_tick, "coop_net_tick");
             coop_net_tick(&coop_ctx);
+            PROFILE_END(coop_tick);
 
             // Detect coop disconnection (kicked, host shutdown, connection lost)
             // and apply settings to trigger a proper reload
@@ -2963,14 +2964,17 @@ int main(int argc, char *argv[]) {
             // or dropped the preview again. Only the template data has to be rebuilt: paths, settings
             // and the file watchers are all unaffected, so this deliberately skips the heavy
             // g_settings_changed path below and just reparses.
+            PROFILE_BEGIN(preview_reinit, "template_preview_reinit");
             if (SDL_SetAtomicInt(&g_template_preview_changed, 0) == 1) {
                 tracker_reinit_template(tracker, &app_settings);
                 // The rebuilt goals start out empty, so read the player's progress back into them.
                 SDL_SetAtomicInt(&g_needs_update, 1);
             }
+            PROFILE_END(preview_reinit);
 
             // Check if settings.json has been modified (by UI or external editor)
             // Single point of truth for tracker data, triggered by "Apply" button
+            PROFILE_BEGIN(settings_reinit, "settings_changed_reinit");
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
                 log_message(LOG_INFO, "[MAIN] Settings changed. Re-initializing template and file watcher.\n");
 
@@ -3070,12 +3074,14 @@ int main(int argc, char *argv[]) {
                 frame_target_time = 1000.0f / app_settings.fps;
                 SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
             }
+            PROFILE_END(settings_reinit);
 
             // ---- Hermes live-update poll ----------------------------------------
             // Both stat and advancement events are applied directly to in-memory
             // state - no disk reads. The game files are only read when the game
             // saves and dmon fires a normal tracker_update(), which corrects and
             // confirms everything.
+            PROFILE_BEGIN(hermes_poll, "hermes_poll");
             if (app_settings.using_hermes && tracker->hermes_active) {
                 tracker_poll_hermes_log(tracker, &app_settings);
 
@@ -3162,9 +3168,11 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
+            PROFILE_END(hermes_poll);
 
 
             // --- Co-op Receiver: consume template sync from host ---
+            PROFILE_BEGIN(coop_template_sync, "coop_template_sync");
             if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx &&
                 coop_net_template_sync_ready(g_coop_ctx)) {
                 char sync_json[1024];
@@ -3271,7 +3279,10 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            PROFILE_END(coop_template_sync);
+
             // --- Co-op Receiver: consume state updates from host ---
+            PROFILE_BEGIN(coop_state_update, "coop_receiver_state");
             if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx) {
                 static int rcv_last_applied_player_idx = -1;
                 static int rcv_last_applied_ghost_idx = -1;
@@ -3383,6 +3394,7 @@ int main(int argc, char *argv[]) {
 
                 SDL_UnlockMutex(g_coop_ctx->recv_mutex);
             }
+            PROFILE_END(coop_state_update);
 
             // --- Co-op Host: handle player-view dropdown change ---
             // Apply the cached snapshot for the newly selected player (or merged)
@@ -3632,6 +3644,7 @@ int main(int argc, char *argv[]) {
 
             // Check if dmon (or manual update through custom goal) has requested an update
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
+            PROFILE_BEGIN(needs_update, "tracker_update_full");
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
                 // Full update covers broadcast needs too
                 SDL_SetAtomicInt(&g_coop_broadcast_needed, 0);
@@ -4001,6 +4014,7 @@ int main(int argc, char *argv[]) {
 
             // Lightweight custom goal broadcast: no file re-reading, just recalculate + broadcast + IPC
             else if (SDL_SetAtomicInt(&g_coop_broadcast_needed, 0) == 1) {
+                PROFILE_SCOPE("coop_broadcast_light");
                 log_message(LOG_INFO, "[COOP] Custom goal change — broadcasting without full re-merge.\n");
                 tracker_recalculate_progress(tracker, &app_settings);
 
@@ -4097,6 +4111,7 @@ int main(int argc, char *argv[]) {
 
             // Continuous Update - Update the time in shared memory every frame so the overlay timer ticks
             else if (tracker->p_shared_data) {
+                PROFILE_SCOPE("ipc_header_continuous");
 #ifdef _WIN32
                 if (WaitForSingleObject(tracker->h_mutex, 5) == WAIT_OBJECT_0) {
 #else
@@ -4128,19 +4143,25 @@ int main(int argc, char *argv[]) {
 #endif
                 }
             }
+            PROFILE_END(needs_update);
 
             // --- Update Title Bar Timer ---
             // Refresh the window title every 0.1s to update the "Upd:" timer, very light-weight operation
+            PROFILE_BEGIN(update_title, "tracker_update_title");
             static float title_update_timer = 0.0f;
             title_update_timer += deltaTime;
             if (title_update_timer >= 0.1f) {
                 tracker_update_title(tracker, &app_settings);
                 title_update_timer = 0.0f;
             }
+            PROFILE_END(update_title);
+
             // IMGUI RENDERING
+            PROFILE_BEGIN(imgui_newframe, "imgui_new_frame");
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+            PROFILE_END(imgui_newframe);
 
             // Load the welcome window
             welcome_render_gui(&show_welcome_window, &app_settings, tracker, g_logo_texture);
@@ -4186,16 +4207,22 @@ int main(int argc, char *argv[]) {
             }
 
             // Render the tracker GUI USING ImGui
+            PROFILE_BEGIN(render_tracker, "tracker_render_gui");
             tracker_render_gui(tracker, &app_settings);
+            PROFILE_END(render_tracker);
 
 
             // Render settings window in tracker window
             // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
+            PROFILE_BEGIN(render_settings, "settings_render_gui");
             settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_reason,
                                 &tracker->temp_creator_window_open);
+            PROFILE_END(render_settings);
 
             // Render the template creator window
+            PROFILE_BEGIN(render_temp_creator, "temp_creator_render_gui");
             temp_creator_render_gui(&tracker->temp_creator_window_open, &app_settings, tracker->roboto_font, tracker);
+            PROFILE_END(render_temp_creator);
 
             // --- Quit Confirmation Popup ---
             CoopNetState quit_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
@@ -4549,17 +4576,27 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            PROFILE_BEGIN(imgui_render, "imgui_render");
             ImGui::Render();
+            PROFILE_END(imgui_render);
 
+            PROFILE_BEGIN(skin_pump, "skin_cache_pump");
             skin_cache_pump();
+            PROFILE_END(skin_pump);
 
+            PROFILE_BEGIN(sdl_draw, "sdl_render_draw_data");
             SDL_SetRenderDrawColor(tracker->renderer, (Uint8) (app_settings.tracker_bg_color.r),
                                    (Uint8) (app_settings.tracker_bg_color.g), (Uint8) (app_settings.tracker_bg_color.b),
                                    (Uint8) (app_settings.tracker_bg_color.a));
             SDL_RenderClear(tracker->renderer);
             ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
-            SDL_RenderPresent(tracker->renderer);
+            PROFILE_END(sdl_draw);
 
+            PROFILE_BEGIN(sdl_present, "sdl_render_present");
+            SDL_RenderPresent(tracker->renderer);
+            PROFILE_END(sdl_present);
+
+            profiler_frame_end();
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - (float) current_time;
@@ -4567,6 +4604,7 @@ int main(int argc, char *argv[]) {
                 SDL_Delay((Uint32) (frame_target_time - frame_time));
             }
         }
+        profiler_shutdown();
         exit_status = EXIT_SUCCESS;
     }
 

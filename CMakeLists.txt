@@ -66,6 +66,7 @@ set(SOURCE_FILES
         "source/mojang_api.cpp"
         "source/update_checker.cpp"
         "source/logger.cpp"
+        "source/profiler.cpp"
         "source/dialog_utils.cpp"
         "source/coop_net.cpp"
         "source/coop_net_relay.cpp"

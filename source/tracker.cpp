@@ -38,6 +38,7 @@
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
+#include "profiler.h"
 #include "main.h" // For show_error_message
 
 #include "imgui_internal.h"
@@ -479,6 +480,7 @@ bool str_contains_insensitive(const char *haystack, const char *needle) {
 // Builds s_linked_top and s_linked_sub from counters and text headers that match the current search.
 // One layer deep only (no transitivity). Exact matching (no parent/child propagation).
 static void build_search_linked_sets(const Tracker *t) {
+    PROFILE_SCOPE("build_search_linked_sets");
     s_linked_top.clear();
     s_linked_sub.clear();
     if (t->search_buffer[0] == '\0') return;
@@ -5166,11 +5168,21 @@ static void coop_finalize_advancements(TemplateData *td) {
     }
 }
 
+// "No world" has two spellings: tracker_reinit_paths() clears world_name to "" when no saves path
+// could be resolved, while find_player_data_files() writes the "No Worlds Found" placeholder when
+// the saves path holds no world. Both mean the same thing, so a plain strcmp between them reported
+// a world change on every update.
+static bool world_names_match(const char *a, const char *b) {
+    const bool a_none = (a[0] == '\0' || strcmp(a, "No Worlds Found") == 0);
+    const bool b_none = (b[0] == '\0' || strcmp(b, "No Worlds Found") == 0);
+    if (a_none || b_none) return a_none && b_none;
+    return strcmp(a, b) == 0;
+}
+
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
-    if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
-        strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
+    if (!world_names_match(t->world_name, t->template_data->last_known_world_name)) {
         // Save notes for the OLD world before doing anything else
         tracker_save_notes(t, settings);
 
@@ -5208,7 +5220,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // Otherwise, each player has their own baseline captured/loaded on world change.
     const PlayerLegacySnapshot *legacy_baseline = nullptr;
     if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-        if (strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+        if (!world_names_match(t->world_name, t->template_data->snapshot_world_name)) {
             log_message(LOG_INFO, "[TRACKER] Legacy world change detected. Invalidating baselines for world: %s\n",
                         t->world_name);
             tracker_clear_legacy_player_snapshots(t);
@@ -5684,8 +5696,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
     // Detect world changes (same as tracker_update)
-    if (t->template_data->last_known_world_name[0] == '\0' ||
-        strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
+    if (!world_names_match(t->world_name, t->template_data->last_known_world_name)) {
         tracker_save_notes(t, settings);
         tracker_reset_progress_on_world_change(t, settings);
         tracker_update_notes_path(t, settings);
@@ -7212,6 +7223,7 @@ static float get_global_safe_x(Tracker *t) {
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
+    PROFILE_SCOPE(section_title);
     // --- LOD THRESHOLDS ---
     // 1. Zoom < 0.60: Hide Sub-Item Text & Progress Text
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
@@ -9071,6 +9083,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
+    PROFILE_SCOPE(section_title);
     // LOD Thresholds
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Progress Text
@@ -9488,6 +9501,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
  */
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                         const char *section_title) {
+    PROFILE_SCOPE(section_title);
     // LOD Thresholds
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Progress Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name & Checkboxes
@@ -10161,6 +10175,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
  */
 static void render_counter_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                          const char *section_title) {
+    PROFILE_SCOPE(section_title);
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold;
 
@@ -10540,6 +10555,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
  */
 static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                             const char *section_title) {
+    PROFILE_SCOPE(section_title);
     // LOD Thresholds
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Stage Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Goal Name
@@ -11083,6 +11099,7 @@ static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
  * Only renders when manual layout mode is active.
  */
 static void render_decorations(Tracker *t, const AppSettings *settings) {
+    PROFILE_SCOPE("render_decorations");
     if (!settings->use_manual_layout) return;
     if (!t->template_data || t->template_data->decoration_count <= 0) return;
 
@@ -14888,6 +14905,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         log_message(LOG_INFO, "[TRACKER] Unsaved template preview: skipping the settings.json sync.\n");
     } else if (save_needed) {
         log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
+        // This write is app-initiated, so the settings watcher has to swallow the dmon event it
+        // causes. Clearing g_settings_changed after the write cannot do that: dmon delivers on its
+        // own thread ~100ms later, long after the clear, which is what turned this into a reinit loop.
+        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
         // Atomically write the synchronized settings back to the file.
         if (!cJSON_write_to_file_atomic(get_settings_file_path(), settings_root)) {
             log_message(LOG_ERROR, "[TRACKER] Failed to write synchronized settings.json.\n");

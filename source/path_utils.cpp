@@ -10,6 +10,7 @@
 #include "path_utils.h" // includes main.h
 #include "settings_utils.h"
 #include "logger.h"
+#include "profiler.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -495,6 +496,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
 // PUBLIC FUNCTIONS
 
 bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *manual_path) {
+    PROFILE_SCOPE("get_saves_path");
     if (!out_path || max_len == 0) return false;
 
     bool success = false;
@@ -582,6 +584,15 @@ void find_player_data_files(
         latest_world_name[sizeof(latest_world_name) - 1] = '\0';
         log_message(LOG_INFO, "[PATH UTILS] Fixed world mode. Using world: %s\n", latest_world_name);
     } else {
+        // No saves folder is being tracked. Scanning anyway would build the pattern "/*", which
+        // FindFirstFileA happily resolves to the root of the current drive, so the most recently
+        // modified folder there (C:/Users, C:/Windows, ...) would be adopted as the world name.
+        if (!saves_path || saves_path[0] == '\0') {
+            strncpy(out_world_name, "No Worlds Found", max_len - 1);
+            out_world_name[max_len - 1] = '\0';
+            return;
+        }
+
         // Auto/Manual/Instance: scan for the most recently modified world folder.
         char search_path[MAX_PATH_LENGTH];
         snprintf(search_path, sizeof(search_path), "%s/*", saves_path);
@@ -746,6 +757,13 @@ void find_player_data_files(
         latest_world_name[sizeof(latest_world_name) - 1] = '\0';
         log_message(LOG_INFO, "[PATH UTILS] Fixed world mode. Using world: %s\n", latest_world_name);
     } else {
+        // No saves folder is being tracked; opendir would just fail and log an error every call.
+        if (!saves_path || saves_path[0] == '\0') {
+            strncpy(out_world_name, "No Worlds Found", max_len - 1);
+            out_world_name[max_len - 1] = '\0';
+            return;
+        }
+
         // Auto/Manual/Instance: scan for the most recently modified world folder.
         DIR *saves_dir = opendir(saves_path);
         if (!saves_dir) {
