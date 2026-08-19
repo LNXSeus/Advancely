@@ -16,6 +16,7 @@
 
 #include <SDL3/SDL_mutex.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_thread.h>
 #include <SDL3/SDL_timer.h>
 
 bool g_profiler_enabled = false;
@@ -62,6 +63,11 @@ static FILE *g_profile_file = nullptr;
 // (the dmon watcher threads call profiler_count), so they get a lock.
 static SDL_Mutex *g_counter_mutex = nullptr;
 
+// Zones measure the frame loop, and their bookkeeping is deliberately lock-free. Some zoned
+// functions also run on worker threads (get_saves_path from the instance poller), so recording is
+// limited to the thread that owns the frame loop instead of paying for a lock on every begin/end.
+static SDL_ThreadID g_main_thread_id = 0;
+
 static double ticks_to_ms(Uint64 ticks) {
     const Uint64 freq = SDL_GetPerformanceFrequency();
     if (freq == 0) return 0.0;
@@ -94,6 +100,7 @@ static void profiler_write(const char *format, ...) {
 void profiler_init(bool enabled, float report_interval_seconds) {
     g_profiler_enabled = enabled;
     g_report_interval = report_interval_seconds > 0.0f ? (double) report_interval_seconds : 5.0;
+    g_main_thread_id = SDL_GetCurrentThreadID();
     if (!enabled) return;
 
     if (!g_counter_mutex) g_counter_mutex = SDL_CreateMutex();
@@ -125,6 +132,8 @@ void profiler_shutdown(void) {
 
 int profiler_zone(const char *name) {
     if (!name) return -1;
+    // Registration mutates the zone table, so it stays on the frame-loop thread as well.
+    if (SDL_GetCurrentThreadID() != g_main_thread_id) return -1;
     for (int i = 0; i < g_zone_count; i++) {
         if (strcmp(g_zones[i].name, name) == 0) return i;
     }
@@ -138,6 +147,7 @@ int profiler_zone(const char *name) {
 
 void profiler_begin(int zone) {
     if (!g_profiler_enabled || zone < 0 || zone >= g_zone_count) return;
+    if (SDL_GetCurrentThreadID() != g_main_thread_id) return;
 
     ProfilerZone *z = &g_zones[zone];
     if (z->depth++ == 0) {
@@ -149,6 +159,7 @@ void profiler_begin(int zone) {
 
 void profiler_end(int zone) {
     if (!g_profiler_enabled || zone < 0 || zone >= g_zone_count) return;
+    if (SDL_GetCurrentThreadID() != g_main_thread_id) return;
 
     ProfilerZone *z = &g_zones[zone];
     if (z->depth == 0) return;

@@ -58,6 +58,7 @@ extern "C" {
 #include "global_event_handler.h"
 #include "global_hotkeys.h" // For OS-level hotkey registration
 #include "profiler.h" // For --profiler frame timing
+#include "instance_poller.h" // For the background PATH_MODE_INSTANCE scan
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 #include "logger.h"
@@ -2545,6 +2546,11 @@ int main(int argc, char *argv[]) {
 
         profiler_init(is_profiling, profile_interval);
 
+        // The instance scan runs off the frame loop from here on. Enabled per frame from the
+        // active path mode, so it idles instead of scanning under the other modes.
+        instance_poller_set_enabled(app_settings.path_mode == PATH_MODE_INSTANCE);
+        instance_poller_start();
+
         // Co-op template mismatch popup state
         bool coop_template_mismatch = false;
         char coop_mismatch_msg[512] = {};
@@ -2684,43 +2690,24 @@ int main(int argc, char *argv[]) {
             // Stamp host timer into template_data so broadcasts carry it to receivers
             if (tracker->template_data)
                 tracker->template_data->host_time_since_last_update = tracker->time_since_last_update;
-            // Periodically check if the active instance has changed.
-            // When an instance is actively being tracked, poll every 2s to react quickly
-            // to instance switches. When no Minecraft process is running, back off to
-            // every 10s to avoid hammering the process table for nothing.
+            // Pick up the active instance scan, which runs on the poller thread because walking the
+            // process table and reading each Java process's command line costs 12-22 ms and dropped a
+            // frame every time it ran here. All that is left per frame is claiming a finished result.
             PROFILE_BEGIN(instance_poll, "instance_poll");
+            instance_poller_set_enabled(app_settings.path_mode == PATH_MODE_INSTANCE);
             if (app_settings.path_mode == PATH_MODE_INSTANCE) {
-                static float time_since_instance_check = 0.0f;
-                static bool last_instance_found = false; // Track whether we found an instance last time
+                char detected_path[MAX_PATH_LENGTH];
+                // An empty path means the scan found no instance, which is not a switch: keep
+                // watching the current folder rather than dropping it every time Minecraft closes.
+                if (instance_poller_take_result(detected_path, MAX_PATH_LENGTH) &&
+                    detected_path[0] != '\0' &&
+                    strcmp(detected_path, tracker->saves_path) != 0) {
+                    log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n",
+                                tracker->saves_path, detected_path);
 
-                time_since_instance_check += deltaTime;
-
-                const float poll_interval = last_instance_found ? 2.0f : 10.0f;
-
-                if (time_since_instance_check > poll_interval) {
-                    time_since_instance_check = 0.0f;
-                    char detected_path[MAX_PATH_LENGTH];
-
-                    // Ask path_utils what the currently active instance is
-                    if (get_saves_path(detected_path, MAX_PATH_LENGTH, PATH_MODE_INSTANCE, nullptr)) {
-                        last_instance_found = true;
-                        // If it differs from what we are currently watching
-                        if (strcmp(detected_path, tracker->saves_path) != 0) {
-                            log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n",
-                                        tracker->saves_path, detected_path);
-
-                            // Trigger the existing settings-changed workflow.
-                            // This safely de-inits dmon, re-inits paths, and reloads the template.
-                            SDL_SetAtomicInt(&g_settings_changed, 1);
-                        }
-                    } else {
-                        // No Minecraft instance found — log only on state transition to avoid spam
-                        if (last_instance_found) {
-                            log_message(
-                                LOG_INFO, "[MAIN] No active Minecraft instance detected. Reducing poll rate.\n");
-                        }
-                        last_instance_found = false;
-                    }
+                    // Trigger the existing settings-changed workflow.
+                    // This safely de-inits dmon, re-inits paths, and reloads the template.
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
             }
             PROFILE_END(instance_poll);
@@ -4604,6 +4591,9 @@ int main(int argc, char *argv[]) {
                 SDL_Delay((Uint32) (frame_target_time - frame_time));
             }
         }
+        // Joined before the tracker is torn down: the poller only touches its own state and the
+        // logger, but it must not outlive either.
+        instance_poller_stop();
         profiler_shutdown();
         exit_status = EXIT_SUCCESS;
     }

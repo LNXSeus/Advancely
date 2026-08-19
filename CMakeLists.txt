@@ -67,6 +67,7 @@ set(SOURCE_FILES
         "source/update_checker.cpp"
         "source/logger.cpp"
         "source/profiler.cpp"
+        "source/instance_poller.cpp"
         "source/dialog_utils.cpp"
         "source/coop_net.cpp"
         "source/coop_net_relay.cpp"
