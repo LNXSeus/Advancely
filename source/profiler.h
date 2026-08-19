@@ -72,6 +72,13 @@ void profiler_note_log(void);
 void profiler_count(const char *name);
 
 /**
+ * @brief Adds an amount to a named counter, for per-frame totals such as draw calls or vertices.
+ * @param name Static string, used as the counter label.
+ * @param amount How much to add for this frame.
+ */
+void profiler_count_n(const char *name, int amount);
+
+/**
  * @brief Writes a one-off line into the profile log, for inspecting values behind a
  * counter. Rate limited per report interval so a per-frame call cannot flood the file.
  */

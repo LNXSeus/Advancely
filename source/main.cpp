@@ -4571,12 +4571,26 @@ int main(int argc, char *argv[]) {
             skin_cache_pump();
             PROFILE_END(skin_pump);
 
-            PROFILE_BEGIN(sdl_draw, "sdl_render_draw_data");
+            PROFILE_BEGIN(sdl_clear, "sdl_render_clear");
             SDL_SetRenderDrawColor(tracker->renderer, (Uint8) (app_settings.tracker_bg_color.r),
                                    (Uint8) (app_settings.tracker_bg_color.g), (Uint8) (app_settings.tracker_bg_color.b),
                                    (Uint8) (app_settings.tracker_bg_color.a));
             SDL_RenderClear(tracker->renderer);
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
+            PROFILE_END(sdl_clear);
+
+            ImDrawData *draw_data = ImGui::GetDrawData();
+
+            // Draw calls and vertices explain the cost of the submission below: a draw command is
+            // emitted per texture switch, so an icon-heavy map racks them up quickly.
+            if (g_profiler_enabled && draw_data) {
+                int draw_calls = 0;
+                for (const ImDrawList *cmd_list: draw_data->CmdLists) draw_calls += cmd_list->CmdBuffer.Size;
+                profiler_count_n("imgui draw calls", draw_calls);
+                profiler_count_n("imgui vertices", draw_data->TotalVtxCount);
+            }
+
+            PROFILE_BEGIN(sdl_draw, "sdl_render_draw_data");
+            ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, tracker->renderer);
             PROFILE_END(sdl_draw);
 
             PROFILE_BEGIN(sdl_present, "sdl_render_present");

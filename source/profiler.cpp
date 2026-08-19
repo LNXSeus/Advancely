@@ -179,24 +179,28 @@ void profiler_note_log(void) {
     g_log_calls++;
 }
 
-void profiler_count(const char *name) {
+void profiler_count_n(const char *name, int amount) {
     if (!g_profiler_enabled || !name) return;
 
     if (g_counter_mutex) SDL_LockMutex(g_counter_mutex);
     bool found = false;
     for (int i = 0; i < g_counter_count; i++) {
         if (strcmp(g_counters[i].name, name) == 0) {
-            g_counters[i].count++;
+            g_counters[i].count += amount;
             found = true;
             break;
         }
     }
     if (!found && g_counter_count < PROFILER_MAX_COUNTERS) {
         g_counters[g_counter_count].name = name;
-        g_counters[g_counter_count].count = 1;
+        g_counters[g_counter_count].count = amount;
         g_counter_count++;
     }
     if (g_counter_mutex) SDL_UnlockMutex(g_counter_mutex);
+}
+
+void profiler_count(const char *name) {
+    profiler_count_n(name, 1);
 }
 
 #define PROFILER_MAX_NOTES_PER_INTERVAL 4
@@ -265,9 +269,10 @@ static void profiler_report(double interval_seconds) {
 
     if (g_counter_mutex) SDL_LockMutex(g_counter_mutex);
     for (int i = 0; i < g_counter_count; i++) {
-        profiler_write("[PROFILE]   count %-34s %8.1f /s\n",
+        profiler_write("[PROFILE]   count %-34s %10.1f /s  %10.2f /frame\n",
                        counter_display_name(g_counters[i].name),
-                       (double) g_counters[i].count / interval_seconds);
+                       (double) g_counters[i].count / interval_seconds,
+                       g_frame_count > 0 ? (double) g_counters[i].count / g_frame_count : 0.0);
         g_counters[i].count = 0;
     }
     if (g_counter_mutex) SDL_UnlockMutex(g_counter_mutex);

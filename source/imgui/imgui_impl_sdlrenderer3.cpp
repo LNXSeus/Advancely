@@ -120,21 +120,32 @@ void ImGui_ImplSDLRenderer3_NewFrame()
 }
 
 // https://github.com/libsdl-org/SDL/issues/9009
-static int SDL_RenderGeometryRaw8BitColor(SDL_Renderer* renderer, ImVector<SDL_FColor>& colors_out, SDL_Texture* texture, const float* xy, int xy_stride, const SDL_Color* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices)
+// ----------------------------------------------------------------------------------------------
+// ADVANCELY LOCAL MODIFICATION - RE-APPLY THIS WHEN UPDATING DEAR IMGUI.
+// SDL3 dropped the 8-bit colour path, so the backend converts every vertex colour to float first.
+// Upstream did that inside a SDL_RenderGeometryRaw8BitColor() wrapper called once per draw command,
+// with num_vertices set to "all remaining vertices in the draw list" rather than just the ones that
+// command indexes. The whole buffer was therefore re-converted for every command, making the cost
+// (commands x vertices). The tracker map emits one draw command per icon texture across a single
+// large draw list, where that was measured at 5-9 ms per frame.
+// The conversion is hoisted out below to run once per draw list, which is the same output for a
+// fraction of the work. Vertex data is copied by SDL during SDL_RenderGeometryRaw(), so one filled
+// buffer stays valid for every command in the list.
+// ----------------------------------------------------------------------------------------------
+static void ImGui_ImplSDLRenderer3_ConvertVertexColors(ImVector<SDL_FColor>& colors_out, const ImDrawVert* vtx_buffer, int num_vertices)
 {
-    const Uint8* color2 = (const Uint8*)color;
     colors_out.resize(num_vertices);
-    SDL_FColor* color3 = colors_out.Data;
+    SDL_FColor* dst = colors_out.Data;
+    const Uint8* src = (const Uint8*)(const void*)((const char*)vtx_buffer + offsetof(ImDrawVert, col));
     for (int i = 0; i < num_vertices; i++)
     {
-        color3[i].r = color->r / 255.0f;
-        color3[i].g = color->g / 255.0f;
-        color3[i].b = color->b / 255.0f;
-        color3[i].a = color->a / 255.0f;
-        color2 += color_stride;
-        color = (const SDL_Color*)color2;
+        const SDL_Color* c = (const SDL_Color*)(const void*)src; // SDL 2.0.19+
+        dst[i].r = c->r / 255.0f;
+        dst[i].g = c->g / 255.0f;
+        dst[i].b = c->b / 255.0f;
+        dst[i].a = c->a / 255.0f;
+        src += sizeof(ImDrawVert);
     }
-    return SDL_RenderGeometryRaw(renderer, texture, xy, xy_stride, color3, sizeof(*color3), uv, uv_stride, num_vertices, indices, num_indices, size_indices);
 }
 
 void ImGui_ImplSDLRenderer3_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* renderer)
@@ -197,6 +208,10 @@ void ImGui_ImplSDLRenderer3_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
         const ImDrawVert* vtx_buffer = draw_list->VtxBuffer.Data;
         const ImDrawIdx* idx_buffer = draw_list->IdxBuffer.Data;
 
+        // ADVANCELY LOCAL MODIFICATION - see ImGui_ImplSDLRenderer3_ConvertVertexColors() above.
+        ImGui_ImplSDLRenderer3_ConvertVertexColors(bd->ColorBuffer, vtx_buffer, draw_list->VtxBuffer.Size);
+        const SDL_FColor* colors_f = bd->ColorBuffer.Data;
+
         for (int cmd_i = 0; cmd_i < draw_list->CmdBuffer.Size; cmd_i++)
         {
             const ImDrawCmd* pcmd = &draw_list->CmdBuffer[cmd_i];
@@ -226,13 +241,15 @@ void ImGui_ImplSDLRenderer3_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
 
                 const float* xy = (const float*)(const void*)((const char*)(vtx_buffer + pcmd->VtxOffset) + offsetof(ImDrawVert, pos));
                 const float* uv = (const float*)(const void*)((const char*)(vtx_buffer + pcmd->VtxOffset) + offsetof(ImDrawVert, uv));
-                const SDL_Color* color = (const SDL_Color*)(const void*)((const char*)(vtx_buffer + pcmd->VtxOffset) + offsetof(ImDrawVert, col)); // SDL 2.0.19+
+                // ADVANCELY LOCAL MODIFICATION: colours are already converted for the whole draw
+                // list, so this only has to point at the matching offset.
+                const SDL_FColor* color = colors_f + pcmd->VtxOffset;
 
                 // Bind texture, Draw
                 SDL_Texture* tex = (SDL_Texture*)pcmd->GetTexID();
-                SDL_RenderGeometryRaw8BitColor(renderer, bd->ColorBuffer, tex,
+                SDL_RenderGeometryRaw(renderer, tex,
                     xy, (int)sizeof(ImDrawVert),
-                    color, (int)sizeof(ImDrawVert),
+                    color, (int)sizeof(SDL_FColor),
                     uv, (int)sizeof(ImDrawVert),
                     draw_list->VtxBuffer.Size - pcmd->VtxOffset,
                     idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
