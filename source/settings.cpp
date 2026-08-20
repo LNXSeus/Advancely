@@ -3971,8 +3971,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             char compact_icon_cycle_tooltip_buffer[384];
                             snprintf(compact_icon_cycle_tooltip_buffer, sizeof(compact_icon_cycle_tooltip_buffer),
                                      "How long each page of icons stays before flipping to the next set.\n"
-                                     "Independent of the panel's Cycle Interval.\n"
-                                     "Default: %.1f s", DEFAULT_COMPACT_ICON_CYCLE_INTERVAL);
+                                     "Independent of the panel's Cycle Interval, but %s still\n"
+                                     "advances the icons and the panel together.\n"
+                                     "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_ICON_CYCLE_INTERVAL);
                             ImGui::SetTooltip("%s", compact_icon_cycle_tooltip_buffer);
                         }
 
@@ -4174,7 +4175,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "How long each selected entry stays on the panel before the\n"
                                  "cycle advances to the next one. With a single entry selected the\n"
                                  "panel is static. Press %s while the overlay window is focused\n"
-                                 "to jump to the next goal.\n"
+                                 "to jump to the next goal, which also flips the Row 1 icons.\n"
                                  "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
                         ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
                     }

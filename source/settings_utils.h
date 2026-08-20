@@ -481,6 +481,7 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Advance / Speed Up", \
       "Belt mode: hold to scroll faster.\n" \
       "Page and Compact mode: press to cut to the next page or cycle entry.\n" \
+      "In Compact mode it advances the Row 1 icon strip along with the panel.\n" \
       "Only fires while the overlay window itself is focused.") \
     X(APP_HOTKEY_EDITOR_NEXT_GOAL, "editor_next_goal", "Tab", HOTKEY_MOD_CTRL, \
       APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \

@@ -2863,6 +2863,14 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
                     if (!event->key.repeat) {
                         o->page_index++;
                         o->page_timer = 0.0f;
+
+                        // Compact mode's row-1 icon strip cycles on its own timer, so advance it
+                        // alongside the panel to keep one press moving everything on screen.
+                        if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_COMPACT &&
+                            settings->compact_show_row1_icons) {
+                            o->compact_icon_page_index++;
+                            o->compact_icon_page_timer = 0.0f;
+                        }
                     }
                 } else {
                     // Belt mode: holding the key speeds up the scroll.
