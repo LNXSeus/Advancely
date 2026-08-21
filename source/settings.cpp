@@ -3445,6 +3445,60 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             app_hotkey_display_label(&temp_settings.app_hotkeys[APP_HOTKEY_OVERLAY_ADVANCE],
                                      overlay_advance_label, sizeof(overlay_advance_label));
 
+            // The row layout only applies to the Belt and Page modes, so it's built once here and
+            // reused by both of their tooltips. Compact mode doesn't use rows at all.
+            // The overlay is spawned as its own process, so it can also be started on its own.
+            const char *overlay_process_tip =
+                    " • The overlay runs as its own process: starting Advancely with the '--overlay'\n"
+                    "   flag launches only the overlay (Advancely itself has to be running already).\n"
+#ifdef __linux__
+                    "   Handy in Waywall, where it might be useful to attach the overlay as a separate process.\n"
+#endif
+                    ;
+
+            char overlay_row_layout[768];
+            if (selected_version <= MC_VERSION_1_6_4) {
+                snprintf(overlay_row_layout, sizeof(overlay_row_layout),
+                         "Row Layout:\n"
+                         " • Row 1: Sub-stats of complex stats (if not template hidden).\n"
+                         "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
+                         " • Row 2: Main %s (Default).\n"
+                         " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
+                         "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n",
+                         advancements_label_plural_lowercase
+                );
+            } else if (selected_version <= MC_VERSION_1_11_2) {
+                snprintf(overlay_row_layout, sizeof(overlay_row_layout),
+                         "Row Layout:\n"
+                         " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
+                         "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
+                         " • Row 2: Main %s (Default).\n"
+                         " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
+                         "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n",
+                         advancement_label_uppercase, advancements_label_plural_lowercase
+                );
+            } else if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+                snprintf(overlay_row_layout, sizeof(overlay_row_layout),
+                         "Row Layout:\n"
+                         " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
+                         "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
+                         " • Row 2: Main %s, recipes and unlocks (Default).\n"
+                         " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
+                         "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n",
+                         advancement_label_uppercase, advancements_label_plural_lowercase
+                );
+            } else {
+                snprintf(overlay_row_layout, sizeof(overlay_row_layout),
+                         "Row Layout:\n"
+                         " • Row 1: %s criteria and sub-stats of complex stats.\n"
+                         "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                         " • Row 2: Main %s and recipes (Default).\n"
+                         " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
+                         "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n",
+                         advancement_label_uppercase, advancements_label_plural_lowercase
+                );
+            }
+
             // General Settings
             ImGui::Text("General");
 
@@ -3462,82 +3516,62 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n"
                              "More overlay-related settings become visible.\n\n"
-                             "Overlay Layout:\n"
-                             " • Row 1: Sub-stats of complex stats (if not template hidden).\n"
-                             "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                             " • Row 2: Main %s (Default).\n"
-                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
-                             " • Horizontal spacing depends on the length of the display text.\n\n"
+                             " • Horizontal spacing depends on the length of the display text.\n"
+                             "%s\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "On Windows you MUST use GAME CAPTURE for the overlay (NOT window capture).\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).\n"
                              "Default: Off",
-                             advancements_label_plural_lowercase
+                             overlay_process_tip
                     );
                 } else if (selected_version <= MC_VERSION_1_11_2) {
                     // Mid-era
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
-                             "Overlay Layout:\n"
-                             " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
-                             "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                             " • Row 2: Main %s (Default).\n"
-                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
-                             " • Horizontal spacing depends on the length of the display text.\n\n"
+                             " • Horizontal spacing depends on the length of the display text.\n"
+                             "%s\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).\n"
                              "Default: Off",
-                             advancement_label_uppercase, advancements_label_plural_lowercase
+                             overlay_process_tip
                     );
                 } else if (selected_version == MC_VERSION_25W14CRAFTMINE) {
                     // Craftmine
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
-                             "Overlay Layout:\n"
-                             " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
-                             "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                             " • Row 2: Main %s, recipes and unlocks (Default).\n"
-                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
-                             " • Horizontal spacing depends on the length of the display text.\n\n"
+                             " • Horizontal spacing depends on the length of the display text.\n"
+                             "%s\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).\n"
                              "Default: Off",
-                             advancement_label_uppercase, advancements_label_plural_lowercase
+                             overlay_process_tip
                     );
                 } else {
                     // Modern
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
-                             "Overlay Layout:\n"
-                             " • Row 1: %s criteria and sub-stats of complex stats.\n"
-                             "   (If two items share an icon, the parent's icon is overlaid.)\n"
-                             " • Row 2: Main %s and recipes (Default).\n"
-                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
-                             " • Horizontal spacing depends on the length of the display text.\n\n"
+                             " • Horizontal spacing depends on the length of the display text.\n"
+                             "%s\n"
                              "IMPORTANT FOR STREAMERS:\n"
                              "Applying overlay-related changes will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).\n"
                              "Default: Off",
-                             advancement_label_uppercase, advancements_label_plural_lowercase
+                             overlay_process_tip
                     );
                 }
                 ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
@@ -3570,12 +3604,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // For displaying the default mode
                 const char *overlay_mode_names[] = {"Scrolling Belt", "Page", "Compact"};
                 if (ImGui::IsItemHovered()) {
-                    char overlay_mode_belt_tooltip_buffer[512];
+                    char overlay_mode_belt_tooltip_buffer[1536];
                     snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
                              "Items continuously scroll across the overlay as a conveyor belt.\n"
                              "Enables the scroll speed, per-row custom speed and auto-freeze options below.\n"
-                             "Hold %s while the overlay window is focused to speed up the scroll 5x.\n"
-                             "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                             "Hold %s while the overlay window is focused to speed up the scroll 5x.\n\n"
+                             "%s\n"
+                             "Default: %s", overlay_advance_label, overlay_row_layout,
+                             overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3583,12 +3619,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     overlay_mode = OVERLAY_RENDER_MODE_PAGE;
                 }
                 if (ImGui::IsItemHovered()) {
-                    char overlay_mode_page_tooltip_buffer[512];
+                    char overlay_mode_page_tooltip_buffer[1536];
                     snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
                              "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
                              "After the interval below the overlay cuts to the next page of items (like a book).\n"
-                             "Press %s while the overlay window is focused to flip to the next page.\n"
-                             "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
+                             "Press %s while the overlay window is focused to flip to the next page.\n\n"
+                             "%s\n"
+                             "Default: %s", overlay_advance_label, overlay_row_layout,
+                             overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
                     ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
                 }
                 ImGui::SameLine();
