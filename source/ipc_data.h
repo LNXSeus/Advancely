@@ -22,6 +22,14 @@
 #define SHARED_MEM_NAME "AdvancelySharedMemory"
 #define MUTEX_NAME "AdvancelyMutex"
 
+// Guard held by whichever process is currently running the overlay window, no matter who started
+// it. The tracker checks it before spawning its own overlay child so a manually launched
+// "Advancely --overlay" (needed for Waywall, where the overlay has to be its own process to be
+// captured into the game) never gets a second overlay stacked on top of it. Windows uses a named
+// mutex, Linux/macOS an flock'd file next to settings.json; both are released by the OS when the
+// overlay process dies, so a crashed overlay never leaves a stale guard behind.
+#define OVERLAY_INSTANCE_MUTEX_NAME "AdvancelyOverlayInstanceMutex"
+
 // Define a large, fixed-size buffer for our serialized data.
 // 64MB should be more than enough for any template.
 #define SHARED_BUFFER_SIZE (64 * 1024 * 1024)

@@ -1302,6 +1302,125 @@ static void build_overlay_argv(char *exe_path, char *argv[]) {
 }
 #endif
 
+// Prints a message into the terminal that launched this process. On Windows Advancely is built for
+// the GUI subsystem and therefore has no console of its own, so attach to the parent one (the
+// cmd/PowerShell window that ran "Advancely --overlay") and print there. If there is no console to
+// attach to, e.g. when the overlay was spawned by the tracker or launched from Explorer, nothing is
+// printed and the log file remains the record.
+static void print_console_error(const char *msg) {
+#ifdef _WIN32
+    static bool console_attached = false;
+    if (!console_attached) {
+        if (!AttachConsole(ATTACH_PARENT_PROCESS)) return;
+#ifdef _MSC_VER
+        FILE *reopened = nullptr;
+        freopen_s(&reopened, "CONOUT$", "w", stderr);
+#else
+        (void) freopen("CONOUT$", "w", stderr);
+#endif
+        console_attached = true;
+    }
+#endif
+    fprintf(stderr, "%s", msg);
+    fflush(stderr);
+}
+
+// --- Overlay instance guard -------------------------------------------------------------------
+// Mirrors the tracker's single-instance guard further down, but for the overlay window. The
+// overlay process takes the guard at startup and the OS drops it when that process dies, so the
+// tracker can always tell whether an overlay is on screen, including one the user started by hand
+// with --overlay (the Waywall setup). See OVERLAY_INSTANCE_MUTEX_NAME in ipc_data.h.
+#ifdef _WIN32
+static HANDLE g_overlay_instance_mutex = nullptr;
+#else
+static int g_overlay_instance_fd = -1;
+
+// The lock lives next to the settings file (not the CWD) so it follows --settings-file and
+// --use-home-dir, exactly like the tracker's single-instance lock.
+static void get_overlay_instance_lock_path(char *out, size_t out_size) {
+    snprintf(out, out_size, "%s.overlay.lock", get_settings_file_path());
+}
+#endif
+
+// Called by the overlay process at startup. Returns false when another overlay already holds the
+// guard, which means this one must not open a second window. A guard that cannot be created at all
+// never blocks the overlay: it returns true and the old behaviour applies.
+static bool overlay_instance_lock_acquire(void) {
+#ifdef _WIN32
+    HANDLE h = CreateMutexA(nullptr, TRUE, OVERLAY_INSTANCE_MUTEX_NAME);
+    if (h == nullptr) {
+        log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to create the overlay instance guard. Error: %lu\n",
+                    GetLastError());
+        return true;
+    }
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(h);
+        return false;
+    }
+    // Handle intentionally left open for the process lifetime; the OS releases it on exit.
+    g_overlay_instance_mutex = h;
+    return true;
+#else
+    char lock_path[1088];
+    get_overlay_instance_lock_path(lock_path, sizeof(lock_path));
+    int fd = open(lock_path, O_CREAT | O_RDWR, 0644);
+    if (fd < 0) {
+        log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to open the overlay instance guard '%s'.\n", lock_path);
+        return true;
+    }
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        close(fd);
+        return false;
+    }
+    // fd intentionally left open to hold the flock for the process lifetime.
+    g_overlay_instance_fd = fd;
+    return true;
+#endif
+}
+
+// Called by the tracker. True when SOME overlay process is alive, whether it is this tracker's own
+// child or one the user launched separately.
+static bool overlay_instance_is_held(void) {
+#ifdef _WIN32
+    HANDLE h = OpenMutexA(SYNCHRONIZE, FALSE, OVERLAY_INSTANCE_MUTEX_NAME);
+    if (h != nullptr) {
+        CloseHandle(h);
+        return true;
+    }
+    return false;
+#else
+    char lock_path[1088];
+    get_overlay_instance_lock_path(lock_path, sizeof(lock_path));
+    int fd = open(lock_path, O_RDWR);
+    if (fd < 0) return false; // No overlay has ever run for this settings file.
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        close(fd);
+        return true;
+    }
+    // flock locks are per open file description, so releasing this probe fd leaves any other
+    // process's lock untouched.
+    flock(fd, LOCK_UN);
+    close(fd);
+    return false;
+#endif
+}
+
+// True when this tracker spawned the overlay itself and that child is still alive.
+static bool tracker_owns_overlay_process(const Tracker *t) {
+#ifdef _WIN32
+    return t != nullptr && t->overlay_process_info.hProcess != nullptr;
+#else
+    return t != nullptr && t->overlay_pid > 0;
+#endif
+}
+
+// True when an overlay is on screen that this tracker did NOT start, i.e. one launched with
+// --overlay. The tracker can neither restart nor close it, so it must leave it alone and tell the
+// user to do it by hand.
+static bool external_overlay_attached(const Tracker *t) {
+    return !tracker_owns_overlay_process(t) && overlay_instance_is_held();
+}
+
 #if defined(__APPLE__) || defined(__linux__)
 // Name of the stamp file written into the data directory after a fully successful seed. It holds
 // the ADVANCELY_VERSION string it was written for; when that matches the running build the entire
@@ -1798,6 +1917,17 @@ int main(int argc, char *argv[]) {
         log_init(true); // Each process needs its own log, advancely_overlay_log.txt
         log_message(LOG_INFO, "[OVERLAY PROCESS] Starting in overlay-only mode.\n");
 
+        // Only ever one overlay window. Without this a manual --overlay launch on top of the
+        // tracker's own overlay would give two windows reading the same shared memory and both
+        // writing their geometry back to settings.json on exit.
+        if (!overlay_instance_lock_acquire()) {
+            log_message(LOG_INFO, "[OVERLAY PROCESS] An overlay is already running. Exiting.\n");
+            print_console_error("[Advancely] An overlay window is already open. Only one can run at a time.\n");
+            log_close();
+            SDL_Quit();
+            return EXIT_SUCCESS;
+        }
+
         // static: AppSettings is large (fixed coop arrays); keep it off the stack
         // to avoid a stack overflow in the chkstk probe at startup.
         static AppSettings settings;
@@ -1823,12 +1953,20 @@ int main(int argc, char *argv[]) {
 
         // Open existing shared memory and mutex
         log_message(LOG_INFO, "[OVERLAY IPC] Opening shared memory and mutex...\n");
+
+        // The tracker owns both IPC objects, so failing to open them means it isn't running. That's
+        // the common mistake when launching the overlay by hand, so say so in the terminal instead
+        // of only in the log file.
+        const char *tracker_not_running_msg =
+                "[Advancely] Cannot start the overlay: Advancely is not running.\n"
+                "            Start Advancely first, then launch the overlay again with --overlay.\n";
 #ifdef _WIN32
         overlay->h_mutex = OpenMutexA(MUTEX_ALL_ACCESS, FALSE, MUTEX_NAME);
 
         if (overlay->h_mutex == nullptr) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to open mutex. Is the tracker running? Error: %lu\n",
                         GetLastError());
+            print_console_error(tracker_not_running_msg);
             overlay_free(&overlay, &settings);
             return 1;
         }
@@ -1839,6 +1977,7 @@ int main(int argc, char *argv[]) {
 
         if (overlay->p_shared_data == nullptr) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to map shared memory. Is the tracker running?\n");
+            print_console_error(tracker_not_running_msg);
             overlay_free(&overlay, &settings); // Cleans up SDL stuff as well
             return 1;
         }
@@ -1848,6 +1987,7 @@ int main(int argc, char *argv[]) {
 
         if (overlay->mutex == SEM_FAILED) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to open semaphore/mutex. Is the tracker running?\n");
+            print_console_error(tracker_not_running_msg);
             overlay_free(&overlay, &settings);
             return 1;
         }
@@ -1857,6 +1997,7 @@ int main(int argc, char *argv[]) {
 
         if (overlay->p_shared_data == MAP_FAILED) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to map shared memory. Is the tracker running?\n");
+            print_console_error(tracker_not_running_msg);
             overlay_free(&overlay, &settings); // Cleans up SDL stuff as well
             return 1;
         }
@@ -2555,6 +2696,11 @@ int main(int argc, char *argv[]) {
         bool coop_template_mismatch = false;
         char coop_mismatch_msg[512] = {};
 
+        // Set when Apply changed an overlay setting while the overlay runs as a separate process.
+        // The tracker can't restart a process it doesn't own, so the user has to do it by hand.
+        bool external_overlay_warning = false;
+        char external_overlay_warning_msg[768] = {};
+
         // Track previous coop state for detecting disconnects
         CoopNetState prev_coop_state = COOP_NET_IDLE;
 
@@ -2565,8 +2711,12 @@ int main(int argc, char *argv[]) {
             test_mode_start_time = SDL_GetTicks();
         }
 
-        // Launch overlay if enabled
-        if (app_settings.enable_overlay) {
+        // Launch overlay if enabled, unless one is already running as its own process (--overlay)
+        if (app_settings.enable_overlay && external_overlay_attached(tracker)) {
+            log_message(LOG_INFO,
+                        "[MAIN] Overlay enabled in settings, but an overlay is already running as a separate "
+                        "process. Not launching a second one.\n");
+        } else if (app_settings.enable_overlay) {
             log_message(LOG_INFO, "[MAIN] Overlay enabled in settings. Launching on startup.\n");
             char exe_path[MAX_PATH_LENGTH];
             if (get_executable_path(exe_path, sizeof(exe_path))) {
@@ -2834,6 +2984,33 @@ int main(int argc, char *argv[]) {
                 overlay_is_running = tracker->overlay_pid > 0;
 #endif
 
+                // An overlay the user started by hand with --overlay isn't ours to restart or to
+                // close: it's a detached process, so shutting it down wouldn't bring the tracker
+                // window with it and re-spawning would just stack a second overlay on top. Leave
+                // it running and tell the user to bounce it themselves. This is the Waywall case,
+                // where the overlay has to be its own process to be captured into the game.
+                const bool external_overlay = !overlay_is_running && overlay_instance_is_held();
+                if (external_overlay) {
+                    log_message(LOG_INFO,
+                                "[MAIN] Overlay settings changed while the overlay runs as a separate process. "
+                                "Leaving it untouched; the user has to restart it manually.\n");
+                    if (app_settings.enable_overlay) {
+                        snprintf(external_overlay_warning_msg, sizeof(external_overlay_warning_msg),
+                                 "The overlay is running as its own process, so Advancely can't restart it.\n\n"
+                                 "The settings you just applied are only read when the overlay starts up. "
+                                 "To apply them, close the overlay window yourself and launch it again with "
+                                 "the --overlay flag.\n\n"
+                                 "Closing the overlay window will NOT close Advancely while it runs detached.");
+                    } else {
+                        snprintf(external_overlay_warning_msg, sizeof(external_overlay_warning_msg),
+                                 "The overlay is now disabled in the settings, but the overlay currently on "
+                                 "screen is running as its own process and Advancely can't close it.\n\n"
+                                 "Close the overlay window yourself. Doing so will NOT close Advancely while "
+                                 "it runs detached.");
+                    }
+                    external_overlay_warning = true;
+                }
+
                 // Graceful Shutdown Sequence
                 if (overlay_is_running) {
                     log_message(LOG_INFO, "[MAIN] Requesting graceful shutdown of overlay...\n");
@@ -2902,8 +3079,9 @@ int main(int argc, char *argv[]) {
                 // value before the new overlay process starts.
                 settings_save_overlay_width_only(app_settings.overlay_window.w);
 
-                // Now, check if the NEW settings require the overlay to be enabled.
-                if (app_settings.enable_overlay) {
+                // Now, check if the NEW settings require the overlay to be enabled. Never spawn one
+                // next to an overlay that's already running detached.
+                if (app_settings.enable_overlay && !external_overlay) {
                     log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
                     char exe_path[MAX_PATH_LENGTH];
                     if (get_executable_path(exe_path, sizeof(exe_path))) {
@@ -4284,7 +4462,9 @@ int main(int argc, char *argv[]) {
 #else
                     overlay_alive = tracker && tracker->overlay_pid > 0;
 #endif
-                    if (app_settings.enable_overlay && !overlay_alive) {
+                    // Not when the overlay runs detached: that one is still on screen, so there's
+                    // nothing to re-spawn and the apply flag would only raise a stale warning.
+                    if (app_settings.enable_overlay && !overlay_alive && !overlay_instance_is_held()) {
                         SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     }
                     tracker->quit_popup_active = false;
@@ -4295,6 +4475,40 @@ int main(int argc, char *argv[]) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Go back and save your changes before exiting.\n"
                              "You can also press 'ESCAPE'.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
+                ImGui::EndPopup();
+            }
+
+            // --- Detached Overlay Popup ---
+            // Apply changed something the overlay only reads at startup, but the overlay isn't our
+            // child process, so it has to be restarted by hand.
+            if (external_overlay_warning) {
+                ImGui::OpenPopup("Overlay Restart Required##external");
+                external_overlay_warning = false;
+            } {
+                ImVec2 external_overlay_center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(external_overlay_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            }
+            ImGui::SetNextWindowSizeConstraints(ImVec2(500, 0), ImVec2(FLT_MAX, FLT_MAX));
+            if (ImGui::BeginPopupModal("Overlay Restart Required##external", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                ImGui::TextWrapped("%s", external_overlay_warning_msg);
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                if (ImGui::Button("OK") || enter_pressed || esc_pressed) {
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[128];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Dismiss this message.\n"
+                             "You can also press 'ENTER' or 'ESCAPE'.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
 
@@ -4660,6 +4874,22 @@ int main(int argc, char *argv[]) {
             waitpid(tracker->overlay_pid, nullptr, WNOHANG);
         }
 #endif
+    } else if (tracker && tracker->p_shared_data && overlay_instance_is_held()) {
+        // An overlay running as its own process isn't ours to kill, but it reads shared memory that
+        // is about to be torn down, so ask it to close the same graceful way and give it a moment.
+        log_message(LOG_INFO, "[MAIN] Requesting the detached overlay process to shut down...\n");
+#ifdef _WIN32
+        if (WaitForSingleObject(tracker->h_mutex, 1000) == WAIT_OBJECT_0) {
+            tracker->p_shared_data->shutdown_requested = true;
+            ReleaseMutex(tracker->h_mutex);
+        }
+#else
+        if (sem_wait(tracker->mutex) == 0) {
+            tracker->p_shared_data->shutdown_requested = true;
+            sem_post(tracker->mutex);
+        }
+#endif
+        SDL_Delay(500);
     }
 
     // IPC CLEANUP
