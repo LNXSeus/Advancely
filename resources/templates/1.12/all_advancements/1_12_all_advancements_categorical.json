@@ -36,8 +36,14 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:adventure/summon_iron_golem":	{
-			"icon":	"blocks/Carved_Pumpkin_(E)_JE1_BE1_OLD.png",
+		"minecraft:adventure/sleep_in_bed":	{
+			"icon":	"blocks/White_Bed_(N)_JE1_1.12.png",
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
+		"minecraft:adventure/sniper_duel":	{
+			"icon":	"items/arrow_1.0.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
@@ -48,14 +54,14 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:story/deflect_arrow":	{
-			"icon":	"items/Shield_JE1_OLD.png",
+		"minecraft:adventure/summon_iron_golem":	{
+			"icon":	"blocks/Carved_Pumpkin_(E)_JE1_BE1_OLD.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
-		"minecraft:adventure/sniper_duel":	{
-			"icon":	"items/arrow_1.0.png",
+		"minecraft:story/deflect_arrow":	{
+			"icon":	"items/Shield_JE1_OLD.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
@@ -328,29 +334,29 @@
 				"chorus_fruit":	{
 					"icon":	"items/chorus_fruit_1.11.png"
 				},
-				"cooked_beef":	{
-					"icon":	"items/beef_cooked_1.11.png"
-				},
 				"beef":	{
 					"icon":	"items/beef_raw_1.0.png"
 				},
-				"cooked_mutton":	{
-					"icon":	"items/mutton_cooked_1.11.png"
+				"cooked_beef":	{
+					"icon":	"items/beef_cooked_1.11.png"
 				},
 				"mutton":	{
 					"icon":	"items/mutton_raw_1.11.png"
 				},
-				"cooked_porkchop":	{
-					"icon":	"items/porkchop_cooked_1.0.png"
+				"cooked_mutton":	{
+					"icon":	"items/mutton_cooked_1.11.png"
 				},
 				"porkchop":	{
 					"icon":	"items/porkchop_raw_1.9.png"
 				},
-				"cooked_chicken":	{
-					"icon":	"items/chicken_cooked_1.0.png"
+				"cooked_porkchop":	{
+					"icon":	"items/porkchop_cooked_1.0.png"
 				},
 				"chicken":	{
 					"icon":	"items/chicken_raw_1.0.png"
+				},
+				"cooked_chicken":	{
+					"icon":	"items/chicken_cooked_1.0.png"
 				},
 				"golden_apple":	{
 					"icon":	"items/golden_apple_1.13.png"
@@ -388,11 +394,11 @@
 				"mushroom_stew":	{
 					"icon":	"items/mushroom_stew_1.0.png"
 				},
-				"cooked_rabbit":	{
-					"icon":	"items/rabbit_cooked_1.11.png"
-				},
 				"rabbit":	{
 					"icon":	"items/rabbit_raw_1.11.png"
+				},
+				"cooked_rabbit":	{
+					"icon":	"items/rabbit_cooked_1.11.png"
 				},
 				"rabbit_stew":	{
 					"icon":	"items/rabbit_stew_1.11.png"
@@ -472,13 +478,6 @@
 		},
 		"minecraft:adventure/kill_a_mob":	{
 			"icon":	"items/iron_sword_1.0.png",
-			"hidden":	true,
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
-		"minecraft:adventure/sleep_in_bed":	{
-			"icon":	"blocks/White_Bed_(N)_JE1_1.12.png",
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
@@ -677,7 +676,6 @@
 	"stats":	{
 		"hdwgh_summary":	{
 			"icon":	"items/bucket_25w14craftmine.png",
-			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.mineBlock.end_stone":	{
 					"icon":	"monsters/wither.png",
@@ -736,7 +734,6 @@
 		},
 		"early_game_items":	{
 			"icon":	"blocks/Chest_(S)_JE2.png",
-			"hidden":	true,
 			"in_2nd_row":	true,
 			"hide_substats_in_row1":	true,
 			"criteria":	{
@@ -784,7 +781,6 @@
 		},
 		"fishing":	{
 			"icon":	"items/fish_cod_raw_1.11.png",
-			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.fish",
 			"target":	-1,
@@ -831,13 +827,13 @@
 			"root_name":	"stat.pickup.minecraft.ghast_tear",
 			"target":	4,
 			"linked_goals":	[{
-					"root_name":	"minecraft:end/respawn_dragon",
-					"type":	"advancement"
+					"root_name":	"stat.craft.minecraft.end_crystal",
+					"parent_root":	"stat_complete_helper",
+					"type":	"stat"
 				}]
 		},
 		"fortress":	{
 			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
-			"hidden":	true,
 			"in_2nd_row":	true,
 			"hide_substats_in_row1":	true,
 			"criteria":	{
@@ -876,7 +872,6 @@
 		"stat_complete_helper":	{
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
-			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.craft.minecraft.end_crystal":	{
 					"icon":	"blocks/placeholder.png",
@@ -937,10 +932,29 @@
 					"target":	3,
 					"complete_with_next":	true
 				}, {
-					"stage_id":	"3",
+					"stage_id":	"2",
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:nether/summon_wither",
+					"target":	1
+				}, {
+					"stage_id":	"3",
+					"icon":	"monsters/Wither_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
+					"target":	1
+				}, {
+					"stage_id":	"4",
+					"icon":	"monsters/Wither_JE2_BE2.png",
+					"type":	"stat",
+					"root_name":	"stat.craft.minecraft.beacon",
+					"target":	1,
+					"complete_with_next":	true
+				}, {
+					"stage_id":	"5",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
+					"type":	"stat",
+					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1,
 					"complete_with_next":	true
 				}, {
@@ -960,16 +974,22 @@
 			"root_name":	"any%",
 			"icon":	"blocks/Dragon_Head.png",
 			"linked_goals":	[{
-					"root_name":	"rotten_flesh",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"root_name":	"minecraft:story/iron_tools",
 					"type":	"advancement"
 				}, {
-					"root_name":	"spider_eye",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"root_name":	"minecraft:story/lava_bucket",
 					"type":	"advancement"
 				}, {
-					"root_name":	"chorus_fruit",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"root_name":	"minecraft:end/kill_dragon",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:story/obtain_armor",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:story/shiny_gear",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:story/enchant_item",
 					"type":	"advancement"
 				}, {
 					"root_name":	"blaze",
@@ -984,29 +1004,35 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:story/iron_tools",
+					"root_name":	"rotten_flesh",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:story/lava_bucket",
+					"root_name":	"spider_eye",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:end/kill_dragon",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:story/obtain_armor",
-					"type":	"advancement"
-				}, {
-					"root_name":	"early_game_items",
-					"type":	"stat"
-				}, {
-					"root_name":	"minecraft:story/shiny_gear",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:story/enchant_item",
+					"root_name":	"chorus_fruit",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
 					"root_name":	"stat.mineBlock.end_stone",
 					"parent_root":	"hdwgh_summary",
+					"type":	"stat"
+				}, {
+					"root_name":	"early_game_items",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.obsidian",
+					"parent_root":	"early_game_items",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.lapis_lazuli",
+					"parent_root":	"early_game_items",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.redstone",
+					"parent_root":	"early_game_items",
 					"type":	"stat"
 				}]
 		}, {
@@ -1135,6 +1161,9 @@
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:story/upgrade_tools",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/sleep_in_bed",
 					"type":	"advancement"
 				}]
 		}, {
@@ -1442,17 +1471,11 @@
 			"root_name":	"nether",
 			"icon":	"blocks/Netherrack_JE2_BE1.png",
 			"linked_goals":	[{
-					"root_name":	"fortress",
-					"type":	"stat"
-				}, {
 					"root_name":	"minecraft:nether/return_to_sender",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:nether/uneasy_alliance",
 					"type":	"advancement"
-				}, {
-					"root_name":	"tears",
-					"type":	"stat"
 				}, {
 					"root_name":	"minecraft:nether/fast_travel",
 					"type":	"advancement"
@@ -1472,6 +1495,24 @@
 					"root_name":	"ghast",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
+				}, {
+					"root_name":	"tears",
+					"type":	"stat"
+				}, {
+					"root_name":	"fortress",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.skull",
+					"parent_root":	"fortress",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.blaze_rod",
+					"parent_root":	"fortress",
+					"type":	"stat"
+				}, {
+					"root_name":	"stat.pickup.minecraft.nether_wart",
+					"parent_root":	"fortress",
+					"type":	"stat"
 				}]
 		}, {
 			"root_name":	"endgame",
@@ -1505,7 +1546,7 @@
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh",
+					"root_name":	"hdwgh_summary",
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]

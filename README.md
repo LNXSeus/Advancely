@@ -1527,23 +1527,23 @@ group hides its rows but never its conflicts, so a clash still blocks `Apply Set
 Visual Layout Editor shortcuts are the exception to the custom goal check: goal hotkeys are switched off while that
 editor is open, so its rows can reuse their keys freely, `Global` ones included.
 
-| Group                    | Default                    | Action                                                                                                                                                                     |
-|--------------------------|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Tracker Window**       | `Shift+V`                  | Toggle the Visual Layout Editor. Opens the template editor and puts the applied template into `Edit Template` first if needed. |
-|                          | `Shift+E`                  | Toggle the Template Editor window.                                                                                                                                         |
-| **Settings Window**      | `Ctrl+S`                   | Apply Settings.                                                                                                                                                            |
-|                          | `Ctrl+Z`                   | Revert Changes.                                                                                                                                                            |
-| **Overlay Window**       | `Space`                    | Belt mode: hold to scroll faster. Page and Compact mode: press to cut to the next page or cycle entry (in Compact mode it advances the Row 1 icon strip too).                                                                     |
-| **Template Editor**      | `Ctrl+Tab`                 | Select the next goal in the open tab's list, following the search filter.                                                                                                  |
-|                          | `Ctrl+Shift+Tab`           | Select the previous goal in that list.                                                                                                                                     |
-|                          | `Ctrl+S`                   | Save the template.                                                                                                                                                         |
-|                          | `Ctrl+Z`                   | Revert the template's unsaved changes.                                                                                                                                     |
-| **Visual Layout Editor** | `Left` `Right` `Up` `Down` | Move the selection by 1 pixel. Holding repeats.                                                                                                                            |
-|                          | `A` `D` `W` `S`            | Move the selection by 10 pixels. Holding repeats.                                                                                                                          |
-|                          | `V`                        | Toggle the manual layout `Hide` checkbox of every selected element. If any is still visible they all get hidden, otherwise they are all shown again.                       |
-|                          | `H`                        | Toggle the `Hidden` checkbox (overlay and automatic layout) of every selected goal, with the same rule.                                                                    |
-|                          | `Delete`                   | Remove the selected goals, criteria, sub-stats and decorations from the template.                                                                                          |
-|                          | `Ctrl+C`                   | Duplicate them, layout coordinates included, under the usual `_copy` id. The copy ends up selected in the editor.                                                          |
+| Group                    | Default                    | Action                                                                                                                                                        |
+|--------------------------|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Tracker Window**       | `Shift+V`                  | Toggle the Visual Layout Editor. Opens the template editor and puts the applied template into `Edit Template` first if needed.                                |
+|                          | `Shift+E`                  | Toggle the Template Editor window.                                                                                                                            |
+| **Settings Window**      | `Ctrl+S`                   | Apply Settings.                                                                                                                                               |
+|                          | `Ctrl+Z`                   | Revert Changes.                                                                                                                                               |
+| **Overlay Window**       | `Space`                    | Belt mode: hold to scroll faster. Page and Compact mode: press to cut to the next page or cycle entry (in Compact mode it advances the Row 1 icon strip too). |
+| **Template Editor**      | `Ctrl+Tab`                 | Select the next goal in the open tab's list, following the search filter.                                                                                     |
+|                          | `Ctrl+Shift+Tab`           | Select the previous goal in that list.                                                                                                                        |
+|                          | `Ctrl+S`                   | Save the template.                                                                                                                                            |
+|                          | `Ctrl+Z`                   | Revert the template's unsaved changes.                                                                                                                        |
+| **Visual Layout Editor** | `Left` `Right` `Up` `Down` | Move the selection by 1 pixel. Holding repeats.                                                                                                               |
+|                          | `A` `D` `W` `S`            | Move the selection by 10 pixels. Holding repeats.                                                                                                             |
+|                          | `V`                        | Toggle the manual layout `Hide` checkbox of every selected element. If any is still visible they all get hidden, otherwise they are all shown again.          |
+|                          | `H`                        | Toggle the `Hidden` checkbox (overlay and automatic layout) of every selected goal, with the same rule.                                                       |
+|                          | `Delete`                   | Remove the selected goals, criteria, sub-stats and decorations from the template.                                                                             |
+|                          | `Ctrl+C`                   | Duplicate them, layout coordinates included, under the usual `_copy` id. The copy ends up selected in the editor.                                             |
 
 `V`, `H`, `Delete` and `Ctrl+C` change the template editor's copy of the template, which is the one that gets saved, so
 the map only catches up once you click `Save` and `Revert Changes` undoes them until then. What each press did is
@@ -1975,24 +1975,24 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                                         | Optional Flag(s)         | Languages           |
-|--------------------|-------------------------------------------------------------|--------------------------|---------------------|
-| `any%`             | 25w14craftmine                                              |                          | Default             |
-| `AMI`              | 25w14craftmine                                              |                          | Default             |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                 |                          | Default, ger        |
-| `all_achievements` | 1.6.4                                                       | `_ssg_keimaseed`         | Default, ger        |
-| `all_achievements` | 1.11                                                        |                          | Default             |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                                  |                          | Default             |
-| `all_advancements` | 1.12                                                        | `_categorical`           | Default             |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3   |                          | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.21.11, 26.1, 26.2, 26.3 | `_categorical`           | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.2                     | `_aatool_optimized`      | Default, ger, zh_cn |
-| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3       | `_optimized`             | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1                                                      | `_ssg_blackcat`, `_coop` | Default, ger, zh_cn |
-| `all_blocks`       | 1.16.1                                                      |                          | Default             |
-| `miku%`            | 1.21                                                        |                          | Default             |
-| `all_trims`        | 1.21                                                        |                          | Default             |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                  | `1`                      | Default             |
+| Category           | Template Version(s)                                                                    | Optional Flag(s)         | Languages           |
+|--------------------|----------------------------------------------------------------------------------------|--------------------------|---------------------|
+| `any%`             | 25w14craftmine                                                                         |                          | Default             |
+| `AMI`              | 25w14craftmine                                                                         |                          | Default             |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                                            |                          | Default, ger        |
+| `all_achievements` | 1.6.4                                                                                  | `_ssg_keimaseed`         | Default, ger        |
+| `all_achievements` | 1.11                                                                                   |                          | Default             |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                                                             |                          | Default             |
+| `all_advancements` | 1.12                                                                                   | `_categorical`           | Default             |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                              |                          | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3 | `_categorical`           | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.2                                                | `_aatool_optimized`      | Default, ger, zh_cn |
+| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                  | `_optimized`             | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                                                                 | `_ssg_blackcat`, `_coop` | Default, ger, zh_cn |
+| `all_blocks`       | 1.16.1                                                                                 |                          | Default             |
+| `miku%`            | 1.21                                                                                   |                          | Default             |
+| `all_trims`        | 1.21                                                                                   |                          | Default             |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                             | `1`                      | Default             |
 
 If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the bottom right of the tracker.
 
@@ -2060,10 +2060,7 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
   detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest
   version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
   Also **don't** open Advancely using **Jingle**.
-* **Multiple Advancely Windows**: If for whatever reason you have Advancely open multiple times the Overlay will most
-  likely glitch out as it's a separate process and it then doesn't know from which main Advancely process to read
-  from. So make sure to only ever have `ONE Advancely window` open at all times.
-* **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by
+* **Check log file**: First, look into the `advancely_log.txt` and the `advancely_overlay_log.txt` file to see if there are any errors that were caused by
   wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain
   detailed progress updates, not just errors.
 * **Report an Issue**: If you have any issues that aren't caused by incorrect usage, please contact me
