@@ -141,6 +141,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_OVERLAY_CLEAR_ANIMATION (-1.2f) // Seconds for the clear (crop) animation; 0 = instant, sign = direction
+#define DEFAULT_OVERLAY_CLEAR_FADE_ENABLED false // Items only crop away unless the fade is turned on
+#define DEFAULT_OVERLAY_CLEAR_FADE_TIME DEFAULT_COMPACT_STACK_FADE_TIME // Seconds a leaving item takes to fade out
 
 // Overlay custom vertical spacing. Each value is added on top of the default,
 // font-driven layout, so the defaults are 0 and reproduce the stock spacing exactly.
@@ -175,6 +177,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_ICON_SHARED_SIZE_MIN 0.0f // Upper bound is the strip icon it is drawn on (compact_row1_icon_size)
 #define DEFAULT_COMPACT_ROW1_SPACING 8.0f // Horizontal px between icons in the compact-mode row-1 strip
 #define DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION (-1.2f) // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction
+#define DEFAULT_COMPACT_ROW1_FADE_ENABLED false // Strip icons only crop away unless the fade is turned on
+#define DEFAULT_COMPACT_ROW1_FADE_TIME DEFAULT_COMPACT_STACK_FADE_TIME // Seconds a leaving strip icon takes to fade out
 
 
 // Compact pop-out stack (goals slide out from under the panel as they progress/complete).
@@ -759,6 +763,8 @@ struct AppSettings {
     float compact_row1_spacing; // Horizontal px between icons in the compact-mode row-1 strip.
     float compact_row1_clear_animation;
     // Seconds for the compact row-1 icon clear (crop) animation; 0 = instant, sign = direction.
+    bool compact_row1_fade_enabled; // Fade a leaving strip icon out on top of the crop (needs a transparent overlay).
+    float compact_row1_fade_time; // Seconds a leaving strip icon takes to fade out.
     float compact_icon_shared_size; // Shared-parent overlay icon size on a strip icon (capped by the strip icon size).
     // Pop-out stack selection (independent of the panel cycle): which goals may slide out below the
     // panel as they progress or complete. Same additive model as the cycle (type OR individual goal).
@@ -821,6 +827,8 @@ struct AppSettings {
     float overlay_gap_row3_to_bottom; // Extra vertical gap between row 3 and the bottom window edge (pixels).
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
     float overlay_clear_animation; // Seconds for the item clear (crop) animation; 0 = instant, sign = direction.
+    bool overlay_clear_fade_enabled; // Fade a leaving item out on top of the crop (needs a transparent overlay).
+    float overlay_clear_fade_time; // Seconds a leaving item takes to fade out.
 
     // Level of Detail (LOD)
     float lod_text_sub_threshold; // Zoom level below which sub-item text/progress is hidden

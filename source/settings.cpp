@@ -619,6 +619,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_icon_row_gap != b->compact_icon_row_gap ||
         a->compact_row1_spacing != b->compact_row1_spacing ||
         a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
+        a->compact_row1_fade_enabled != b->compact_row1_fade_enabled ||
+        a->compact_row1_fade_time != b->compact_row1_fade_time ||
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -659,6 +661,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
+        a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
+        a->overlay_clear_fade_time != b->overlay_clear_fade_time ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
         a->adv_icon_size != b->adv_icon_size ||
         a->adv_icon_offset_x != b->adv_icon_offset_x ||
@@ -869,6 +873,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->compact_icon_row_gap != b->compact_icon_row_gap ||
             a->compact_row1_spacing != b->compact_row1_spacing ||
             a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
+            a->compact_row1_fade_enabled != b->compact_row1_fade_enabled ||
+            a->compact_row1_fade_time != b->compact_row1_fade_time ||
             a->compact_icon_shared_size != b->compact_icon_shared_size ||
             compact_stack_different(a, b) ||
             a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -901,6 +907,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
             a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
             a->overlay_clear_animation != b->overlay_clear_animation ||
+            a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
+            a->overlay_clear_fade_time != b->overlay_clear_fade_time ||
             a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
 
             // Row spacing / sizing.
@@ -3847,6 +3855,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
                     }
 
+                    // A cleared goal plays either the crop or the fade, never both, so the crop
+                    // duration is locked while Fade Out below is on.
+                    ImGui::BeginDisabled(temp_settings.overlay_clear_fade_enabled);
                     if (ImGui::DragFloat("Clear Animation (s)", &temp_settings.overlay_clear_animation, 0.01f, -10.0f,
                                          10.0f,
                                          "%.2f s")) {
@@ -3855,13 +3866,72 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_clear_animation > 10.0f)
                             temp_settings.overlay_clear_animation = 10.0f;
                     }
-                    if (ImGui::IsItemHovered()) {
-                        char clear_animation_tooltip_buffer[512];
-                        snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
-                                 "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
-                                 "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
-                                 "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char clear_animation_tooltip_buffer[640];
+                        if (temp_settings.overlay_clear_fade_enabled) {
+                            snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
+                                     "Disabled because Fade Out is on. A cleared goal plays either the crop\n"
+                                     "or the fade, never both. Uncheck Fade Out to crop again.\n"
+                                     "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
+                        } else {
+                            snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
+                                     "How long a goal takes to crop away when it is cleared, instead of vanishing instantly.\n"
+                                     "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
+                                     "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
+                        }
                         ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
+                    }
+
+                    // A fade needs real alpha to fade into, which only a transparent overlay has. On a
+                    // solid background the half-faded pixels blend with the key color and survive the
+                    // color key filter as a ghost, so the fade stays locked until Transparent is on.
+                    ImGui::BeginDisabled(!temp_settings.overlay_transparent);
+                    ImGui::Checkbox("Fade Out", &temp_settings.overlay_clear_fade_enabled);
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char clear_fade_tooltip_buffer[768];
+                        if (temp_settings.overlay_transparent) {
+                            snprintf(clear_fade_tooltip_buffer, sizeof(clear_fade_tooltip_buffer),
+                                     "Fade a cleared goal out instead of cropping it away, replacing the\n"
+                                     "Clear Animation above (a goal plays one or the other, never both).\n"
+                                     "Applies to all three rows. Works like the pop-out stack's Fade Out\n"
+                                     "in Compact Mode Settings.\n"
+                                     "Default: %s", DEFAULT_OVERLAY_CLEAR_FADE_ENABLED ? "On" : "Off");
+                        } else {
+                            snprintf(clear_fade_tooltip_buffer, sizeof(clear_fade_tooltip_buffer),
+                                     "Disabled because the overlay background is not transparent.\n"
+                                     "Fading needs real transparency to fade into. Over a solid background\n"
+                                     "the half-faded pixels blend with the background color and a color key\n"
+                                     "filter leaves them behind as a ghost, so no fade is applied right now.\n"
+                                     "Check Transparent next to the Overlay\n"
+                                     "Background Color to unlock this again.\n"
+                                     "Default: %s", DEFAULT_OVERLAY_CLEAR_FADE_ENABLED ? "On" : "Off");
+                        }
+                        ImGui::SetTooltip("%s", clear_fade_tooltip_buffer);
+                    }
+
+                    if (temp_settings.overlay_clear_fade_enabled) {
+                        ImGui::SameLine();
+                        ImGui::SetNextItemWidth(150.0f);
+                        ImGui::BeginDisabled(!temp_settings.overlay_transparent);
+                        if (ImGui::DragFloat("##overlay_clear_fade_time", &temp_settings.overlay_clear_fade_time,
+                                             0.01f, COMPACT_STACK_FADE_TIME_MIN, COMPACT_STACK_FADE_TIME_MAX,
+                                             "%.2f s")) {
+                            if (temp_settings.overlay_clear_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                                temp_settings.overlay_clear_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+                            if (temp_settings.overlay_clear_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                                temp_settings.overlay_clear_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+                        }
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char clear_fade_time_tooltip_buffer[512];
+                            snprintf(clear_fade_time_tooltip_buffer, sizeof(clear_fade_time_tooltip_buffer),
+                                     "How long the fade-out takes. It replaces the Clear Animation above,\n"
+                                     "so the goal is gone once the fade has finished.\n"
+                                     "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_FADE_TIME);
+                            ImGui::SetTooltip("%s", clear_fade_time_tooltip_buffer);
+                        }
                     }
                 } // End of Content & Behavior (belt/page only; hidden in Compact mode)
 
@@ -4015,6 +4085,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::SetTooltip("%s", compact_icon_cycle_tooltip_buffer);
                         }
 
+                        // A cleared icon plays either the crop or the fade, never both, so the crop
+                        // duration is locked while Fade Out below is on.
+                        ImGui::BeginDisabled(temp_settings.compact_row1_fade_enabled);
                         if (ImGui::DragFloat("Clear Animation (s)##CompactRow1Icons",
                                              &temp_settings.compact_row1_clear_animation, 0.01f, -10.0f, 10.0f,
                                              "%.2f s")) {
@@ -4023,15 +4096,73 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_clear_animation > 10.0f)
                                 temp_settings.compact_row1_clear_animation = 10.0f;
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char compact_clear_anim_tooltip_buffer[512];
-                            snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
-                                     "How long a strip icon takes to crop away when its goal is cleared,\n"
-                                     "instead of vanishing instantly. 0.0 is instant. Positive values clear\n"
-                                     "the icon upwards, negative values clear it downwards. Independent of\n"
-                                     "the Belt/Page Clear Animation.\n"
-                                     "Default: %.2f s", DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION);
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char compact_clear_anim_tooltip_buffer[640];
+                            if (temp_settings.compact_row1_fade_enabled) {
+                                snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
+                                         "Disabled because Fade Out is on. A cleared icon plays either the\n"
+                                         "crop or the fade, never both. Uncheck Fade Out to crop again.\n"
+                                         "Default: %.2f s", DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION);
+                            } else {
+                                snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
+                                         "How long a strip icon takes to crop away when its goal is cleared,\n"
+                                         "instead of vanishing instantly. 0.0 is instant. Positive values clear\n"
+                                         "the icon upwards, negative values clear it downwards. Independent of\n"
+                                         "the Belt/Page Clear Animation.\n"
+                                         "Default: %.2f s", DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION);
+                            }
                             ImGui::SetTooltip("%s", compact_clear_anim_tooltip_buffer);
+                        }
+
+                        // Same gate as the pop-out stack's fade: half-faded pixels only survive on a
+                        // transparent overlay, otherwise a color key filter leaves them behind as a ghost.
+                        ImGui::BeginDisabled(!temp_settings.overlay_transparent);
+                        ImGui::Checkbox("Fade Out##CompactRow1Icons", &temp_settings.compact_row1_fade_enabled);
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char compact_row1_fade_tooltip_buffer[768];
+                            if (temp_settings.overlay_transparent) {
+                                snprintf(compact_row1_fade_tooltip_buffer, sizeof(compact_row1_fade_tooltip_buffer),
+                                         "Fade a cleared strip icon out instead of cropping it away, replacing\n"
+                                         "the Clear Animation above (an icon plays one or the other, never\n"
+                                         "both). Works like the pop-out stack's Fade Out below.\n"
+                                         "Default: %s", DEFAULT_COMPACT_ROW1_FADE_ENABLED ? "On" : "Off");
+                            } else {
+                                snprintf(compact_row1_fade_tooltip_buffer, sizeof(compact_row1_fade_tooltip_buffer),
+                                         "Disabled because the overlay background is not transparent.\n"
+                                         "Fading needs real transparency to fade into. Over a solid background\n"
+                                         "the half-faded pixels blend with the background color and a color key\n"
+                                         "filter leaves them behind as a ghost, so no fade is applied right now.\n"
+                                         "Check Transparent next to the Overlay\n"
+                                         "Background Color to unlock this again.\n"
+                                         "Default: %s", DEFAULT_COMPACT_ROW1_FADE_ENABLED ? "On" : "Off");
+                            }
+                            ImGui::SetTooltip("%s", compact_row1_fade_tooltip_buffer);
+                        }
+
+                        if (temp_settings.compact_row1_fade_enabled) {
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(150.0f);
+                            ImGui::BeginDisabled(!temp_settings.overlay_transparent);
+                            if (ImGui::DragFloat("##compact_row1_fade_time", &temp_settings.compact_row1_fade_time,
+                                                 0.01f, COMPACT_STACK_FADE_TIME_MIN, COMPACT_STACK_FADE_TIME_MAX,
+                                                 "%.2f s")) {
+                                if (temp_settings.compact_row1_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                                    temp_settings.compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+                                if (temp_settings.compact_row1_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                                    temp_settings.compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+                            }
+                            ImGui::EndDisabled();
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char compact_row1_fade_time_tooltip_buffer[512];
+                                snprintf(compact_row1_fade_time_tooltip_buffer,
+                                         sizeof(compact_row1_fade_time_tooltip_buffer),
+                                         "How long the fade-out takes. It replaces the Clear Animation above,\n"
+                                         "so the icon is gone once the fade has finished.\n"
+                                         "Default: %.2f s", DEFAULT_COMPACT_ROW1_FADE_TIME);
+                                ImGui::SetTooltip("%s", compact_row1_fade_time_tooltip_buffer);
+                            }
                         }
                     }
 

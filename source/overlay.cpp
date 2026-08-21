@@ -242,12 +242,30 @@ struct ScrollBelt {
 };
 
 // One tile to draw this frame. clear is 0 for a normal item, or (0,1] while the
-// item is animating out (the fraction already cropped away).
+// item is animating out (the fraction already cropped away). alpha runs the other
+// way for the optional fade-out: 1 while the item is normal, sinking to 0 as it goes.
 struct BeltTile {
     int idx; // item index, or -1 for a gap
     float x; // left edge
     float clear; // 0 = full, 1 = fully cropped
+    float alpha; // 1 = opaque, 0 = fully faded out
 };
+
+// BeltTile::alpha as the 0-255 modulation SDL wants.
+static inline Uint8 tile_alpha_mod(float alpha) {
+    if (alpha <= 0.0f) return 0;
+    if (alpha >= 1.0f) return 255;
+    return (Uint8) (alpha * 255.0f + 0.5f);
+}
+
+// Draws a cached text texture with an alpha modulation. Text textures come from a shared cache,
+// so the modulation is always restored to 255 afterwards.
+static inline void render_text_with_alpha(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *dest, Uint8 alpha) {
+    if (!tex) return;
+    if (alpha != 255) SDL_SetTextureAlphaMod(tex, alpha);
+    SDL_RenderTexture(r, tex, nullptr, dest);
+    if (alpha != 255) SDL_SetTextureAlphaMod(tex, 255);
+}
 
 // Next/previous not-removed index, searched cyclically from `from` (exclusive).
 static int belt_step_active(int from, int dir, int F, const std::vector<char> &removed) {
@@ -261,13 +279,16 @@ static int belt_step_active(int from, int dir, int F, const std::vector<char> &r
 // Advances the belt one frame and fills `out` covering [left_bound, right_bound].
 // scroll_offset drives motion (its delta is the per-frame pixel movement); its
 // fractional part is preserved so every row snaps to whole pixels in sync.
-// A cleared item keeps its tiles (cropping over `duration` seconds) before they
-// turn into gaps; duration <= 0 clears instantly.
+// A cleared item keeps its tiles while it animates out: it crops over `crop_duration`
+// seconds and/or fades over `fade_duration` seconds, and becomes a gap once the longer
+// of the two is done. Both <= 0 clears instantly.
 static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
                         float left_bound, float right_bound,
-                        int F, const std::vector<char> &removed, float duration,
+                        int F, const std::vector<char> &removed,
+                        float crop_duration, float fade_duration,
                         bool flow_right, unsigned long long signature,
                         std::vector<BeltTile> &out) {
+    float duration = fmaxf(crop_duration, fade_duration); // how long a cleared tile lives
     out.clear();
     if (F <= 0 || iw <= 0.0f) {
         b.tiles.clear();
@@ -402,12 +423,20 @@ static void belt_update(ScrollBelt &b, float scroll_offset, float iw,
     for (size_t j = 0; j < b.tiles.size(); ++j) {
         int idx = b.tiles[j];
         float clear = 0.0f;
-        if (idx >= 0 && removed[idx] && duration > 0.0f) {
-            clear = b.clear_elapsed[idx] / duration;
-            if (clear < 0.0f) clear = 0.0f;
-            if (clear > 1.0f) clear = 1.0f;
+        float alpha = 1.0f;
+        if (idx >= 0 && removed[idx]) {
+            if (crop_duration > 0.0f) {
+                clear = b.clear_elapsed[idx] / crop_duration;
+                if (clear < 0.0f) clear = 0.0f;
+                if (clear > 1.0f) clear = 1.0f;
+            }
+            if (fade_duration > 0.0f) {
+                alpha = 1.0f - b.clear_elapsed[idx] / fade_duration;
+                if (alpha < 0.0f) alpha = 0.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+            }
         }
-        out.push_back({idx, b.head_x + (float) j * iw, clear});
+        out.push_back({idx, b.head_x + (float) j * iw, clear, alpha});
     }
 }
 
@@ -489,7 +518,7 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
     int slot = 0;
     for (int i = 0; i < F; i++) {
         if (removed[i]) continue;
-        out.push_back({i, snap_px(start_x + (float) slot * iw), 0.0f});
+        out.push_back({i, snap_px(start_x + (float) slot * iw), 0.0f, 1.0f});
         slot++;
     }
     return true;
@@ -566,9 +595,10 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
 
 // Advances the page view one frame and fills `out` with the current page's tiles,
 // centered within the window. `page_index` is the shared page counter (advanced by
-// the interval timer or by SPACE); the page flips whenever it changes. A cleared
-// item keeps its slot (cropping over `duration` seconds) before turning into a gap;
-// duration <= 0 clears instantly.
+// the interval timer or by SPACE); the page flips whenever it changes. A cleared item
+// keeps its slot while it animates out: it crops over `crop_duration` seconds and/or
+// fades over `fade_duration` seconds, and turns into a gap once the longer of the two
+// is done. Both <= 0 clears instantly.
 //
 // Repeat is automatic: while more items remain than fit one page, pages repeat so each
 // is full (no empty space); once every remaining item fits a single page they stop
@@ -576,8 +606,10 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
 // the old manual "repeat to fill" toggle.
 static void page_update(PageView &p, int page_index, OverlayProgressTextAlignment align,
                         int window_w, float iw, float cell,
-                        int F, const std::vector<char> &removed, float duration,
+                        int F, const std::vector<char> &removed,
+                        float crop_duration, float fade_duration,
                         unsigned long long signature, std::vector<BeltTile> &out) {
+    float duration = fmaxf(crop_duration, fade_duration); // how long a cleared slot lives
     out.clear();
     if (F <= 0 || iw <= 0.0f) {
         p.tiles.clear();
@@ -661,16 +693,22 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
         int idx = p.tiles[k];
         float x = snap_px(start_x + (float) k * iw);
         float clear = 0.0f;
+        float alpha = 1.0f;
         if (idx >= 0 && removed[idx]) {
-            if (duration > 0.0f) {
-                clear = p.clear_elapsed[idx] / duration;
+            if (crop_duration > 0.0f) {
+                clear = p.clear_elapsed[idx] / crop_duration;
                 if (clear < 0.0f) clear = 0.0f;
                 if (clear > 1.0f) clear = 1.0f;
             }
-            // Once fully cropped (or instant clear) the slot becomes a gap.
+            if (fade_duration > 0.0f) {
+                alpha = 1.0f - p.clear_elapsed[idx] / fade_duration;
+                if (alpha < 0.0f) alpha = 0.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+            }
+            // Once fully animated out (or instant clear) the slot becomes a gap.
             if (duration <= 0.0f || p.clear_elapsed[idx] >= duration) idx = -1;
         }
-        out.push_back({idx, x, clear});
+        out.push_back({idx, x, clear, alpha});
     }
 }
 
@@ -2310,7 +2348,7 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
 // Draws one row-1 icon (with the shared-parent overlay when applicable) into `dest`, matching the
 // belt/page Row 1 look. Used by the Compact icon strip. A missing texture draws a magenta placeholder.
 static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRect *dest,
-                                   float shared_icon_size) {
+                                   float shared_icon_size, Uint8 alpha = 255) {
     TrackableItem *item = it.first;
     TrackableCategory *parent = it.second;
 
@@ -2325,10 +2363,10 @@ static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRe
     }
 
     if (!tex && !anim_tex) {
-        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
+        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, (Uint8) (100 * alpha / 255));
         SDL_RenderFillRect(o->renderer, dest);
     } else {
-        render_texture_with_alpha(o->renderer, tex, anim_tex, dest, 255);
+        render_texture_with_alpha(o->renderer, tex, anim_tex, dest, alpha);
     }
 
     if (item->is_shared && parent && shared_icon_size > 0.0f) {
@@ -2343,7 +2381,7 @@ static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRe
                                                 &o->texture_cache_capacity, parent->icon_path, SDL_SCALEMODE_NEAREST);
         }
         SDL_FRect shared_dest = {dest->x, dest->y, shared_icon_size, shared_icon_size};
-        render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest, 255);
+        render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest, alpha);
     }
 }
 
@@ -2523,14 +2561,21 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // icons across the panel width and, once they all fit one page, stops repeating and lets completed
     // icons clear away in place. It flips on compact_icon_page_index (its own timer) and centers a full
     // page within the panel span (drawn at panel_x + tile.x), matching the other Page-mode rows. Each
-    // completing icon crops away over its own Clear Animation setting (0 = instant, sign = direction).
+    // completing icon animates out with either the crop (its own Clear Animation setting, 0 = instant,
+    // sign = direction) or the fade, never both: the strip's Fade Out replaces the crop and is gated on
+    // a transparent overlay, like the pop-out stack's fade.
     if (have_icons) {
         static PageView page_compact_icons;
         std::vector<BeltTile> icon_tiles;
         int icon_F = (int) icon_items.size();
+        float icon_fade = (settings->overlay_transparent && settings->compact_row1_fade_enabled)
+                              ? settings->compact_row1_fade_time
+                              : 0.0f;
+        float icon_crop = (icon_fade > 0.0f) ? 0.0f : fabsf(settings->compact_row1_clear_animation);
         page_update(page_compact_icons, o->compact_icon_page_index, settings->compact_panel_align,
                     (int) panel_w, icon_full_w, icon_size,
-                    icon_F, icon_removed, fabsf(settings->compact_row1_clear_animation), icon_sig, icon_tiles);
+                    icon_F, icon_removed, icon_crop, icon_fade,
+                    icon_sig, icon_tiles);
         float icon_y = snap_px(pad);
         for (const auto &tile: icon_tiles) {
             if (tile.idx < 0) continue; // gap (item completed mid-page)
@@ -2538,7 +2583,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
             bool clipped = belt_set_clear_clip(o->renderer, want_w, tile.clear,
                                                icon_y, icon_y + icon_size,
                                                settings->compact_row1_clear_animation);
-            compact_draw_row1_icon(o, icon_items[tile.idx], &dest, settings->compact_icon_shared_size);
+            compact_draw_row1_icon(o, icon_items[tile.idx], &dest, settings->compact_icon_shared_size,
+                                   tile_alpha_mod(tile.alpha));
             if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
         }
     }
@@ -3352,6 +3398,19 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     int window_w;
     SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);
+
+    // How a cleared goal animates out, shared by all three rows: either the crop or the
+    // fade, never both. Like the compact stack's fade it only runs on a transparent
+    // overlay: over a solid background the half-faded pixels blend with the background
+    // color and survive a color key filter as a ghost, so a hand-edited settings.json
+    // cannot force it on either. The fade wins when it is on, so the crop is zeroed.
+    const float clear_fade_duration = (settings->overlay_transparent && settings->overlay_clear_fade_enabled)
+                                          ? settings->overlay_clear_fade_time
+                                          : 0.0f;
+    const float clear_crop_duration = (clear_fade_duration > 0.0f)
+                                          ? 0.0f
+                                          : fabsf(settings->overlay_clear_animation);
+
     SDL_Color text_color = {
         settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
     };
@@ -3378,7 +3437,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row1, o->page_index, settings->overlay_page_align,
                             window_w, item_full_width, ROW1_ICON_SIZE,
-                            F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                            F, removed, clear_crop_duration, clear_fade_duration,
+                            signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
                                      window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
@@ -3386,7 +3446,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             } else {
                 belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
                             -item_full_width, (float) window_w + item_full_width,
-                            F, removed, fabsf(settings->overlay_clear_animation),
+                            F, removed, clear_crop_duration, clear_fade_duration,
                             effective_scroll_speed(settings->overlay_row1_custom_scroll_speed_enabled,
                                                    settings->overlay_row1_scroll_speed,
                                                    settings->overlay_scroll_speed) > 0, signature, tiles);
@@ -3397,6 +3457,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 TrackableItem *item_to_render = row1_items[tile.idx].first;
                 TrackableCategory *parent = row1_items[tile.idx].second;
                 float x_pos = snap_px(tile.x);
+                Uint8 tile_alpha = tile_alpha_mod(tile.alpha);
 
                 bool clipped = belt_set_clear_clip(o->renderer, window_w, tile.clear,
                                                    ROW1_Y_POS, ROW1_Y_POS + ROW1_ICON_SIZE,
@@ -3418,10 +3479,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
 
                 if (!tex && !anim_tex) {
-                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
+                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, (Uint8) (100 * tile_alpha / 255));
                     SDL_RenderFillRect(o->renderer, &dest_rect);
                 } else {
-                    render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, tile_alpha);
                 }
 
                 // --- Render Shared Parent Icon Overlay ---
@@ -3442,7 +3503,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     SDL_FRect shared_dest_rect = {
                         x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
                     };
-                    render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
+                    render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect,
+                                              tile_alpha);
                 }
 
                 if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
@@ -3602,7 +3664,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 std::vector<BeltTile> tiles;
                 page_update(page_supporters, o->page_index, settings->overlay_page_align,
                             window_w, item_full_width, cell_width,
-                            NUM_SUPPORTERS, removed, 0.0f, 0x5507702EULL /* "supporters" */, tiles);
+                            NUM_SUPPORTERS, removed, 0.0f, 0.0f, 0x5507702EULL /* "supporters" */, tiles);
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap (never happens for supporters, but be safe)
                     draw_supporter((size_t) tiles[ti].idx, snap_px(tiles[ti].x));
@@ -3850,7 +3912,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                     page_update(page_row2, o->page_index, settings->overlay_page_align,
                                 window_w, item_full_width_row2, cell_width_row2,
-                                F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                                F, removed, clear_crop_duration, clear_fade_duration,
+                                signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                 } else if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
                                          window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
@@ -3858,7 +3921,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 } else {
                     belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
                                 -coverage, (float) window_w + coverage,
-                                F, removed, fabsf(settings->overlay_clear_animation),
+                                F, removed, clear_crop_duration, clear_fade_duration,
                                 effective_scroll_speed(settings->overlay_row2_custom_scroll_speed_enabled,
                                                        settings->overlay_row2_scroll_speed,
                                                        settings->overlay_scroll_speed) > 0, signature, tiles);
@@ -3870,6 +3933,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         float current_x = snap_px(tiles[ti].x);
 
                         float bg_x_offset = snap_px((cell_width_row2 - ITEM_WIDTH) / 2.0f);
+                        Uint8 tile_alpha = tile_alpha_mod(tiles[ti].alpha);
 
                         bool clipped = belt_set_clear_clip(o->renderer, window_w, tiles[ti].clear,
                                                            ROW2_Y_POS, clear_band_bottom,
@@ -4063,7 +4127,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
 
                         SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                        render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
+                        render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, tile_alpha);
 
                         SDL_FRect icon_rect = {
                             bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
@@ -4081,7 +4145,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                                          &o->texture_cache_capacity, icon_path.c_str(),
                                                          SDL_SCALEMODE_NEAREST);
                         }
-                        render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+                        render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, tile_alpha);
 
                         SDL_Texture *name_texture = get_text_texture_from_cache(o, o->font, name_buf, text_color);
                         if (name_texture) {
@@ -4089,7 +4153,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             SDL_GetTextureSize(name_texture, &w, &h);
                             float text_x = current_x + snap_px((cell_width_row2 - w) / 2.0f);
                             SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
-                            SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
+                            render_text_with_alpha(o->renderer, name_texture, &dest_rect, tile_alpha);
 
                             if (progress_buf[0] != '\0') {
                                 SDL_Texture *progress_texture =
@@ -4101,7 +4165,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     SDL_FRect p_dest_rect = {
                                         p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph
                                     };
-                                    SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
+                                    render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
                                 }
                             }
                         }
@@ -4350,7 +4414,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row3, o->page_index, settings->overlay_page_align,
                             window_w, item_full_width_row3, cell_width_row3,
-                            F, removed, fabsf(settings->overlay_clear_animation), signature, tiles);
+                            F, removed, clear_crop_duration, clear_fade_duration,
+                            signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
             } else if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
                                      window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
@@ -4358,7 +4423,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             } else {
                 belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
                             -coverage, (float) window_w + coverage,
-                            F, removed, fabsf(settings->overlay_clear_animation),
+                            F, removed, clear_crop_duration, clear_fade_duration,
                             effective_scroll_speed(settings->overlay_row3_custom_scroll_speed_enabled,
                                                    settings->overlay_row3_scroll_speed,
                                                    settings->overlay_scroll_speed) > 0, signature, tiles);
@@ -4370,6 +4435,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     float current_x = snap_px(tiles[ti].x);
 
                     float bg_x_offset = snap_px((cell_width_row3 - ITEM_WIDTH) / 2.0f);
+                    Uint8 tile_alpha = tile_alpha_mod(tiles[ti].alpha);
 
                     bool clipped = belt_set_clear_clip(o->renderer, window_w, tiles[ti].clear,
                                                        ROW3_Y_POS, clear_band_bottom,
@@ -4577,7 +4643,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                     // --- Make sure text positioning uses cell_width_row3 for centering ---
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW3_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
+                    render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, tile_alpha);
 
                     SDL_FRect icon_rect = {
                         bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
@@ -4594,7 +4660,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                                      &o->texture_cache_capacity, icon_path.c_str(),
                                                      SDL_SCALEMODE_NEAREST);
                     }
-                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, tile_alpha);
 
 
                     // Text rendering uses cell_width_row3 for centering
@@ -4606,7 +4672,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         float text_x = current_x + snap_px((cell_width_row3 - w) / 2.0f);
                         // Center using cell_width_row3
                         SDL_FRect dest_rect = {text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
-                        SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
+                        render_text_with_alpha(o->renderer, name_texture, &dest_rect, tile_alpha);
 
                         if (progress_buf[0] != '\0') {
                             // Use progress_buf which holds current text
@@ -4618,7 +4684,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 float p_text_x = current_x + snap_px((cell_width_row3 - pw) / 2.0f);
                                 // Center using cell_width_row3
                                 SDL_FRect p_dest_rect = {p_text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
-                                SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
+                                render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
                             }
                         }
                     }

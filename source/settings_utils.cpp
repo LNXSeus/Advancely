@@ -985,6 +985,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
     settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING;
     settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
+    settings->compact_row1_fade_enabled = DEFAULT_COMPACT_ROW1_FADE_ENABLED;
+    settings->compact_row1_fade_time = DEFAULT_COMPACT_ROW1_FADE_TIME;
     settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
     settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancement completions pop by default
@@ -1039,6 +1041,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_gap_row3_to_bottom = DEFAULT_OVERLAY_GAP_ROW3_TO_BOTTOM;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
     settings->overlay_clear_animation = DEFAULT_OVERLAY_CLEAR_ANIMATION;
+    settings->overlay_clear_fade_enabled = DEFAULT_OVERLAY_CLEAR_FADE_ENABLED;
+    settings->overlay_clear_fade_time = DEFAULT_OVERLAY_CLEAR_FADE_TIME;
 
     settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
 
@@ -1576,6 +1580,26 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *clear_fade_on = cJSON_GetObjectItem(general_settings, "overlay_clear_fade_enabled");
+        if (clear_fade_on && cJSON_IsBool(clear_fade_on))
+            settings->overlay_clear_fade_enabled = cJSON_IsTrue(clear_fade_on);
+        else {
+            settings->overlay_clear_fade_enabled = DEFAULT_OVERLAY_CLEAR_FADE_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *clear_fade_time = cJSON_GetObjectItem(general_settings, "overlay_clear_fade_time");
+        if (clear_fade_time && cJSON_IsNumber(clear_fade_time)) {
+            settings->overlay_clear_fade_time = (float) clear_fade_time->valuedouble;
+            if (settings->overlay_clear_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                settings->overlay_clear_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+            if (settings->overlay_clear_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                settings->overlay_clear_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+        } else {
+            settings->overlay_clear_fade_time = DEFAULT_OVERLAY_CLEAR_FADE_TIME;
+            defaults_were_used = true;
+        }
+
         const cJSON *notes_font = cJSON_GetObjectItem(general_settings, "notes_use_roboto_font");
         if (notes_font && cJSON_IsBool(notes_font)) settings->notes_use_roboto_font = cJSON_IsTrue(notes_font);
         else {
@@ -2109,6 +2133,26 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             if (settings->compact_row1_clear_animation > 10.0f) settings->compact_row1_clear_animation = 10.0f;
         } else {
             settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_row1_fade_on = cJSON_GetObjectItem(visual_settings, "compact_row1_fade_enabled");
+        if (compact_row1_fade_on && cJSON_IsBool(compact_row1_fade_on))
+            settings->compact_row1_fade_enabled = cJSON_IsTrue(compact_row1_fade_on);
+        else {
+            settings->compact_row1_fade_enabled = DEFAULT_COMPACT_ROW1_FADE_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_row1_fade_json = cJSON_GetObjectItem(visual_settings, "compact_row1_fade_time");
+        if (compact_row1_fade_json && cJSON_IsNumber(compact_row1_fade_json)) {
+            settings->compact_row1_fade_time = (float) compact_row1_fade_json->valuedouble;
+            if (settings->compact_row1_fade_time < COMPACT_STACK_FADE_TIME_MIN)
+                settings->compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MIN;
+            if (settings->compact_row1_fade_time > COMPACT_STACK_FADE_TIME_MAX)
+                settings->compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MAX;
+        } else {
+            settings->compact_row1_fade_time = DEFAULT_COMPACT_ROW1_FADE_TIME;
             defaults_were_used = true;
         }
 
@@ -2754,6 +2798,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
         settings->compact_row1_spacing = DEFAULT_COMPACT_ROW1_SPACING;
         settings->compact_row1_clear_animation = DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION;
+        settings->compact_row1_fade_enabled = DEFAULT_COMPACT_ROW1_FADE_ENABLED;
+        settings->compact_row1_fade_time = DEFAULT_COMPACT_ROW1_FADE_TIME;
         settings->compact_icon_shared_size = DEFAULT_COMPACT_ICON_SHARED_SIZE;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_stack_type[i] = false;
         settings->compact_stack_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
@@ -3300,6 +3346,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_clear_animation");
         cJSON_AddItemToObject(general_obj, "overlay_clear_animation",
                               cJSON_CreateNumber(settings->overlay_clear_animation));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_clear_fade_enabled");
+        cJSON_AddItemToObject(general_obj, "overlay_clear_fade_enabled",
+                              cJSON_CreateBool(settings->overlay_clear_fade_enabled));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_clear_fade_time");
+        cJSON_AddItemToObject(general_obj, "overlay_clear_fade_time",
+                              cJSON_CreateNumber(settings->overlay_clear_fade_time));
         cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
         cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
         cJSON_DeleteItemFromObject(general_obj, "per_world_notes");
@@ -3561,6 +3613,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_clear_animation");
         cJSON_AddItemToObject(visuals_obj, "compact_row1_clear_animation",
                               cJSON_CreateNumber(settings->compact_row1_clear_animation));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_fade_enabled");
+        cJSON_AddItemToObject(visuals_obj, "compact_row1_fade_enabled",
+                              cJSON_CreateBool(settings->compact_row1_fade_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_row1_fade_time");
+        cJSON_AddItemToObject(visuals_obj, "compact_row1_fade_time",
+                              cJSON_CreateNumber(settings->compact_row1_fade_time));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_icon_shared_size");
         cJSON_AddItemToObject(visuals_obj, "compact_icon_shared_size",
                               cJSON_CreateNumber(settings->compact_icon_shared_size));
