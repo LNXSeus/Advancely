@@ -369,8 +369,15 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         t->toggle_visual_editing_request_ttl = 5;
                     }
                 } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, key, app_mods)) {
-                    if (!coop_session_active || t->temp_creator_window_open) {
-                        t->temp_creator_window_open = !t->temp_creator_window_open;
+                    // Closing follows the same rule as the editor's close button, which is hidden
+                    // while the visual editor runs or the template has unsaved changes. The hotkey
+                    // must not be a way around a window that deliberately has no X.
+                    bool editor_close_blocked = t->is_visual_layout_editing ||
+                                                t->template_editor_has_unsaved_changes;
+                    if (t->temp_creator_window_open) {
+                        if (!editor_close_blocked) t->temp_creator_window_open = false;
+                    } else if (!coop_session_active) {
+                        t->temp_creator_window_open = true;
                     }
                 } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_NOTES, key, app_mods)) {
                     t->notes_window_open = !t->notes_window_open;
