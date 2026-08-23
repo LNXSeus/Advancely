@@ -471,6 +471,12 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Toggle Template Editor Window", \
       "Opens or closes the template editor window.\n" \
       "Cannot open it during a Co-op session, where template editing is disabled.") \
+    X(APP_HOTKEY_TOGGLE_NOTES, "toggle_notes", "N", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Notes Window", \
+      "Opens or closes the notes window, exactly like the \"Notes\" checkbox in the control bar.\n" \
+      "Whether the window shows per-world or per-template notes stays whatever it was set to\n" \
+      "inside the window itself.") \
     X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
       APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
       "Apply Settings", \

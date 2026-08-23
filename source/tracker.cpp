@@ -12836,11 +12836,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add the "Notes" checkbox
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
+        char notes_hotkey_label[96];
+        app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_TOGGLE_NOTES],
+                                 notes_hotkey_label, sizeof(notes_hotkey_label));
         char notes_tooltip_buffer[1024];
         snprintf(notes_tooltip_buffer, sizeof(notes_tooltip_buffer),
                  "Notes Window\n"
                  "--------------------------------\n"
                  "Toggles a persistent text editor for keeping notes.\n"
+                 "Hotkey: %s (configurable in Settings > Hotkeys).\n"
                  "The system has two modes, configurable inside the window:\n\n"
                  " - Per-World (Default): Notes are saved for each world individually.\n"
                  "   The last 32 worlds are remembered.\n"
@@ -12849,7 +12853,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  "The window's size and position are remembered across sessions.\n"
                  "Anything you type is immediately saved.\n"
                  "Hotkeys are disabled while typing in the notes window.\n"
-                 "The maximum note size is 64KB.");
+                 "The maximum note size is 64KB.", notes_hotkey_label);
         ImGui::SetTooltip("%s", notes_tooltip_buffer);
     }
 

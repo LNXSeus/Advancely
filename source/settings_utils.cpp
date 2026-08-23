@@ -854,7 +854,8 @@ const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT] = {
     // Visual Layout Editor
     "Shortcuts for visual layout editing, where goals are dragged around the map by hand.\n"
     "They only fire while an editing session is running, so plain letters like W, A, S and D\n"
-    "are safe to use here."
+    "are safe to use here.\n"
+    "Two movement keys can be held at once, which moves the selection diagonally."
 };
 
 const AppHotkeyDef APP_HOTKEY_DEFS[APP_HOTKEY_COUNT] = {

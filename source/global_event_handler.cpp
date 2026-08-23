@@ -132,6 +132,31 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
     return true;
 }
 
+// How long a movement key has to be held before it starts repeating, and how often it repeats
+// afterwards. The visual editor polls the keyboard itself instead of riding the OS key repeat,
+// which only ever repeats the key pressed last and so can never express two directions at once.
+#define VISUAL_MOVE_REPEAT_DELAY 0.4f
+#define VISUAL_MOVE_REPEAT_INTERVAL 0.04f
+// A frame long enough to owe more steps than this had the app stalled; the rest is dropped instead
+// of teleporting the selection across the map.
+#define VISUAL_MOVE_MAX_STEPS_PER_FRAME 16
+
+// Whether the key bound to an action is currently held down, with the modifiers matching exactly,
+// just like app_hotkey_matches does for a key press.
+static bool app_hotkey_is_held(const AppSettings *settings, AppHotkeyAction action,
+                               const bool *key_state, Uint16 held_mods) {
+    if (!settings || !key_state || action < 0 || action >= APP_HOTKEY_COUNT) return false;
+    const AppHotkey *hk = &settings->app_hotkeys[action];
+    if (hk->key[0] == '\0' || strcmp(hk->key, "None") == 0) return false;
+    if (held_mods != hk->mods) return false;
+
+    SDL_Keycode key = SDL_GetKeyFromName(hk->key);
+    if (key == SDLK_UNKNOWN) return false;
+    SDL_Scancode scancode = SDL_GetScancodeFromKey(key, nullptr);
+    if (scancode == SDL_SCANCODE_UNKNOWN) return false;
+    return key_state[scancode];
+}
+
 void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
@@ -347,11 +372,13 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     if (!coop_session_active || t->temp_creator_window_open) {
                         t->temp_creator_window_open = !t->temp_creator_window_open;
                     }
+                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_NOTES, key, app_mods)) {
+                    t->notes_window_open = !t->notes_window_open;
                 }
             }
 
-            // Movement accumulates instead of overwriting, so two directions pressed within one
-            // frame move the selection diagonally.
+            // The movement keys themselves are not handled here: they are polled once per frame
+            // below, so several directions can be held at the same time.
             if (t->is_visual_layout_editing) {
                 if (event.key.repeat == 0) {
                     if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, key, app_mods)) {
@@ -367,15 +394,6 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         t->visual_copy_pressed = true;
                     }
                 }
-
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_LEFT, key, app_mods)) t->pending_visual_move_x -= 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_RIGHT, key, app_mods)) t->pending_visual_move_x += 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_UP, key, app_mods)) t->pending_visual_move_y -= 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_NUDGE_DOWN, key, app_mods)) t->pending_visual_move_y += 1.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_LEFT, key, app_mods)) t->pending_visual_move_x -= 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_RIGHT, key, app_mods)) t->pending_visual_move_x += 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_UP, key, app_mods)) t->pending_visual_move_y -= 10.0f;
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_MOVE_DOWN, key, app_mods)) t->pending_visual_move_y += 10.0f;
             }
         }
 
@@ -413,6 +431,74 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
             }
+        }
+    }
+
+    // --- Visual layout editor movement, polled once per frame ---
+    // Reading the keyboard state instead of the key events lets several directions be held at the
+    // same time, so Up and Right together move diagonally, as do W and D or whatever else the
+    // Hotkeys tab has them bound to. Each direction keeps its own repeat timer, which is why a
+    // second key pressed later still starts moving immediately.
+    {
+        static float s_visual_move_timers[APP_HOTKEY_COUNT] = {};
+        static bool s_visual_move_held[APP_HOTKEY_COUNT] = {};
+
+        struct VisualMoveBinding {
+            AppHotkeyAction action;
+            float dx, dy;
+        };
+        static const VisualMoveBinding VISUAL_MOVE_BINDINGS[] = {
+            {APP_HOTKEY_NUDGE_LEFT, -1.0f, 0.0f},
+            {APP_HOTKEY_NUDGE_RIGHT, 1.0f, 0.0f},
+            {APP_HOTKEY_NUDGE_UP, 0.0f, -1.0f},
+            {APP_HOTKEY_NUDGE_DOWN, 0.0f, 1.0f},
+            {APP_HOTKEY_MOVE_LEFT, -10.0f, 0.0f},
+            {APP_HOTKEY_MOVE_RIGHT, 10.0f, 0.0f},
+            {APP_HOTKEY_MOVE_UP, 0.0f, -10.0f},
+            {APP_HOTKEY_MOVE_DOWN, 0.0f, 10.0f}
+        };
+
+        // The same gates the key events go through: the tracker window focused, an editing session
+        // running, and nothing typing-related in the way. A settings row waiting for a binding also
+        // stops the poll, so capturing a movement key does not move anything.
+        bool movement_allowed = (t && t->window && t->is_visual_layout_editing &&
+                                 (SDL_GetWindowFlags(t->window) & SDL_WINDOW_INPUT_FOCUS) &&
+                                 SDL_GetAtomicInt(&g_hotkey_capture_armed) == 0 &&
+                                 !ImGui::IsAnyItemActive() &&
+                                 !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup));
+
+        const bool *key_state = movement_allowed ? SDL_GetKeyboardState(nullptr) : nullptr;
+        Uint16 poll_mods = movement_allowed ? hotkey_mods_from_sdl(SDL_GetModState()) : (Uint16) HOTKEY_MOD_NONE;
+        float frame_time = deltaTime ? *deltaTime : 0.0f;
+
+        for (const VisualMoveBinding &binding: VISUAL_MOVE_BINDINGS) {
+            bool held = movement_allowed &&
+                        app_hotkey_is_held(app_settings, binding.action, key_state, poll_mods);
+            if (!held) {
+                s_visual_move_held[binding.action] = false;
+                s_visual_move_timers[binding.action] = 0.0f;
+                continue;
+            }
+
+            int steps = 0;
+            if (!s_visual_move_held[binding.action]) {
+                // First frame of the press: one step right away, then wait out the repeat delay.
+                s_visual_move_held[binding.action] = true;
+                s_visual_move_timers[binding.action] = VISUAL_MOVE_REPEAT_DELAY;
+                steps = 1;
+            } else {
+                s_visual_move_timers[binding.action] -= frame_time;
+                while (s_visual_move_timers[binding.action] <= 0.0f && steps < VISUAL_MOVE_MAX_STEPS_PER_FRAME) {
+                    s_visual_move_timers[binding.action] += VISUAL_MOVE_REPEAT_INTERVAL;
+                    steps++;
+                }
+                if (s_visual_move_timers[binding.action] <= 0.0f) s_visual_move_timers[binding.action] = VISUAL_MOVE_REPEAT_INTERVAL;
+            }
+
+            // Movement accumulates instead of overwriting, so opposite directions cancel out and
+            // perpendicular ones combine into a diagonal.
+            t->pending_visual_move_x += binding.dx * (float) steps;
+            t->pending_visual_move_y += binding.dy * (float) steps;
         }
     }
 }
