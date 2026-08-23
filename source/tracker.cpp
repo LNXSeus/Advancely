@@ -6725,9 +6725,14 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     if (!t->is_visual_layout_editing) return;
 
     ImGui::PushID(id);
-    // Create an invisible button over the item so ImGui captures the mouse
+    // Create an invisible button over the item so ImGui captures the mouse.
+    // ImGuiItemFlags_NoNav keeps keyboard navigation off the handle: the movement hotkeys are
+    // arrow keys by default, and a nav move would park the nav cursor on some unrelated handle,
+    // which then counts as hovered and shows its tooltip in place of the one under the mouse.
     ImGui::SetCursorScreenPos(item_screen_pos);
+    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
     ImGui::InvisibleButton("##drag_handle", hit_box_size);
+    ImGui::PopItemFlag();
 
     bool is_dragging = ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
     bool is_hovered = ImGui::IsItemHovered();
@@ -11228,7 +11233,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     ImVec2 line_handle_pos = ImVec2(mid_x - line_handle_size * 0.5f,
                                                     mid_y - line_handle_size * 0.5f);
                     ImGui::SetCursorScreenPos(line_handle_pos);
+                    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
                     ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_size, line_handle_size));
+                    ImGui::PopItemFlag();
 
                     bool is_line_dragging = ImGui::IsItemActive() &&
                                             ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -11575,7 +11582,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     ImVec2 arrow_handle_pos = ImVec2(mid_x - arrow_handle_size * 0.5f,
                                                      mid_y - arrow_handle_size * 0.5f);
                     ImGui::SetCursorScreenPos(arrow_handle_pos);
+                    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
                     ImGui::InvisibleButton("##drag_handle", ImVec2(arrow_handle_size, arrow_handle_size));
+                    ImGui::PopItemFlag();
 
                     bool is_arrow_dragging = ImGui::IsItemActive() &&
                                              ImGui::IsMouseDragging(ImGuiMouseButton_Left);
