@@ -53,6 +53,20 @@ ImGui::SetWindowFontScale(scale_factor); \
 
 #define RESET_FONT_SCALE() ImGui::SetWindowFontScale(1.0f)
 
+// Zoom range of the tracker map. The mouse wheel clamps to these and the View menu's Zoom slider
+// spans exactly them, so neither way of zooming can reach a level the other cannot.
+#define TRACKER_ZOOM_MIN 0.1f
+#define TRACKER_ZOOM_MAX 10.0f
+
+// A View menu opened by a shortcut is only there to show the checkbox that changed, so it holds
+// this long and then fades away. One opened by clicking the button stays until it is dismissed.
+#define VIEW_MENU_AUTO_CLOSE_DELAY 5.0f
+#define VIEW_MENU_FADE_DURATION 0.5f
+// The end of the fade stops just short of zero: ImGui hides a window whose style alpha is exactly
+// 0.0f, which skips its contents, and the popup closes itself from inside those contents. This is
+// far below what one 8-bit color channel can hold, so it still reads as invisible.
+#define VIEW_MENU_MIN_ALPHA 0.001f
+
 // --- Visual Layout Multi-Select State ---
 // Registered draggable items for selection rectangle hit-testing (rebuilt every frame)
 struct VisualLayoutItem {
@@ -4235,8 +4249,12 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 
     // Initialize camera and zoom from settings.json
     t->camera_offset = ImVec2(settings->view_pan_x, settings->view_pan_y);
-    t->zoom_level = (settings->view_zoom > 0.1f) ? settings->view_zoom : 1.0f;
+    t->zoom_level = (settings->view_zoom > TRACKER_ZOOM_MIN) ? settings->view_zoom : 1.0f;
+    // A hand-edited settings.json could hold a level past the top of the range, which the wheel and
+    // the Zoom slider both refuse to produce.
+    if (t->zoom_level > TRACKER_ZOOM_MAX) t->zoom_level = TRACKER_ZOOM_MAX;
     t->layout_locked = settings->view_locked;
+    t->camera_locked = settings->view_camera_locked;
     t->locked_layout_width = (settings->view_locked_width > 0.0f) ? settings->view_locked_width : 0.0f;
 
     // Initialize time since last update
@@ -4338,25 +4356,9 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
                         // Open settings window, TOGGLE settings_opened
                         *settings_opened = !(*settings_opened);
                         break;
-                    case SDL_SCANCODE_SPACE:
-                        // Only react when the tracker's own view holds keyboard focus. Settings and the
-                        // template editor render into this same SDL window, and there SPACE belongs to the
-                        // widget keyboard nav has selected. IsAnyItemActive() cannot catch that: the
-                        // activation only happens later, while ImGui builds the next frame.
-                        if (!t->tracker_view_focused) {
-                            break;
-                        }
-
-                        // Toggle the layout locked state
-                        t->layout_locked = !t->layout_locked;
-
-                        // If we just locked the layout, save the current width
-                        if (t->layout_locked) {
-                            // This logic mirrors what happens when the UI checkbox is clicked.
-                            ImGuiIO &io = ImGui::GetIO();
-                            t->locked_layout_width = io.DisplaySize.x / t->zoom_level;
-                        }
-                        break;
+                    // Locking the layout used to live here on a hardcoded SPACE. It is an
+                    // Advancely shortcut now (Settings > Hotkeys, "Tracker Window"), handled with
+                    // the other View menu toggles in handle_global_events().
                     // Window move/resize events are handled in main.c
                     default:
                         break;
@@ -12345,24 +12347,18 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     const float clear_button_width = frame_height; // Square button
     const float search_box_width = 250.0f; // Keep this fixed for now
 
-    // Calculate sizes for Checkboxes (Square + Spacing + Label + Padding)
-    // Checkbox square is roughly frame_height wide.
-    ImVec2 lock_text_size = ImGui::CalcTextSize("Lock Layout");
-    float lock_checkbox_width = frame_height + style.ItemInnerSpacing.x + lock_text_size.x + frame_padding_x * 0.5f;
-    // Approx checkbox width calculation
+    // Zoom, Reset Camera, the two locks, Manual Layout and Goal Visibility all live in the "View"
+    // menu, so the bar only has to reserve that one button next to the search box. Notes stays a
+    // checkbox of its own, since it opens a window rather than changing the map.
+    const char *view_menu_button_label = "View";
+    ImVec2 view_menu_text_size = ImGui::CalcTextSize(view_menu_button_label);
+    float view_menu_button_width = view_menu_text_size.x + frame_padding_x * 2.0f;
 
-    // "Reset Camera" is a button (text + horizontal frame padding on both sides).
-    ImVec2 reset_text_size = ImGui::CalcTextSize("Reset Camera");
-    float reset_checkbox_width = reset_text_size.x + frame_padding_x * 2.0f;
-
-    ImVec2 manual_layout_text_size = ImGui::CalcTextSize("Manual Layout");
-    float manual_layout_checkbox_width = frame_height + style.ItemInnerSpacing.x + manual_layout_text_size.x +
-                                         frame_padding_x * 0.5f;
-
+    // Checkbox width: the square (roughly frame_height) + inner spacing + label + padding.
     ImVec2 notes_text_size = ImGui::CalcTextSize("Notes");
     float notes_checkbox_width = frame_height + style.ItemInnerSpacing.x + notes_text_size.x + frame_padding_x * 0.5f;
 
-    // Player dropdown is conditionally rendered between search box and Lock Layout
+    // Player dropdown is conditionally rendered between search box and the View menu
     // when a co-op lobby is active. Reserve its width (must match the SetNextItemWidth
     // used below) so subsequent controls don't get shoved off-screen.
     const float player_dropdown_width = 160.0f;
@@ -12390,15 +12386,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         if (w > visibility_dropdown_width) visibility_dropdown_width = w;
     }
     // Room for frame padding on both sides plus the dropdown arrow button.
+    // The View menu's Zoom slider takes the same width, so the two line up in the menu.
     visibility_dropdown_width += style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
 
     // Calculate total width using ImGui's ItemSpacing
     float controls_total_width = clear_button_width + button_padding_x +
                                  search_box_width + button_padding_x +
-                                 lock_checkbox_width + button_padding_x +
-                                 reset_checkbox_width + button_padding_x +
-                                 manual_layout_checkbox_width + button_padding_x +
-                                 visibility_dropdown_width + button_padding_x +
+                                 view_menu_button_width + button_padding_x +
                                  notes_checkbox_width;
     if (controls_show_dropdown) {
         controls_total_width += player_dropdown_width + button_padding_x;
@@ -12698,151 +12692,314 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
     }
 
-    ImGui::SameLine();
-
-    // "Lock Layout" checkbox
-    if (ImGui::Checkbox("Lock Layout", &t->layout_locked)) {
+    // The View menu shortcuts land here rather than in the event handler, so a key press runs the
+    // exact same code as clicking the checkbox. Each one pops the menu open afterwards, which is
+    // the only feedback a state that lives in a menu can give.
+    if (t->view_lock_camera_pressed) {
+        t->camera_locked = !t->camera_locked;
+        t->view_menu_open_requested = true;
+        t->view_lock_camera_pressed = false;
+    }
+    if (t->view_lock_layout_pressed) {
+        t->layout_locked = !t->layout_locked;
         if (t->layout_locked) {
-            // When locking, store the current scroll position
-            t->locked_layout_width = io.DisplaySize.x / t->zoom_level; // Store the current width
+            // Same as clicking the checkbox: remember the width the grid wraps at right now.
+            t->locked_layout_width = io.DisplaySize.x / t->zoom_level;
         }
+        t->view_menu_open_requested = true;
+        t->view_lock_layout_pressed = false;
+    }
+    if (t->view_toggle_manual_layout_pressed) {
+        // The same gate the checkbox has: visual layout editing forces Manual Layout on, and
+        // without a template there is nothing to lay out.
+        if (t->template_data && !t->is_visual_layout_editing) {
+            settings->use_manual_layout = !settings->use_manual_layout;
+            settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+            t->view_menu_open_requested = true;
+        }
+        t->view_toggle_manual_layout_pressed = false;
     }
 
-    if (ImGui::IsItemHovered()) {
-        char lock_layout_tooltip_buffer[1024];
-        snprintf(lock_layout_tooltip_buffer, sizeof(lock_layout_tooltip_buffer),
-                 "Also toggled by pressing SPACE.\n"
-                 "Prevents the layout from rearranging when zooming or resizing the window.\n"
-                 "Adjusting the window width gives more control over\n"
-                 "the exact amount of goals displayed per row.");
-        ImGui::SetTooltip("%s", lock_layout_tooltip_buffer);
-    }
+    // Counts down while a shortcut-opened menu is on screen. Zero means the menu stays put, which
+    // is what clicking the button gives.
+    static float s_view_menu_auto_close_timer = 0.0f;
 
     ImGui::SameLine();
 
-    // "Reset Camera" button, it also turns off the lock layout
-    if (ImGui::Button("Reset Camera")) {
-        t->camera_offset = ImVec2(0.0f, 0.0f);
-        t->zoom_level = 1.0f;
-        t->layout_locked = false; // Unlocks the layout
+    // Everything about how the map is shown lives in this one menu, so the bar over the map stays
+    // a search field and two buttons. Same popup pattern the template editor uses for its Import
+    // and Bulk Actions menus.
+    if (ImGui::Button(view_menu_button_label)) {
+        ImGui::OpenPopup("view_menu_popup");
+        s_view_menu_auto_close_timer = 0.0f; // Asked for by hand, so it stays until dismissed.
+    }
+    // The menu hangs off the button rather than the mouse, so a shortcut press puts it in the same
+    // place a click does no matter where the cursor happens to be. Anchored bottom-right, so it
+    // grows up and to the left, away from the screen edges the control bar sits in.
+    ImVec2 view_menu_anchor = ImVec2(ImGui::GetItemRectMax().x,
+                                     ImGui::GetItemRectMin().y - style.ItemSpacing.y);
+    if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("view_menu_popup")) {
+        char view_menu_tooltip_buffer[256];
+        snprintf(view_menu_tooltip_buffer, sizeof(view_menu_tooltip_buffer),
+                 "How the map is shown: Zoom, Reset Camera, the camera and\n"
+                 "layout locks, Manual Layout and Goal Visibility.\n"
+                 "The locks and Manual Layout also have shortcuts (Settings > Hotkeys),\n"
+                 "which open this menu so you can see what changed.");
+        ImGui::SetTooltip("%s", view_menu_tooltip_buffer);
     }
 
-    if (ImGui::IsItemHovered()) {
-        char reset_layout_tooltip_buffer[1024];
-        snprintf(reset_layout_tooltip_buffer, sizeof(reset_layout_tooltip_buffer),
-                 "Resets camera position and zoom level to their defaults.");
-        ImGui::SetTooltip("%s", reset_layout_tooltip_buffer);
+    // A shortcut toggled one of the states below, so show the menu holding it. Another toggle
+    // while it is already up starts the countdown over.
+    if (t->view_menu_open_requested) {
+        ImGui::OpenPopup("view_menu_popup");
+        s_view_menu_auto_close_timer = VIEW_MENU_AUTO_CLOSE_DELAY + VIEW_MENU_FADE_DURATION;
+        t->view_menu_open_requested = false;
     }
 
-    ImGui::SameLine();
-
-    // Locked while the Visual Layout Editor is active: that mode forces "Manual Layout" ON,
-    // so toggling it off here would break active editing.
-    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); // Prevent crashing if template_data is null
-    bool temp_manual = settings->use_manual_layout;
-    if (ImGui::Checkbox("Manual Layout", &temp_manual)) {
-        settings->use_manual_layout = temp_manual;
-        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save the preference instantly
-    }
-    ImGui::EndDisabled();
-    // Hover text outside the disabled scope so the tooltip still shows while the checkbox is locked.
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[256];
-        if (t->is_visual_layout_editing) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Locked while the Visual Layout Editor is active.\n"
-                     "The editor requires 'Manual Layout' to stay enabled.");
-        } else {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-                     "Any non-manually placed goals get pushed to the right.\n"
-                     "Repositioning for the manual layout is done through the\n"
-                     "Template Editor's Visual Layout Editor.");
+    // Run the countdown and turn what is left of it into the window's opacity.
+    if (!ImGui::IsPopupOpen("view_menu_popup")) s_view_menu_auto_close_timer = 0.0f;
+    bool view_menu_expired = false;
+    float view_menu_alpha = 1.0f;
+    if (s_view_menu_auto_close_timer > 0.0f) {
+        s_view_menu_auto_close_timer -= io.DeltaTime;
+        if (s_view_menu_auto_close_timer <= 0.0f) {
+            s_view_menu_auto_close_timer = 0.0f;
+            view_menu_expired = true;
+            // The popup is still submitted on the frame it closes, so it has to be invisible by
+            // then. Leaving the alpha at its default would end the fade on one bright frame.
+            view_menu_alpha = 0.0f;
+        } else if (s_view_menu_auto_close_timer < VIEW_MENU_FADE_DURATION) {
+            view_menu_alpha = s_view_menu_auto_close_timer / VIEW_MENU_FADE_DURATION;
         }
-        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
-    ImGui::SameLine();
+    ImGui::SetNextWindowPos(view_menu_anchor, ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, fmaxf(view_menu_alpha, VIEW_MENU_MIN_ALPHA));
 
-    // "Visibility" dropdown - quick switch for goal_hiding_mode + invert_hiding_mode.
-    // Six entries cover every combination of the 3 modes and the invert flag.
-    // Locked while the Visual Layout Editor is active: that mode forces "Show All" so every
-    // goal stays visible while repositioning, so switching the mode here would be misleading.
-    ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); {
-        struct VisibilityOption {
-            const char *label;
-            GoalHidingMode mode;
-            bool inverted;
-        };
-        static const VisibilityOption visibility_options[] = {
-            {"Hide All Completed", HIDE_ALL_COMPLETED, false},
-            {"Hide All Incomplete (Inv.)", HIDE_ALL_COMPLETED, true},
-            {"Hide Template-Hidden Only", HIDE_ONLY_TEMPLATE_HIDDEN, false},
-            {"Hide Template-Hidden (Inv.)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
-            {"Show All", SHOW_ALL, false},
-            {"Show All (Inv.)", SHOW_ALL, true},
-            {"Show Only Incomplete", SHOW_ONLY_INCOMPLETE, false},
-            {"Show Only Completed", SHOW_ONLY_INCOMPLETE, true},
-        };
-        const int visibility_option_count = (int) (sizeof(visibility_options) / sizeof(visibility_options[0]));
+    if (ImGui::BeginPopup("view_menu_popup")) {
+        // A popup is its own ImGui window, so the control bar's font scale does not carry into it.
+        ImGui::SetWindowFontScale(scale_factor_controls);
 
-        int current_idx = 0;
-        for (int i = 0; i < visibility_option_count; i++) {
-            if (visibility_options[i].mode == settings->goal_hiding_mode &&
-                visibility_options[i].inverted == settings->invert_hiding_mode) {
-                current_idx = i;
-                break;
-            }
+        // Reaching for the menu keeps it. The countdown only exists so a menu nobody asked to see
+        // goes away on its own, and a half-faded menu under the cursor would be a trap.
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows |
+                                   ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) ||
+            ImGui::IsAnyItemActive()) {
+            s_view_menu_auto_close_timer = 0.0f;
+            view_menu_expired = false;
         }
+        if (view_menu_expired) ImGui::CloseCurrentPopup();
 
+        // --- Zoom ---
+        // The endpoints are the same limits the mouse wheel clamps to below, and the anchoring
+        // matches as well: the wheel keeps the point under the cursor still, so the slider keeps
+        // the center of the screen still. Ctrl + click (Cmd on macOS) types an exact value.
+        float zoom_value = t->zoom_level;
         ImGui::SetNextItemWidth(visibility_dropdown_width);
-        if (ImGui::BeginCombo("##VisibilityMode", visibility_options[current_idx].label)) {
-            for (int i = 0; i < visibility_option_count; i++) {
-                bool is_selected = (i == current_idx);
-                if (ImGui::Selectable(visibility_options[i].label, is_selected)) {
-                    if (i != current_idx) {
-                        settings->goal_hiding_mode = visibility_options[i].mode;
-                        settings->invert_hiding_mode = visibility_options[i].inverted;
-                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                    }
-                }
-                if (is_selected) ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
+        if (ImGui::SliderFloat("Zoom", &zoom_value, TRACKER_ZOOM_MIN, TRACKER_ZOOM_MAX, "%.3fx",
+                               ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic)) {
+            ImVec2 screen_center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+            ImVec2 center_before_zoom = ImVec2((screen_center.x - t->camera_offset.x) / t->zoom_level,
+                                               (screen_center.y - t->camera_offset.y) / t->zoom_level);
+            float old_zoom = t->zoom_level;
+            t->zoom_level = zoom_value;
+            t->camera_offset.x += center_before_zoom.x * (old_zoom - t->zoom_level);
+            t->camera_offset.y += center_before_zoom.y * (old_zoom - t->zoom_level);
         }
+        if (ImGui::IsItemHovered()) {
+            char zoom_tooltip_buffer[512];
+            snprintf(zoom_tooltip_buffer, sizeof(zoom_tooltip_buffer),
+                     "Zoom level of the tracker map, between %.1fx and %.0fx.\n"
+                     "Drag for a rough value, or Ctrl + click (Cmd on macOS) to type an exact one.\n"
+                     "The mouse wheel over the map does the same thing around the cursor,\n"
+                     "unless 'Lock Camera' is on.",
+                     TRACKER_ZOOM_MIN, TRACKER_ZOOM_MAX);
+            ImGui::SetTooltip("%s", zoom_tooltip_buffer);
+        }
+
+        ImGui::Separator();
+
+        // "Reset Camera" button, it also turns off the lock layout
+        if (ImGui::Button("Reset Camera")) {
+            t->camera_offset = ImVec2(0.0f, 0.0f);
+            t->zoom_level = 1.0f;
+            t->layout_locked = false; // Unlocks the layout
+        }
+
+        if (ImGui::IsItemHovered()) {
+            char reset_layout_tooltip_buffer[1024];
+            snprintf(reset_layout_tooltip_buffer, sizeof(reset_layout_tooltip_buffer),
+                     "Resets camera position and zoom level to their defaults.\n"
+                     "Also unlocks the layout. A locked camera stays locked,\n"
+                     "since this button is a deliberate action rather than a stray scroll.");
+            ImGui::SetTooltip("%s", reset_layout_tooltip_buffer);
+        }
+
+        // "Lock Camera" checkbox
+        ImGui::Checkbox("Lock Camera", &t->camera_locked);
+
+        if (ImGui::IsItemHovered()) {
+            char lock_camera_hotkey_label[96];
+            app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_LOCK_CAMERA],
+                                     lock_camera_hotkey_label, sizeof(lock_camera_hotkey_label));
+            char lock_camera_tooltip_buffer[1024];
+            snprintf(lock_camera_tooltip_buffer, sizeof(lock_camera_tooltip_buffer),
+                     "Ignores mouse wheel zooming and right/middle mouse dragging on the map,\n"
+                     "so a view you have set up cannot be nudged out of place by accident.\n"
+                     "The Zoom slider and Reset Camera above still work.\n"
+                     "Hotkey: %s (configurable in Settings > Hotkeys).", lock_camera_hotkey_label);
+            ImGui::SetTooltip("%s", lock_camera_tooltip_buffer);
+        }
+
+        // "Lock Layout" checkbox
+        if (ImGui::Checkbox("Lock Layout", &t->layout_locked)) {
+            if (t->layout_locked) {
+                // When locking, store the current scroll position
+                t->locked_layout_width = io.DisplaySize.x / t->zoom_level; // Store the current width
+            }
+        }
+
+        if (ImGui::IsItemHovered()) {
+            char lock_layout_hotkey_label[96];
+            app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_LOCK_LAYOUT],
+                                     lock_layout_hotkey_label, sizeof(lock_layout_hotkey_label));
+            char lock_layout_tooltip_buffer[1024];
+            snprintf(lock_layout_tooltip_buffer, sizeof(lock_layout_tooltip_buffer),
+                     "Prevents the layout from rearranging when zooming or resizing the window.\n"
+                     "Adjusting the window width gives more control over\n"
+                     "the exact amount of goals displayed per row.\n"
+                     "Hotkey: %s (configurable in Settings > Hotkeys).\n\n"
+                     "This is about the automatic grid, so it applies to the whole map in\n"
+                     "'Auto Layout'. In 'Manual Layout' it only affects the goals that have no\n"
+                     "position of their own, the ones pushed into the grid to the right of\n"
+                     "everything you placed by hand.", lock_layout_hotkey_label);
+            ImGui::SetTooltip("%s", lock_layout_tooltip_buffer);
+        }
+
+        ImGui::Separator();
+
+        // Locked while the Visual Layout Editor is active: that mode forces "Manual Layout" ON,
+        // so toggling it off here would break active editing.
+        ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); // Prevent crashing if template_data is null
+        bool temp_manual = settings->use_manual_layout;
+        if (ImGui::Checkbox("Manual Layout", &temp_manual)) {
+            settings->use_manual_layout = temp_manual;
+            settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save the preference instantly
+        }
+        ImGui::EndDisabled();
+        // Hover text outside the disabled scope so the tooltip still shows while the checkbox is locked.
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            char tooltip_buffer[1024];
+            char tooltip_buffer[512];
             if (t->is_visual_layout_editing) {
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Goal Visibility Mode\n"
                          "Locked while the Visual Layout Editor is active.\n"
-                         "Every goal is forced visible (Show All) so you can\n"
-                         "reposition them, regardless of completion or hidden status.\n"
-                         "Close the Visual Layout Editor to change this again.");
+                         "The editor requires 'Manual Layout' to stay enabled.");
             } else {
+                char manual_layout_hotkey_label[96];
+                app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_TOGGLE_MANUAL_LAYOUT],
+                                         manual_layout_hotkey_label, sizeof(manual_layout_hotkey_label));
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Goal Visibility Mode\n"
-                         "Quick switch for the mode + invert combo.\n\n"
-                         " - Hide All Completed: hides completed AND template-hidden goals.\n"
-                         " - Hide All Incomplete (Inverted): hides incomplete goals instead.\n"
-                         " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
-                         " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
-                         " - Show All: nothing is hidden.\n"
-                         " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n"
-                         " - Show Only Incomplete: hides completed goals and shows every incomplete one,\n"
-                         "   including template-hidden goals.\n"
-                         " - Show Only Completed: the reverse, only completed goals are shown,\n"
-                         "   including template-hidden ones.\n\n"
-                         "Changing this saves immediately and does not restart the overlay.");
+                         "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
+                         "Any non-manually placed goals get pushed to the right.\n"
+                         "Repositioning for the manual layout is done through the\n"
+                         "Template Editor's Visual Layout Editor.\n"
+                         "Hotkey: %s (configurable in Settings > Hotkeys).", manual_layout_hotkey_label);
             }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
+
+        ImGui::Separator();
+
+        // "Visibility" dropdown - quick switch for goal_hiding_mode + invert_hiding_mode.
+        // Six entries cover every combination of the 3 modes and the invert flag.
+        // Locked while the Visual Layout Editor is active: that mode forces "Show All" so every
+        // goal stays visible while repositioning, so switching the mode here would be misleading.
+        ImGui::BeginDisabled(!t->template_data || t->is_visual_layout_editing); {
+            struct VisibilityOption {
+                const char *label;
+                GoalHidingMode mode;
+                bool inverted;
+            };
+            static const VisibilityOption visibility_options[] = {
+                {"Hide All Completed", HIDE_ALL_COMPLETED, false},
+                {"Hide All Incomplete (Inv.)", HIDE_ALL_COMPLETED, true},
+                {"Hide Template-Hidden Only", HIDE_ONLY_TEMPLATE_HIDDEN, false},
+                {"Hide Template-Hidden (Inv.)", HIDE_ONLY_TEMPLATE_HIDDEN, true},
+                {"Show All", SHOW_ALL, false},
+                {"Show All (Inv.)", SHOW_ALL, true},
+                {"Show Only Incomplete", SHOW_ONLY_INCOMPLETE, false},
+                {"Show Only Completed", SHOW_ONLY_INCOMPLETE, true},
+            };
+            const int visibility_option_count = (int) (sizeof(visibility_options) / sizeof(visibility_options[0]));
+
+            int current_idx = 0;
+            for (int i = 0; i < visibility_option_count; i++) {
+                if (visibility_options[i].mode == settings->goal_hiding_mode &&
+                    visibility_options[i].inverted == settings->invert_hiding_mode) {
+                    current_idx = i;
+                    break;
+                }
+            }
+
+            ImGui::SetNextItemWidth(visibility_dropdown_width);
+            if (ImGui::BeginCombo("##VisibilityMode", visibility_options[current_idx].label)) {
+                for (int i = 0; i < visibility_option_count; i++) {
+                    bool is_selected = (i == current_idx);
+                    if (ImGui::Selectable(visibility_options[i].label, is_selected)) {
+                        if (i != current_idx) {
+                            settings->goal_hiding_mode = visibility_options[i].mode;
+                            settings->invert_hiding_mode = visibility_options[i].inverted;
+                            settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                        }
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char tooltip_buffer[1024];
+                if (t->is_visual_layout_editing) {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Goal Visibility Mode\n"
+                             "Locked while the Visual Layout Editor is active.\n"
+                             "Every goal is forced visible (Show All) so you can\n"
+                             "reposition them, regardless of completion or hidden status.\n"
+                             "Close the Visual Layout Editor to change this again.");
+                } else {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Goal Visibility Mode\n"
+                             "Quick switch for the mode + invert combo.\n\n"
+                             " - Hide All Completed: hides completed AND template-hidden goals.\n"
+                             " - Hide All Incomplete (Inverted): hides incomplete goals instead.\n"
+                             " - Hide Template-Hidden Only: hides only template-hidden goals.\n"
+                             " - Hide Template-Hidden (Inverted): same, but greys/fades incomplete goals.\n"
+                             " - Show All: nothing is hidden.\n"
+                             " - Show All (Inverted): nothing is hidden, but incomplete goals are greyed/faded.\n"
+                             " - Show Only Incomplete: hides completed goals and shows every incomplete one,\n"
+                             "   including template-hidden goals.\n"
+                             " - Show Only Completed: the reverse, only completed goals are shown,\n"
+                             "   including template-hidden ones.\n\n"
+                             "Changing this saves immediately and does not restart the overlay.");
+                }
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::EndPopup();
     }
-    ImGui::EndDisabled();
+
+    ImGui::PopStyleVar(); // ImGuiStyleVar_Alpha, pushed whether or not the popup is up
+
+    // The event handler needs to know whether this menu is on screen, so its own shortcuts can
+    // still fire while it is open.
+    t->view_menu_popup_open = ImGui::IsPopupOpen("view_menu_popup");
 
     ImGui::SameLine();
 
-    // Add the "Notes" checkbox
+    // The "Notes" checkbox stays in the bar. The View menu is about how the map itself is drawn,
+    // and the notes are a window of their own that has nothing to do with the view.
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
         char notes_hotkey_label[96];
@@ -13006,15 +13163,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
 
     // Pan and zoom logic (Moved to bottom to respect is_hovering_scrollable_list flag set during render)
-    if (ImGui::IsWindowHovered()) {
+    // "Lock Camera" only blocks these mouse gestures. The zoom slider and Reset Camera in the View
+    // menu are deliberate actions, so they keep working while the camera is locked.
+    if (!t->camera_locked && ImGui::IsWindowHovered()) {
         if (!t->is_hovering_scrollable_list && io.MouseWheel != 0) {
             ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
             ImVec2 mouse_pos_before_zoom = ImVec2((mouse_pos_in_window.x - t->camera_offset.x) / t->zoom_level,
                                                   (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
             float old_zoom = t->zoom_level;
             t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level;
-            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f;
-            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f;
+            if (t->zoom_level < TRACKER_ZOOM_MIN) t->zoom_level = TRACKER_ZOOM_MIN;
+            if (t->zoom_level > TRACKER_ZOOM_MAX) t->zoom_level = TRACKER_ZOOM_MAX;
             t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
             t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
         }
@@ -14971,6 +15130,7 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             settings->view_pan_y = t->camera_offset.y;
             settings->view_zoom = t->zoom_level;
             settings->view_locked = t->layout_locked;
+            settings->view_camera_locked = t->camera_locked;
             settings->view_locked_width = t->locked_layout_width;
 
             // Save settings immediately

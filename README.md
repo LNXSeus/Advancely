@@ -224,7 +224,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   time when your run completes. Should `record.json` start moving again, or should you switch worlds, the mod's time is
   used again right away. Without the mod nothing changes: the tick-based play time is used exactly as before.
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
-  `Middle-Click`, zoom with the `Mouse Wheel`, and lock the layout in place by pressing `SPACE`.
+  `Middle-Click`, zoom with the `Mouse Wheel` or the `Zoom` slider in the `View` menu, and lock the camera or the layout
+  in place from that same menu.
 * **Scrollable Lists**: Goals containing large numbers of sub-items (like "All Animals Bred" or complex stats) are
   automatically converted into scrollable lists to save screen space.
 * **Comprehensive Real-Time Tracking**: Advancely operates in real-time by watching your singleplayer save files for
@@ -645,15 +646,30 @@ the [settings window](#the-settings-window-esc).
 
 You can manipulate the view using several intuitive controls:
 
+* **View Menu**: The `View` button in the bottom-right corner opens everything that decides how the map is drawn: the
+  `Zoom` slider, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Manual Layout` and the goal visibility dropdown.
+  Keeping them in one menu leaves the bar over the map to the search box and the `Notes` checkbox. `Lock Camera`,
+  `Lock Layout` and `Manual Layout` also have shortcuts (`Shift+C`, `Space` and `Shift+M` by default), and using one
+  opens the menu so you can see the checkbox that changed. A menu opened that way fades out after five seconds, unless
+  you move the mouse onto it.
 * **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
 * **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
+  For an exact level, use the `Zoom` slider in the `View` menu, which spans the same 0.1x to 10x range. Drag it for a
+  rough value, or `Ctrl+Click` (`Cmd+Click` on macOS) to type one with up to three decimal places. The wheel keeps the
+  point under your cursor in place, the slider keeps the center of the window in place.
 * **Scroll Lists**: When hovering over a goal with many sub-items, the `Mouse Wheel` will scroll the list contents
   instead of zooming the map. You can also left-click and drag the scrollbar.
-* **Lock Layout**: Press the `SPACE` key to lock the grid layout. This prevents goals from rearranging when you resize
-  the window, giving you precise control over how many items appear in each row.
-* **Reset Camera**: Click the `Reset Camera` button in the bottom-right corner to instantly reset the pan and zoom to
-  their default positions.
-* **Goal Visibility Dropdown**: A dropdown in the bottom controls (next to `Manual Layout`) lets you switch the goal
+* **Lock Camera**: The `Lock Camera` checkbox in the `View` menu (`Shift+C` by default) makes the map ignore wheel zooming and
+  drag panning, so a view you have set up cannot be nudged out of place by accident. The `Zoom` slider and
+  `Reset Camera` still work, since those are deliberate actions.
+* **Lock Layout**: The `Lock Layout` checkbox in the `View` menu (`Space` by default) locks the grid layout.
+  This prevents goals from rearranging when you resize
+  the window, giving you precise control over how many items appear in each row. It is about the automatic grid, so in
+  `Auto Layout` it applies to the whole map, while in `Manual Layout` it only affects the goals that have no position of
+  their own, the ones pushed into the grid to the right of everything you placed by hand.
+* **Reset Camera**: Click the `Reset Camera` button in the `View` menu to instantly reset the pan and zoom to
+  their default positions. It also unlocks the layout, while a locked camera stays locked.
+* **Goal Visibility Dropdown**: A dropdown in the `View` menu (below `Manual Layout`) lets you switch the goal
   visibility mode on the fly. It exposes all eight combinations of the four modes and the invert flag in one list:
   `Hide All Completed`, `Hide All Incomplete (Inv.)`, `Hide Template-Hidden Only` (the default),
   `Hide Template-Hidden (Inv.)`, `Show All`, `Show All (Inv.)`, `Show Only Incomplete`, and
@@ -711,7 +727,7 @@ Each section header (the separator drawn above each section in the automatic lay
 "Statistics") displays dynamic counters reflecting the completion status based on the currently visible items. This is
 how the tracker shows, at a glance, the number of completed advancements (or stats, unlocks, etc.) versus the total for
 that section. These counters respect both the current goal visibility mode (set via the **Goal Visibility Dropdown** in
-the bottom controls) and any active search filter. The section header counters are shown in the automatic layout; they
+the `View` menu) and any active search filter. The section header counters are shown in the automatic layout; they
 do not appear in manual layout mode.
 
 **Format:**
@@ -808,7 +824,7 @@ A transparent info bar at the top of the window provides a live summary of your 
 
 ### The Notes Window
 
-A powerful notes editor can be toggled via the "Notes" button in the bottom-right corner. All text is saved instantly as
+A powerful notes editor can be toggled via the `Notes` checkbox in the bottom-right corner. All text is saved instantly as
 you type. The notes system has two distinct modes, which can be changed from within the notes window:
 
 * **Per-World Mode (Default)**: Notes are saved for each world individually. This is perfect for keeping track of
@@ -1530,8 +1546,10 @@ or `AZERTY` keyboard, while the custom goal hotkeys above keep binding the physi
 
 Two shortcuts may share a key when they belong to windows or modes that are never active at the same time, which is why
 the template editor and the settings window can both use `Ctrl+S`. Anything that could fire twice at once, including a
-clash with a custom goal hotkey, is highlighted in red and blocks `Apply Settings` until it is resolved. Collapsing a
-group hides its rows but never its conflicts, so a clash still blocks `Apply Settings` from behind a closed header.
+clash with a custom goal hotkey, is highlighted in red on both rows involved and blocks `Apply Settings` until it is
+resolved. Every conflict is also listed in red at the top of the settings window, above the tabs, naming both sides of
+the clash. That list is the one that decides whether `Apply Settings` is blocked, so a clash counts the same whether it
+sits behind a collapsed group header or in a tab you never opened.
 Visual Layout Editor shortcuts are the exception to the custom goal check: goal hotkeys are switched off while that
 editor is open, so its rows can reuse their keys freely, `Global` ones included.
 
@@ -1540,6 +1558,9 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 | **Tracker Window**       | `Shift+V`                  | Toggle the Visual Layout Editor. Opens the template editor and puts the applied template into `Edit Template` first if needed.                                |
 |                          | `Shift+E`                  | Toggle the Template Editor window.                                                                                                                            |
 |                          | `Shift+N`                  | Toggle the `Notes` window.                                                                                                                                    |
+|                          | `Shift+C`                  | Toggle `Lock Camera` in the `View` menu, which makes the map ignore wheel zooming and drag panning. Opens the menu to show the new state.                     |
+|                          | `Space`                    | Toggle `Lock Layout` in the `View` menu. Opens the menu to show the new state.                                                                                |
+|                          | `Shift+M`                  | Toggle `Manual Layout` in the `View` menu. Does nothing while the Visual Layout Editor runs, which forces it on. Opens the menu to show the new state.        |
 | **Settings Window**      | `Ctrl+S`                   | Apply Settings.                                                                                                                                               |
 |                          | `Ctrl+Z`                   | Revert Changes.                                                                                                                                               |
 | **Overlay Window**       | `Space`                    | Belt mode: hold to scroll faster. Page and Compact mode: press to cut to the next page or cycle entry (in Compact mode it advances the Row 1 icon strip too). |
@@ -1554,12 +1575,19 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 |                          | `Delete`                   | Remove the selected goals, criteria, sub-stats and decorations from the template.                                                                             |
 |                          | `Ctrl+C`                   | Duplicate them, layout coordinates included, under the usual `_copy` id. The copy ends up selected in the editor.                                             |
 
+The three `View` menu toggles only fire while the tracker map itself is focused, never while you are working in the
+settings or the template editor, which is what lets `Lock Layout` keep the bare `Space` it has always used. Each one
+opens the `View` menu after toggling, anchored to the `View` button rather than to your cursor, so the checkbox that
+changed is visible. That menu fades away again five seconds later unless you move the mouse onto it, in which case it
+stays like one you opened by clicking. Pressing the key again while the menu is up toggles the checkbox back and
+restarts the five seconds.
+
 `V`, `H`, `Delete` and `Ctrl+C` change the template editor's copy of the template, which is the one that gets saved, so
 the map only catches up once you click `Save` and `Revert Changes` undoes them until then. What each press did is
 reported in a short green message left of the `Visual Layout Editor` button, which disappears as soon as the next editor
 message appears or the changes are saved or reverted.
 
-A few controls stay fixed: `ESC` opens the settings, `SPACE` locks the tracker layout, `Enter` also applies settings and
+A few controls stay fixed: `ESC` opens the settings, `Enter` also applies settings and
 saves the template, `Ctrl+F` focuses the search box, and the mouse controls (left-click to select, right-click or middle
 mouse to pan, wheel to zoom). Right-clicking an element while the Visual Layout Editor runs shows that goal in the
 template editor without changing the map selection.
@@ -1894,7 +1922,7 @@ Faces` toggle, so turning it off hides them just like on the tracker.
 Note that the goal visibility mode still applies on top of this. In `Hide All Completed` mode,
 goals that have been finished are hidden from the tracker entirely, so their faces disappear with them. This is most
 visible for completed simple advancements and for goals whose only remaining state is a ticked manual checkbox. Use the
-**Goal Visibility Dropdown** in the bottom controls to switch to one of the other modes if you want completed goals
+**Goal Visibility Dropdown** in the `View` menu to switch to one of the other modes if you want completed goals
 (and their contributor faces) to stay on screen.
 * **Play Time / IGT:** Taken from the Host's own world. The merged run-completion timer freezes the first time the
   view hits 100% (per-view, so a per-player view and the All Players view each have their own frozen timer - see
@@ -2003,7 +2031,7 @@ This way templates don't need to be copied for each subversion.
 | `all_trims`        | 1.21                                                                                   |                          | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                             | `1`                      | Default             |
 
-If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the bottom right of the tracker.
+If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the `View` menu in the bottom right of the tracker.
 
 _The `test1` templates are for you to learn and understand how templates work. These test templates include all the core
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any

@@ -840,8 +840,10 @@ const char *APP_HOTKEY_GROUP_NAMES[APP_HOTKEY_GROUP_COUNT] = {
 const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT] = {
     // Tracker Window
     "Shortcuts that work on the main tracker window, the one showing the map of goals.\n"
-    "They also fire while the settings or template editor windows are focused, so the\n"
-    "editor can be opened and closed from anywhere.",
+    "The window toggles also fire while the settings or template editor windows are focused,\n"
+    "so the editor can be opened and closed from anywhere.\n"
+    "The View menu toggles (camera lock, layout lock, manual layout) instead need the tracker\n"
+    "map itself to be focused, since they use plain keys that belong to whatever is focused.",
     // Settings Window
     "Shortcuts for this settings window. They only fire while it is focused, which is why\n"
     "they may reuse keys the template editor already claims.",
@@ -1142,6 +1144,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->view_pan_y = DEFAULT_TRACKER_VIEW_PAN_Y;
     settings->view_zoom = DEFAULT_TRACKER_VIEW_ZOOM;
     settings->view_locked = DEFAULT_TRACKER_VIEW_LOCKED;
+    settings->view_camera_locked = DEFAULT_TRACKER_VIEW_CAMERA_LOCKED;
     settings->view_locked_width = DEFAULT_TRACKER_VIEW_LOCKED_WIDTH;
     settings->use_manual_layout = DEFAULT_TRACKER_USE_MANUAL_LAYOUT;
 
@@ -3128,6 +3131,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         cJSON *locked = cJSON_GetObjectItem(view_state_json, "locked");
         if (cJSON_IsBool(locked)) settings->view_locked = cJSON_IsTrue(locked);
 
+        cJSON *camera_locked = cJSON_GetObjectItem(view_state_json, "camera_locked");
+        if (cJSON_IsBool(camera_locked)) settings->view_camera_locked = cJSON_IsTrue(camera_locked);
+
         cJSON *locked_width = cJSON_GetObjectItem(view_state_json, "locked_width");
         if (cJSON_IsNumber(locked_width)) settings->view_locked_width = (float) locked_width->valuedouble;
 
@@ -3942,6 +3948,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddNumberToObject(view_state_obj, "pan_y", settings->view_pan_y);
         cJSON_AddNumberToObject(view_state_obj, "zoom", settings->view_zoom);
         cJSON_AddBoolToObject(view_state_obj, "locked", settings->view_locked);
+        cJSON_AddBoolToObject(view_state_obj, "camera_locked", settings->view_camera_locked);
         cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
         cJSON_AddBoolToObject(view_state_obj, "use_manual_layout", settings->use_manual_layout);
 

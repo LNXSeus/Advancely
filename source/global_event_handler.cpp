@@ -386,6 +386,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
             // The movement keys themselves are not handled here: they are polled once per frame
             // below, so several directions can be held at the same time.
+            // (View menu toggles are handled in their own block after this one, because they are
+            // the only shortcuts allowed to fire while the View menu itself is open.)
             if (t->is_visual_layout_editing) {
                 if (event.key.repeat == 0) {
                     if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, key, app_mods)) {
@@ -401,6 +403,31 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         t->visual_copy_pressed = true;
                     }
                 }
+            }
+        }
+
+        // --- View menu shortcuts ---
+        // Separate from the block above for two reasons. They are plain keys by default (L, Space,
+        // M), so they need the tracker map itself to be focused rather than just the window, the
+        // way the hardcoded SPACE for the layout lock always did. And they are the only shortcuts
+        // allowed to fire while the View menu is open: pressing one pops that menu up to show the
+        // state it changed, and the menu must not then swallow the next press of the same key.
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0 && t && t->window &&
+            event.key.windowID == SDL_GetWindowID(t->window) &&
+            (t->tracker_view_focused || t->view_menu_popup_open) &&
+            !ImGui::IsAnyItemActive() &&
+            (t->view_menu_popup_open || !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
+            SDL_Keycode view_key = event.key.key;
+            Uint16 view_mods = hotkey_mods_from_sdl(event.key.mod);
+
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_LOCK_CAMERA, view_key, view_mods)) {
+                t->view_lock_camera_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_LOCK_LAYOUT, view_key, view_mods)) {
+                t->view_lock_layout_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_MANUAL_LAYOUT, view_key, view_mods)) {
+                t->view_toggle_manual_layout_pressed = true;
             }
         }
 

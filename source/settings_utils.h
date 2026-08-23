@@ -319,6 +319,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_VIEW_PAN_Y 0.0f
 #define DEFAULT_TRACKER_VIEW_ZOOM 1.0f
 #define DEFAULT_TRACKER_VIEW_LOCKED false
+#define DEFAULT_TRACKER_VIEW_CAMERA_LOCKED false
 #define DEFAULT_TRACKER_VIEW_LOCKED_WIDTH 0.0f
 #define DEFAULT_TRACKER_USE_MANUAL_LAYOUT true
 
@@ -477,6 +478,32 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Opens or closes the notes window, exactly like the \"Notes\" checkbox in the control bar.\n" \
       "Whether the window shows per-world or per-template notes stays whatever it was set to\n" \
       "inside the window itself.") \
+    X(APP_HOTKEY_LOCK_CAMERA, "lock_camera", "C", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
+      "Lock Camera (Zoom & Pan)", \
+      "Flips the \"Lock Camera\" checkbox in the View menu, which makes the map ignore mouse\n" \
+      "wheel zooming and right/middle mouse dragging.\n" \
+      "The Zoom slider and \"Reset Camera\" keep working while locked.\n" \
+      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
+      "seconds unless the mouse reaches it.\n" \
+      "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
+    X(APP_HOTKEY_LOCK_LAYOUT, "lock_layout", "Space", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
+      "Lock Layout", \
+      "Flips the \"Lock Layout\" checkbox in the View menu, freezing the width the automatic\n" \
+      "grid wraps at so goals stop rearranging when the window is resized or zoomed.\n" \
+      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
+      "seconds unless the mouse reaches it.\n" \
+      "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
+    X(APP_HOTKEY_TOGGLE_MANUAL_LAYOUT, "toggle_manual_layout", "M", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Manual Layout", \
+      "Flips the \"Manual Layout\" checkbox in the View menu, switching between the procedural\n" \
+      "grid and the positions stored in the template's layout file.\n" \
+      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
+      "seconds unless the mouse reaches it.\n" \
+      "Does nothing while the Visual Layout Editor is running, which forces Manual Layout on.\n" \
+      "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
       APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
       "Apply Settings", \
@@ -907,6 +934,7 @@ struct AppSettings {
     float view_pan_y;
     float view_zoom;
     bool view_locked;
+    bool view_camera_locked; // Zooming and panning the tracker map are ignored while this is set.
     float view_locked_width;
     bool use_manual_layout; // Manual Layout or Auto Layout
 

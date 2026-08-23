@@ -977,6 +977,155 @@ static void open_content(const char *target) {
 #endif
 }
 
+// Every hotkey clash in one place. The Hotkeys tab still marks the offending rows, but a clash that
+// only shows up there is invisible from another tab or behind a collapsed group header, so the
+// settings window prints this list above the tabs and blocks Apply from the same flags.
+struct HotkeyConflictReport {
+    std::vector<std::string> messages;
+    bool counter_duplicate = false; // Two goal hotkeys share a key.
+    bool reserved = false; // A combination Advancely handles itself.
+    bool app_conflict = false; // An Advancely shortcut collides with a shortcut or a goal hotkey.
+};
+
+// True for a slot that actually carries a key.
+static bool hotkey_slot_bound(const char *key) {
+    return key && key[0] != '\0' && strcmp(key, "None") != 0;
+}
+
+// Goal hotkeys store the physical key (a US-layout scancode name) while the app shortcuts store the
+// keycap, so one of the two has to be translated before they can be compared. Without it a real
+// clash on a non-US layout would go unnoticed, and an imaginary one would be reported.
+static const char *hotkey_counter_key_as_keycap(const char *stored, char *buf, size_t buf_size) {
+    snprintf(buf, buf_size, "%s", stored ? stored : "");
+    SDL_Scancode sc = SDL_GetScancodeFromName(buf);
+    if (sc == SDL_SCANCODE_UNKNOWN) return buf;
+    const char *name = SDL_GetKeyName(SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false));
+    if (name && name[0] != '\0') snprintf(buf, buf_size, "%s", name);
+    return buf;
+}
+
+// The name the user sees for a goal hotkey's target, falling back to the root name when the
+// template holding it is not the one currently loaded.
+static const char *hotkey_goal_display_name(const Tracker *t, const char *root_name) {
+    if (!t || !t->template_data || !t->template_data->custom_goals || !root_name) return root_name;
+    for (int i = 0; i < t->template_data->custom_goal_count; ++i) {
+        const TrackableItem *goal = t->template_data->custom_goals[i];
+        if (goal && strcmp(goal->root_name, root_name) == 0 && goal->display_name[0] != '\0') {
+            return goal->display_name;
+        }
+    }
+    return root_name;
+}
+
+// Which contexts a goal hotkey can fire in. A global one is handed to the OS, so it reaches every
+// window except visual layout editing, where hotkey_apply_counter_action() refuses to run. That
+// refusal is also what keeps the visual editor's plain W, A, S and D usable.
+static Uint16 hotkey_counter_contexts(const HotkeyBinding *hb) {
+    return hb->is_global ? (Uint16) (APP_HOTKEY_CTX_ALL & ~APP_HOTKEY_CTX_VISUAL)
+                         : (Uint16) APP_HOTKEY_CTX_COUNTER_HOTKEYS;
+}
+
+static void collect_hotkey_conflicts(const AppSettings &settings, const Tracker *t,
+                                     HotkeyConflictReport &out) {
+    out.messages.clear();
+    out.counter_duplicate = false;
+    out.reserved = false;
+    out.app_conflict = false;
+
+    char line[512];
+    char reason[192];
+
+    int counter_count = settings.hotkey_count;
+    if (counter_count > MAX_HOTKEYS) counter_count = MAX_HOTKEYS;
+    const int counter_slots = counter_count * HOTKEY_SLOT_COUNT;
+
+    // --- Goal hotkey against goal hotkey ---
+    // Both sides store the key the same way, so the stored names can be compared directly. A clash
+    // needs the modifiers to match too, which is why Ctrl+G and a bare G can live on two goals.
+    for (int a = 0; a < counter_slots; ++a) {
+        const HotkeyBinding *hb_a = &settings.hotkeys[a / HOTKEY_SLOT_COUNT];
+        HotkeySlot slot_a = (HotkeySlot) (a % HOTKEY_SLOT_COUNT);
+        const char *key_a = hotkey_binding_slot_key(hb_a, slot_a);
+        if (!hotkey_slot_bound(key_a)) continue;
+        Uint16 mods_a = hotkey_binding_slot_mods(hb_a, slot_a);
+
+        char label_a[96];
+        char keycap_a[64];
+        hotkey_counter_key_as_keycap(key_a, keycap_a, sizeof(keycap_a));
+        char prefix_a[64];
+        snprintf(label_a, sizeof(label_a), "%s%s", hotkey_mods_to_prefix(mods_a, prefix_a, sizeof(prefix_a)),
+                 keycap_a);
+
+        if (hotkey_slot_is_reserved(key_a, mods_a, reason, sizeof(reason))) {
+            out.reserved = true;
+            snprintf(line, sizeof(line), "\"%s\" %s %s.",
+                     hotkey_goal_display_name(t, hb_a->target_goal), hotkey_slot_name(slot_a), reason);
+            out.messages.push_back(line);
+        }
+
+        for (int b = a + 1; b < counter_slots; ++b) {
+            const HotkeyBinding *hb_b = &settings.hotkeys[b / HOTKEY_SLOT_COUNT];
+            HotkeySlot slot_b = (HotkeySlot) (b % HOTKEY_SLOT_COUNT);
+            const char *key_b = hotkey_binding_slot_key(hb_b, slot_b);
+            if (!hotkey_slot_bound(key_b)) continue;
+            if (strcmp(key_a, key_b) != 0 || mods_a != hotkey_binding_slot_mods(hb_b, slot_b)) continue;
+
+            out.counter_duplicate = true;
+            snprintf(line, sizeof(line), "\"%s\" %s and \"%s\" %s both use %s.",
+                     hotkey_goal_display_name(t, hb_a->target_goal), hotkey_slot_name(slot_a),
+                     hotkey_goal_display_name(t, hb_b->target_goal), hotkey_slot_name(slot_b), label_a);
+            out.messages.push_back(line);
+        }
+
+        // --- Goal hotkey against Advancely shortcut ---
+        Uint16 contexts_a = hotkey_counter_contexts(hb_a);
+        for (int action = 0; action < APP_HOTKEY_COUNT; ++action) {
+            const AppHotkeyDef *def = &APP_HOTKEY_DEFS[action];
+            const AppHotkey *hk = &settings.app_hotkeys[action];
+            if (!hotkey_slot_bound(hk->key)) continue;
+            if ((contexts_a & def->contexts) == 0) continue;
+            if (mods_a != hk->mods || strcmp(keycap_a, hk->key) != 0) continue;
+
+            out.app_conflict = true;
+            snprintf(line, sizeof(line), "\"%s\" %s collides with the shortcut \"%s\" on %s.",
+                     hotkey_goal_display_name(t, hb_a->target_goal), hotkey_slot_name(slot_a),
+                     def->label, label_a);
+            out.messages.push_back(line);
+        }
+    }
+
+    // --- Advancely shortcut against Advancely shortcut ---
+    // Two of them may share a key when they belong to windows or modes that are never active at the
+    // same time, which is why the editor and the settings window can both use Ctrl+S.
+    for (int a = 0; a < APP_HOTKEY_COUNT; ++a) {
+        const AppHotkeyDef *def_a = &APP_HOTKEY_DEFS[a];
+        const AppHotkey *hk_a = &settings.app_hotkeys[a];
+        if (!hotkey_slot_bound(hk_a->key)) continue;
+
+        char label_a[96];
+        app_hotkey_display_label(hk_a, label_a, sizeof(label_a));
+
+        if (hotkey_slot_is_reserved(hk_a->key, hk_a->mods, reason, sizeof(reason))) {
+            out.reserved = true;
+            snprintf(line, sizeof(line), "\"%s\" %s.", def_a->label, reason);
+            out.messages.push_back(line);
+        }
+
+        for (int b = a + 1; b < APP_HOTKEY_COUNT; ++b) {
+            const AppHotkeyDef *def_b = &APP_HOTKEY_DEFS[b];
+            const AppHotkey *hk_b = &settings.app_hotkeys[b];
+            if (!hotkey_slot_bound(hk_b->key)) continue;
+            if ((def_a->contexts & def_b->contexts) == 0) continue;
+            if (hk_a->mods != hk_b->mods || strcmp(hk_a->key, hk_b->key) != 0) continue;
+
+            out.app_conflict = true;
+            snprintf(line, sizeof(line), "The shortcuts \"%s\" and \"%s\" both use %s.",
+                     def_a->label, def_b->label, label_a);
+            out.messages.push_back(line);
+        }
+    }
+}
+
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          ForceOpenReason *force_open_reason, bool *p_temp_creator_open) {
     // This static variable tracks the open state from the previous frame
@@ -1679,6 +1828,38 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     ImGui::Separator();
     ImGui::Spacing();
+
+    // --- Hotkey conflicts ---
+    // Computed here rather than in the Hotkeys tab so a clash is reported no matter which tab is
+    // open or which group headers are collapsed, and so Apply stays blocked either way.
+    static HotkeyConflictReport hotkey_conflicts;
+    collect_hotkey_conflicts(temp_settings, t, hotkey_conflicts);
+    hotkey_duplicate_error = hotkey_conflicts.counter_duplicate;
+    hotkey_reserved_error = hotkey_conflicts.reserved;
+    hotkey_app_error = hotkey_conflicts.app_conflict;
+
+    if (!hotkey_conflicts.messages.empty()) {
+        // One group, so hovering any of the lines explains the whole block.
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                           "Hotkey conflicts (%d) - 'Apply Settings' stays disabled until they are resolved:",
+                           (int) hotkey_conflicts.messages.size());
+        for (const std::string &message: hotkey_conflicts.messages) {
+            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", message.c_str());
+        }
+        ImGui::EndGroup();
+        if (ImGui::IsItemHovered()) {
+            char hotkey_conflict_tooltip[512];
+            snprintf(hotkey_conflict_tooltip, sizeof(hotkey_conflict_tooltip),
+                     "Two bindings clash when the same key and modifiers can fire both at once.\n"
+                     "Rebind either side in the Hotkeys tab, where the rows involved are marked\n"
+                     "in red as well.");
+            ImGui::SetTooltip("%s", hotkey_conflict_tooltip);
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
 
     // SETTINGS TABS START
     if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None)) {
@@ -7106,9 +7287,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of Co-op Tab
 
         if (ImGui::BeginTabItem("Hotkeys")) {
-            hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
-            hotkey_reserved_error = false;
-            hotkey_app_error = false;
+            // The three conflict flags are owned by collect_hotkey_conflicts() above the tab bar,
+            // which runs every frame. The rows below only mark themselves; they no longer decide
+            // whether Apply is blocked, so a clash behind a collapsed header still counts.
             // --- Hotkey Settings ---
 
             // Capture state: which goal+slot is currently waiting for a key press.
@@ -7382,19 +7563,42 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     // Explain exactly which slot is at fault rather than a generic complaint.
-                    // Reserved combinations block Apply; a global row without a modifier only
-                    // earns an amber warning, since it does work.
+                    // Reserved combinations and collisions block Apply; a global row without a
+                    // modifier only earns an amber warning, since it does work.
                     if (binding) {
                         auto validate_slot = [&](HotkeySlot slot) {
                             const char *key = hotkey_binding_slot_key(binding, slot);
                             Uint16 mods = hotkey_binding_slot_mods(binding, slot);
                             char reason[192];
                             if (hotkey_slot_is_reserved(key, mods, reason, sizeof(reason))) {
-                                hotkey_reserved_error = true;
                                 ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
                                                    "    %s %s", hotkey_slot_name(slot), reason);
-                            } else if (row_is_global &&
-                                       hotkey_global_slot_is_bare(key, mods, reason, sizeof(reason))) {
+                                return;
+                            }
+
+                            // An Advancely shortcut that can fire in the same context takes the
+                            // key away from this goal, so the row has to say so too. The shortcut
+                            // rows further down report the same clash from their side.
+                            if (hotkey_slot_bound(key)) {
+                                char keycap[64];
+                                hotkey_counter_key_as_keycap(key, keycap, sizeof(keycap));
+                                Uint16 counter_contexts = hotkey_counter_contexts(binding);
+                                for (int action = 0; action < APP_HOTKEY_COUNT; ++action) {
+                                    const AppHotkeyDef *clash_def = &APP_HOTKEY_DEFS[action];
+                                    const AppHotkey *clash_hk = &temp_settings.app_hotkeys[action];
+                                    if (!hotkey_slot_bound(clash_hk->key)) continue;
+                                    if ((counter_contexts & clash_def->contexts) == 0) continue;
+                                    if (mods != clash_hk->mods || strcmp(keycap, clash_hk->key) != 0) continue;
+
+                                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                                       "    %s collides with the shortcut \"%s\"",
+                                                       hotkey_slot_name(slot), clash_def->label);
+                                    return;
+                                }
+                            }
+
+                            if (row_is_global &&
+                                hotkey_global_slot_is_bare(key, mods, reason, sizeof(reason))) {
                                 ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
                                                    "    %s %s", hotkey_slot_name(slot), reason);
                             }
@@ -7475,35 +7679,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
                 temp_settings.hotkey_count = kept;
 
-                // --- Duplicate Hotkey Validation ---
-                // Two slots clash only when the key AND the modifiers match, so Ctrl+G and a
-                // bare G are free to live on different goals.
-                auto slot_is_active = [](const char *key) -> bool {
-                    return key[0] != '\0' && strcmp(key, "None") != 0;
-                };
-
-                // Every bound slot of every binding, flattened, so each pair is compared once.
-                int total_slots = temp_settings.hotkey_count * HOTKEY_SLOT_COUNT;
-                for (int a = 0; a < total_slots && !hotkey_duplicate_error; ++a) {
-                    const HotkeyBinding *hb_a = &temp_settings.hotkeys[a / HOTKEY_SLOT_COUNT];
-                    HotkeySlot slot_a = (HotkeySlot) (a % HOTKEY_SLOT_COUNT);
-                    const char *key_a = hotkey_binding_slot_key(hb_a, slot_a);
-                    if (!slot_is_active(key_a)) continue;
-                    Uint16 mods_a = hotkey_binding_slot_mods(hb_a, slot_a);
-
-                    for (int b = a + 1; b < total_slots; ++b) {
-                        const HotkeyBinding *hb_b = &temp_settings.hotkeys[b / HOTKEY_SLOT_COUNT];
-                        HotkeySlot slot_b = (HotkeySlot) (b % HOTKEY_SLOT_COUNT);
-                        const char *key_b = hotkey_binding_slot_key(hb_b, slot_b);
-                        if (!slot_is_active(key_b)) continue;
-                        if (strcmp(key_a, key_b) == 0 &&
-                            mods_a == hotkey_binding_slot_mods(hb_b, slot_b)) {
-                            hotkey_duplicate_error = true;
-                            break;
-                        }
-                    }
-                }
-
+                // Duplicate detection itself lives in collect_hotkey_conflicts(), which runs above
+                // the tab bar and names both goals in the list up there.
                 if (hotkey_duplicate_error) {
                     ImGui::Spacing();
                     ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
@@ -7620,8 +7797,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                 }
 
-                // Only the rendering is skipped while a group is folded away. The conflict checks
-                // below still run, so a clash hidden behind a closed header keeps blocking Apply.
+                // Only the rendering is skipped while a group is folded away. A clash hidden behind
+                // a closed header is still listed above the tab bar and still blocks Apply, since
+                // collect_hotkey_conflicts() looks at the bindings rather than at what is drawn.
                 if (group_open) {
                     ImGui::Text("%s", def->label);
                     if (ImGui::IsItemHovered()) {
@@ -7741,11 +7919,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                 }
 
-                if (conflict[0] != '\0') {
-                    hotkey_app_error = true;
-                    if (group_open) {
-                        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", conflict);
-                    }
+                // Blocking Apply is decided by collect_hotkey_conflicts() above the tab bar, which
+                // sees this clash whether or not the group holding the row is open.
+                if (conflict[0] != '\0' && group_open) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", conflict);
                 }
             }
 

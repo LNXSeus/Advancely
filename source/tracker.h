@@ -88,6 +88,18 @@ struct Tracker {
     float zoom_level; // The current zoom level of the main view.
     float time_since_last_update; // Timer tracking seconds since the last data file update.
     bool layout_locked; // Flag to lock the grid layout width, preventing reflow on window resize.
+    bool camera_locked; // Flag to ignore mouse wheel zooming and drag panning of the main view.
+
+    // View menu shortcuts. The event handler only records the press; the toggles themselves happen
+    // where the checkboxes are drawn, so a key and a click go through exactly the same code.
+    bool view_lock_camera_pressed;
+    bool view_lock_layout_pressed;
+    bool view_toggle_manual_layout_pressed;
+    // A shortcut changed one of those states, so the View menu opens to show it.
+    bool view_menu_open_requested;
+    // Whether the View menu is on screen right now. The event handler lets its own shortcuts
+    // through while it is, so the menu it just opened does not swallow the next press.
+    bool view_menu_popup_open;
     float locked_layout_width; // The saved width of the layout when it was locked.
 
     // --- UI State Flags ---
