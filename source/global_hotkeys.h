@@ -42,8 +42,12 @@ void global_hotkeys_shutdown(void);
  * already in place and returns immediately when nothing changed.
  *
  * @param app_settings The settings whose hotkeys array should be mirrored to the OS.
+ * @param template_data The template currently loaded. Bindings whose goal it does not contain are
+ * left unregistered: settings.json keeps a binding per goal name across every template, and a key
+ * the OS reserves is taken away from Minecraft, so a binding that cannot do anything must not hold
+ * one. Passing nullptr registers nothing, which is what a session without a template can act on.
  */
-void global_hotkeys_apply(const AppSettings *app_settings);
+void global_hotkeys_apply(const AppSettings *app_settings, const TemplateData *template_data);
 
 /**
  * @brief Tests whether an SDL event is an OS-level hotkey press and reports which binding fired.

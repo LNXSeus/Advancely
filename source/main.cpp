@@ -2865,7 +2865,7 @@ int main(int argc, char *argv[]) {
             // Mirror the current bindings to the OS before polling. Diff-based, so this is a
             // handful of comparisons on the frames where nothing changed.
             PROFILE_BEGIN(hotkeys_apply, "global_hotkeys_apply");
-            global_hotkeys_apply(&app_settings);
+            global_hotkeys_apply(&app_settings, tracker->template_data);
             PROFILE_END(hotkeys_apply);
 
             PROFILE_BEGIN(events, "handle_global_events");

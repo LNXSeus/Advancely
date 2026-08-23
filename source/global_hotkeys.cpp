@@ -655,7 +655,21 @@ void global_hotkeys_shutdown(void) {
     g_gh_initialized = false;
 }
 
-void global_hotkeys_apply(const AppSettings *app_settings) {
+// Whether the loaded template has the custom goal a binding points at. Bindings are stored per goal
+// name for every template the user has ever bound a key in, so most of them belong to some other
+// template at any given time.
+static bool gh_goal_in_template(const TemplateData *template_data, const char *target_goal) {
+    if (!template_data || !template_data->custom_goals) return false;
+    if (!target_goal || target_goal[0] == '\0') return false;
+
+    for (int i = 0; i < template_data->custom_goal_count; i++) {
+        const TrackableItem *goal = template_data->custom_goals[i];
+        if (goal && strcmp(goal->root_name, target_goal) == 0) return true;
+    }
+    return false;
+}
+
+void global_hotkeys_apply(const AppSettings *app_settings, const TemplateData *template_data) {
     if (!g_gh_initialized || !app_settings) return;
 
     // Build what the settings ask for, then diff. A binding slot only becomes a registration when
@@ -669,6 +683,9 @@ void global_hotkeys_apply(const AppSettings *app_settings) {
     for (int i = 0; i < count; i++) {
         const HotkeyBinding *hb = &app_settings->hotkeys[i];
         if (!hb->is_global) continue;
+        // A binding left over from another template has nothing to act on, so reserving its key
+        // system-wide would only take it away from the game.
+        if (!gh_goal_in_template(template_data, hb->target_goal)) continue;
 
         for (int slot = 0; slot < HOTKEY_SLOT_COUNT; slot++) {
             const char *key_name = hotkey_binding_slot_key(hb, (HotkeySlot) slot);
