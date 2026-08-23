@@ -15,6 +15,28 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.7.0" date="2026-08-23">
+      <description>
+        <p>The Hotkey Update: OS-level global hotkeys, configurable shortcuts throughout the app, a transparent overlay, and major tracker performance work.</p>
+        <ul>
+          <li>Global hotkeys: counters and toggleable custom goals can now be bound to OS-level hotkeys that fire while Minecraft is focused, on Windows, macOS and Linux/X11. A (?) next to the setting explains the OS-specific behavior and limitations.</li>
+          <li>Hotkeys support modifiers (Ctrl, Alt and Shift), and the reorganized Hotkeys tab covers Advancely's own shortcuts too: overlay speed-up/advance, toggling notes (Ctrl+N), toggling the overlay (H), toggling manual-selection visibility (V), opening the template editor and the visual layout editor (Shift+E / Shift+V), Ctrl+S, ENTER, and Ctrl+Tab / Ctrl+Shift+Tab to move between template editor lists.</li>
+          <li>Transparent overlay background, with an optional fade-out so items in the Belt and Page rows and in the compact stack fade as they leave, including the row 1 icons in every mode.</li>
+          <li>The overlay can now be launched and relaunched as a standalone process with the new --overlay flag, which makes changing overlay settings inside setups like Waywall far more convenient. Starting it without Advancely running shows a clear notice instead of failing silently.</li>
+          <li>Performance: Advancely no longer renders nearly twice as slow while Minecraft is running, the active-instance check moved off the main thread, and the constant world-change flip-flopping with auto-detect instance on Windows is fixed. The new --profiler flag writes a per-frame timing breakdown for diagnosing the rest.</li>
+          <li>The visual layout editor is now usable without Minecraft running, applies copies and deletions live (the tracker displays the unsaved template straight from the editor), supports zoom locking plus a precise zoom slider, diagonal movement with two movement keys held, 10 pixel movement hotkeys, Delete to remove and Ctrl+C to duplicate a goal, right-click selection, and fixed tooltip positioning that only shows coordinates for what is actually being moved.</li>
+          <li>Timing accuracy: the in-game time now reads final_igt from SpeedRunIGT's record.json, and with Hermes active a completed run's time updates once on the next save and then freezes. The new "Freeze Timer on Completion" setting (on by default) controls that behavior for the overlay, debug print and info window.</li>
+          <li>Sub-items with their own independent position now ignore their parent's hiding, and enabling manual position on an item starts it at its actual screen position instead of 100/100. Automatic goals on the manual layout arrange properly, and all templates were fixed up for the new behavior.</li>
+          <li>New option to hide sub-stats from the first row of the overlay while keeping them in the cycling text.</li>
+          <li>Template editor: custom goals, unlocks and decorations now use the same list plus details pane as every other goal type, a compact "Add..." button for decorators, a new "Select All" bulk action, tooltips on all bulk-action popups, and new search tags for stat categories and for stat categories excluded from row 1 (multi, multistat, multi-stat, nor1, no-r1, norow1). Copied goals are selected after copying.</li>
+          <li>Non-portable installers (macOS and Linux packages) now seed fonts, GUI assets, reference files and icons into your writable data directory, with macOS seeding gated behind a version stamp so it no longer runs on every launch.</li>
+          <li>Auto-updater: a "What's New?" button on the update popup, clearer button naming, a fixed --updated flag and a new --update flag to trigger the popup manually.</li>
+          <li>Templates and textures: all _categorical templates updated plus 4 new ones (1.20, 1.20.5, 1.21, 1.21.6), a new frog gif and Wither model, shortened 1.16 _aatool_optimized egap stage naming, and a 1.12 lapis lazuli fix using the stat_complete_helper.</li>
+          <li>Coop: room codes are now trimmed when typed or pasted, and template editor hotkeys are blocked while a lobby is active.</li>
+          <li>Fixes: the tracker no longer briefly forgets stages on a failed file read (which made the compact stack treat the recovery as a fresh completion), a silent Linux startup failure, global hotkeys still being consumed after switching templates, the template editor hotkey not closing the editor when the X button is absent, SPACE toggling the lock layout while a window is focused, and macOS Command firing as Ctrl in hotkey combinations. Tracker "View" buttons were cleaned up and the collision error moved to the top of the settings window.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.3" date="2026-07-26">
       <description>
         <p>A new goal visibility mode, small tracker and template editor refinements, and categorical template fixes.</p>
