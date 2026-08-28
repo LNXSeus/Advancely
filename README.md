@@ -324,7 +324,9 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
 * **Customizable Stream Overlay**: An animated overlay is available to show your progress to viewers. Pick one of three
   render modes - `Scrolling Belt` (the classic scrolling conveyor), `Page` (static pages that cut like a book), or
   `Compact` (a tall, narrow counter panel with goals popping out beneath it) - and customize its scroll speed, font,
-  colors, FPS, if the 3rd row remains visible and which information is displayed. Find more
+  colors, FPS, if the 3rd row remains visible and which information is displayed. The overlay window can also be truly
+  transparent via the `Transparent` checkbox next to `Overlay Background Color`, so **no color key filter is needed** in
+  your streaming software. Find more
   information [here](https://github.com/LNXSeus/Advancely#The-Stream-Overlay).
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and
   advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla
