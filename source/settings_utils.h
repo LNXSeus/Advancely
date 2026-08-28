@@ -104,7 +104,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_HOTKEY_IS_GLOBAL false // Hotkeys are window-focused unless explicitly made global
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
-#define DEFAULT_USING_HERMES false
+#define DEFAULT_USING_HERMES true
 #define DEFAULT_PATH_MODE PATH_MODE_INSTANCE
 #define DEFAULT_FIXED_WORLD_PATH ""
 #define DEFAULT_FPS 60

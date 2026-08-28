@@ -2253,9 +2253,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     "  Hermes intentionally omits (high-frequency ones like distance walked) are\n"
                     "  still read from the regular game files as usual. Stats are also synchronized\n"
                     "  when the game actually saves.");
+                if (selected_version > MC_VERSION_1_6_4) {
+                    ImGui::BulletText(
+                        "Co-op: only the Host's Hermes log is read. Everyone else keeps this on\n"
+                        "  purely so their overlay shows 'Synced:' instead of 'Upd:'.");
+                }
                 ImGui::Spacing();
                 ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
-                ImGui::TextDisabled("Default: Disabled");
+                ImGui::TextDisabled("Harmless to leave on without Hermes: the log is simply never found.");
+                ImGui::TextDisabled("Default: %s", DEFAULT_USING_HERMES ? "Enabled" : "Disabled");
                 if (hermes_net_active) {
                     ImGui::Spacing();
                     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
