@@ -807,9 +807,15 @@ bool hotkey_global_slot_is_bare(const char *key_name, Uint16 mods, char *out_war
 #else
         const char *mod_names = "Ctrl or Alt";
 #endif
-        snprintf(out_warning, warning_size,
-                 "has no %s: a single key is riskier than a combination, it also fires while you type.",
-                 mod_names);
+        if (mods & HOTKEY_MOD_SHIFT) {
+            snprintf(out_warning, warning_size,
+                     "only adds Shift: other programs see that as a capital letter. Use %s instead.",
+                     mod_names);
+        } else {
+            snprintf(out_warning, warning_size,
+                     "has no %s: a single key is riskier than a combination, it also fires while you type.",
+                     mod_names);
+        }
     }
     return true;
 }

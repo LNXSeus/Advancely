@@ -258,11 +258,12 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
               Advancely tracker window is focused, any key may be used, and other programs keep receiving that key
               normally. Switched on, the operating system reserves the key for Advancely so it fires while you are
               playing Minecraft. Because a global hotkey is taken away from every other program, `Ctrl` or `Alt`
-              (`Cmd` or `Option` on macOS) is strongly recommended; `Shift` alone does not help, since the bare key
-              stays reachable and keeps triggering the goal. A single key without them is still allowed and never
+              (`Cmd` or `Option` on macOS) is strongly recommended. Such a binding is still allowed and never
               blocks `Apply Settings`, but the row shows an amber warning: a single key is riskier than a
               combination, since no other program receives it while Advancely runs and the goal also changes while
-              you type in chat or any text field. Keys `F13` through `F24` never warn, as no physical keyboard has
+              you type in chat or any text field. Adding only `Shift` gets its own warning, because other programs
+              read `Shift` plus a key as nothing more than a capital letter, so the binding keeps firing whenever
+              you type one. Keys `F13` through `F24` never warn, as no physical keyboard has
               them and macro pads are the only thing that sends them. A row is handed to the operating system when
               you click `Apply Settings`. The Visual Layout Editor's own shortcuts are never affected, since goal
               hotkeys do nothing while it is open, so its plain `W`/`A`/`S`/`D` stay free for `Global` goal
