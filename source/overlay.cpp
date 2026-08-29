@@ -1675,7 +1675,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             int stage = g->current_stage;
             bool done = (g->stage_count > 0 && stage >= g->stage_count - 1);
             char gname[224];
-            compact_ms_label(gname, sizeof(gname), compact_display_name(g->display_name, g->root_name));
+            // An unnamed multi-stage goal shows only its stage: falling back to the root_name would
+            // put the raw ID ("ms_goal:bees:") in front of every stage on the one line it pops as.
+            compact_ms_label(gname, sizeof(gname), g->display_name);
+            const char *gsep = (gname[0] != '\0') ? " " : "";
             const char *icon = g->icon_path;
             int stat_prog = 0;
             snprintf(itext, sizeof(itext), "%s", gname);
@@ -1687,13 +1690,13 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // change, so they stay text-only.
                 if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
                     stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s %s (%d/%d)", gname, st->display_text, stat_prog,
+                    snprintf(itext, sizeof(itext), "%s%s%s (%d/%d)", gname, gsep, st->display_text, stat_prog,
                              st->required_progress);
                 } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
                     stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s %s (%d)", gname, st->display_text, stat_prog);
+                    snprintf(itext, sizeof(itext), "%s%s%s (%d)", gname, gsep, st->display_text, stat_prog);
                 } else {
-                    snprintf(itext, sizeof(itext), "%s %s", gname, st->display_text);
+                    snprintf(itext, sizeof(itext), "%s%s%s", gname, gsep, st->display_text);
                 }
             }
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
@@ -1987,17 +1990,18 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name))
             continue;
         char gn[224];
-        compact_ms_label(gn, sizeof(gn), compact_display_name(g->display_name, g->root_name));
+        compact_ms_label(gn, sizeof(gn), g->display_name);
+        const char *gsep = (gn[0] != '\0') ? " " : "";
         for (int j = 0; j < g->stage_count; j++) {
             const SubGoal *st = (g->stages) ? g->stages[j] : nullptr;
             if (!st) continue;
             if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
                 compact_worst_count(cnt, sizeof(cnt), st->required_progress, wdig);
-                snprintf(buf, sizeof(buf), "%s %s (%s)", gn, st->display_text, cnt);
+                snprintf(buf, sizeof(buf), "%s%s%s (%s)", gn, gsep, st->display_text, cnt);
             } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
-                snprintf(buf, sizeof(buf), "%s %s (%s)", gn, st->display_text, open);
+                snprintf(buf, sizeof(buf), "%s%s%s (%s)", gn, gsep, st->display_text, open);
             } else {
-                snprintf(buf, sizeof(buf), "%s %s", gn, st->display_text);
+                snprintf(buf, sizeof(buf), "%s%s%s", gn, gsep, st->display_text);
             }
             measure(buf);
         }

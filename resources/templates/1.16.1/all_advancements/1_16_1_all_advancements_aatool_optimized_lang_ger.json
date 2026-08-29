@@ -260,7 +260,7 @@
 	"multi_stage_goal.ms_goal:egap.display_name":	"Verz. Goldapf.",
 	"multi_stage_goal.ms_goal:egap.stage.1":	"",
 	"multi_stage_goal.ms_goal:egap.stage.final":	"Gefunden",
-	"multi_stage_goal.ms_goal:bees.display_name":	"",
+	"multi_stage_goal.ms_goal:bees.display_name":	"Bienen",
 	"multi_stage_goal.ms_goal:bees.stage.1":	"Nest setzen",
 	"multi_stage_goal.ms_goal:bees.stage.2":	"Honig ernten",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"'Klebrig' holen",

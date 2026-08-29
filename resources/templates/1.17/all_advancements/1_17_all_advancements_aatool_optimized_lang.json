@@ -276,7 +276,7 @@
 	"multi_stage_goal.ms_goal:egap.display_name":	"God Apple",
 	"multi_stage_goal.ms_goal:egap.stage.1":	"",
 	"multi_stage_goal.ms_goal:egap.stage.final":	"Obtained God Apple",
-	"multi_stage_goal.ms_goal:bees.display_name":	"",
+	"multi_stage_goal.ms_goal:bees.display_name":	"Bees",
 	"multi_stage_goal.ms_goal:bees.stage.1":	"Place Nest",
 	"multi_stage_goal.ms_goal:bees.stage.2":	"Harvest Honey",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"Get 'Sticky'",

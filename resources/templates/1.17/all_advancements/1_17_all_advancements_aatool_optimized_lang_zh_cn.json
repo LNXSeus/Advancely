@@ -276,7 +276,7 @@
 	"multi_stage_goal.ms_goal:egap.display_name":	"附魔金苹果",
 	"multi_stage_goal.ms_goal:egap.stage.1":	"",
 	"multi_stage_goal.ms_goal:egap.stage.final":	"已获取附魔金苹果",
-	"multi_stage_goal.ms_goal:bees.display_name":	"",
+	"multi_stage_goal.ms_goal:bees.display_name":	"蜜蜂",
 	"multi_stage_goal.ms_goal:bees.stage.1":	"放置蜂巢",
 	"multi_stage_goal.ms_goal:bees.stage.2":	"采集蜂蜜",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"获取'胶着状态'",
