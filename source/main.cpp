@@ -1372,6 +1372,15 @@ static void print_console_error(const char *msg) {
 // the process actually exiting, so this timeout is not reached during a healthy restart.
 #define OVERLAY_SHUTDOWN_TIMEOUT_MS 5000
 
+// How long a starting overlay keeps retrying the single-overlay guard before giving up. The OS
+// releases the guard as part of tearing the previous overlay process down, and that teardown is not
+// finished at the instant the tracker can already read the process's exit code, so a replacement
+// spawned right away can find the name still taken for a few milliseconds. Retrying rides that
+// window out instead of exiting as a bogus duplicate; a real second overlay still exits, just this
+// much later.
+#define OVERLAY_INSTANCE_LOCK_WAIT_MS 2000
+#define OVERLAY_INSTANCE_LOCK_POLL_MS 25
+
 // --- Overlay instance guard -------------------------------------------------------------------
 // Mirrors the tracker's single-instance guard further down, but for the overlay window. The
 // overlay process takes the guard at startup and the OS drops it when that process dies, so the
@@ -1389,24 +1398,35 @@ static void get_overlay_instance_lock_path(char *out, size_t out_size) {
 }
 #endif
 
-// Called by the overlay process at startup. Returns false when another overlay already holds the
-// guard, which means this one must not open a second window. A guard that cannot be created at all
-// never blocks the overlay: it returns true and the old behaviour applies.
+// Called by the overlay process at startup. Returns false when another overlay still holds the
+// guard after OVERLAY_INSTANCE_LOCK_WAIT_MS, which means this one must not open a second window. A
+// guard that cannot be created at all never blocks the overlay: it returns true and the old
+// behaviour applies.
 static bool overlay_instance_lock_acquire(void) {
+    const Uint64 deadline = SDL_GetTicks() + OVERLAY_INSTANCE_LOCK_WAIT_MS;
+    bool waited = false;
 #ifdef _WIN32
-    HANDLE h = CreateMutexA(nullptr, TRUE, OVERLAY_INSTANCE_MUTEX_NAME);
-    if (h == nullptr) {
-        log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to create the overlay instance guard. Error: %lu\n",
-                    GetLastError());
-        return true;
-    }
-    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    for (;;) {
+        HANDLE h = CreateMutexA(nullptr, TRUE, OVERLAY_INSTANCE_MUTEX_NAME);
+        if (h == nullptr) {
+            log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to create the overlay instance guard. Error: %lu\n",
+                        GetLastError());
+            return true;
+        }
+        if (GetLastError() != ERROR_ALREADY_EXISTS) {
+            // Handle intentionally left open for the process lifetime; the OS releases it on exit.
+            g_overlay_instance_mutex = h;
+            if (waited) {
+                log_message(LOG_INFO, "[OVERLAY PROCESS] Took the overlay instance guard once the previous "
+                            "overlay process had finished exiting.\n");
+            }
+            return true;
+        }
         CloseHandle(h);
-        return false;
+        if (SDL_GetTicks() >= deadline) return false;
+        waited = true;
+        SDL_Delay(OVERLAY_INSTANCE_LOCK_POLL_MS);
     }
-    // Handle intentionally left open for the process lifetime; the OS releases it on exit.
-    g_overlay_instance_mutex = h;
-    return true;
 #else
     char lock_path[1088];
     get_overlay_instance_lock_path(lock_path, sizeof(lock_path));
@@ -1415,13 +1435,23 @@ static bool overlay_instance_lock_acquire(void) {
         log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to open the overlay instance guard '%s'.\n", lock_path);
         return true;
     }
-    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
-        close(fd);
-        return false;
+    for (;;) {
+        if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+            // fd intentionally left open to hold the flock for the process lifetime.
+            g_overlay_instance_fd = fd;
+            if (waited) {
+                log_message(LOG_INFO, "[OVERLAY PROCESS] Took the overlay instance guard once the previous "
+                            "overlay process had finished exiting.\n");
+            }
+            return true;
+        }
+        if (SDL_GetTicks() >= deadline) {
+            close(fd);
+            return false;
+        }
+        waited = true;
+        SDL_Delay(OVERLAY_INSTANCE_LOCK_POLL_MS);
     }
-    // fd intentionally left open to hold the flock for the process lifetime.
-    g_overlay_instance_fd = fd;
-    return true;
 #endif
 }
 
@@ -2900,9 +2930,10 @@ int main(int argc, char *argv[]) {
                     log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
 #ifdef _WIN32
                     TerminateProcess(tracker->overlay_process_info.hProcess, 0);
-                    // TerminateProcess is asynchronous, and until the kernel has finished tearing the
-                    // process down it still holds OVERLAY_INSTANCE_MUTEX_NAME. Spawning the
-                    // replacement before then makes it exit immediately as a duplicate overlay.
+                    // TerminateProcess is asynchronous, so wait for the process to actually die before
+                    // spawning the replacement. Being signaled still doesn't prove the kernel has
+                    // released OVERLAY_INSTANCE_MUTEX_NAME, which is why the new overlay retries the
+                    // guard rather than exiting as a duplicate on its first look.
                     WaitForSingleObject(tracker->overlay_process_info.hProcess, OVERLAY_SHUTDOWN_TIMEOUT_MS);
                     CloseHandle(tracker->overlay_process_info.hProcess);
                     CloseHandle(tracker->overlay_process_info.hThread);
