@@ -1325,6 +1325,11 @@ static void print_console_error(const char *msg) {
     fflush(stderr);
 }
 
+// How long the tracker waits for the overlay process to shut down on its own before killing it.
+// Purely a backstop against an overlay that has stopped responding: the normal path is driven by
+// the process actually exiting, so this timeout is not reached during a healthy restart.
+#define OVERLAY_SHUTDOWN_TIMEOUT_MS 5000
+
 // --- Overlay instance guard -------------------------------------------------------------------
 // Mirrors the tracker's single-instance guard further down, but for the overlay window. The
 // overlay process takes the guard at startup and the OS drops it when that process dies, so the
@@ -1921,11 +1926,13 @@ int main(int argc, char *argv[]) {
         // tracker's own overlay would give two windows reading the same shared memory and both
         // writing their geometry back to settings.json on exit.
         if (!overlay_instance_lock_acquire()) {
-            log_message(LOG_INFO, "[OVERLAY PROCESS] An overlay is already running. Exiting.\n");
+            log_message(LOG_ERROR, "[OVERLAY PROCESS] An overlay is already running. Exiting.\n");
             print_console_error("[Advancely] An overlay window is already open. Only one can run at a time.\n");
             log_close();
             SDL_Quit();
-            return EXIT_SUCCESS;
+            // Nonzero: the tracker reads the overlay's exit code to tell a failed launch from the
+            // user closing the overlay window, and this is a failed launch.
+            return EXIT_FAILURE;
         }
 
         // static: AppSettings is large (fixed coop arrays); keep it off the stack
@@ -2789,6 +2796,7 @@ int main(int argc, char *argv[]) {
             if (app_settings.enable_overlay) {
                 // Only check if the overlay should be active
                 bool overlay_has_terminated = false;
+                int overlay_exit_code = 0;
 #ifdef _WIN32
                 if (tracker->overlay_process_info.hProcess != nullptr) {
                     // GetExitCodeProcess returns STILL_ACTIVE if the process is running.
@@ -2797,6 +2805,7 @@ int main(int argc, char *argv[]) {
                     if (GetExitCodeProcess(tracker->overlay_process_info.hProcess, &exitCode) && exitCode !=
                         STILL_ACTIVE) {
                         overlay_has_terminated = true;
+                        overlay_exit_code = (int) exitCode;
                         CloseHandle(tracker->overlay_process_info.hProcess); // Clean up handles
                         CloseHandle(tracker->overlay_process_info.hThread);
                         memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
@@ -2809,10 +2818,30 @@ int main(int argc, char *argv[]) {
                     // It returns the PID of the exited child, 0 if it's still running, or -1 on error.
                     if (waitpid(tracker->overlay_pid, &status, WNOHANG) == tracker->overlay_pid) {
                         overlay_has_terminated = true;
+                        // A signalled death is a failed overlay just as much as a nonzero return is.
+                        overlay_exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
                         tracker->overlay_pid = 0; // Clear the PID
                     }
                 }
 #endif
+
+                if (overlay_has_terminated && overlay_exit_code != 0) {
+                    // Only a clean exit means the user closed the overlay window. Every other code is
+                    // an overlay that failed to start or died on its own (the instance guard, a failed
+                    // init, a crash), and following it down would look like Advancely crashing.
+                    overlay_has_terminated = false;
+                    log_message(LOG_ERROR, "[MAIN] Overlay process exited with code %d. "
+                                "Keeping the tracker running without an overlay.\n", overlay_exit_code);
+                    snprintf(external_overlay_warning_msg, sizeof(external_overlay_warning_msg),
+                             "The overlay closed unexpectedly (exit code %d), so Advancely is running "
+                             "without one.\n\n"
+                             "The usual cause is a second overlay window still being open, including one "
+                             "started by hand with the --overlay flag, because only one overlay can run at "
+                             "a time. Close any other overlay and press 'Apply' again.\n\n"
+                             "advancely_overlay_log.txt says why it exited.",
+                             overlay_exit_code);
+                    external_overlay_warning = true;
+                }
 
                 if (overlay_has_terminated) {
                     log_message(LOG_INFO, "[MAIN] Overlay process terminated. Shutting down tracker.\n");
@@ -3028,19 +3057,29 @@ int main(int argc, char *argv[]) {
 #endif
                     }
 
-                    // 2. Wait for the process to exit cleanly (up to 500ms)
+                    // 2. Wait for the process to exit cleanly. A huge template makes the overlay's
+                    // teardown (freeing the deserialized tree, joining the skin-cache worker,
+                    // destroying every cached texture) take well over half a second, so the budget
+                    // has to be generous: a premature kill loses the overlay's geometry save and
+                    // races the instance guard below.
 #ifdef _WIN32
-                    DWORD wait_result = WaitForSingleObject(tracker->overlay_process_info.hProcess, 500);
+                    DWORD wait_result = WaitForSingleObject(tracker->overlay_process_info.hProcess,
+                                                            OVERLAY_SHUTDOWN_TIMEOUT_MS);
                     if (wait_result == WAIT_TIMEOUT) {
                         log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
                         TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+                        // TerminateProcess is asynchronous. Until the kernel has finished tearing the
+                        // process down it still holds OVERLAY_INSTANCE_MUTEX_NAME, and the replacement
+                        // spawned below would see the guard as taken and exit immediately, which in turn
+                        // shuts down the whole tracker.
+                        WaitForSingleObject(tracker->overlay_process_info.hProcess, OVERLAY_SHUTDOWN_TIMEOUT_MS);
                     }
                     CloseHandle(tracker->overlay_process_info.hProcess);
                     CloseHandle(tracker->overlay_process_info.hThread);
                     memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
 #else
                     int status;
-                    int retries = 5;
+                    int retries = OVERLAY_SHUTDOWN_TIMEOUT_MS / 100;
                     bool exited = false;
                     while (retries-- > 0) {
                         if (waitpid(tracker->overlay_pid, &status, WNOHANG) == tracker->overlay_pid) {
