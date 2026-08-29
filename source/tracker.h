@@ -597,6 +597,16 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings);
 void tracker_refresh_ghost_players(Tracker *t, const AppSettings *settings, MC_Version version);
 
 /**
+ * @brief Cancels and joins the background ghost-username resolver.
+ *
+ * Must be called before the co-op context is destroyed: the worker locks
+ * g_coop_ctx->lobby_mutex after a blocking Mojang request, and a thread still
+ * running when the process tears down faults on unloaded libraries. Waits out at
+ * most the one request already in flight. Safe to call when no resolver is running.
+ */
+void tracker_shutdown_ghost_name_resolver(void);
+
+/**
  * @brief Updates the tracker with a single player's progress (for individual player view in coop).
  * Same merge logic as tracker_update_coop_merged but only processes one player.
  */

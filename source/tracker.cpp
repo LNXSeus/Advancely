@@ -5510,6 +5510,12 @@ static void coop_merge_one_player_from_disk(Tracker *t, const AppSettings *setti
 // off the main thread, then writes names back (matched by UUID under lobby_mutex).
 static SDL_AtomicInt g_ghost_name_resolver_busy;
 
+// The worker outlives the frame it was started from and dereferences g_coop_ctx after a blocking
+// Mojang request, so it has to be joined before co-op state (and the process) is torn down. A
+// detached thread still inside libcurl when main() returns faults on unloaded DLLs at shutdown.
+static SDL_Thread *g_ghost_name_resolver_thread_handle = nullptr;
+static SDL_AtomicInt g_ghost_name_resolver_cancel;
+
 static int SDLCALL ghost_name_resolver_thread(void *) {
     if (!g_coop_ctx) {
         SDL_SetAtomicInt(&g_ghost_name_resolver_busy, 0);
@@ -5530,8 +5536,13 @@ static int SDLCALL ghost_name_resolver_thread(void *) {
     SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
 
     for (int i = 0; i < todo_n; i++) {
+        // Checked between requests so shutdown only ever waits out the one already in flight.
+        if (SDL_GetAtomicInt(&g_ghost_name_resolver_cancel)) break;
+
         char name[64] = {0};
         bool ok = mojang_fetch_username_by_uuid(todo[i], name, sizeof(name));
+
+        if (!g_coop_ctx) break;
 
         // Write the result back, matched by UUID (the index may have shifted).
         SDL_LockMutex(g_coop_ctx->lobby_mutex);
@@ -5573,13 +5584,28 @@ static void tracker_kick_ghost_name_resolver(void) {
     SDL_UnlockMutex(g_coop_ctx->lobby_mutex);
     if (!has_unresolved) return;
 
+    if (SDL_GetAtomicInt(&g_ghost_name_resolver_cancel)) return;
+
     if (SDL_CompareAndSwapAtomicInt(&g_ghost_name_resolver_busy, 0, 1)) {
-        SDL_Thread *th = SDL_CreateThread(ghost_name_resolver_thread, "GhostNameResolver", nullptr);
-        if (th) {
-            SDL_DetachThread(th);
-        } else {
+        // Winning the CAS means the previous run has already finished, so this reaps its handle
+        // without blocking rather than leaking it.
+        if (g_ghost_name_resolver_thread_handle) {
+            SDL_WaitThread(g_ghost_name_resolver_thread_handle, nullptr);
+            g_ghost_name_resolver_thread_handle = nullptr;
+        }
+        g_ghost_name_resolver_thread_handle = SDL_CreateThread(ghost_name_resolver_thread,
+                                                              "GhostNameResolver", nullptr);
+        if (!g_ghost_name_resolver_thread_handle) {
             SDL_SetAtomicInt(&g_ghost_name_resolver_busy, 0); // spawn failed; allow retry
         }
+    }
+}
+
+void tracker_shutdown_ghost_name_resolver(void) {
+    SDL_SetAtomicInt(&g_ghost_name_resolver_cancel, 1);
+    if (g_ghost_name_resolver_thread_handle) {
+        SDL_WaitThread(g_ghost_name_resolver_thread_handle, nullptr);
+        g_ghost_name_resolver_thread_handle = nullptr;
     }
 }
 

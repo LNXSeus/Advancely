@@ -1302,6 +1302,48 @@ static void build_overlay_argv(char *exe_path, char *argv[]) {
 }
 #endif
 
+// Launches the overlay child process and records its handle/pid on the tracker.
+static bool spawn_overlay_process(Tracker *t) {
+    char exe_path[MAX_PATH_LENGTH];
+    if (!get_executable_path(exe_path, sizeof(exe_path))) {
+        log_message(LOG_ERROR, "[MAIN] Could not resolve the executable path. Overlay not started.\n");
+        return false;
+    }
+#ifdef _WIN32
+    STARTUPINFOA si;
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    char args[MAX_PATH_LENGTH * 2 + 64];
+    build_overlay_command_line(args, sizeof(args), exe_path);
+
+    if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
+                       &t->overlay_process_info)) {
+        log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n",
+                    t->overlay_process_info.dwProcessId);
+        return true;
+    }
+    log_message(LOG_ERROR, "[MAIN] Failed to create overlay process. Error code: %lu\n", GetLastError());
+    return false;
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child process
+        char *args[6];
+        build_overlay_argv(exe_path, args);
+        execv(exe_path, args);
+        log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
+        _exit(1); // Should not be reached
+    }
+    if (pid > 0) {
+        t->overlay_pid = pid;
+        log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
+        return true;
+    }
+    log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process.\n");
+    return false;
+#endif
+}
+
 // Prints a message into the terminal that launched this process. On Windows Advancely is built for
 // the GUI subsystem and therefore has no console of its own, so attach to the parent one (the
 // cmd/PowerShell window that ran "Advancely --overlay") and print there. If there is no console to
@@ -2708,6 +2750,12 @@ int main(int argc, char *argv[]) {
         bool external_overlay_warning = false;
         char external_overlay_warning_msg[768] = {};
 
+        // A settings Apply only ASKS the old overlay to close; the replacement is spawned once the
+        // process is observed to be gone. Blocking the frame loop on the teardown of a large
+        // template froze the tracker for seconds and, on a timeout, raced the single-overlay guard.
+        bool overlay_restart_pending = false;
+        Uint64 overlay_restart_deadline = 0;
+
         // Track previous coop state for detecting disconnects
         CoopNetState prev_coop_state = COOP_NET_IDLE;
 
@@ -2725,40 +2773,7 @@ int main(int argc, char *argv[]) {
                         "process. Not launching a second one.\n");
         } else if (app_settings.enable_overlay) {
             log_message(LOG_INFO, "[MAIN] Overlay enabled in settings. Launching on startup.\n");
-            char exe_path[MAX_PATH_LENGTH];
-            if (get_executable_path(exe_path, sizeof(exe_path))) {
-#ifdef _WIN32
-                STARTUPINFOA si;
-                memset(&si, 0, sizeof(si));
-                si.cb = sizeof(si);
-                char args[MAX_PATH_LENGTH * 2 + 64];
-                build_overlay_command_line(args, sizeof(args), exe_path);
-
-                if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
-                                   &tracker->overlay_process_info)) {
-                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n",
-                                tracker->overlay_process_info.dwProcessId);
-                } else {
-                    log_message(LOG_ERROR, "[MAIN] Failed to create overlay process on startup. Error code: %lu\n",
-                                GetLastError());
-                }
-#else
-                pid_t pid = fork();
-                if (pid == 0) {
-                    // Child process
-                    char *args[6];
-                    build_overlay_argv(exe_path, args);
-                    execv(exe_path, args);
-                    _exit(1); // Should not be reached
-                } else if (pid > 0) {
-                    // Parent process
-                    tracker->overlay_pid = pid;
-                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
-                } else {
-                    log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process on startup.\n");
-                }
-#endif
-            }
+            spawn_overlay_process(tracker);
         }
 
         // Unified MAIN TRACKER LOOP -------------------------------------------------
@@ -2793,7 +2808,7 @@ int main(int argc, char *argv[]) {
             // --- Per-Frame Logic ---
 
             // Check if overlay process has terminated
-            if (app_settings.enable_overlay) {
+            if (app_settings.enable_overlay || overlay_restart_pending) {
                 // Only check if the overlay should be active
                 bool overlay_has_terminated = false;
                 int overlay_exit_code = 0;
@@ -2824,6 +2839,12 @@ int main(int argc, char *argv[]) {
                     }
                 }
 #endif
+
+                if (overlay_has_terminated && overlay_restart_pending) {
+                    // Expected: this is the overlay we asked to close so the replacement can pick up
+                    // the new settings. The respawn happens in the restart block below.
+                    overlay_has_terminated = false;
+                }
 
                 if (overlay_has_terminated && overlay_exit_code != 0) {
                     // Only a clean exit means the user closed the overlay window. Every other code is
@@ -2860,6 +2881,69 @@ int main(int argc, char *argv[]) {
                         tracker->quit_requested = true;
                     } else {
                         is_running = false; // Signal the tracker's main loop to shut down
+                    }
+                }
+            }
+
+            // Finish a pending overlay restart. Driven by the old process actually being gone, which
+            // the block above detects exactly, so no healthy restart waits on a timer.
+            if (overlay_restart_pending) {
+                bool old_overlay_gone;
+#ifdef _WIN32
+                old_overlay_gone = tracker->overlay_process_info.hProcess == nullptr;
+#else
+                old_overlay_gone = tracker->overlay_pid <= 0;
+#endif
+                // Backstop for an overlay that has stopped responding, and the only place a wall
+                // clock is involved: a hung process produces no event to wait for.
+                if (!old_overlay_gone && SDL_GetTicks() >= overlay_restart_deadline) {
+                    log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
+#ifdef _WIN32
+                    TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+                    // TerminateProcess is asynchronous, and until the kernel has finished tearing the
+                    // process down it still holds OVERLAY_INSTANCE_MUTEX_NAME. Spawning the
+                    // replacement before then makes it exit immediately as a duplicate overlay.
+                    WaitForSingleObject(tracker->overlay_process_info.hProcess, OVERLAY_SHUTDOWN_TIMEOUT_MS);
+                    CloseHandle(tracker->overlay_process_info.hProcess);
+                    CloseHandle(tracker->overlay_process_info.hThread);
+                    memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
+#else
+                    int status;
+                    kill(tracker->overlay_pid, SIGKILL);
+                    waitpid(tracker->overlay_pid, &status, 0); // Clean up zombie
+                    tracker->overlay_pid = 0;
+#endif
+                    old_overlay_gone = true;
+                }
+
+                if (old_overlay_gone) {
+                    overlay_restart_pending = false;
+
+                    // Reset the shutdown flag so the NEW process doesn't immediately exit
+                    if (tracker->p_shared_data) {
+#ifdef _WIN32
+                        WaitForSingleObject(tracker->h_mutex, 100);
+                        tracker->p_shared_data->shutdown_requested = false;
+                        ReleaseMutex(tracker->h_mutex);
+#else
+                        sem_wait(tracker->mutex);
+                        tracker->p_shared_data->shutdown_requested = false;
+                        sem_post(tracker->mutex);
+#endif
+                    }
+
+                    // The overlay's exit-save just wrote its actual SDL window geometry.
+                    // The width there does NOT reflect a width change made via the
+                    // settings dialog (we never push width into the overlay process),
+                    // so rewrite just the width subkey using the tracker's authoritative
+                    // value before the new overlay process starts.
+                    settings_save_overlay_width_only(app_settings.overlay_window.w);
+
+                    if (app_settings.enable_overlay) {
+                        log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
+                        spawn_overlay_process(tracker);
+                    } else {
+                        log_message(LOG_INFO, "[MAIN] Overlay remains disabled as per new settings.\n");
                     }
                 }
             }
@@ -3040,11 +3124,11 @@ int main(int argc, char *argv[]) {
                     external_overlay_warning = true;
                 }
 
-                // Graceful Shutdown Sequence
+                // Graceful shutdown sequence. Only the request is made here; the replacement is
+                // spawned by the restart block once the old process is observed to have exited.
                 if (overlay_is_running) {
                     log_message(LOG_INFO, "[MAIN] Requesting graceful shutdown of overlay...\n");
 
-                    // 1. Request shutdown via Shared Memory
                     if (tracker->p_shared_data) {
 #ifdef _WIN32
                         WaitForSingleObject(tracker->h_mutex, 100);
@@ -3057,108 +3141,30 @@ int main(int argc, char *argv[]) {
 #endif
                     }
 
-                    // 2. Wait for the process to exit cleanly. A huge template makes the overlay's
-                    // teardown (freeing the deserialized tree, joining the skin-cache worker,
-                    // destroying every cached texture) take well over half a second, so the budget
-                    // has to be generous: a premature kill loses the overlay's geometry save and
-                    // races the instance guard below.
+                    overlay_restart_pending = true;
+                    overlay_restart_deadline = SDL_GetTicks() + OVERLAY_SHUTDOWN_TIMEOUT_MS;
+                } else {
+                    // Nothing of ours is on screen, so there is nothing to wait for. Clearing the
+                    // pending flag matters when Apply is pressed twice and the first restart has
+                    // already reaped the old process but not yet spawned its replacement.
+                    overlay_restart_pending = false;
+
+                    if (tracker->p_shared_data) {
 #ifdef _WIN32
-                    DWORD wait_result = WaitForSingleObject(tracker->overlay_process_info.hProcess,
-                                                            OVERLAY_SHUTDOWN_TIMEOUT_MS);
-                    if (wait_result == WAIT_TIMEOUT) {
-                        log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
-                        TerminateProcess(tracker->overlay_process_info.hProcess, 0);
-                        // TerminateProcess is asynchronous. Until the kernel has finished tearing the
-                        // process down it still holds OVERLAY_INSTANCE_MUTEX_NAME, and the replacement
-                        // spawned below would see the guard as taken and exit immediately, which in turn
-                        // shuts down the whole tracker.
-                        WaitForSingleObject(tracker->overlay_process_info.hProcess, OVERLAY_SHUTDOWN_TIMEOUT_MS);
-                    }
-                    CloseHandle(tracker->overlay_process_info.hProcess);
-                    CloseHandle(tracker->overlay_process_info.hThread);
-                    memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
+                        WaitForSingleObject(tracker->h_mutex, 100);
+                        tracker->p_shared_data->shutdown_requested = false;
+                        ReleaseMutex(tracker->h_mutex);
 #else
-                    int status;
-                    int retries = OVERLAY_SHUTDOWN_TIMEOUT_MS / 100;
-                    bool exited = false;
-                    while (retries-- > 0) {
-                        if (waitpid(tracker->overlay_pid, &status, WNOHANG) == tracker->overlay_pid) {
-                            exited = true;
-                            break;
-                        }
-                        usleep(100000); // Wait 100ms
+                        sem_wait(tracker->mutex);
+                        tracker->p_shared_data->shutdown_requested = false;
+                        sem_post(tracker->mutex);
+#endif
                     }
 
-                    if (!exited) {
-                        log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
-                        kill(tracker->overlay_pid, SIGKILL);
-                        waitpid(tracker->overlay_pid, &status, 0); // Clean up zombie
-                    }
-                    tracker->overlay_pid = 0;
-#endif
-                }
-
-                // Reset the shutdown flag so the NEW process doesn't immediately exit
-                if (tracker->p_shared_data) {
-#ifdef _WIN32
-                    WaitForSingleObject(tracker->h_mutex, 100);
-                    tracker->p_shared_data->shutdown_requested = false;
-                    ReleaseMutex(tracker->h_mutex);
-#else
-                    sem_wait(tracker->mutex);
-                    tracker->p_shared_data->shutdown_requested = false;
-                    sem_post(tracker->mutex);
-#endif
-                }
-
-                // The overlay's exit-save just wrote its actual SDL window geometry.
-                // The width there does NOT reflect a width change made via the
-                // settings dialog (we never push width into the overlay process),
-                // so rewrite just the width subkey using the tracker's authoritative
-                // value before the new overlay process starts.
-                settings_save_overlay_width_only(app_settings.overlay_window.w);
-
-                // Now, check if the NEW settings require the overlay to be enabled. Never spawn one
-                // next to an overlay that's already running detached.
-                if (app_settings.enable_overlay && !external_overlay) {
-                    log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
-                    char exe_path[MAX_PATH_LENGTH];
-                    if (get_executable_path(exe_path, sizeof(exe_path))) {
-#ifdef _WIN32
-                        STARTUPINFOA si;
-                        memset(&si, 0, sizeof(si));
-                        si.cb = sizeof(si);
-                        char args[MAX_PATH_LENGTH * 2 + 64];
-                        build_overlay_command_line(args, sizeof(args), exe_path);
-
-                        if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
-                                           &tracker->overlay_process_info)) {
-                            log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n",
-                                        tracker->overlay_process_info.dwProcessId);
-                        } else {
-                            log_message(LOG_ERROR, "[MAIN] Failed to create overlay process. Error code: %lu\n",
-                                        GetLastError());
-                        }
-#else
-                        pid_t pid = fork();
-                        if (pid == 0) {
-                            // Child process
-                            char *args[6];
-                            build_overlay_argv(exe_path, args);
-                            execv(exe_path, args);
-                            // If execv returns, it's an error
-                            log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
-                            _exit(1);
-                        } else if (pid > 0) {
-                            // Parent process
-                            tracker->overlay_pid = pid;
-                            log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
-                        } else {
-                            log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process.\n");
-                        }
-#endif
-                    } else {
-                        log_message(LOG_INFO, "[MAIN] Overlay remains disabled as per new settings.\n");
+                    // Never spawn one next to an overlay that is already running detached.
+                    if (app_settings.enable_overlay && !external_overlay) {
+                        log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
+                        spawn_overlay_process(tracker);
                     }
                 }
             }
@@ -4965,6 +4971,9 @@ int main(int argc, char *argv[]) {
     // Release every OS-level hotkey before SDL_Quit, so the combinations go back to the system
     // even when the process is torn down by the auto-updater restart.
     global_hotkeys_shutdown();
+
+    // Join the ghost-username worker before the co-op mutexes it locks are destroyed.
+    tracker_shutdown_ghost_name_resolver();
 
     // Shut down co-op networking before SDL_Quit
     coop_net_shutdown(&coop_ctx);
