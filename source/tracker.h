@@ -235,10 +235,13 @@ struct Tracker {
 
     // Hermes live-update support
     HermesRotator hermes_rotator; // cipher tables, built once
-    FILE *hermes_play_log; // file handle for the restricted play.log.enc
+    // Path to the restricted play.log.enc. Only the path is kept, never an open handle: on Windows an
+    // open handle denies delete sharing, which would make Minecraft's "Delete World" fail on the world
+    // Advancely is tracking. Every reader opens, reads and closes again (hermes_open_log).
+    char hermes_log_path[MAX_PATH_LENGTH];
     long hermes_file_offset; // how far we've already read
     bool hermes_active; // true if Hermes was detected for this world
-    char hermes_world_name[MAX_PATH_LENGTH]; // world the play.log.enc handle was opened for
+    char hermes_world_name[MAX_PATH_LENGTH]; // world play.log.enc was detected for
     bool hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
     void *hermes_coop_stat_cache; // Per-player stat values for CUMULATIVE merge delta tracking
     // (std::unordered_map<std::string, int>*, managed in tracker.cpp)

@@ -4195,7 +4195,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 
     // Explicitly construct HermesRotator (calloc doesn't call its constructor)
     new(&t->hermes_rotator) HermesRotator();
-    t->hermes_play_log = nullptr;
+    t->hermes_log_path[0] = '\0';
     t->hermes_file_offset = 0;
     t->hermes_active = false;
     t->hermes_world_name[0] = '\0';
@@ -13394,12 +13394,9 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
 void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return;
 
-    // When Hermes is disabled, drop any open handle and reset state.
+    // When Hermes is disabled, forget the file and reset state.
     if (!settings->using_hermes) {
-        if (t->hermes_play_log) {
-            fclose(t->hermes_play_log);
-            t->hermes_play_log = nullptr;
-        }
+        t->hermes_log_path[0] = '\0';
         t->hermes_file_offset = 0;
         t->hermes_active = false;
         t->hermes_world_name[0] = '\0';
@@ -13409,18 +13406,15 @@ void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings) {
     // No world resolved yet: nothing to attach to.
     if (t->world_name[0] == '\0' || t->saves_path[0] == '\0') return;
 
-    // Already attached to the current world: leave the handle (and read offset)
-    // untouched so the live poll keeps tailing from where it left off.
-    if (t->hermes_active && t->hermes_play_log &&
+    // Already attached to the current world: leave the read offset untouched so the
+    // live poll keeps tailing from where it left off.
+    if (t->hermes_active && t->hermes_log_path[0] != '\0' &&
         strcmp(t->hermes_world_name, t->world_name) == 0) {
         return;
     }
 
-    // World changed (or no handle yet): close the stale handle and re-detect.
-    if (t->hermes_play_log) {
-        fclose(t->hermes_play_log);
-        t->hermes_play_log = nullptr;
-    }
+    // World changed (or nothing detected yet): drop the old path and re-detect.
+    t->hermes_log_path[0] = '\0';
     t->hermes_file_offset = 0;
     t->hermes_active = false;
 
@@ -13428,9 +13422,13 @@ void tracker_refresh_hermes_log(Tracker *t, const AppSettings *settings) {
     snprintf(hermes_log_path, sizeof(hermes_log_path),
              "%s/%s/hermes/restricted/play.log.enc", // Encrypted log file
              t->saves_path, t->world_name);
+    // Opened only to confirm it exists, then closed again right away - the readers reopen it
+    // per call so the world folder is never held open (see hermes_open_log).
     FILE *f = fopen(hermes_log_path, "rb");
     if (f) {
-        t->hermes_play_log = f;
+        fclose(f);
+        strncpy(t->hermes_log_path, hermes_log_path, MAX_PATH_LENGTH - 1);
+        t->hermes_log_path[MAX_PATH_LENGTH - 1] = '\0';
         t->hermes_file_offset = 0; // start from beginning on new world, then it appends
         t->hermes_active = true;
         strncpy(t->hermes_world_name, t->world_name, MAX_PATH_LENGTH - 1);
@@ -14465,12 +14463,28 @@ static bool hermes_process_decrypted_line(
 }
 
 
+// Opens the tracked play.log.enc for one read pass. The handle is deliberately never cached on the
+// Tracker: on Windows an open handle denies delete sharing, so holding one makes Minecraft's "Delete
+// World" fail on the world Advancely is tracking (and leaves a delete-pending entry that stops the
+// folder itself from going away). Callers must fclose what they get back. The read position lives in
+// hermes_file_offset, so reopening costs nothing but the open itself.
+static FILE *hermes_open_log(const Tracker *t) {
+    if (!t || !t->hermes_active || t->hermes_log_path[0] == '\0') return nullptr;
+    return fopen(t->hermes_log_path, "rb");
+}
+
+
 void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
-    if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log)
+    if (!settings->using_hermes || !t->hermes_active)
         return;
 
-    if (fseek(t->hermes_play_log, t->hermes_file_offset, SEEK_SET) != 0)
+    FILE *play_log = hermes_open_log(t);
+    if (!play_log) return;
+
+    if (fseek(play_log, t->hermes_file_offset, SEEK_SET) != 0) {
+        fclose(play_log);
         return;
+    }
 
     bool any_changed = false;
     bool snapshots_changed = false;
@@ -14480,13 +14494,12 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     const size_t workbuf_size = 4 * 1024 * 1024;
 
     while (true) {
-        long start_offset = ftell(t->hermes_play_log);
         std::string line_buf;
         char chunk[8192];
         bool newline_found = false;
 
         // Read chunks until we hit the end of the line or EOF
-        while (fgets(chunk, sizeof(chunk), t->hermes_play_log)) {
+        while (fgets(chunk, sizeof(chunk), play_log)) {
             line_buf += chunk;
             if (!line_buf.empty() && line_buf.back() == '\n') {
                 newline_found = true;
@@ -14496,13 +14509,13 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 
         if (!newline_found) {
             // Incomplete line - Minecraft is still writing or we reached EOF. Retry next frame.
-            // Reset to start of this line so we read it completely next time.
-            fseek(t->hermes_play_log, start_offset, SEEK_SET);
+            // hermes_file_offset still points at the start of this line, so the next pass reads
+            // it from the beginning.
             break;
         }
 
         // Commit read position past this complete line.
-        t->hermes_file_offset = ftell(t->hermes_play_log);
+        t->hermes_file_offset = ftell(play_log);
 
         while (!line_buf.empty() && (line_buf.back() == '\n' || line_buf.back() == '\r')) {
             line_buf.pop_back();
@@ -14531,6 +14544,7 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     }
 
     if (workbuf) free(workbuf);
+    fclose(play_log);
 }
 
 
@@ -14567,11 +14581,13 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
                                   long long window_ms) {
     if (!t || !settings) return;
-    if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log) return;
+    if (!settings->using_hermes || !t->hermes_active) return;
     if (t->hermes_file_offset <= 0) return;
 
+    FILE *play_log = hermes_open_log(t);
+    if (!play_log) return;
+
     long saved_offset = t->hermes_file_offset;
-    if (fseek(t->hermes_play_log, 0, SEEK_SET) != 0) return;
 
     struct ReplayEntry {
         std::string line;
@@ -14581,19 +14597,19 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
     long long max_time = 0;
 
     while (true) {
-        long pos = ftell(t->hermes_play_log);
+        long pos = ftell(play_log);
         if (pos < 0 || pos >= saved_offset) break;
 
         std::string line_buf;
         char chunk[8192];
         bool newline_found = false;
-        while (fgets(chunk, sizeof(chunk), t->hermes_play_log)) {
+        while (fgets(chunk, sizeof(chunk), play_log)) {
             line_buf += chunk;
             if (!line_buf.empty() && line_buf.back() == '\n') {
                 newline_found = true;
                 break;
             }
-            if (ftell(t->hermes_play_log) >= saved_offset) break;
+            if (ftell(play_log) >= saved_offset) break;
         }
         if (!newline_found && line_buf.empty()) break;
 
@@ -14621,8 +14637,8 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
         cJSON_Delete(peek);
     }
 
-    // Forward-polling must resume exactly where it left off.
-    fseek(t->hermes_play_log, saved_offset, SEEK_SET);
+    // Forward-polling resumes from hermes_file_offset, which this pass never moved.
+    fclose(play_log);
 
     if (entries.empty() || max_time == 0) return;
     long long cutoff = max_time - window_ms;
@@ -15274,11 +15290,8 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             t->window = nullptr;
         }
 
-        // Close Hermes log if open
-        if (t->hermes_play_log) {
-            fclose(t->hermes_play_log);
-            t->hermes_play_log = nullptr;
-        }
+        // Forget the Hermes log (no handle is ever held on it)
+        t->hermes_log_path[0] = '\0';
         t->hermes_active = false;
         t->hermes_world_name[0] = '\0';
 
