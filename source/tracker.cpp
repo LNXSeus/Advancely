@@ -3220,10 +3220,13 @@ static int ms_compute_current_stage(MultiStageGoal *goal, std::vector<bool> &bas
  * @param player_stats_json The parsed player stats JSON file.
  * @param player_unlocks_json The parsed player unlocks JSON file.
  * @param version The game version from the MC_Version enum.
+ * @param hermes_stat_floor When true, a stat stage keeps the higher of its stored progress and the
+ *        value just read from disk (see the floor in tracker_update).
  */
 static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
-                                                MC_Version version, const AppSettings *settings) {
+                                                MC_Version version, const AppSettings *settings,
+                                                bool hermes_stat_floor) {
     (void) settings;
     if (t->template_data->multi_stage_goal_count == 0) return false;
 
@@ -3292,6 +3295,7 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                 continue;
             }
 
+            const int stored_stat_progress = stage_to_check->current_stat_progress;
             stage_to_check->current_stat_progress = 0;
 
             switch (stage_to_check->type) {
@@ -3369,6 +3373,14 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                                 }
                             }
                         }
+                    }
+
+                    // A stats file that hasn't been rewritten yet reports the previous save's number,
+                    // which would drop the stage back and re-pop it in the compact stack once Hermes
+                    // raises it again. Stats only count up inside a world, so keep the stored value.
+                    if (hermes_stat_floor && current_progress < stored_stat_progress) {
+                        current_progress = stored_stat_progress;
+                        stat_found = true;
                     }
 
                     // Check for completion. A required_progress of -1 is an infinite counter
@@ -5184,7 +5196,8 @@ static bool world_names_match(const char *a, const char *b) {
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
-    if (!world_names_match(t->world_name, t->template_data->last_known_world_name)) {
+    const bool world_changed = !world_names_match(t->world_name, t->template_data->last_known_world_name);
+    if (world_changed) {
         // Save notes for the OLD world before doing anything else
         tracker_save_notes(t, settings);
 
@@ -5237,6 +5250,22 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         }
     }
 
+    // Hermes runs ahead of the game files, and a save (e.g. on pause) touches the whole world folder,
+    // so dmon can fire this rebuild while stats.json still holds the previous save's numbers. Reading
+    // those back drops a stat, and the value coming back afterwards reads as fresh progress to the
+    // compact stack, which pops the line a second time. Stats only count up inside a world, so a disk
+    // value below the one we hold is stale: keep the higher. Off on a world change, where lower is real.
+    const bool hermes_stat_floor = settings->using_hermes && t->hermes_active && !world_changed;
+    std::vector<int> stat_floor;
+    if (hermes_stat_floor) {
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            const TrackableCategory *stat_cat = t->template_data->stats[i];
+            if (!stat_cat) continue;
+            for (int j = 0; j < stat_cat->criteria_count; j++)
+                stat_floor.push_back(stat_cat->criteria[j] ? stat_cat->criteria[j]->progress : 0);
+        }
+    }
+
     // Load all necessary player files ONCE
     cJSON *player_adv_json = nullptr;
     // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
@@ -5268,9 +5297,28 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         tracker_update_unlock_progress(t, player_unlocks_json); // Just returns if unlocks don't exist
     }
 
+    // Re-apply the Hermes floor over whatever the (possibly not-yet-rewritten) stats file just set.
+    // Only the raw value and its own done flag are restored here; the category counters and the
+    // template totals are recomputed by tracker_update_stat_linked_goals in the loop below.
+    if (hermes_stat_floor) {
+        size_t fi = 0;
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            TrackableCategory *stat_cat = t->template_data->stats[i];
+            if (!stat_cat) continue;
+            for (int j = 0; j < stat_cat->criteria_count && fi < stat_floor.size(); j++, fi++) {
+                TrackableItem *sub_stat = stat_cat->criteria[j];
+                if (!sub_stat || sub_stat->progress >= stat_floor[fi]) continue;
+                sub_stat->progress = stat_floor[fi];
+                if (!sub_stat->is_manually_completed && sub_stat->goal > 0)
+                    sub_stat->done = (sub_stat->progress >= sub_stat->goal);
+            }
+        }
+    }
+
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings, settings->local_player.uuid);
-    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
+    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings,
+                                        hermes_stat_floor);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
     // Counters participate so that stats/custom goals/counters can all link to counters.
     // Safety cap of 32 iterations prevents infinite loops from unexpected circular references.
@@ -5282,7 +5330,8 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
             changed |= tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json,
-                                                           player_unlocks_json, version, settings);
+                                                           player_unlocks_json, version, settings,
+                                                           hermes_stat_floor);
         } while (changed && ++guard < 32);
     }
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
@@ -14486,15 +14535,24 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 
 
 // Replay Hermes events from the already-processed portion of the log whose
-// "time" field is within window_ms of the newest event's time. Called after
-// the disk-rebuild path (tracker_update / tracker_update_coop_merged +
-// tracker_update_coop_single_player) to restore in-memory progress that disk
-// files don't yet reflect because Minecraft's autosave hasn't fired.
+// "time" field is within window_ms of the newest event's time (window_ms <= 0
+// replays all of them). Called after the disk-rebuild path (tracker_update /
+// tracker_update_coop_merged + tracker_update_coop_single_player) to restore
+// in-memory progress that disk files don't yet reflect because Minecraft's
+// autosave hasn't fired.
 //
 // We read [0, hermes_file_offset) - events past the offset are future events
 // that live polling will pick up normally. The window is driven off the
 // newest event's time (not wall-clock) so paused / AFK sessions still pick
 // the right cutoff. HermesRotator is stateless, so seeking is safe.
+//
+// A window only ever drops events the safety rules below would have made
+// harmless no-ops anyway, and how far back the game files lag is not bounded
+// by wall-clock time: with autosave off, Minecraft writes them only when the
+// player pauses or quits, so an hour of progress can sit unpersisted. Cutting
+// the replay off by age lets that progress vanish on the next rebuild and
+// reappear on the save after it, which the compact stack pops as a fresh
+// completion. Hence the callers replay everything.
 //
 // Safety:
 //   - Stats (HIGHEST): hermes_apply_stat_event only accepts new_value > progress.
@@ -14576,7 +14634,7 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
     size_t applied = 0;
 
     for (auto &e: entries) {
-        if (e.time_ms < cutoff) continue;
+        if (window_ms > 0 && e.time_ms < cutoff) continue;
         // disk_authoritative = true: this replay runs right after a full disk rebuild, so the
         // game files win. Advancements the disk records are not re-completed by replayed events.
         if (hermes_process_decrypted_line(t, settings, e.line,
@@ -14589,10 +14647,17 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
 
     if (workbuf) free(workbuf);
 
-    log_message(LOG_INFO,
-                "[TRACKER - HERMES] Replay window: scanned %zu event(s), applied %zu within %lldms "
-                "(cutoff=%lld, newest=%lld).\n",
-                entries.size(), applied, window_ms, cutoff, max_time);
+    if (window_ms > 0) {
+        log_message(LOG_INFO,
+                    "[TRACKER - HERMES] Replay window: scanned %zu event(s), applied %zu within %lldms "
+                    "(cutoff=%lld, newest=%lld).\n",
+                    entries.size(), applied, window_ms, cutoff, max_time);
+    } else {
+        log_message(LOG_INFO,
+                    "[TRACKER - HERMES] Replay window: scanned %zu event(s), applied all %zu "
+                    "(no cutoff, newest=%lld).\n",
+                    entries.size(), applied, max_time);
+    }
 
     if (any_changed) {
         if (!snapshots_changed) {

@@ -4137,11 +4137,11 @@ int main(int argc, char *argv[]) {
 
                         // Manual toggles / custom goal changes drove us through a full
                         // disk rebuild, which wiped any Hermes progress that hadn't yet
-                        // autosaved. Re-apply the last 5 minutes of Hermes events on top
-                        // of the fresh per-player and merged snapshots so the UI doesn't
-                        // regress to stale disk state. Sets g_coop_broadcast_needed if
-                        // anything changed so receivers get the corrected view.
-                        tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+                        // autosaved. Re-apply the Hermes events on top of the fresh
+                        // per-player and merged snapshots so the UI doesn't regress to
+                        // stale disk state. Sets g_coop_broadcast_needed if anything
+                        // changed so receivers get the corrected view.
+                        tracker_hermes_replay_window(tracker, &app_settings, 0);
                     } else {
                         // A host with the ghost toggle on and ghosts discovered must
                         // still run the merge path even with nobody connected, so
@@ -4158,7 +4158,7 @@ int main(int argc, char *argv[]) {
                         if (ghost_n > 0) {
                             // Merge local roster + ghosts (no broadcast: nobody connected).
                             tracker_update_coop_merged(tracker, &app_settings);
-                            tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+                            tracker_hermes_replay_window(tracker, &app_settings, 0);
 
                             // The merge above leaves the All-Players view in template_data.
                             // If the dropdown has an individual player or ghost selected,
@@ -4176,7 +4176,7 @@ int main(int argc, char *argv[]) {
                         } else {
                             // Singleplayer or host with no clients and no ghosts: normal update
                             tracker_update(tracker, &app_settings);
-                            tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+                            tracker_hermes_replay_window(tracker, &app_settings, 0);
                             // Host alone in a lobby: the singleplayer rebuild doesn't
                             // stamp contributor UUIDs, so post-stamp the local player
                             // so faces still render in the All Players view.

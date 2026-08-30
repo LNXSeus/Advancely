@@ -567,7 +567,8 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings);
  *
  * @param t          Tracker.
  * @param settings   Application settings.
- * @param window_ms  Replay window in milliseconds (typically 5 minutes).
+ * @param window_ms  Replay window in milliseconds, measured back from the newest
+ *                   event. 0 (or less) replays every processed event.
  */
 void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
                                   long long window_ms);
