@@ -208,6 +208,10 @@ struct Tracker {
     long long speedrunigt_last_ms; // final_igt as of the last comparison
     long long speedrunigt_last_save_ticks; // stats play time as of the last comparison
     bool speedrunigt_stalled; // true while the mod's timer is considered stopped
+    // True once record.json reported "is_completed": true on a run the tracked template also
+    // counts as complete. That final_igt IS the final time, so it is held from that moment on
+    // instead of waiting for the next game save, and the stall detection above stops running.
+    bool speedrunigt_final;
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
