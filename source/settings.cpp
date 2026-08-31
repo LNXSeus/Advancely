@@ -138,6 +138,21 @@ static int count_template_advancement_goals(const AppSettings *s) {
     return count;
 }
 
+// True when the template picked in this window is the one the tracker currently has loaded.
+// A loaded preset (or an edited version/category/flag) points at a different template that is
+// only read on Apply, so until then the tracker's template says nothing about which goals the
+// pending selection refers to.
+static bool settings_template_is_loaded(const AppSettings *s, const Tracker *t) {
+    if (!s || !t) return false;
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(s, base_path, sizeof(base_path));
+    char template_path[MAX_PATH_LENGTH];
+    snprintf(template_path, sizeof(template_path), "%s.json", base_path);
+
+    return strcmp(template_path, t->advancement_template_path) == 0;
+}
+
 // True if the two Compact-cycle selections differ (which whole-section type counts are enabled and
 // which individual goals are selected, in order). Used by both settings-diff functions below.
 static bool compact_cycle_different(const AppSettings *a, const AppSettings *b) {
@@ -4455,8 +4470,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     // is selectable; presence and labels follow the same MC-version rules as the tracker's
                     // section separators (Advancement Criteria and Recipe Criteria are separate categories).
                     const TemplateData *ctd = (t && t->template_data) ? t->template_data : nullptr;
+                    // While a different template is picked but not applied yet (a loaded preset, or an
+                    // edited version/category/flag), the selections belong to THAT template. Pruning them
+                    // against the still-loaded one would silently drop every goal it doesn't contain.
+                    bool compact_template_pending = ctd && !settings_template_is_loaded(&temp_settings, t);
                     if (!ctd) {
                         ImGui::TextDisabled("Load a template to choose what the panel cycles through.");
+                    } else if (compact_template_pending) {
+                        int pending_cycle_types = 0;
+                        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+                            if (temp_settings.compact_cycle_type[i]) pending_cycle_types++;
+                        char pending_cycle_buffer[320];
+                        snprintf(pending_cycle_buffer, sizeof(pending_cycle_buffer),
+                                 "%d goal %s and %d individual %s selected for the template you picked.\n"
+                                 "Click 'Apply Settings' to load that template, then edit the selection here.",
+                                 pending_cycle_types, pending_cycle_types == 1 ? "type" : "types",
+                                 temp_settings.compact_cycle_item_count,
+                                 temp_settings.compact_cycle_item_count == 1 ? "goal" : "goals");
+                        ImGui::TextDisabled("%s", pending_cycle_buffer);
                     } else {
                         // Keep the selection lists free of goals that aren't in the currently loaded
                         // template, so a template switch (here or via the editor) doesn't leave stale
@@ -4545,6 +4576,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     const TemplateData *sctd = (t && t->template_data) ? t->template_data : nullptr;
                     if (!sctd) {
                         ImGui::TextDisabled("Load a template to choose what pops into the stack.");
+                    } else if (compact_template_pending) {
+                        int pending_stack_types = 0;
+                        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+                            if (temp_settings.compact_stack_type[i]) pending_stack_types++;
+                        char pending_stack_buffer[320];
+                        snprintf(pending_stack_buffer, sizeof(pending_stack_buffer),
+                                 "%d goal %s and %d individual %s selected for the template you picked.\n"
+                                 "Click 'Apply Settings' to load that template, then edit the selection here.",
+                                 pending_stack_types, pending_stack_types == 1 ? "type" : "types",
+                                 temp_settings.compact_stack_item_count,
+                                 temp_settings.compact_stack_item_count == 1 ? "goal" : "goals");
+                        ImGui::TextDisabled("%s", pending_stack_buffer);
                     } else {
                         settings_prune_compact_stack_items(&temp_settings, sctd);
                         settings_prune_compact_stack_items(&saved_settings, sctd);
