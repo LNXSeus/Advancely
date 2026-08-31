@@ -4127,6 +4127,24 @@ static void seed_manual_pos_from_tracker(ManualPos *pos, Tracker *t, const char 
     }
 }
 
+// World coordinates of the middle of the tracker map's current view, for elements that are created
+// from scratch and have nowhere to be seeded from. Only reported while the manual layout is on,
+// which is the only mode where a fresh element's coordinates are visible (the Visual Layout Editor
+// forces it on). t is the tracker only when the edited template is the running one.
+static bool new_element_view_center(Tracker *t, const AppSettings *app_settings, float *out_x, float *out_y) {
+    if (!t || !app_settings || !app_settings->use_manual_layout) return false;
+    return tracker_get_view_center_world(t, out_x, out_y);
+}
+
+// Pins a fresh element to the view center, offset by half its size so the element itself is
+// centered rather than its top-left corner. New elements always start on the top-left anchor.
+static void place_new_element_at_center(ManualPos *pos, float center_x, float center_y,
+                                        float width, float height) {
+    pos->is_set = true;
+    pos->x = fminf(fmaxf(roundf(center_x - width * 0.5f), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+    pos->y = fminf(fmaxf(roundf(center_y - height * 0.5f), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+}
+
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false,
@@ -7785,6 +7803,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  counter);
                         strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
                         new_adv.icon_path[sizeof(new_adv.icon_path) - 1] = '\0';
+                        float new_adv_cx, new_adv_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_adv_cx, &new_adv_cy)) {
+                            place_new_element_at_center(&new_adv.icon_pos, new_adv_cx, new_adv_cy, 96.0f, 96.0f);
+                        }
                         current_template_data.advancements.push_back(new_adv);
                         request_scroll_to_new_goal(new_adv.root_name);
                         save_message_type = MSG_NONE;
@@ -10592,6 +10614,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_crit.goal = 1; // Default to a completable goal
                         new_stat.criteria.push_back(new_crit);
 
+                        float new_stat_cx, new_stat_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_stat_cx, &new_stat_cy)) {
+                            place_new_element_at_center(&new_stat.icon_pos, new_stat_cx, new_stat_cy, 96.0f, 96.0f);
+                        }
                         current_template_data.stats.push_back(new_stat);
                         request_scroll_to_new_goal(new_stat.root_name);
                         save_message_type = MSG_NONE;
@@ -13142,6 +13168,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(new_unlock.display_name, sizeof(new_unlock.display_name), "New Unlock %d", counter);
                         strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
                         new_unlock.icon_path[sizeof(new_unlock.icon_path) - 1] = '\0';
+                        float new_unlock_cx, new_unlock_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_unlock_cx,
+                                                    &new_unlock_cy)) {
+                            place_new_element_at_center(&new_unlock.icon_pos, new_unlock_cx, new_unlock_cy,
+                                                        96.0f, 96.0f);
+                        }
                         current_template_data.unlocks.push_back(new_unlock);
                         selected_unlock_index = (int) current_template_data.unlocks.size() - 1;
                         request_scroll_to_new_goal(new_unlock.root_name);
@@ -14072,6 +14104,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
                         new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
                         new_goal.goal = 1; // Default to a progress-based counter
+                        float new_custom_cx, new_custom_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_custom_cx,
+                                                    &new_custom_cy)) {
+                            place_new_element_at_center(&new_goal.icon_pos, new_custom_cx, new_custom_cy,
+                                                        96.0f, 96.0f);
+                        }
                         current_template_data.custom_goals.push_back(new_goal);
                         selected_custom_index = (int) current_template_data.custom_goals.size() - 1;
                         request_scroll_to_new_goal(new_goal.root_name);
@@ -15206,6 +15244,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         final_stage.type = SUBGOAL_MANUAL;
                         new_goal.stages.push_back(final_stage);
 
+                        float new_ms_cx, new_ms_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_ms_cx, &new_ms_cy)) {
+                            place_new_element_at_center(&new_goal.icon_pos, new_ms_cx, new_ms_cy, 96.0f, 96.0f);
+                        }
                         current_template_data.multi_stage_goals.push_back(new_goal);
 
                         // After modifying the vector, re-find the selected item to get a valid pointer.
@@ -17700,6 +17742,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(new_counter.display_name, sizeof(new_counter.display_name), "New Counter %d", ctr_num);
                         strncpy(new_counter.icon_path, "blocks/placeholder.png", sizeof(new_counter.icon_path) - 1);
                         new_counter.icon_path[sizeof(new_counter.icon_path) - 1] = '\0';
+                        float new_counter_cx, new_counter_cy;
+                        if (new_element_view_center(layout_seed_tracker, app_settings, &new_counter_cx,
+                                                    &new_counter_cy)) {
+                            place_new_element_at_center(&new_counter.icon_pos, new_counter_cx, new_counter_cy,
+                                                        96.0f, 96.0f);
+                        }
                         current_template_data.counter_goals.push_back(new_counter);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
                         request_scroll_to_new_goal(new_counter.root_name);
@@ -18766,6 +18814,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 counter++;
                             }
                             snprintf(new_elem.display_text, sizeof(new_elem.display_text), "Header %d", counter);
+                            float header_cx, header_cy;
+                            if (new_element_view_center(layout_seed_tracker, app_settings, &header_cx, &header_cy)) {
+                                place_new_element_at_center(&new_elem.pos, header_cx, header_cy, 0.0f, 0.0f);
+                            }
                             current_template_data.decorations.push_back(new_elem);
                             selected_deco_index = (int) current_template_data.decorations.size() - 1;
                             request_scroll_to_new_goal(new_elem.id);
@@ -18796,6 +18848,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 if (!id_exists) break;
                                 counter++;
+                            }
+                            float line_cx, line_cy;
+                            if (new_element_view_center(layout_seed_tracker, app_settings, &line_cx, &line_cy)) {
+                                // Both endpoints, so the segment straddles the middle of the view
+                                place_new_element_at_center(&new_elem.pos, line_cx - 100.0f, line_cy, 0.0f, 0.0f);
+                                place_new_element_at_center(&new_elem.pos2, line_cx + 100.0f, line_cy, 0.0f, 0.0f);
                             }
                             current_template_data.decorations.push_back(new_elem);
                             selected_deco_index = (int) current_template_data.decorations.size() - 1;
@@ -18830,6 +18888,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 if (!id_exists) break;
                                 counter++;
+                            }
+                            float arrow_cx, arrow_cy;
+                            if (new_element_view_center(layout_seed_tracker, app_settings, &arrow_cx, &arrow_cy)) {
+                                // Tail and tip, so the arrow straddles the middle of the view
+                                place_new_element_at_center(&new_elem.pos, arrow_cx - 100.0f, arrow_cy, 0.0f, 0.0f);
+                                place_new_element_at_center(&new_elem.pos2, arrow_cx + 100.0f, arrow_cy, 0.0f, 0.0f);
                             }
                             current_template_data.decorations.push_back(new_elem);
                             selected_deco_index = (int) current_template_data.decorations.size() - 1;

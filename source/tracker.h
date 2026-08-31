@@ -806,6 +806,15 @@ bool tracker_get_current_element_pos(Tracker *t, const char *section, const char
                                      const char *parent_root_name, const char *element,
                                      AnchorPoint anchor, float *out_x, float *out_y);
 
+/**
+ * @brief Gives the manual-layout coordinates at the middle of what the tracker map currently shows.
+ *
+ * Derived from the camera offset and zoom, so it follows panning and zooming. Newly added goals and
+ * decorations use it to land in view instead of at the map origin. Reports false when the tracker
+ * or the window has no usable size yet.
+ */
+bool tracker_get_view_center_world(const Tracker *t, float *out_x, float *out_y);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus

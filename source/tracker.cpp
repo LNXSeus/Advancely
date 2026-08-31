@@ -6658,6 +6658,18 @@ bool tracker_get_current_element_pos(Tracker *t, const char *section, const char
     return true;
 }
 
+bool tracker_get_view_center_world(const Tracker *t, float *out_x, float *out_y) {
+    if (!t || !out_x || !out_y || t->zoom_level <= 0.0f) return false;
+    ImVec2 display_size = ImGui::GetIO().DisplaySize;
+    if (display_size.x <= 0.0f || display_size.y <= 0.0f) return false;
+
+    float center_x = (display_size.x * 0.5f - t->camera_offset.x) / t->zoom_level;
+    float center_y = (display_size.y * 0.5f - t->camera_offset.y) / t->zoom_level;
+    *out_x = fminf(fmaxf(roundf(center_x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+    *out_y = fminf(fmaxf(roundf(center_y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+    return true;
+}
+
 // Initializes an unset ManualPos by reverse-engineering its world position from the registered screen rect.
 static void init_unset_pos_from_screen(ManualPos *pos, float zoom_level, ImVec2 camera_offset) {
     if (pos->is_set) return;
