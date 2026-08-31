@@ -141,7 +141,7 @@ jobs:
           # 2. Use that Homebrew to install the x86_64 dependencies.
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
           # mbedTLS codegen needs these Python modules
           python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake (macOS)
@@ -216,7 +216,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
         run: |
-          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
           # mbedTLS codegen needs these Python modules
           python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake (macOS)
@@ -291,7 +291,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
         run: |
-          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
           # mbedTLS codegen needs these Python modules
           python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake to get version
@@ -375,7 +375,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
         run: |
-          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
           # mbedTLS codegen needs these Python modules
           python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake to get version
