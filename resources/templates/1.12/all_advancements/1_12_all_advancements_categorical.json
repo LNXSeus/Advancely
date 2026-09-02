@@ -218,17 +218,17 @@
 				"jungle_hills":	{
 					"icon":	"ovBiomes/jungle_hills.png"
 				},
-				"savanna":	{
-					"icon":	"ovBiomes/savanna.png"
-				},
-				"savanna_rock":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png"
-				},
 				"extreme_hills":	{
 					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills.png"
 				},
 				"extreme_hills_with_trees":	{
 					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills+.png"
+				},
+				"savanna":	{
+					"icon":	"ovBiomes/savanna.png"
+				},
+				"savanna_rock":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png"
 				},
 				"desert":	{
 					"icon":	"ovBiomes/desert.png"
@@ -409,17 +409,17 @@
 				"cookie":	{
 					"icon":	"items/cookie_1.0.png"
 				},
-				"cooked_cod":	{
-					"icon":	"items/fish_cod_cooked_1.7.2.png"
-				},
 				"raw_cod":	{
 					"icon":	"items/fish_cod_raw_1.11.png"
 				},
-				"cooked_salmon":	{
-					"icon":	"items/fish_salmon_cooked_1.11.png"
+				"cooked_cod":	{
+					"icon":	"items/fish_cod_cooked_1.7.2.png"
 				},
 				"raw_salmon":	{
 					"icon":	"items/fish_salmon_raw_1.11.png"
+				},
+				"cooked_salmon":	{
+					"icon":	"items/fish_salmon_cooked_1.11.png"
 				},
 				"clownfish":	{
 					"icon":	"items/fish_clownfish_raw_1.11.png"
@@ -675,7 +675,7 @@
 	},
 	"stats":	{
 		"hdwgh_summary":	{
-			"icon":	"items/bucket_25w14craftmine.png",
+			"icon":	"items/bucket_1.13.png",
 			"criteria":	{
 				"stat.mineBlock.end_stone":	{
 					"icon":	"monsters/wither.png",
@@ -1037,7 +1037,7 @@
 				}]
 		}, {
 			"root_name":	"overworld",
-			"icon":	"blocks/Grass_Block_JE6_BE5.png",
+			"icon":	"blocks/Grass_Block_JE6_BE5_OLD.png",
 			"linked_goals":	[{
 					"root_name":	"plains",
 					"parent_root":	"minecraft:adventure/adventuring_time",

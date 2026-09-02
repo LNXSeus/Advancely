@@ -116,6 +116,18 @@
 			"criteria":	{
 			}
 		},
+		"minecraft:husbandry/tactical_fishing":	{
+			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
+		"minecraft:husbandry/fishy_business":	{
+			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
 		"minecraft:husbandry/ride_a_boat_with_a_goat":	{
 			"icon":	"items/oak_boat_1.19.png",
 			"groups_enabled":	false,
@@ -148,18 +160,6 @@
 		},
 		"minecraft:adventure/bullseye":	{
 			"icon":	"blocks/Target_JE1_BE1.png",
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
-		"minecraft:husbandry/fishy_business":	{
-			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
-		"minecraft:husbandry/tactical_fishing":	{
-			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
@@ -282,24 +282,6 @@
 				"minecraft:dark_forest":	{
 					"icon":	"ovBiomes/1.21.11+/dark_forest.png"
 				},
-				"minecraft:grove":	{
-					"icon":	"ovBiomes/1.21.11+/grove.png"
-				},
-				"minecraft:snowy_slopes":	{
-					"icon":	"ovBiomes/1.21.11+/snowy_slopes.png"
-				},
-				"minecraft:frozen_peaks":	{
-					"icon":	"ovBiomes/1.21.11+/frozen_peaks.png"
-				},
-				"minecraft:jagged_peaks":	{
-					"icon":	"ovBiomes/1.21.11+/jagged_peaks.png"
-				},
-				"minecraft:stony_peaks":	{
-					"icon":	"ovBiomes/1.21.11+/stony_peaks.png"
-				},
-				"minecraft:meadow":	{
-					"icon":	"ovBiomes/1.21.11+/meadow.png"
-				},
 				"minecraft:frozen_ocean":	{
 					"icon":	"ovBiomes/1.21.11+/frozen_ocean.png"
 				},
@@ -353,6 +335,24 @@
 				},
 				"minecraft:windswept_gravelly_hills":	{
 					"icon":	"ovBiomes/1.21.11+/windswept_gravelly_hills.png"
+				},
+				"minecraft:grove":	{
+					"icon":	"ovBiomes/1.21.11+/grove.png"
+				},
+				"minecraft:snowy_slopes":	{
+					"icon":	"ovBiomes/1.21.11+/snowy_slopes.png"
+				},
+				"minecraft:frozen_peaks":	{
+					"icon":	"ovBiomes/1.21.11+/frozen_peaks.png"
+				},
+				"minecraft:jagged_peaks":	{
+					"icon":	"ovBiomes/1.21.11+/jagged_peaks.png"
+				},
+				"minecraft:stony_peaks":	{
+					"icon":	"ovBiomes/1.21.11+/stony_peaks.png"
+				},
+				"minecraft:meadow":	{
+					"icon":	"ovBiomes/1.21.11+/meadow.png"
 				},
 				"minecraft:taiga":	{
 					"icon":	"ovBiomes/1.21.11+/taiga.png"
@@ -467,14 +467,14 @@
 				"minecraft:skeleton":	{
 					"icon":	"monsters/skeleton.png"
 				},
+				"minecraft:phantom":	{
+					"icon":	"monsters/phantom.png"
+				},
 				"minecraft:creeper":	{
 					"icon":	"monsters/creeper.png"
 				},
 				"minecraft:spider":	{
 					"icon":	"monsters/spider.png"
-				},
-				"minecraft:phantom":	{
-					"icon":	"monsters/phantom.png"
 				},
 				"minecraft:drowned":	{
 					"icon":	"monsters/drowned.png"
@@ -706,9 +706,6 @@
 				"minecraft:cat":	{
 					"icon":	"animals/cat.png"
 				},
-				"minecraft:goat":	{
-					"icon":	"animals/goat.png"
-				},
 				"minecraft:turtle":	{
 					"icon":	"animals/turtle.png"
 				},
@@ -717,6 +714,9 @@
 				},
 				"minecraft:frog":	{
 					"icon":	"animals/frog.png"
+				},
+				"minecraft:goat":	{
+					"icon":	"animals/goat.png"
 				},
 				"minecraft:fox":	{
 					"icon":	"animals/fox.png"
@@ -1344,47 +1344,6 @@
 				}],
 			"linked_goal_mode":	"or"
 		},
-		"stat:bee_nests_picked_up":	{
-			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:bee_nest",
-			"target":	-1,
-			"linked_goals":	[{
-					"root_name":	"minecraft:picked_up/minecraft:bee_nest",
-					"parent_root":	"stat_complete_helper",
-					"type":	"stat"
-				}]
-		},
-		"pufferfish":	{
-			"icon":	"items/pufferfish_25w14craftmine.png",
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:pufferfish",
-			"target":	2,
-			"linked_goals":	[{
-					"root_name":	"brew_potions",
-					"parent_root":	"hdwgh_summary",
-					"type":	"stat"
-				}]
-		},
-		"trident":	{
-			"icon":	"items/trident_1.13.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:trident",
-			"target":	1,
-			"linked_goals":	[{
-					"root_name":	"minecraft:adventure/very_very_frightening"
-				}, {
-					"root_name":	"minecraft:adventure/throw_trident"
-				}]
-		},
-		"shells":	{
-			"icon":	"items/nautilus_shell_25w14craftmine.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-			"target":	8
-		},
 		"fermented":	{
 			"icon":	"items/fermented_spider_eye_3d_shareware_v1.34.png",
 			"hidden":	true,
@@ -1414,6 +1373,17 @@
 			"target":	-1,
 			"linked_goals":	[{
 					"root_name":	"minecraft/picked_up/minecraft:slime_ball",
+					"parent_root":	"stat_complete_helper",
+					"type":	"stat"
+				}]
+		},
+		"stat:bee_nests_picked_up":	{
+			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
+			"in_2nd_row":	true,
+			"root_name":	"minecraft:picked_up/minecraft:bee_nest",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 					"parent_root":	"stat_complete_helper",
 					"type":	"stat"
 				}]
@@ -1615,6 +1585,30 @@
 						}]
 				}
 			}
+		},
+		"underwater_items":	{
+			"icon":	"items/water_bucket_1.20.2.png",
+			"in_2nd_row":	true,
+			"hide_substats_in_row1":	true,
+			"criteria":	{
+				"minecraft:picked_up/minecraft:pufferfish":	{
+					"icon":	"items/pufferfish_25w14craftmine.png",
+					"target":	2
+				},
+				"minecraft:picked_up/minecraft:trident":	{
+					"icon":	"items/trident_1.13.png",
+					"target":	1
+				},
+				"minecraft:picked_up/minecraft:nautilus_shell":	{
+					"icon":	"items/nautilus_shell_25w14craftmine.png",
+					"target":	8,
+					"linked_goals":	[{
+							"root_name":	"minecraft:crafted/minecraft:conduit",
+							"parent_root":	"stat_complete_helper",
+							"type":	"stat"
+						}]
+				}
+			}
 		}
 	},
 	"unlocks":	[],
@@ -1686,7 +1680,7 @@
 				}]
 		}, {
 			"root_name":	"frogs_summary",
-			"icon":	"animals/frog.png",
+			"icon":	"animals/Temperate_Frog_JE1_BE1_unoptimized.gif",
 			"use_stage_icons":	true,
 			"stages":	[{
 					"stage_id":	"1",
@@ -2009,7 +2003,7 @@
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"animals/Temperate_Frog_JE1_BE1_unoptimized.gif",
+					"icon":	"blocks/Verdant_Froglight_(UD)_JE1.png",
 					"type":	"final",
 					"root_name":	""
 				}]
@@ -2317,53 +2311,6 @@
 					"type":	"stat"
 				}]
 		}, {
-			"root_name":	"mountains",
-			"icon":	"blocks/Stone_JE8.png",
-			"linked_goals":	[{
-					"root_name":	"minecraft:husbandry/ride_a_boat_with_a_goat",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:adventure/walk_on_powder_snow_with_leather_boots",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:adventure/play_jukebox_in_meadows",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:husbandry/silk_touch_nest",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:grove",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:snowy_slopes",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:frozen_peaks",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:jagged_peaks",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:stony_peaks",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:meadow",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:goat",
-					"parent_root":	"minecraft:husbandry/bred_all_animals",
-					"type":	"advancement"
-				}, {
-					"root_name":	"stat:bee_nests_picked_up",
-					"type":	"stat"
-				}]
-		}, {
 			"root_name":	"underwater",
 			"icon":	"items/water_bucket_1.20.2.png",
 			"linked_goals":	[{
@@ -2460,15 +2407,6 @@
 					"root_name":	"minecraft:turtle",
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
-				}, {
-					"root_name":	"pufferfish",
-					"type":	"stat"
-				}, {
-					"root_name":	"trident",
-					"type":	"stat"
-				}, {
-					"root_name":	"shells",
-					"type":	"stat"
 				}]
 		}, {
 			"root_name":	"mushroom",
@@ -2529,6 +2467,53 @@
 					"type":	"advancement"
 				}, {
 					"root_name":	"slimeballs",
+					"type":	"stat"
+				}]
+		}, {
+			"root_name":	"mountains",
+			"icon":	"blocks/Stone_JE8.png",
+			"linked_goals":	[{
+					"root_name":	"minecraft:husbandry/ride_a_boat_with_a_goat",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/walk_on_powder_snow_with_leather_boots",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/play_jukebox_in_meadows",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:husbandry/silk_touch_nest",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:grove",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:snowy_slopes",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:frozen_peaks",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:jagged_peaks",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:stony_peaks",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:meadow",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:goat",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"stat:bee_nests_picked_up",
 					"type":	"stat"
 				}]
 		}, {
@@ -2891,10 +2876,6 @@
 				}, {
 					"root_name":	"minecraft:guardian",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"pufferfish",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
 					"root_name":	"suspicious_stew",

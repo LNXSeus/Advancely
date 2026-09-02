@@ -97,14 +97,14 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:husbandry/fishy_business":	{
-			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
+		"minecraft:husbandry/tactical_fishing":	{
+			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
-		"minecraft:husbandry/tactical_fishing":	{
-			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
+		"minecraft:husbandry/fishy_business":	{
+			"icon":	"items/fishing_rod_3d_shareware_v1.34.png",
 			"groups_enabled":	false,
 			"criteria":	{
 			}
@@ -376,14 +376,14 @@
 				"minecraft:skeleton":	{
 					"icon":	"monsters/skeleton.png"
 				},
+				"minecraft:phantom":	{
+					"icon":	"monsters/phantom.png"
+				},
 				"minecraft:creeper":	{
 					"icon":	"monsters/creeper.png"
 				},
 				"minecraft:spider":	{
 					"icon":	"monsters/spider.png"
-				},
-				"minecraft:phantom":	{
-					"icon":	"monsters/phantom.png"
 				},
 				"minecraft:drowned":	{
 					"icon":	"monsters/drowned.png"
@@ -1136,35 +1136,29 @@
 					"type":	"stat"
 				}]
 		},
-		"pufferfish":	{
-			"icon":	"items/pufferfish_25w14craftmine.png",
+		"underwater_items":	{
+			"icon":	"items/water_bucket_1.20.2.png",
 			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:pufferfish",
-			"target":	2,
-			"linked_goals":	[{
-					"root_name":	"brew_potions",
-					"parent_root":	"hdwgh_summary",
-					"type":	"stat"
-				}]
-		},
-		"trident":	{
-			"icon":	"items/trident_1.13.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:trident",
-			"target":	1,
-			"linked_goals":	[{
-					"root_name":	"minecraft:adventure/very_very_frightening"
-				}, {
-					"root_name":	"minecraft:adventure/throw_trident"
-				}]
-		},
-		"shells":	{
-			"icon":	"items/nautilus_shell_25w14craftmine.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-			"target":	8
+			"hide_substats_in_row1":	true,
+			"criteria":	{
+				"minecraft:picked_up/minecraft:pufferfish":	{
+					"icon":	"items/pufferfish_25w14craftmine.png",
+					"target":	2
+				},
+				"minecraft:picked_up/minecraft:trident":	{
+					"icon":	"items/trident_1.13.png",
+					"target":	1
+				},
+				"minecraft:picked_up/minecraft:nautilus_shell":	{
+					"icon":	"items/nautilus_shell_25w14craftmine.png",
+					"target":	8,
+					"linked_goals":	[{
+							"root_name":	"minecraft:crafted/minecraft:conduit",
+							"parent_root":	"stat_complete_helper",
+							"type":	"stat"
+						}]
+				}
+			}
 		},
 		"fermented":	{
 			"icon":	"items/fermented_spider_eye_3d_shareware_v1.34.png",
@@ -1901,11 +1895,7 @@
 					"root_name":	"minecraft:husbandry/tactical_fishing",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:lukewarm_ocean",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:deep_lukewarm_ocean",
+					"root_name":	"minecraft:deep_frozen_ocean",
 					"parent_root":	"minecraft:adventure/adventuring_time",
 					"type":	"advancement"
 				}, {
@@ -1917,7 +1907,11 @@
 					"parent_root":	"minecraft:adventure/adventuring_time",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:deep_frozen_ocean",
+					"root_name":	"minecraft:lukewarm_ocean",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:deep_lukewarm_ocean",
 					"parent_root":	"minecraft:adventure/adventuring_time",
 					"type":	"advancement"
 				}, {
@@ -1933,6 +1927,10 @@
 					"parent_root":	"minecraft:adventure/adventuring_time",
 					"type":	"advancement"
 				}, {
+					"root_name":	"minecraft:river",
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
+				}, {
 					"root_name":	"minecraft:drowned",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
@@ -1941,19 +1939,11 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
 				}, {
-					"root_name":	"cooked_cod",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
-					"type":	"advancement"
-				}, {
 					"root_name":	"cod",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
-					"root_name":	"cooked_salmon",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
-					"type":	"advancement"
-				}, {
-					"root_name":	"salmon",
+					"root_name":	"cooked_cod",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
@@ -1969,22 +1959,32 @@
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
+					"root_name":	"salmon",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"cooked_salmon",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
 					"root_name":	"minecraft:turtle",
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"pufferfish",
+					"root_name":	"underwater_items",
 					"type":	"stat"
 				}, {
-					"root_name":	"trident",
+					"root_name":	"minecraft:picked_up/minecraft:pufferfish",
+					"parent_root":	"underwater_items",
 					"type":	"stat"
 				}, {
-					"root_name":	"shells",
+					"root_name":	"minecraft:picked_up/minecraft:trident",
+					"parent_root":	"underwater_items",
 					"type":	"stat"
 				}, {
-					"root_name":	"minecraft:river",
-					"parent_root":	"minecraft:adventure/adventuring_time",
-					"type":	"advancement"
+					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
+					"parent_root":	"underwater_items",
+					"type":	"stat"
 				}]
 		}, {
 			"root_name":	"mushroom",
@@ -2293,6 +2293,10 @@
 				}, {
 					"root_name":	"stat:gold_blocks_picked_up",
 					"type":	"stat"
+				}, {
+					"root_name":	"minecraft:piglin_brute",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}]
 		}, {
 			"root_name":	"endgame",
@@ -2340,10 +2344,6 @@
 				}, {
 					"root_name":	"minecraft:guardian",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"pufferfish",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
 					"root_name":	"suspicious_stew",
