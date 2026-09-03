@@ -8486,6 +8486,50 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                         icon_tint);
                                 // --- End Icon Scaling and Centering Logic (Child Icon) ---
                             }
+
+                            // Shared-icon badge: when this criterion's icon content is identical to a
+                            // criterion of another goal (crit->is_shared, hash-detected), its parent's
+                            // icon is drawn in the corner of the sub-item box so the two stay tellable
+                            // apart. Mirrors the overlay's shared icon. Capped by the box it sits in.
+                            if (crit->is_shared && settings->tracker_shared_icon_size > 0.0f) {
+                                SDL_Texture *shared_texture_to_draw = nullptr;
+                                if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
+                                    if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
+                                        Uint32 shared_ticks = SDL_GetTicks();
+                                        Uint32 shared_elapsed = shared_ticks % cat->anim_texture->total_duration;
+                                        int shared_frame = 0;
+                                        Uint32 shared_sum = 0;
+                                        for (int frame_idx = 0; frame_idx < cat->anim_texture->frame_count;
+                                             ++frame_idx) {
+                                            shared_sum += cat->anim_texture->delays[frame_idx];
+                                            if (shared_elapsed < shared_sum) {
+                                                shared_frame = frame_idx;
+                                                break;
+                                            }
+                                        }
+                                        shared_texture_to_draw = cat->anim_texture->frames[shared_frame];
+                                    } else {
+                                        shared_texture_to_draw = cat->anim_texture->frames[0];
+                                    }
+                                } else if (cat->texture) {
+                                    shared_texture_to_draw = cat->texture;
+                                }
+
+                                if (shared_texture_to_draw) {
+                                    float shared_size = settings->tracker_shared_icon_size;
+                                    if (shared_size > TRACKER_SUB_ICON_BOX_SIZE)
+                                        shared_size = TRACKER_SUB_ICON_BOX_SIZE;
+                                    ImVec2 s_min = crit_base_pos_screen;
+                                    ImVec2 s_max = ImVec2(s_min.x + shared_size * t->zoom_level,
+                                                          s_min.y + shared_size * t->zoom_level);
+                                    ImU32 shared_tint = tracker_is_faded_by_mode(settings, crit->done)
+                                                            ? icon_tint_faded
+                                                            : IM_COL32_WHITE;
+                                    if (rect_on_screen(s_min, s_max, io.DisplaySize))
+                                        draw_list->AddImage((void *) shared_texture_to_draw, s_min, s_max,
+                                                            ImVec2(0, 0), ImVec2(1, 1), shared_tint);
+                                }
+                            }
                         } else if (!hide_crit_icon_in_layout) {
                             // RENDER SIMPLIFIED SQUARE (Average Color Placeholder)
                             // Since we don't have the exact average color calculated, use a generic color

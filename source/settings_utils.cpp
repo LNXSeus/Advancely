@@ -1117,6 +1117,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE;
     settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
     settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
+    settings->tracker_shared_icon_size = DEFAULT_TRACKER_SHARED_ICON_SIZE;
 
     // UI Theme Colors
     settings->ui_text_color = DEFAULT_UI_TEXT_COLOR;
@@ -1903,6 +1904,18 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
             defaults_were_used = true;
         }
+
+        const cJSON *tracker_shared_json = cJSON_GetObjectItem(visual_settings, "tracker_shared_icon_size");
+        if (tracker_shared_json && cJSON_IsNumber(tracker_shared_json))
+            settings->tracker_shared_icon_size = (float) tracker_shared_json->valuedouble;
+        else {
+            settings->tracker_shared_icon_size = DEFAULT_TRACKER_SHARED_ICON_SIZE;
+            defaults_were_used = true;
+        }
+        if (settings->tracker_shared_icon_size < TRACKER_SHARED_ICON_SIZE_MIN)
+            settings->tracker_shared_icon_size = TRACKER_SHARED_ICON_SIZE_MIN;
+        if (settings->tracker_shared_icon_size > TRACKER_SUB_ICON_BOX_SIZE)
+            settings->tracker_shared_icon_size = TRACKER_SUB_ICON_BOX_SIZE;
 
         // Clamp to valid bounds so the icon box always stays inside the 96x96 background.
         if (settings->adv_icon_size < ADV_ICON_MIN_SIZE) settings->adv_icon_size = ADV_ICON_MIN_SIZE;
@@ -2776,6 +2789,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->adv_icon_size = DEFAULT_ADV_ICON_SIZE;
         settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
         settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
+        settings->tracker_shared_icon_size = DEFAULT_TRACKER_SHARED_ICON_SIZE;
 
         strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
         settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
@@ -3542,6 +3556,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(visuals_obj, "adv_icon_offset_x", cJSON_CreateNumber(settings->adv_icon_offset_x));
         cJSON_DeleteItemFromObject(visuals_obj, "adv_icon_offset_y");
         cJSON_AddItemToObject(visuals_obj, "adv_icon_offset_y", cJSON_CreateNumber(settings->adv_icon_offset_y));
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_shared_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "tracker_shared_icon_size",
+                              cJSON_CreateNumber(settings->tracker_shared_icon_size));
 
         // --- Save Compact mode panel ---
         cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_path");

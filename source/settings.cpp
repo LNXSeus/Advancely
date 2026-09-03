@@ -682,6 +682,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->adv_icon_size != b->adv_icon_size ||
         a->adv_icon_offset_x != b->adv_icon_offset_x ||
         a->adv_icon_offset_y != b->adv_icon_offset_y ||
+        a->tracker_shared_icon_size != b->tracker_shared_icon_size ||
 
         // LOD Settings
         a->lod_text_sub_threshold != b->lod_text_sub_threshold ||
@@ -3505,6 +3506,27 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "The icon always stays inside the %.0fx%.0f background.\n"
                          "Range: 0 - %.0f px (depends on Icon Size). Default: %.0f px.",
                          ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, icon_max_off, DEFAULT_ADV_ICON_OFFSET_Y);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            // Shared Icon Size (parent icon overlaid on a criterion/sub-stat icon)
+            if (ImGui::DragFloat("Shared Icon Size", &temp_settings.tracker_shared_icon_size, 0.5f,
+                                 TRACKER_SHARED_ICON_SIZE_MIN, TRACKER_SUB_ICON_BOX_SIZE, "%.0f px")) {
+                if (temp_settings.tracker_shared_icon_size < TRACKER_SHARED_ICON_SIZE_MIN)
+                    temp_settings.tracker_shared_icon_size = TRACKER_SHARED_ICON_SIZE_MIN;
+                if (temp_settings.tracker_shared_icon_size > TRACKER_SUB_ICON_BOX_SIZE)
+                    temp_settings.tracker_shared_icon_size = TRACKER_SUB_ICON_BOX_SIZE;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Size of the small parent icon drawn on a criterion/sub-stat whose icon is shared\n"
+                         "with a criterion/sub-stat of another goal. It tells overlapping icons apart.\n"
+                         "Drawn in the corner of the %.0fx%.0f sub-item icon box, so it can never exceed it.\n"
+                         "Set it to 0 to hide it.\n"
+                         "Range: %.0f - %.0f px. Default: %.0f px.",
+                         TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SHARED_ICON_SIZE_MIN,
+                         TRACKER_SUB_ICON_BOX_SIZE, DEFAULT_TRACKER_SHARED_ICON_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 

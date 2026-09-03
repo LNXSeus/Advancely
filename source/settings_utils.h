@@ -280,6 +280,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define ADV_ICON_MIN_SIZE 8.0f
 #define ADV_ICON_BG_SIZE 96.0f
 
+// Shared-parent icon overlaid on a criterion/sub-stat icon in the tracker.
+#define DEFAULT_TRACKER_SHARED_ICON_SIZE 20.0f
+#define TRACKER_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the sub-item icon box (TRACKER_SUB_ICON_BOX_SIZE)
+#define TRACKER_SUB_ICON_BOX_SIZE 32.0f // Edge length of the criteria/sub-stat icon box in the tracker
+
 // Compact mode 9-slice counter panel texture (inset / pixel scale / padding live in the
 // "Overlay Compact Mode Settings" block above).
 #define DEFAULT_COMPACT_PANEL_PATH "compact_panel_default.png" // 9-slice panel texture in resources/gui/
@@ -913,6 +918,7 @@ struct AppSettings {
     float adv_icon_size; // Icon box edge length in 96x96 background space (ADV_ICON_MIN_SIZE..ADV_ICON_BG_SIZE)
     float adv_icon_offset_x; // Icon box left offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
     float adv_icon_offset_y; // Icon box top offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
+    float tracker_shared_icon_size; // Shared-parent icon size on a tracker criterion/sub-stat icon (0 hides it)
 
     // --- UI Theme Colors (collapsible section) ---
     ColorRGBA ui_text_color; // Text color for the UI elements.
