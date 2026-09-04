@@ -216,6 +216,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 // Tracker Section Item Width
 #define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
+#define DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING 0.0f // Default extra vertical spacing between criteria/sub-stat rows
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
 #define DEFAULT_TRACKER_SECTION_ITEM_WIDTH 128.0f // Default item width in pixels
 
@@ -880,6 +881,7 @@ struct AppSettings {
     int scrollable_list_threshold; // Number of items before list becomes scrollable
     float tracker_list_scroll_speed; // Configurable speed
     float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally
+    float tracker_criteria_vertical_spacing; // Extra vertical spacing in pixels between criteria/sub-stat rows
     bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section
     float tracker_section_custom_item_width[SECTION_COUNT]; // An array of item widths, one for each section
 

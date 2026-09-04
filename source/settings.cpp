@@ -679,6 +679,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
         a->overlay_clear_fade_time != b->overlay_clear_fade_time ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
+        a->tracker_criteria_vertical_spacing != b->tracker_criteria_vertical_spacing ||
         a->adv_icon_size != b->adv_icon_size ||
         a->adv_icon_offset_x != b->adv_icon_offset_x ||
         a->adv_icon_offset_y != b->adv_icon_offset_y ||
@@ -3190,6 +3191,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Adjusts the vertical gap (in pixels) between rows of items in the tracker window\n"
                          "for all sections. Default: %.1f px",
                          DEFAULT_TRACKER_VERTICAL_SPACING);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            // --- Criteria/Sub-Stat Vertical Spacing ---
+            if (ImGui::DragFloat("Criteria Vertical Spacing", &temp_settings.tracker_criteria_vertical_spacing, 1.0f,
+                                 0.0f, 1024.0f, "%.0f px")) {
+                if (temp_settings.tracker_criteria_vertical_spacing < 0.0f)
+                    temp_settings.tracker_criteria_vertical_spacing = 0.0f;
+                if (temp_settings.tracker_criteria_vertical_spacing > 1024.0f)
+                    temp_settings.tracker_criteria_vertical_spacing = 1024.0f;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[320];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Adds extra vertical gap (in pixels) between the criteria/sub-stat rows listed\n"
+                         "underneath a goal, including inside scrollable lists. Only affects rows that are\n"
+                         "laid out automatically, not manually placed ones. Default: %.1f px",
+                         DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 

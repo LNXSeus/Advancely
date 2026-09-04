@@ -1054,6 +1054,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_clear_fade_time = DEFAULT_OVERLAY_CLEAR_FADE_TIME;
 
     settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+    settings->tracker_criteria_vertical_spacing = DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING;
 
     // Custom Tracker Spacing
     for (int i = 0; i < SECTION_COUNT; i++) {
@@ -1844,6 +1845,17 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->tracker_vertical_spacing = (float) vertical_spacing_json->valuedouble;
         } else {
             settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+            defaults_were_used = true;
+        }
+
+        const cJSON *criteria_vertical_spacing_json = cJSON_GetObjectItem(
+            visual_settings, "tracker_criteria_vertical_spacing");
+        if (criteria_vertical_spacing_json && cJSON_IsNumber(criteria_vertical_spacing_json)) {
+            settings->tracker_criteria_vertical_spacing = (float) criteria_vertical_spacing_json->valuedouble;
+            if (settings->tracker_criteria_vertical_spacing < 0.0f)
+                settings->tracker_criteria_vertical_spacing = 0.0f;
+        } else {
+            settings->tracker_criteria_vertical_spacing = DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING;
             defaults_were_used = true;
         }
 
@@ -2760,6 +2772,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row3_freeze_align = DEFAULT_OVERLAY_ROW_FREEZE_ALIGN;
 
         settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+        settings->tracker_criteria_vertical_spacing = DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING;
 
         settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
         settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
@@ -3539,6 +3552,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_vertical_spacing");
         cJSON_AddItemToObject(visuals_obj, "tracker_vertical_spacing",
                               cJSON_CreateNumber(settings->tracker_vertical_spacing));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_criteria_vertical_spacing");
+        cJSON_AddItemToObject(visuals_obj, "tracker_criteria_vertical_spacing",
+                              cJSON_CreateNumber(settings->tracker_criteria_vertical_spacing));
 
         // --- Save Background Paths ---
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_path");

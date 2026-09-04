@@ -7911,7 +7911,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (has_progress_text) item_height += sub_text_line_height + 4.0f;
 
             bool use_scrolling_list = false;
-            float single_criterion_height = 36.0f; // Height for each criterion row
+            // Height for each criterion row. The configurable spacing only ever adds to the base
+            // row height, so rows can never overlap.
+            float single_criterion_height = 36.0f + fmaxf(0.0f, settings->tracker_criteria_vertical_spacing);
             float criteria_list_height = 0.0f; // The pixel height the list will take up
 
             // ONLY expand parent height based on UNPLACED criteria!
