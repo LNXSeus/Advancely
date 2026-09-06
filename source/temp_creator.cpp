@@ -29,6 +29,7 @@
 #include <map> // For deferred multi-language import (ordered lang key merge)
 #include <unordered_set> // For checking duplicates
 #include <unordered_map>
+#include <memory> // For the undo history's shared template snapshots
 
 #include "tinyfiledialogs.h"
 
@@ -4288,9 +4289,12 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 
 // --------------------------------------- EDITOR UNDO / REDO HISTORY ---------------------------------------
 
-// Which goal each of the editor's lists had selected when a step was committed. An undo that puts a
-// goal back should also put the user in front of it again, so the selection travels with the data.
-// Pointer-based selections are stored by root_name because every step reassigns the vectors.
+// What was selected when a step was committed: the editor's own lists and, while the Visual
+// Layout Editor runs, the elements picked on the map. Selecting is a step in its own right, so
+// an undo can walk back to a selection that was replaced or cleared.
+// Pointer-based selections are stored by root_name because every step reassigns the vectors, and
+// the map selection by the tracker's stable element keys because a reload reallocates every
+// ManualPos it points at.
 struct TcHistorySelection {
     char advancement[192] = "";
     char stat[192] = "";
@@ -4299,12 +4303,34 @@ struct TcHistorySelection {
     int custom_index = -1;
     int counter_index = -1;
     int deco_index = -1;
+    // Sorted by the tracker, so a plain vector comparison answers "same selection?".
+    std::vector<std::string> visual_keys;
+    // False for a step taken with the Visual Layout Editor off. Restoring one of those must leave
+    // the map selection alone instead of clearing a selection the step never knew about.
+    bool visual_active = false;
 };
+
+static bool tc_history_selections_different(const TcHistorySelection &a, const TcHistorySelection &b) {
+    if (strcmp(a.advancement, b.advancement) != 0 ||
+        strcmp(a.stat, b.stat) != 0 ||
+        strcmp(a.ms_goal, b.ms_goal) != 0 ||
+        a.unlock_index != b.unlock_index ||
+        a.custom_index != b.custom_index ||
+        a.counter_index != b.counter_index ||
+        a.deco_index != b.deco_index) {
+        return true;
+    }
+    // The map selection only counts when both steps were taken with the Visual Layout Editor up.
+    // Starting or stopping it is not an edit and must not become a step of its own.
+    return a.visual_active && b.visual_active && a.visual_keys != b.visual_keys;
+}
 
 // One committed step: the whole template, not a diff. Applying a step is then a plain assignment,
 // which is what keeps this independent of the hundreds of places that mutate the editor state.
+// Selecting is a step too, and those leave the template untouched, so consecutive steps share one
+// snapshot instead of each paying for a full copy of a template that can run to several MB.
 struct TcHistoryEntry {
-    EditorTemplate data;
+    std::shared_ptr<const EditorTemplate> data;
     TcHistorySelection selection;
 };
 
@@ -4321,9 +4347,15 @@ static std::string s_history_owner; // Identity of the template/lang/layout the 
 // preview whose reload lands a frame or two later; without the pause that lag can be recorded as a
 // step of its own and the user would need two undos to get anywhere.
 static int s_history_settle_frames = 0;
+// The selection as it looked on the previous settled frame. A selection-only step is committed
+// once the same selection has stood for two of them: the map registers its elements as it draws
+// them, so a rubber-band release only has every picked element identified on the frame after,
+// and committing straight away would leave a half-finished step in front of the real one.
+static TcHistorySelection s_history_last_seen_selection;
 
-// Approximate heap footprint of one step. Only used to decide when to drop the oldest ones, so the
-// vector capacities are enough and the fixed-size char members come along in sizeof().
+// Approximate heap footprint of one step's template. Only used to decide when to drop the oldest
+// ones, so the vector capacities are enough and the fixed-size char members come along in
+// sizeof(). The selection's keys are a rounding error next to the template and are ignored.
 static size_t tc_history_entry_bytes(const EditorTemplate &d) {
     auto linked_bytes = [](const std::vector<EditorCounterLinkedGoal> &v) {
         return v.capacity() * sizeof(EditorCounterLinkedGoal);
@@ -4358,6 +4390,19 @@ static size_t tc_history_entry_bytes(const EditorTemplate &d) {
     return bytes;
 }
 
+// What the whole history costs. Snapshots shared by several steps are counted once, which is the
+// point of sharing them: a run of selection steps must not look like a run of full templates.
+static size_t tc_history_total_bytes() {
+    std::unordered_set<const EditorTemplate *> counted;
+    size_t total = 0;
+    for (const auto &entry: s_history) {
+        if (entry.data && counted.insert(entry.data.get()).second) {
+            total += tc_history_entry_bytes(*entry.data);
+        }
+    }
+    return total;
+}
+
 // Drops the oldest steps once either cap is exceeded. Never touches anything at or after the current
 // step, so trimming can shorten the undo reach but never the redo reach.
 static void tc_history_trim() {
@@ -4365,10 +4410,8 @@ static void tc_history_trim() {
         s_history.erase(s_history.begin());
         s_history_index--;
     }
-    size_t total = 0;
-    for (const auto &entry: s_history) total += tc_history_entry_bytes(entry.data);
-    while (total > TC_HISTORY_MAX_BYTES && (int) s_history.size() > TC_HISTORY_MIN_STEPS && s_history_index > 0) {
-        total -= tc_history_entry_bytes(s_history.front().data);
+    while (tc_history_total_bytes() > TC_HISTORY_MAX_BYTES &&
+           (int) s_history.size() > TC_HISTORY_MIN_STEPS && s_history_index > 0) {
         s_history.erase(s_history.begin());
         s_history_index--;
     }
@@ -5209,6 +5252,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         sel.custom_index = selected_custom_index;
         sel.counter_index = selected_counter_index;
         sel.deco_index = selected_deco_index;
+        if (t && t->is_visual_layout_editing) {
+            sel.visual_active = true;
+            tracker_get_visual_selection_keys(sel.visual_keys);
+        }
         return sel;
     };
 
@@ -5228,6 +5275,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         selected_deco_index = (sel.deco_index < (int) current_template_data.decorations.size())
                                   ? sel.deco_index
                                   : -1;
+        // The map only takes a selection back when both the step and the present know about it.
+        // Keys whose goal no longer exists are dropped by the tracker.
+        if (t && t->is_visual_layout_editing && sel.visual_active) {
+            tracker_restore_visual_selection_keys(sel.visual_keys);
+        }
     };
 
     // The steps belong to one template in one language and layout. Opening another one (or leaving
@@ -5241,9 +5293,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_history.clear();
         s_history_index = -1;
         s_history_settle_frames = 0;
+        s_history_last_seen_selection = TcHistorySelection{};
         s_history_owner = history_owner;
         if (editing_template) {
-            s_history.push_back({current_template_data, history_capture_selection()});
+            s_history.push_back({
+                std::make_shared<const EditorTemplate>(current_template_data),
+                history_capture_selection()
+            });
             s_history_index = 0;
         }
     }
@@ -5255,26 +5311,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             bool settled = !ImGui::IsAnyItemActive() &&
                            !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
                            !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
-                           !(t && t->visual_layout_just_dragged);
-            if (settled && are_editor_templates_different(current_template_data, s_history[s_history_index].data)) {
-                // A new change after an undo is the point of no return for whatever was ahead.
-                s_history.resize(s_history_index + 1);
-                s_history.push_back({current_template_data, history_capture_selection()});
-                s_history_index = (int) s_history.size() - 1;
-                tc_history_trim();
+                           !(t && t->visual_layout_just_dragged) &&
+                           // A map selection waiting to be matched to freshly reloaded elements reads
+                           // as empty for a frame or two. Recording that would put a bogus
+                           // "selection cleared" step in front of the real one. Only the running
+                           // Visual Layout Editor ever answers such a request, so outside it the
+                           // wait would never end.
+                           !(t && t->is_visual_layout_editing && tracker_visual_selection_is_settling());
+            if (settled) {
+                TcHistorySelection live_selection = history_capture_selection();
+                const TcHistoryEntry &current_step = s_history[s_history_index];
+                bool data_changed = are_editor_templates_different(current_template_data,
+                                                                  *current_step.data);
+                bool selection_changed = tc_history_selections_different(live_selection,
+                                                                        current_step.selection);
+                // An edit is committed as soon as it settles; a bare selection change has to hold
+                // still for one more frame first (see s_history_last_seen_selection).
+                bool selection_held = !tc_history_selections_different(live_selection,
+                                                                      s_history_last_seen_selection);
+                if (data_changed || (selection_changed && selection_held)) {
+                    // A selection-only step keeps pointing at the snapshot it was taken from.
+                    std::shared_ptr<const EditorTemplate> snapshot =
+                            data_changed
+                                ? std::make_shared<const EditorTemplate>(current_template_data)
+                                : current_step.data;
+                    // A new change after an undo is the point of no return for whatever was ahead.
+                    s_history.resize(s_history_index + 1);
+                    s_history.push_back({snapshot, live_selection});
+                    s_history_index = (int) s_history.size() - 1;
+                    tc_history_trim();
+                }
+                s_history_last_seen_selection = live_selection;
             }
         }
     }
 
     auto history_apply_step = [&](int new_index) {
         if (new_index < 0 || new_index >= (int) s_history.size()) return;
-        bool data_changed = are_editor_templates_different(current_template_data, s_history[new_index].data);
+        const TcHistoryEntry &step = s_history[new_index];
+        bool data_changed = are_editor_templates_different(current_template_data, *step.data);
         s_history_index = new_index;
-        current_template_data = s_history[new_index].data;
-        history_restore_selection(s_history[new_index].selection);
-        save_message_type = MSG_NONE;
-        status_message[0] = '\0';
-        s_visual_edit_message[0] = '\0'; // The visibility change it reported may be the one undone
+        // Assigned even when the comparison says nothing moved: the step is the authority on what the
+        // template looked like, and a field the comparison happens not to cover must not survive it.
+        current_template_data = *step.data;
+        history_restore_selection(step.selection);
+        if (data_changed) {
+            // A step that only moved the selection leaves the save result standing: it is still
+            // an accurate report of what is on disk.
+            save_message_type = MSG_NONE;
+            status_message[0] = '\0';
+            s_visual_edit_message[0] = '\0'; // The visibility change it reported may be the one undone
+        }
 
         // Coordinates reach the map through the reverse sync that runs every frame anyway; goals
         // appearing or vanishing only get there through a fresh preview.
@@ -5312,8 +5399,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Save (Ctrl+S / Cmd+S by default, rebindable in Settings > Hotkeys)
-    if (t && t->editor_save_pressed && t->is_temp_creator_focused && editing_template) {
+    // Save (Ctrl+S / Cmd+S by default, rebindable in Settings > Hotkeys). Like undo and redo it
+    // also answers while the map has focus, so a layout can be saved without clicking back into
+    // the editor window.
+    if (t && t->editor_save_pressed && editor_hotkey_target && editing_template) {
         // Finalize any active field first (its deactivation callback runs this frame), then save
         // next frame so pending rename propagation lands before the saved snapshot is taken.
         ImGui::ClearActiveID();
@@ -7548,7 +7637,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char undo_tooltip_buffer[512];
             snprintf(undo_tooltip_buffer, sizeof(undo_tooltip_buffer),
                      "Take back the last change made here or on the map (Ctrl+Z / Cmd+Z).\n"
-                     "A whole typing run and a whole drag each count as one step.\n"
+                     "A whole typing run and a whole drag each count as one step, and\n"
+                     "selecting something is a step of its own.\n"
                      "%d step%s left to undo.",
                      history_undo_steps, history_undo_steps == 1 ? "" : "s");
             ImGui::SetTooltip("%s", undo_tooltip_buffer);

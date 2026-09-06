@@ -537,9 +537,10 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Moves the selection one entry up in the list of the open tab, following the search\n" \
       "filter and stopping at the first entry. Holding repeats.") \
     X(APP_HOTKEY_EDITOR_SAVE, "editor_save", "S", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
+      APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_EDITOR, \
       "Save Template", \
       "Saves the template open in the editor, like the \"Save\" button.\n" \
+      "Also fires while the Visual Layout Editor has the map focused.\n" \
       "Pressing Enter with the editor focused saves as well and is not configurable.") \
     X(APP_HOTKEY_EDITOR_UNDO, "editor_undo", "Z", HOTKEY_MOD_CTRL, \
       APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_EDITOR, \

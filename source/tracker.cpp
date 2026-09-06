@@ -119,11 +119,26 @@ static bool s_visual_clear_selection_requested = false;
 // first frame after it.
 static std::unordered_set<std::string> s_visual_selected_keys_pending;
 static bool s_visual_remap_after_reload = false;
+// Set when the template editor's Undo asked for a specific selection rather than for the current
+// one to be carried across a reload. It makes the pending keys authoritative: the capture below
+// would otherwise overwrite them with the selection that is being undone.
+static bool s_visual_selection_restore_requested = false;
+// Keys of the currently selected elements, rebuilt once per frame while layout editing. Kept here
+// rather than derived on demand because s_visual_layout_items is only complete at that one point
+// in the frame, and the editor reads the selection from its own place in the loop.
+static std::vector<std::string> s_visual_selected_keys_current;
 
 // Captures the stable keys of the currently selected items so the selection can be restored after a
 // template reload reallocates the underlying ManualPos objects. Must run BEFORE the old template data
 // is freed; only reads pointer values (no dereference), so the soon-to-be-freed pointers are safe.
 static void tracker_capture_visual_selection_for_reload(void) {
+    // An Undo already said which selection this reload should land on, and that one is newer than
+    // what is on screen right now. The reservation is spent here so a later reload can never be
+    // hijacked by a request the map never got round to answering.
+    if (s_visual_selection_restore_requested) {
+        s_visual_selection_restore_requested = false;
+        return;
+    }
     s_visual_selected_keys_pending.clear();
     s_visual_remap_after_reload = false;
     if (s_visual_selected_items.empty()) return;
@@ -166,6 +181,22 @@ void tracker_clear_visual_edit_request(void) {
 
 void tracker_request_clear_visual_selection(void) {
     s_visual_clear_selection_requested = true;
+}
+
+void tracker_get_visual_selection_keys(std::vector<std::string> &out) {
+    out = s_visual_selected_keys_current;
+}
+
+void tracker_restore_visual_selection_keys(const std::vector<std::string> &keys) {
+    s_visual_selected_keys_pending.clear();
+    s_visual_selected_keys_pending.insert(keys.begin(), keys.end());
+    // Unconditionally, empty list included: selecting nothing is a state Undo has to reach.
+    s_visual_remap_after_reload = true;
+    s_visual_selection_restore_requested = true;
+}
+
+bool tracker_visual_selection_is_settling(void) {
+    return s_visual_remap_after_reload || s_visual_selection_restore_requested;
 }
 
 // Goals the template editor asked to be selected, waiting for the frame in which they exist on the
@@ -12119,6 +12150,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
             s_visual_selected_keys_pending.clear();
             s_visual_remap_after_reload = false;
+            s_visual_selection_restore_requested = false;
         }
 
         // A Copy asked for its duplicates to be selected. They exist as soon as the map has reloaded,
@@ -12148,9 +12180,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
         }
 
-        // Draw highlight around selected items
+        // Draw highlight around selected items, and collect their stable keys on the way: this is
+        // the one point in the frame where s_visual_layout_items is complete, and the template
+        // editor's undo history needs the selection in a form that survives a reload.
+        s_visual_selected_keys_current.clear();
         for (const auto &item: s_visual_layout_items) {
             if (s_visual_selected_items.count(item.pos) > 0) {
+                if (!item.key.empty()) s_visual_selected_keys_current.push_back(item.key);
                 ImVec2 p_min = item.screen_pos;
                 ImVec2 p_max = ImVec2(p_min.x + item.size.x, p_min.y + item.size.y);
                 sel_draw_list->AddRect(p_min, p_max,
@@ -12159,6 +12195,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                        2.0f, 0, 2.0f);
             }
         }
+        // Sorted so two captures of the same selection compare equal, which is what lets the
+        // history tell a real selection change from the map merely re-registering its items.
+        std::sort(s_visual_selected_keys_current.begin(), s_visual_selected_keys_current.end());
 
         // Keyboard movement collected by the event handler this frame (nudge and move hotkeys).
         // Goal hotkeys are already gated off in layout editing, so bound keys won't double-fire.

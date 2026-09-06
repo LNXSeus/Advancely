@@ -29,6 +29,11 @@
 #include "ipc_data.h" // For SharedData
 
 #ifdef __cplusplus
+#include <string>
+#include <vector>  // Both used by the visual-selection key API below
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
@@ -728,6 +733,37 @@ const CounterLinkedGoal *tracker_get_visual_selected_goals(void);
 
 // Requests the tracker to clear its visual selection on the next frame.
 void tracker_request_clear_visual_selection(void);
+
+// --- Visual Layout Editor selection <-> Template Editor undo history ---
+// The map selection is part of what the editor's Undo takes back, so it has to be readable as
+// something that outlives a template reload. These use the same stable element keys the tracker
+// already keeps for that purpose (goal type, parent, root name and element, e.g. an
+// advancement's Icon vs its Text).
+
+/**
+ * @brief Fills @p out with the stable key of every currently selected element, sorted.
+ *
+ * Sorted so two captures of the same selection compare equal. Only meaningful while the Visual
+ * Layout Editor is running; comes back empty otherwise.
+ */
+void tracker_get_visual_selection_keys(std::vector<std::string> &out);
+
+/**
+ * @brief Selects exactly the elements carrying these keys, as soon as they exist on the map.
+ *
+ * An empty list is a real request to select nothing, which is how Undo gets back to a cleared
+ * selection. The request survives a template reload triggered in the same breath (the reload's
+ * own selection capture stands down for it), and keys with no element on the map are dropped.
+ */
+void tracker_restore_visual_selection_keys(const std::vector<std::string> &keys);
+
+/**
+ * @brief True while a selection is waiting to be matched to the map's elements.
+ *
+ * The editor's undo history uses this to hold off recording: during those frames the selection
+ * is momentarily empty, which would otherwise be committed as a step of its own.
+ */
+bool tracker_visual_selection_is_settling(void);
 
 // --- Visual Layout Editor -> Template Editor edit requests ---
 // A hotkey pressed on the map can ask the template editor to change the selection, because the
