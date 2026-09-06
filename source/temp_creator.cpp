@@ -4286,6 +4286,94 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     ImGui::PopID();
 }
 
+// --------------------------------------- EDITOR UNDO / REDO HISTORY ---------------------------------------
+
+// Which goal each of the editor's lists had selected when a step was committed. An undo that puts a
+// goal back should also put the user in front of it again, so the selection travels with the data.
+// Pointer-based selections are stored by root_name because every step reassigns the vectors.
+struct TcHistorySelection {
+    char advancement[192] = "";
+    char stat[192] = "";
+    char ms_goal[192] = "";
+    int unlock_index = -1;
+    int custom_index = -1;
+    int counter_index = -1;
+    int deco_index = -1;
+};
+
+// One committed step: the whole template, not a diff. Applying a step is then a plain assignment,
+// which is what keeps this independent of the hundreds of places that mutate the editor state.
+struct TcHistoryEntry {
+    EditorTemplate data;
+    TcHistorySelection selection;
+};
+
+// Whole-template steps cost a few MB each on the big all_advancements templates, so the list is
+// capped by a step count and by a rough byte budget, whichever bites first.
+static constexpr int TC_HISTORY_MAX_STEPS = 100;
+static constexpr int TC_HISTORY_MIN_STEPS = 5;
+static constexpr size_t TC_HISTORY_MAX_BYTES = 128u * 1024u * 1024u;
+
+static std::vector<TcHistoryEntry> s_history;
+static int s_history_index = -1; // s_history[s_history_index] always mirrors the live editor state
+static std::string s_history_owner; // Identity of the template/lang/layout the steps belong to
+// Frames to wait after applying a step before recording again. Applying one hands the tracker a new
+// preview whose reload lands a frame or two later; without the pause that lag can be recorded as a
+// step of its own and the user would need two undos to get anywhere.
+static int s_history_settle_frames = 0;
+
+// Approximate heap footprint of one step. Only used to decide when to drop the oldest ones, so the
+// vector capacities are enough and the fixed-size char members come along in sizeof().
+static size_t tc_history_entry_bytes(const EditorTemplate &d) {
+    auto linked_bytes = [](const std::vector<EditorCounterLinkedGoal> &v) {
+        return v.capacity() * sizeof(EditorCounterLinkedGoal);
+    };
+    auto category_bytes = [&](const std::vector<EditorTrackableCategory> &v) {
+        size_t b = v.capacity() * sizeof(EditorTrackableCategory);
+        for (const auto &category: v) {
+            b += category.criteria.capacity() * sizeof(EditorTrackableItem);
+            b += linked_bytes(category.linked_goals);
+            for (const auto &criterion: category.criteria) b += linked_bytes(criterion.linked_goals);
+        }
+        return b;
+    };
+    auto item_bytes = [&](const std::vector<EditorTrackableItem> &v) {
+        size_t b = v.capacity() * sizeof(EditorTrackableItem);
+        for (const auto &item: v) b += linked_bytes(item.linked_goals);
+        return b;
+    };
+
+    size_t bytes = sizeof(TcHistoryEntry);
+    bytes += category_bytes(d.advancements) + category_bytes(d.stats);
+    bytes += item_bytes(d.unlocks) + item_bytes(d.custom_goals);
+    bytes += d.multi_stage_goals.capacity() * sizeof(EditorMultiStageGoal);
+    for (const auto &goal: d.multi_stage_goals) {
+        bytes += goal.stages.capacity() * sizeof(EditorSubGoal);
+        for (const auto &stage: goal.stages) bytes += linked_bytes(stage.linked_goals);
+    }
+    bytes += d.counter_goals.capacity() * sizeof(EditorCounterGoal);
+    for (const auto &goal: d.counter_goals) bytes += linked_bytes(goal.linked_goals);
+    bytes += d.decorations.capacity() * sizeof(EditorDecorationElement);
+    for (const auto &deco: d.decorations) bytes += linked_bytes(deco.linked_goals);
+    return bytes;
+}
+
+// Drops the oldest steps once either cap is exceeded. Never touches anything at or after the current
+// step, so trimming can shorten the undo reach but never the redo reach.
+static void tc_history_trim() {
+    while ((int) s_history.size() > TC_HISTORY_MAX_STEPS && s_history_index > 0) {
+        s_history.erase(s_history.begin());
+        s_history_index--;
+    }
+    size_t total = 0;
+    for (const auto &entry: s_history) total += tc_history_entry_bytes(entry.data);
+    while (total > TC_HISTORY_MAX_BYTES && (int) s_history.size() > TC_HISTORY_MIN_STEPS && s_history_index > 0) {
+        total -= tc_history_entry_bytes(s_history.front().data);
+        s_history.erase(s_history.begin());
+        s_history_index--;
+    }
+}
+
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
@@ -5106,39 +5194,111 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         focus_tc_search_box = true;
     }
 
-    // Revert changes (Ctrl+Z / Cmd+Z by default, rebindable in Settings > Hotkeys)
-    if (t && t->editor_revert_pressed && t->is_temp_creator_focused && editor_has_unsaved_changes) {
-        // Capture the current selection by root_name before the copy-assignment below
-        // invalidates the pointers, so the same goal stays open after reverting.
-        char prev_adv[192] = "", prev_stat[192] = "", prev_ms[192] = "";
-        if (selected_advancement) strncpy(prev_adv, selected_advancement->root_name, sizeof(prev_adv) - 1);
-        if (selected_stat) strncpy(prev_stat, selected_stat->root_name, sizeof(prev_stat) - 1);
-        if (selected_ms_goal) strncpy(prev_ms, selected_ms_goal->root_name, sizeof(prev_ms) - 1);
+    // --- UNDO / REDO ---
+    // The editor is immediate-mode: hundreds of widgets write straight into current_template_data,
+    // so instead of every one of them reporting what it changed, a step is committed whenever the
+    // template settles - no widget active, no mouse button held. That folds a whole typing run and
+    // a whole map drag into one step each, which is what Ctrl+Z is expected to take back.
+    auto history_capture_selection = [&]() {
+        TcHistorySelection sel;
+        if (selected_advancement)
+            snprintf(sel.advancement, sizeof(sel.advancement), "%s", selected_advancement->root_name);
+        if (selected_stat) snprintf(sel.stat, sizeof(sel.stat), "%s", selected_stat->root_name);
+        if (selected_ms_goal) snprintf(sel.ms_goal, sizeof(sel.ms_goal), "%s", selected_ms_goal->root_name);
+        sel.unlock_index = selected_unlock_index;
+        sel.custom_index = selected_custom_index;
+        sel.counter_index = selected_counter_index;
+        sel.deco_index = selected_deco_index;
+        return sel;
+    };
 
-        current_template_data = saved_template_data;
+    auto history_restore_selection = [&](const TcHistorySelection &sel) {
+        reselect_after_revert(sel.advancement, sel.stat, sel.ms_goal);
+        // The step may predate a deletion, so an index that no longer exists drops the selection
+        // instead of pointing past the end of the list.
+        selected_unlock_index = (sel.unlock_index < (int) current_template_data.unlocks.size())
+                                    ? sel.unlock_index
+                                    : -1;
+        selected_custom_index = (sel.custom_index < (int) current_template_data.custom_goals.size())
+                                    ? sel.custom_index
+                                    : -1;
+        selected_counter_index = (sel.counter_index < (int) current_template_data.counter_goals.size())
+                                     ? sel.counter_index
+                                     : -1;
+        selected_deco_index = (sel.deco_index < (int) current_template_data.decorations.size())
+                                  ? sel.deco_index
+                                  : -1;
+    };
+
+    // The steps belong to one template in one language and layout. Opening another one (or leaving
+    // the editor) starts over, so a single identity check here covers every entry and exit path.
+    std::string history_owner;
+    if (editing_template) {
+        history_owner = std::string(creator_version_str) + "|" + selected_template_info.category + "|" +
+                        selected_template_info.optional_flag + "|" + selected_lang_flag + "|" + selected_layout_flag;
+    }
+    if (history_owner != s_history_owner) {
+        s_history.clear();
+        s_history_index = -1;
+        s_history_settle_frames = 0;
+        s_history_owner = history_owner;
+        if (editing_template) {
+            s_history.push_back({current_template_data, history_capture_selection()});
+            s_history_index = 0;
+        }
+    }
+
+    if (editing_template && s_history_index >= 0) {
+        if (s_history_settle_frames > 0) {
+            s_history_settle_frames--;
+        } else {
+            bool settled = !ImGui::IsAnyItemActive() &&
+                           !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                           !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
+                           !(t && t->visual_layout_just_dragged);
+            if (settled && are_editor_templates_different(current_template_data, s_history[s_history_index].data)) {
+                // A new change after an undo is the point of no return for whatever was ahead.
+                s_history.resize(s_history_index + 1);
+                s_history.push_back({current_template_data, history_capture_selection()});
+                s_history_index = (int) s_history.size() - 1;
+                tc_history_trim();
+            }
+        }
+    }
+
+    auto history_apply_step = [&](int new_index) {
+        if (new_index < 0 || new_index >= (int) s_history.size()) return;
+        bool data_changed = are_editor_templates_different(current_template_data, s_history[new_index].data);
+        s_history_index = new_index;
+        current_template_data = s_history[new_index].data;
+        history_restore_selection(s_history[new_index].selection);
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
-        s_visual_edit_message[0] = '\0'; // The reverted visibility changes are gone with it
-        s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
+        s_visual_edit_message[0] = '\0'; // The visibility change it reported may be the one undone
 
-        // Reloading template on revert changes -> matters for visual editor mode
-        bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                   strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                   strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
-        // The editor is back on the last saved state, which is what the files hold, so any preview of
-        // unsaved goals goes with it.
-        tc_drop_live_template_preview(!is_active_template);
-        if (is_active_template) {
-            SDL_SetAtomicInt(&g_settings_changed, 1);
+        // Coordinates reach the map through the reverse sync that runs every frame anyway; goals
+        // appearing or vanishing only get there through a fresh preview.
+        if (data_changed && t && t->is_visual_layout_editing) {
+            tc_push_live_template_preview(creator_version_str, selected_template_info,
+                                          selected_lang_flag, selected_layout_flag, current_template_data);
         }
-        if (is_editor_template_empty(saved_template_data)) {
-            editing_template = false;
-            selected_advancement = nullptr;
-            selected_stat = nullptr;
-            selected_ms_goal = nullptr;
-        } else {
-            reselect_after_revert(prev_adv, prev_stat, prev_ms);
-        }
+        s_history_settle_frames = 6;
+    };
+
+    int history_undo_steps = (editing_template && s_history_index > 0) ? s_history_index : 0;
+    int history_redo_steps = (editing_template && s_history_index >= 0)
+                                 ? (int) s_history.size() - 1 - s_history_index
+                                 : 0;
+    bool history_can_undo = history_undo_steps > 0;
+    bool history_can_redo = history_redo_steps > 0;
+
+    // Undo / Redo (Ctrl+Z and Ctrl+Y by default, rebindable in Settings > Hotkeys). Both also fire
+    // while the map has focus, because the Visual Layout Editor edits this same template copy.
+    bool editor_hotkey_target = t && (t->is_temp_creator_focused || t->is_visual_layout_editing);
+    if (t && t->editor_undo_pressed && editor_hotkey_target && history_can_undo) {
+        history_apply_step(s_history_index - 1);
+    } else if (t && t->editor_redo_pressed && editor_hotkey_target && history_can_redo) {
+        history_apply_step(s_history_index + 1);
     }
 
     // Run a save that was deferred last frame so the just-finalized field's deactivation callbacks
@@ -7375,6 +7535,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", save_template_tooltip_buffer);
         }
 
+        // Undo / Redo walk the editor's own step history, which is why they sit next to Save rather
+        // than next to "Revert Changes": that one is not a step, it drops everything since the save.
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!history_can_undo);
+        if (ImGui::Button("Undo") && history_can_undo) {
+            ImGui::ClearActiveID();
+            history_apply_step(s_history_index - 1);
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char undo_tooltip_buffer[512];
+            snprintf(undo_tooltip_buffer, sizeof(undo_tooltip_buffer),
+                     "Take back the last change made here or on the map (Ctrl+Z / Cmd+Z).\n"
+                     "A whole typing run and a whole drag each count as one step.\n"
+                     "%d step%s left to undo.",
+                     history_undo_steps, history_undo_steps == 1 ? "" : "s");
+            ImGui::SetTooltip("%s", undo_tooltip_buffer);
+        }
+
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!history_can_redo);
+        if (ImGui::Button("Redo") && history_can_redo) {
+            ImGui::ClearActiveID();
+            history_apply_step(s_history_index + 1);
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char redo_tooltip_buffer[512];
+            snprintf(redo_tooltip_buffer, sizeof(redo_tooltip_buffer),
+                     "Re-apply the step \"Undo\" took back (Ctrl+Y / Cmd+Y).\n"
+                     "Making a new change after undoing drops everything that was still ahead.\n"
+                     "%d step%s left to redo.",
+                     history_redo_steps, history_redo_steps == 1 ? "" : "s");
+            ImGui::SetTooltip("%s", redo_tooltip_buffer);
+        }
+
         // Calculate the unsaved changes flag on-the-fly each frame
         bool editor_has_unsaved_changes = are_editor_templates_different(current_template_data, saved_template_data);
 
@@ -7424,7 +7620,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 char revert_changes_tooltip_buffer[1024];
                 snprintf(revert_changes_tooltip_buffer, sizeof(revert_changes_tooltip_buffer),
                          "Discard all unsaved changes and reload from the last saved state.\n"
-                         "(Ctrl+Z / Cmd+Z)");
+                         "This is not a single step: it drops everything made since the last save.\n"
+                         "\"Undo\" takes it back like any other change.");
                 ImGui::SetTooltip("%s", revert_changes_tooltip_buffer);
             }
         }

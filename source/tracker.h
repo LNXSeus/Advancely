@@ -149,7 +149,8 @@ struct Tracker {
     // Save/apply/revert hotkeys, consumed by whichever window owns them. They are cleared at the
     // start of every event poll, so one that nobody picks up cannot fire a frame later.
     bool editor_save_pressed;
-    bool editor_revert_pressed;
+    bool editor_undo_pressed;
+    bool editor_redo_pressed;
     bool settings_apply_pressed;
     bool settings_revert_pressed;
     // Template editor list navigation, consumed by the tab that is open.

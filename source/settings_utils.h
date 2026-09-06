@@ -541,11 +541,18 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Save Template", \
       "Saves the template open in the editor, like the \"Save\" button.\n" \
       "Pressing Enter with the editor focused saves as well and is not configurable.") \
-    X(APP_HOTKEY_EDITOR_REVERT, "editor_revert", "Z", HOTKEY_MOD_CTRL, \
-      APP_HOTKEY_CTX_EDITOR, APP_HOTKEY_GROUP_EDITOR, \
-      "Revert Changes", \
-      "Discards the editor's unsaved changes and reloads the last saved state,\n" \
-      "like the \"Revert Changes\" button.") \
+    X(APP_HOTKEY_EDITOR_UNDO, "editor_undo", "Z", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_EDITOR, \
+      "Undo Editor Step", \
+      "Takes back the last change made in the template editor, like the \"Undo\" button.\n" \
+      "A whole typing run and a whole drag each count as one step.\n" \
+      "Also fires while the Visual Layout Editor has the map focused.") \
+    X(APP_HOTKEY_EDITOR_REDO, "editor_redo", "Y", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_EDITOR, \
+      "Redo Editor Step", \
+      "Re-applies the step that \"Undo\" took back, like the \"Redo\" button.\n" \
+      "Making a new change after undoing drops everything that was still ahead.\n" \
+      "Also fires while the Visual Layout Editor has the map focused.") \
     X(APP_HOTKEY_NUDGE_LEFT, "nudge_left", "Left", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
       "Nudge Selection Left (1 px)", "Moves every selected element one pixel to the left. Holding repeats.") \

@@ -167,7 +167,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
     // a window that only opens later.
     if (t) {
         t->editor_save_pressed = false;
-        t->editor_revert_pressed = false;
+        t->editor_undo_pressed = false;
+        t->editor_redo_pressed = false;
         t->settings_apply_pressed = false;
         t->settings_revert_pressed = false;
         t->editor_next_goal_pressed = false;
@@ -325,14 +326,17 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             SDL_Keycode key = event.key.key;
             Uint16 app_mods = hotkey_mods_from_sdl(event.key.mod);
 
-            // Save, apply and revert. Which window acts on them is decided where they are consumed,
-            // by the same focus and enabled checks the buttons themselves use.
+            // Save, apply, revert, undo and redo. Which window acts on them is decided where they
+            // are consumed, by the same focus and enabled checks the buttons themselves use.
             if (event.key.repeat == 0) {
                 if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_SAVE, key, app_mods)) {
                     t->editor_save_pressed = true;
                 }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_REVERT, key, app_mods)) {
-                    t->editor_revert_pressed = true;
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_UNDO, key, app_mods)) {
+                    t->editor_undo_pressed = true;
+                }
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_REDO, key, app_mods)) {
+                    t->editor_redo_pressed = true;
                 }
                 if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_APPLY, key, app_mods)) {
                     t->settings_apply_pressed = true;
