@@ -5259,7 +5259,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         return sel;
     };
 
-    auto history_restore_selection = [&](const TcHistorySelection &sel) {
+    auto history_restore_selection = [&](const TcHistorySelection &sel, const TcHistorySelection &previous) {
         reselect_after_revert(sel.advancement, sel.stat, sel.ms_goal);
         // The step may predate a deletion, so an index that no longer exists drops the selection
         // instead of pointing past the end of the list.
@@ -5279,6 +5279,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Keys whose goal no longer exists are dropped by the tracker.
         if (t && t->is_visual_layout_editing && sel.visual_active) {
             tracker_restore_visual_selection_keys(sel.visual_keys);
+        }
+
+        // Open the tab that owns whatever this step moved, and scroll its list to it. Which tab is
+        // open is not part of a step, so without this a selection restored onto another tab would
+        // land behind the one the user is looking at and the undo would read as having done
+        // nothing - which is how people end up pressing Ctrl+Z again and losing a real edit.
+        const char *scroll_to_root = nullptr;
+        auto index_root = [](const auto &list, int index, auto member) -> const char * {
+            if (index < 0 || index >= (int) list.size()) return nullptr;
+            return list[index].*member;
+        };
+        if (strcmp(sel.advancement, previous.advancement) != 0) {
+            force_select_tab = FORCE_TAB_ADVANCEMENTS;
+            scroll_to_root = sel.advancement;
+        } else if (strcmp(sel.stat, previous.stat) != 0) {
+            force_select_tab = FORCE_TAB_STATS;
+            scroll_to_root = sel.stat;
+        } else if (strcmp(sel.ms_goal, previous.ms_goal) != 0) {
+            force_select_tab = FORCE_TAB_MULTISTAGE;
+            scroll_to_root = sel.ms_goal;
+        } else if (sel.unlock_index != previous.unlock_index) {
+            force_select_tab = FORCE_TAB_UNLOCKS;
+            scroll_to_root = index_root(current_template_data.unlocks, selected_unlock_index,
+                                        &EditorTrackableItem::root_name);
+        } else if (sel.custom_index != previous.custom_index) {
+            force_select_tab = FORCE_TAB_CUSTOM;
+            scroll_to_root = index_root(current_template_data.custom_goals, selected_custom_index,
+                                        &EditorTrackableItem::root_name);
+        } else if (sel.counter_index != previous.counter_index) {
+            force_select_tab = FORCE_TAB_COUNTERS;
+            scroll_to_root = index_root(current_template_data.counter_goals, selected_counter_index,
+                                        &EditorCounterGoal::root_name);
+        } else if (sel.deco_index != previous.deco_index) {
+            force_select_tab = FORCE_TAB_DECORATIONS;
+            scroll_to_root = index_root(current_template_data.decorations, selected_deco_index,
+                                        &EditorDecorationElement::id);
+        }
+        if (scroll_to_root && scroll_to_root[0] != '\0') {
+            strncpy(scroll_to_goal_root_name, scroll_to_root, sizeof(scroll_to_goal_root_name) - 1);
+            scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
+            scroll_to_align_top = true;
         }
     };
 
@@ -5350,11 +5391,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (new_index < 0 || new_index >= (int) s_history.size()) return;
         const TcHistoryEntry &step = s_history[new_index];
         bool data_changed = are_editor_templates_different(current_template_data, *step.data);
+        // Read while the selection pointers still point into the current template, which the
+        // assignment below invalidates. The restore compares against it to work out which tab the
+        // step belongs to.
+        TcHistorySelection previous_selection = history_capture_selection();
         s_history_index = new_index;
         // Assigned even when the comparison says nothing moved: the step is the authority on what the
         // template looked like, and a field the comparison happens not to cover must not survive it.
         current_template_data = *step.data;
-        history_restore_selection(step.selection);
+        history_restore_selection(step.selection, previous_selection);
         if (data_changed) {
             // A step that only moved the selection leaves the save result standing: it is still
             // an accurate report of what is on disk.
