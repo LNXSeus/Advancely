@@ -139,9 +139,16 @@ static void save_editor_manual_pos(cJSON *parent_json, const char *key, const Ma
     }
 }
 
-static bool are_manual_positions_different(const ManualPos &a, const ManualPos &b) {
-    if (a.is_set != b.is_set) return true;
+// ignore_synced_layout skips exactly the fields the Visual Layout Editor's reverse sync block
+// already copies into the tracker's structs every frame (x, y, is_set, anchor), so a caller can ask
+// the narrower question "did anything change that the map would NOT pick up on its own?".
+// is_hidden_in_layout deliberately still counts: it sits in ManualPos but the reverse sync does not
+// copy it. Keep this in step with reverse_sync_pos.
+static bool are_manual_positions_different(const ManualPos &a, const ManualPos &b,
+                                           bool ignore_synced_layout = false) {
     if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
+    if (ignore_synced_layout) return false;
+    if (a.is_set != b.is_set) return true;
     if (a.is_set) {
         if (a.x != b.x || a.y != b.y) return true;
         if (a.anchor != b.anchor) return true;
@@ -667,7 +674,8 @@ static bool are_linked_goals_different(const std::vector<EditorCounterLinkedGoal
 }
 
 // Helper function to compare two EditorTrackableItem structs, custom goals and unlocks
-static bool are_editor_items_different(const EditorTrackableItem &a, const EditorTrackableItem &b) {
+static bool are_editor_items_different(const EditorTrackableItem &a, const EditorTrackableItem &b,
+                                       bool ignore_synced_layout = false) {
     return strcmp(a.root_name, b.root_name) != 0 ||
            strcmp(a.display_name, b.display_name) != 0 ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
@@ -677,13 +685,14 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            a.in_3rd_row != b.in_3rd_row ||
            a.linked_goal_mode != b.linked_goal_mode ||
            are_linked_goals_different(a.linked_goals, b.linked_goals) ||
-           are_manual_positions_different(a.icon_pos, b.icon_pos) ||
-           are_manual_positions_different(a.text_pos, b.text_pos) ||
+           are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
+           are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
            strcmp(a.group, b.group) != 0;
 }
 
 // Helper function to compare two EditorTrackableCategory structs, advancements and stats
-static bool are_editor_categories_different(const EditorTrackableCategory &a, const EditorTrackableCategory &b) {
+static bool are_editor_categories_different(const EditorTrackableCategory &a, const EditorTrackableCategory &b,
+                                            bool ignore_synced_layout = false) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
@@ -696,14 +705,14 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.groups_enabled != b.groups_enabled ||
         a.linked_goal_mode != b.linked_goal_mode ||
         are_linked_goals_different(a.linked_goals, b.linked_goals) ||
-        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
-        are_manual_positions_different(a.text_pos, b.text_pos) ||
-        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.criteria.size() != b.criteria.size()) {
         return true;
     }
     for (size_t i = 0; i < a.criteria.size(); ++i) {
-        if (are_editor_items_different(a.criteria[i], b.criteria[i])) {
+        if (are_editor_items_different(a.criteria[i], b.criteria[i], ignore_synced_layout)) {
             return true;
         }
     }
@@ -725,16 +734,17 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
 }
 
 // Multi-stage goals
-static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a, const EditorMultiStageGoal &b) {
+static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a, const EditorMultiStageGoal &b,
+                                                   bool ignore_synced_layout = false) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
         a.use_stage_icons != b.use_stage_icons ||
-        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
-        are_manual_positions_different(a.text_pos, b.text_pos) ||
-        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -748,15 +758,16 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
 
 
 // Counters
-static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const EditorCounterGoal &b) {
+static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const EditorCounterGoal &b,
+                                               bool ignore_synced_layout = false) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
-        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
-        are_manual_positions_different(a.text_pos, b.text_pos) ||
-        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.linked_goals.size() != b.linked_goals.size()) {
         return true;
     }
@@ -772,35 +783,39 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
 }
 
 // Decorations
-static bool are_editor_decorations_different(const EditorDecorationElement &a, const EditorDecorationElement &b) {
+static bool are_editor_decorations_different(const EditorDecorationElement &a, const EditorDecorationElement &b,
+                                             bool ignore_synced_layout = false) {
     if (strcmp(a.id, b.id) != 0 ||
         a.type != b.type ||
         strcmp(a.display_text, b.display_text) != 0 ||
-        are_manual_positions_different(a.pos, b.pos)) {
+        are_manual_positions_different(a.pos, b.pos, ignore_synced_layout)) {
         return true;
     }
     if (a.type == DECORATION_LINE) {
-        if (are_manual_positions_different(a.pos2, b.pos2) ||
-            a.thickness != b.thickness ||
-            a.opacity != b.opacity) {
+        if (are_manual_positions_different(a.pos2, b.pos2, ignore_synced_layout)) return true;
+        if (!ignore_synced_layout && (a.thickness != b.thickness || a.opacity != b.opacity)) {
             return true;
         }
     }
     if (a.type == DECORATION_ARROW) {
-        if (are_manual_positions_different(a.pos2, b.pos2) ||
-            a.thickness != b.thickness ||
-            a.arrowhead_size != b.arrowhead_size ||
-            a.bend_count != b.bend_count ||
-            a.opacity_before != b.opacity_before ||
-            a.opacity_after != b.opacity_after ||
+        if (are_manual_positions_different(a.pos2, b.pos2, ignore_synced_layout) ||
             strcmp(a.start_goal_root, b.start_goal_root) != 0 ||
             strcmp(a.start_goal_stage, b.start_goal_stage) != 0 ||
             strcmp(a.end_goal_root, b.end_goal_root) != 0 ||
             strcmp(a.end_goal_stage, b.end_goal_stage) != 0) {
             return true;
         }
-        for (int i = 0; i < a.bend_count; i++) {
-            if (are_manual_positions_different(a.bends[i], b.bends[i])) return true;
+        if (!ignore_synced_layout) {
+            if (a.thickness != b.thickness ||
+                a.arrowhead_size != b.arrowhead_size ||
+                a.bend_count != b.bend_count ||
+                a.opacity_before != b.opacity_before ||
+                a.opacity_after != b.opacity_after) {
+                return true;
+            }
+            for (int i = 0; i < a.bend_count; i++) {
+                if (are_manual_positions_different(a.bends[i], b.bends[i])) return true;
+            }
         }
     }
     if (a.type == DECORATION_TEXT_HEADER) {
@@ -898,8 +913,12 @@ static bool is_editor_template_empty(const EditorTemplate &t) {
            t.counter_goals.empty() && t.decorations.empty();
 }
 
-// Main comparison function for the entire editor state
-static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b) {
+// Main comparison function for the entire editor state.
+// With ignore_synced_layout the answer leaves out everything the Visual Layout Editor's reverse sync
+// block already carries to the map every frame, which is what tells an undo whether it has to pay
+// for a full template preview reload or whether the map shows the change by itself.
+static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b,
+                                           bool ignore_synced_layout = false) {
     if (strcmp(a.display_category, b.display_category) != 0) return true;
     if (a.unlocks.size() != b.unlocks.size() ||
         a.custom_goals.size() != b.custom_goals.size() ||
@@ -911,27 +930,159 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
         return true;
     }
     for (size_t i = 0; i < a.unlocks.size(); ++i) {
-        if (are_editor_items_different(a.unlocks[i], b.unlocks[i])) return true;
+        if (are_editor_items_different(a.unlocks[i], b.unlocks[i], ignore_synced_layout)) return true;
     }
     for (size_t i = 0; i < a.custom_goals.size(); ++i) {
-        if (are_editor_items_different(a.custom_goals[i], b.custom_goals[i])) return true;
+        if (are_editor_items_different(a.custom_goals[i], b.custom_goals[i], ignore_synced_layout)) return true;
     }
     for (size_t i = 0; i < a.advancements.size(); ++i) {
-        if (are_editor_categories_different(a.advancements[i], b.advancements[i])) return true;
+        if (are_editor_categories_different(a.advancements[i], b.advancements[i], ignore_synced_layout)) return true;
     }
     for (size_t i = 0; i < a.stats.size(); ++i) {
-        if (are_editor_categories_different(a.stats[i], b.stats[i])) return true;
+        if (are_editor_categories_different(a.stats[i], b.stats[i], ignore_synced_layout)) return true;
     }
     for (size_t i = 0; i < a.multi_stage_goals.size(); ++i) {
-        if (are_editor_multi_stage_goals_different(a.multi_stage_goals[i], b.multi_stage_goals[i])) return true;
+        if (are_editor_multi_stage_goals_different(a.multi_stage_goals[i], b.multi_stage_goals[i],
+                                                   ignore_synced_layout))
+            return true;
     }
     for (size_t i = 0; i < a.counter_goals.size(); ++i) {
-        if (are_editor_counter_goals_different(a.counter_goals[i], b.counter_goals[i])) return true;
+        if (are_editor_counter_goals_different(a.counter_goals[i], b.counter_goals[i], ignore_synced_layout))
+            return true;
     }
     for (size_t i = 0; i < a.decorations.size(); ++i) {
-        if (are_editor_decorations_different(a.decorations[i], b.decorations[i])) return true;
+        if (are_editor_decorations_different(a.decorations[i], b.decorations[i], ignore_synced_layout)) return true;
     }
     return false;
+}
+
+// Where the first difference between two templates sits. An undo jumps to it, so the user sees
+// what the step actually took back instead of having to hunt for it.
+enum TcDiffLocation {
+    TC_DIFF_NONE = 0,
+    TC_DIFF_ADVANCEMENT,
+    TC_DIFF_STAT,
+    TC_DIFF_UNLOCK,
+    TC_DIFF_CUSTOM,
+    TC_DIFF_MULTISTAGE,
+    TC_DIFF_COUNTER,
+    TC_DIFF_DECORATION
+};
+
+struct TcTemplateDiff {
+    // True for any difference at all, including the ones with no goal to jump to (the display
+    // category). Answers the same question as are_editor_templates_different, so a caller that
+    // needs both gets them out of one pass.
+    bool any = false;
+    TcDiffLocation where = TC_DIFF_NONE;
+    int index = -1;
+    char root_name[192] = "";
+    // Criterion, sub-stat or stage inside root_name, when the goal itself is otherwise identical.
+    char child_root_name[192] = "";
+    char child_stage_id[64] = "";
+};
+
+// Walks `a` (the template being switched to) against `b` and reports the first goal that differs.
+// Lists are compared in tab order, and a list that grew or shrank reports the first index only one
+// of them has, which is the goal that was added or removed.
+static TcTemplateDiff tc_find_first_template_difference(const EditorTemplate &a, const EditorTemplate &b) {
+    TcTemplateDiff diff;
+    auto report = [&diff](TcDiffLocation where, int index, const char *root) {
+        diff.any = true;
+        diff.where = where;
+        diff.index = index;
+        snprintf(diff.root_name, sizeof(diff.root_name), "%s", root ? root : "");
+    };
+    auto scan = [&](const auto &la, const auto &lb, TcDiffLocation where, auto differs, auto root_of) {
+        if (diff.any) return;
+        size_t shared = la.size() < lb.size() ? la.size() : lb.size();
+        for (size_t i = 0; i < shared; ++i) {
+            if (differs(la[i], lb[i])) {
+                report(where, (int) i, root_of(la[i]));
+                return;
+            }
+        }
+        if (la.size() != lb.size()) {
+            report(where, (int) shared, la.size() > shared ? root_of(la[shared]) : nullptr);
+        }
+    };
+
+    scan(a.advancements, b.advancements, TC_DIFF_ADVANCEMENT,
+         [](const EditorTrackableCategory &x, const EditorTrackableCategory &y) {
+             return are_editor_categories_different(x, y);
+         },
+         [](const EditorTrackableCategory &x) { return x.root_name; });
+    scan(a.stats, b.stats, TC_DIFF_STAT,
+         [](const EditorTrackableCategory &x, const EditorTrackableCategory &y) {
+             return are_editor_categories_different(x, y);
+         },
+         [](const EditorTrackableCategory &x) { return x.root_name; });
+    scan(a.unlocks, b.unlocks, TC_DIFF_UNLOCK,
+         [](const EditorTrackableItem &x, const EditorTrackableItem &y) {
+             return are_editor_items_different(x, y);
+         },
+         [](const EditorTrackableItem &x) { return x.root_name; });
+    scan(a.custom_goals, b.custom_goals, TC_DIFF_CUSTOM,
+         [](const EditorTrackableItem &x, const EditorTrackableItem &y) {
+             return are_editor_items_different(x, y);
+         },
+         [](const EditorTrackableItem &x) { return x.root_name; });
+    scan(a.multi_stage_goals, b.multi_stage_goals, TC_DIFF_MULTISTAGE,
+         [](const EditorMultiStageGoal &x, const EditorMultiStageGoal &y) {
+             return are_editor_multi_stage_goals_different(x, y);
+         },
+         [](const EditorMultiStageGoal &x) { return x.root_name; });
+    scan(a.counter_goals, b.counter_goals, TC_DIFF_COUNTER,
+         [](const EditorCounterGoal &x, const EditorCounterGoal &y) {
+             return are_editor_counter_goals_different(x, y);
+         },
+         [](const EditorCounterGoal &x) { return x.root_name; });
+    scan(a.decorations, b.decorations, TC_DIFF_DECORATION,
+         [](const EditorDecorationElement &x, const EditorDecorationElement &y) {
+             return are_editor_decorations_different(x, y);
+         },
+         [](const EditorDecorationElement &x) { return x.id; });
+
+    if (!diff.any && strcmp(a.display_category, b.display_category) != 0) diff.any = true;
+    if (!diff.any || diff.root_name[0] == '\0') return diff;
+
+    // The goal is known; narrow it down to the criterion, sub-stat or stage that moved, so the
+    // details pane scrolls there too instead of only opening at the top.
+    auto narrow_criteria = [&](const std::vector<EditorTrackableCategory> &la,
+                               const std::vector<EditorTrackableCategory> &lb) {
+        if (diff.index < 0 || (size_t) diff.index >= la.size() || (size_t) diff.index >= lb.size()) return;
+        const EditorTrackableCategory &x = la[diff.index];
+        const EditorTrackableCategory &y = lb[diff.index];
+        size_t shared = x.criteria.size() < y.criteria.size() ? x.criteria.size() : y.criteria.size();
+        for (size_t i = 0; i < shared; ++i) {
+            if (are_editor_items_different(x.criteria[i], y.criteria[i])) {
+                snprintf(diff.child_root_name, sizeof(diff.child_root_name), "%s", x.criteria[i].root_name);
+                return;
+            }
+        }
+        if (x.criteria.size() > shared) {
+            snprintf(diff.child_root_name, sizeof(diff.child_root_name), "%s", x.criteria[shared].root_name);
+        }
+    };
+    if (diff.where == TC_DIFF_ADVANCEMENT) narrow_criteria(a.advancements, b.advancements);
+    if (diff.where == TC_DIFF_STAT) narrow_criteria(a.stats, b.stats);
+    if (diff.where == TC_DIFF_MULTISTAGE &&
+        diff.index >= 0 && (size_t) diff.index < a.multi_stage_goals.size() &&
+        (size_t) diff.index < b.multi_stage_goals.size()) {
+        const EditorMultiStageGoal &x = a.multi_stage_goals[diff.index];
+        const EditorMultiStageGoal &y = b.multi_stage_goals[diff.index];
+        size_t shared = x.stages.size() < y.stages.size() ? x.stages.size() : y.stages.size();
+        for (size_t i = 0; i < shared; ++i) {
+            if (are_editor_sub_goals_different(x.stages[i], y.stages[i])) {
+                snprintf(diff.child_stage_id, sizeof(diff.child_stage_id), "%s", x.stages[i].stage_id);
+                break;
+            }
+        }
+        if (diff.child_stage_id[0] == '\0' && x.stages.size() > shared) {
+            snprintf(diff.child_stage_id, sizeof(diff.child_stage_id), "%s", x.stages[shared].stage_id);
+        }
+    }
+    return diff;
 }
 
 // Pick the lowest free name in the sequence "group", "group_2", "group_3", ...
@@ -3647,12 +3798,57 @@ static void tc_render_use_visual_selection_arrow_button(const char *id, char *go
 
 // --------------------------------------- EDITOR UNDO / REDO HISTORY ---------------------------------------
 
+// The bulk-selection checkboxes of every list in the editor. They live here rather than next to
+// the lists that draw them because a step of the undo history carries them, and the history runs
+// before any of those lists are drawn. The three owner strings scope a child list's selection to
+// the parent it was made under, so switching parent still clears it.
+static std::set<int> s_adv_selection;
+static std::set<int> s_stat_selection;
+static std::set<int> s_unlocks_selection;
+static std::set<int> s_custom_selection;
+static std::set<int> s_msg_selection;
+static std::set<int> s_ctr_selection;
+static std::set<int> s_deco_selection;
+// The child lists are keyed by their parent goal's root name, so ticks made under one
+// advancement, stat or multi-stage goal survive a visit to another one instead of being wiped.
+// An entry that runs empty is left in place and simply ignored everywhere it matters.
+using TcChildSelections = std::map<std::string, std::set<int> >;
+static TcChildSelections s_crit_selections;
+static TcChildSelections s_sub_selections;
+static TcChildSelections s_stage_selections;
+
+// One step's copy of those checkboxes. Vectors rather than sets: a "Select All" over a template
+// with thousands of goals is captured and compared on every settled frame, which is a memcmp here
+// and a few thousand node allocations with sets. The sets are ordered, so the vectors are sorted
+// and a plain comparison answers "same selection?".
+struct TcBulkSelectionSnapshot {
+    std::vector<int> adv;
+    std::vector<int> stat;
+    std::vector<int> unlocks;
+    std::vector<int> custom;
+    std::vector<int> msg;
+    std::vector<int> ctr;
+    std::vector<int> deco;
+    // Keyed by parent root name like the live maps. Parents with nothing ticked are left out, so
+    // merely opening a goal's detail pane (which creates an empty entry) is never a difference.
+    std::map<std::string, std::vector<int> > crit;
+    std::map<std::string, std::vector<int> > sub;
+    std::map<std::string, std::vector<int> > stage;
+};
+
+static bool tc_bulk_selections_different(const TcBulkSelectionSnapshot &a, const TcBulkSelectionSnapshot &b) {
+    return a.adv != b.adv || a.stat != b.stat || a.unlocks != b.unlocks || a.custom != b.custom ||
+           a.msg != b.msg || a.ctr != b.ctr || a.deco != b.deco ||
+           a.crit != b.crit || a.sub != b.sub || a.stage != b.stage;
+}
+
 // What was selected when a step was committed: the editor's own lists and, while the Visual
-// Layout Editor runs, the elements picked on the map. Selecting is a step in its own right, so
-// an undo can walk back to a selection that was replaced or cleared.
-// Pointer-based selections are stored by root_name because every step reassigns the vectors, and
-// the map selection by the tracker's stable element keys because a reload reallocates every
-// ManualPos it points at.
+// Layout Editor runs, the elements picked on the map.
+// Highlighting a row in an editor list is NOT a step - it changes nothing and an undo that only
+// moved the highlight reads as having done nothing. Those fields are kept only to re-anchor the
+// pointer-based selections onto the template a step installs, which reassigns every vector they
+// point into. The map selection and the bulk checkboxes are steps, and the map selection is stored
+// by the tracker's stable element keys because a reload reallocates every ManualPos it points at.
 struct TcHistorySelection {
     char advancement[192] = "";
     char stat[192] = "";
@@ -3666,18 +3862,12 @@ struct TcHistorySelection {
     // False for a step taken with the Visual Layout Editor off. Restoring one of those must leave
     // the map selection alone instead of clearing a selection the step never knew about.
     bool visual_active = false;
+    // The bulk-action checkboxes of every list, which are undoable in their own right.
+    TcBulkSelectionSnapshot bulk;
 };
 
 static bool tc_history_selections_different(const TcHistorySelection &a, const TcHistorySelection &b) {
-    if (strcmp(a.advancement, b.advancement) != 0 ||
-        strcmp(a.stat, b.stat) != 0 ||
-        strcmp(a.ms_goal, b.ms_goal) != 0 ||
-        a.unlock_index != b.unlock_index ||
-        a.custom_index != b.custom_index ||
-        a.counter_index != b.counter_index ||
-        a.deco_index != b.deco_index) {
-        return true;
-    }
+    if (tc_bulk_selections_different(a.bulk, b.bulk)) return true;
     // The map selection only counts when both steps were taken with the Visual Layout Editor up.
     // Starting or stopping it is not an edit and must not become a step of its own.
     return a.visual_active && b.visual_active && a.visual_keys != b.visual_keys;
@@ -3710,6 +3900,13 @@ static std::string s_history_owner; // Identity of the template/lang/layout the 
 // preview whose reload lands a frame or two later; without the pause that lag can be recorded as a
 // step of its own and the user would need two undos to get anywhere.
 static int s_history_settle_frames = 0;
+// A run of movement hotkey repeats (arrow keys, WASD) is one step, not one per pixel. Recording
+// pauses for this long after the last move the map reported; the repeat delay is 0.4 s, so a hold
+// stays inside one window from the first press to the last repeat. A pending move is flushed early
+// when Ctrl+Z is pressed, or the undo would skip past it and take back the step in front instead.
+static constexpr float TC_HISTORY_MOVE_HOLD_SECONDS = 0.5f;
+static float s_history_move_hold = 0.0f;
+
 // The selection as it looked on the previous settled frame. A selection-only step is committed
 // once the same selection has stood for two of them: the map registers its elements as it draws
 // them, so a rubber-band release only has every picked element identified on the frame after,
@@ -5278,24 +5475,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             sel.visual_active = true;
             tracker_get_visual_selection_keys(sel.visual_keys);
         }
+        auto copy_set = [](const std::set<int> &src, std::vector<int> &dst) {
+            dst.assign(src.begin(), src.end());
+        };
+        auto copy_child = [](const TcChildSelections &src, std::map<std::string, std::vector<int> > &dst) {
+            for (const auto &entry: src) {
+                if (entry.second.empty()) continue;
+                dst[entry.first].assign(entry.second.begin(), entry.second.end());
+            }
+        };
+        copy_set(s_adv_selection, sel.bulk.adv);
+        copy_set(s_stat_selection, sel.bulk.stat);
+        copy_set(s_unlocks_selection, sel.bulk.unlocks);
+        copy_set(s_custom_selection, sel.bulk.custom);
+        copy_set(s_msg_selection, sel.bulk.msg);
+        copy_set(s_ctr_selection, sel.bulk.ctr);
+        copy_set(s_deco_selection, sel.bulk.deco);
+        copy_child(s_crit_selections, sel.bulk.crit);
+        copy_child(s_sub_selections, sel.bulk.sub);
+        copy_child(s_stage_selections, sel.bulk.stage);
         return sel;
     };
 
-    auto history_restore_selection = [&](const TcHistorySelection &sel, const TcHistorySelection &previous) {
-        reselect_after_revert(sel.advancement, sel.stat, sel.ms_goal);
-        // The step may predate a deletion, so an index that no longer exists drops the selection
-        // instead of pointing past the end of the list.
-        selected_unlock_index = (sel.unlock_index < (int) current_template_data.unlocks.size())
-                                    ? sel.unlock_index
+    auto history_restore_selection = [&](const TcHistorySelection &sel, const TcHistorySelection &previous,
+                                         const TcTemplateDiff &diff) {
+        // Which row is highlighted is not part of a step, so the user keeps the one they had. It is
+        // only re-anchored onto the template the step installed, whose vectors the old pointers
+        // point into, and dropped when the goal it named is gone.
+        reselect_after_revert(previous.advancement, previous.stat, previous.ms_goal);
+        selected_unlock_index = (previous.unlock_index < (int) current_template_data.unlocks.size())
+                                    ? previous.unlock_index
                                     : -1;
-        selected_custom_index = (sel.custom_index < (int) current_template_data.custom_goals.size())
-                                    ? sel.custom_index
+        selected_custom_index = (previous.custom_index < (int) current_template_data.custom_goals.size())
+                                    ? previous.custom_index
                                     : -1;
-        selected_counter_index = (sel.counter_index < (int) current_template_data.counter_goals.size())
-                                     ? sel.counter_index
+        selected_counter_index = (previous.counter_index < (int) current_template_data.counter_goals.size())
+                                     ? previous.counter_index
                                      : -1;
-        selected_deco_index = (sel.deco_index < (int) current_template_data.decorations.size())
-                                  ? sel.deco_index
+        selected_deco_index = (previous.deco_index < (int) current_template_data.decorations.size())
+                                  ? previous.deco_index
                                   : -1;
         // The map only takes a selection back when both the step and the present know about it.
         // Keys whose goal no longer exists are dropped by the tracker.
@@ -5303,40 +5521,218 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             tracker_restore_visual_selection_keys(sel.visual_keys);
         }
 
-        // Open the tab that owns whatever this step moved, and scroll its list to it. Which tab is
-        // open is not part of a step, so without this a selection restored onto another tab would
-        // land behind the one the user is looking at and the undo would read as having done
-        // nothing - which is how people end up pressing Ctrl+Z again and losing a real edit.
-        const char *scroll_to_root = nullptr;
-        auto index_root = [](const auto &list, int index, auto member) -> const char * {
-            if (index < 0 || index >= (int) list.size()) return nullptr;
-            return list[index].*member;
+        // The bulk-action checkboxes. Pruned to the lists as they are now, because the lists
+        // themselves prune when they are drawn and a checkbox left pointing past the end would be
+        // dropped there - which the recorder would then see as a fresh change and record as a step
+        // of its own, throwing away everything that was ahead in the history.
+        auto restore_set = [](const std::vector<int> &src, std::set<int> &dst, size_t list_size) {
+            dst.clear();
+            for (int index: src) {
+                if (index >= 0 && (size_t) index < list_size) dst.insert(index);
+            }
         };
-        if (strcmp(sel.advancement, previous.advancement) != 0) {
-            force_select_tab = FORCE_TAB_ADVANCEMENTS;
-            scroll_to_root = sel.advancement;
-        } else if (strcmp(sel.stat, previous.stat) != 0) {
-            force_select_tab = FORCE_TAB_STATS;
-            scroll_to_root = sel.stat;
-        } else if (strcmp(sel.ms_goal, previous.ms_goal) != 0) {
-            force_select_tab = FORCE_TAB_MULTISTAGE;
-            scroll_to_root = sel.ms_goal;
-        } else if (sel.unlock_index != previous.unlock_index) {
-            force_select_tab = FORCE_TAB_UNLOCKS;
-            scroll_to_root = index_root(current_template_data.unlocks, selected_unlock_index,
-                                        &EditorTrackableItem::root_name);
-        } else if (sel.custom_index != previous.custom_index) {
-            force_select_tab = FORCE_TAB_CUSTOM;
-            scroll_to_root = index_root(current_template_data.custom_goals, selected_custom_index,
-                                        &EditorTrackableItem::root_name);
-        } else if (sel.counter_index != previous.counter_index) {
-            force_select_tab = FORCE_TAB_COUNTERS;
-            scroll_to_root = index_root(current_template_data.counter_goals, selected_counter_index,
-                                        &EditorCounterGoal::root_name);
-        } else if (sel.deco_index != previous.deco_index) {
-            force_select_tab = FORCE_TAB_DECORATIONS;
-            scroll_to_root = index_root(current_template_data.decorations, selected_deco_index,
-                                        &EditorDecorationElement::id);
+        restore_set(sel.bulk.adv, s_adv_selection, current_template_data.advancements.size());
+        restore_set(sel.bulk.stat, s_stat_selection, current_template_data.stats.size());
+        restore_set(sel.bulk.unlocks, s_unlocks_selection, current_template_data.unlocks.size());
+        restore_set(sel.bulk.custom, s_custom_selection, current_template_data.custom_goals.size());
+        restore_set(sel.bulk.msg, s_msg_selection, current_template_data.multi_stage_goals.size());
+        restore_set(sel.bulk.ctr, s_ctr_selection, current_template_data.counter_goals.size());
+        restore_set(sel.bulk.deco, s_deco_selection, current_template_data.decorations.size());
+
+        // Child lists come back under the parent they were ticked on. A parent that no longer
+        // exists takes its ticks with it.
+        auto restore_child = [&](const std::map<std::string, std::vector<int> > &src,
+                                 TcChildSelections &dst, const auto &parents, auto member) {
+            dst.clear();
+            for (const auto &entry: src) {
+                for (const auto &parent: parents) {
+                    if (entry.first != parent.root_name) continue;
+                    restore_set(entry.second, dst[entry.first], (parent.*member).size());
+                    break;
+                }
+            }
+        };
+        restore_child(sel.bulk.crit, s_crit_selections, current_template_data.advancements,
+                      &EditorTrackableCategory::criteria);
+        restore_child(sel.bulk.sub, s_sub_selections, current_template_data.stats,
+                      &EditorTrackableCategory::criteria);
+        restore_child(sel.bulk.stage, s_stage_selections, current_template_data.multi_stage_goals,
+                      &EditorMultiStageGoal::stages);
+
+        // Jump to whatever the step actually changed: open its tab, select it, and scroll the list
+        // to it. Without this an undo lands behind the tab the user is looking at and reads as
+        // having done nothing - which is how people end up pressing Ctrl+Z again and losing a real
+        // edit. A step that changed no goal falls through to the checkbox lists below.
+        const char *scroll_to_root = nullptr;
+        auto select_by_root = [&](auto &list, const char *root, auto **out) {
+            *out = nullptr;
+            if (!root || root[0] == '\0') return;
+            for (auto &entry: list) {
+                if (strcmp(entry.root_name, root) == 0) {
+                    *out = &entry;
+                    return;
+                }
+            }
+        };
+        auto clamp_index = [](int index, size_t size) { return (index >= 0 && (size_t) index < size) ? index : -1; };
+        switch (diff.where) {
+            case TC_DIFF_ADVANCEMENT:
+                force_select_tab = FORCE_TAB_ADVANCEMENTS;
+                select_by_root(current_template_data.advancements, diff.root_name, &selected_advancement);
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_STAT:
+                force_select_tab = FORCE_TAB_STATS;
+                select_by_root(current_template_data.stats, diff.root_name, &selected_stat);
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_MULTISTAGE:
+                force_select_tab = FORCE_TAB_MULTISTAGE;
+                select_by_root(current_template_data.multi_stage_goals, diff.root_name, &selected_ms_goal);
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_UNLOCK:
+                force_select_tab = FORCE_TAB_UNLOCKS;
+                selected_unlock_index = clamp_index(diff.index, current_template_data.unlocks.size());
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_CUSTOM:
+                force_select_tab = FORCE_TAB_CUSTOM;
+                selected_custom_index = clamp_index(diff.index, current_template_data.custom_goals.size());
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_COUNTER:
+                force_select_tab = FORCE_TAB_COUNTERS;
+                selected_counter_index = clamp_index(diff.index, current_template_data.counter_goals.size());
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_DECORATION:
+                force_select_tab = FORCE_TAB_DECORATIONS;
+                selected_deco_index = clamp_index(diff.index, current_template_data.decorations.size());
+                scroll_to_root = diff.root_name;
+                break;
+            case TC_DIFF_NONE:
+                break;
+        }
+        if (diff.child_root_name[0] != '\0') {
+            strncpy(scroll_to_child_root_name, diff.child_root_name, sizeof(scroll_to_child_root_name) - 1);
+            scroll_to_child_root_name[sizeof(scroll_to_child_root_name) - 1] = '\0';
+        }
+        if (diff.child_stage_id[0] != '\0') {
+            strncpy(scroll_to_stage_id, diff.child_stage_id, sizeof(scroll_to_stage_id) - 1);
+            scroll_to_stage_id[sizeof(scroll_to_stage_id) - 1] = '\0';
+        }
+        // Only when no goal was named: a step that just ticked or cleared checkboxes still has a
+        // row to go to, the one whose checkbox changed, so it opens that tab, scrolls the list
+        // there and (for a detail-pane tick) opens the parent and scrolls to the child. A step that
+        // did name a goal must not be pulled somewhere else by this.
+        if (diff.where == TC_DIFF_NONE) {
+            // Both sides are sorted, so the lowest index only one of them holds is the checkbox
+            // that changed. -1 when they are equal.
+            auto first_tick_difference = [](const std::vector<int> &x, const std::vector<int> &y) {
+                size_t i = 0, j = 0;
+                while (i < x.size() && j < y.size()) {
+                    if (x[i] == y[j]) {
+                        ++i;
+                        ++j;
+                    } else if (x[i] < y[j]) return x[i];
+                    else return y[j];
+                }
+                if (i < x.size()) return x[i];
+                if (j < y.size()) return y[j];
+                return -1;
+            };
+            auto jump_to_list_tick = [&](const std::vector<int> &x, const std::vector<int> &y,
+                                         ForceSelectTab tab, const auto &list, auto member) {
+                force_select_tab = tab;
+                int index = first_tick_difference(x, y);
+                if (index >= 0 && (size_t) index < list.size()) scroll_to_root = list[index].*member;
+            };
+            // The child maps are keyed by parent, so the parent that differs is found first and the
+            // changed tick is looked up inside it.
+            auto first_child_tick_difference = [&](const std::map<std::string, std::vector<int> > &x,
+                                                   const std::map<std::string, std::vector<int> > &y,
+                                                   std::string &out_parent) {
+                static const std::vector<int> none;
+                for (const auto &entry: x) {
+                    auto other = y.find(entry.first);
+                    const std::vector<int> &rhs = (other == y.end()) ? none : other->second;
+                    if (entry.second != rhs) {
+                        out_parent = entry.first;
+                        return first_tick_difference(entry.second, rhs);
+                    }
+                }
+                for (const auto &entry: y) {
+                    if (x.find(entry.first) == x.end() && !entry.second.empty()) {
+                        out_parent = entry.first;
+                        return first_tick_difference(none, entry.second);
+                    }
+                }
+                return -1;
+            };
+
+            std::string tick_parent;
+            if (sel.bulk.adv != previous.bulk.adv) {
+                jump_to_list_tick(sel.bulk.adv, previous.bulk.adv, FORCE_TAB_ADVANCEMENTS,
+                                  current_template_data.advancements, &EditorTrackableCategory::root_name);
+            } else if (sel.bulk.crit != previous.bulk.crit) {
+                force_select_tab = FORCE_TAB_ADVANCEMENTS;
+                int index = first_child_tick_difference(sel.bulk.crit, previous.bulk.crit, tick_parent);
+                for (auto &adv: current_template_data.advancements) {
+                    if (tick_parent != adv.root_name) continue;
+                    selected_advancement = &adv;
+                    scroll_to_root = adv.root_name;
+                    if (index >= 0 && (size_t) index < adv.criteria.size()) {
+                        snprintf(scroll_to_child_root_name, sizeof(scroll_to_child_root_name), "%s",
+                                 adv.criteria[index].root_name);
+                    }
+                    break;
+                }
+            } else if (sel.bulk.stat != previous.bulk.stat) {
+                jump_to_list_tick(sel.bulk.stat, previous.bulk.stat, FORCE_TAB_STATS,
+                                  current_template_data.stats, &EditorTrackableCategory::root_name);
+            } else if (sel.bulk.sub != previous.bulk.sub) {
+                force_select_tab = FORCE_TAB_STATS;
+                int index = first_child_tick_difference(sel.bulk.sub, previous.bulk.sub, tick_parent);
+                for (auto &stat: current_template_data.stats) {
+                    if (tick_parent != stat.root_name) continue;
+                    selected_stat = &stat;
+                    scroll_to_root = stat.root_name;
+                    if (index >= 0 && (size_t) index < stat.criteria.size()) {
+                        snprintf(scroll_to_child_root_name, sizeof(scroll_to_child_root_name), "%s",
+                                 stat.criteria[index].root_name);
+                    }
+                    break;
+                }
+            } else if (sel.bulk.unlocks != previous.bulk.unlocks) {
+                jump_to_list_tick(sel.bulk.unlocks, previous.bulk.unlocks, FORCE_TAB_UNLOCKS,
+                                  current_template_data.unlocks, &EditorTrackableItem::root_name);
+            } else if (sel.bulk.custom != previous.bulk.custom) {
+                jump_to_list_tick(sel.bulk.custom, previous.bulk.custom, FORCE_TAB_CUSTOM,
+                                  current_template_data.custom_goals, &EditorTrackableItem::root_name);
+            } else if (sel.bulk.msg != previous.bulk.msg) {
+                jump_to_list_tick(sel.bulk.msg, previous.bulk.msg, FORCE_TAB_MULTISTAGE,
+                                  current_template_data.multi_stage_goals, &EditorMultiStageGoal::root_name);
+            } else if (sel.bulk.stage != previous.bulk.stage) {
+                force_select_tab = FORCE_TAB_MULTISTAGE;
+                int index = first_child_tick_difference(sel.bulk.stage, previous.bulk.stage, tick_parent);
+                for (auto &goal: current_template_data.multi_stage_goals) {
+                    if (tick_parent != goal.root_name) continue;
+                    selected_ms_goal = &goal;
+                    scroll_to_root = goal.root_name;
+                    if (index >= 0 && (size_t) index < goal.stages.size()) {
+                        snprintf(scroll_to_stage_id, sizeof(scroll_to_stage_id), "%s",
+                                 goal.stages[index].stage_id);
+                    }
+                    break;
+                }
+            } else if (sel.bulk.ctr != previous.bulk.ctr) {
+                jump_to_list_tick(sel.bulk.ctr, previous.bulk.ctr, FORCE_TAB_COUNTERS,
+                                  current_template_data.counter_goals, &EditorCounterGoal::root_name);
+            } else if (sel.bulk.deco != previous.bulk.deco) {
+                jump_to_list_tick(sel.bulk.deco, previous.bulk.deco, FORCE_TAB_DECORATIONS,
+                                  current_template_data.decorations, &EditorDecorationElement::id);
+            }
         }
         if (scroll_to_root && scroll_to_root[0] != '\0') {
             strncpy(scroll_to_goal_root_name, scroll_to_root, sizeof(scroll_to_goal_root_name) - 1);
@@ -5358,6 +5754,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_history_settle_frames = 0;
         s_history_last_seen_selection = TcHistorySelection{};
         s_history_owner = history_owner;
+        // Checkboxes ticked on another template's lists mean nothing here. They are dropped before
+        // the first step is seeded, so the lists pruning them as they are drawn cannot show up as a
+        // change and become a step nobody made.
+        s_adv_selection.clear();
+        s_stat_selection.clear();
+        s_unlocks_selection.clear();
+        s_custom_selection.clear();
+        s_msg_selection.clear();
+        s_ctr_selection.clear();
+        s_deco_selection.clear();
+        s_crit_selections.clear();
+        s_sub_selections.clear();
+        s_stage_selections.clear();
         if (editing_template) {
             s_history.push_back({
                 std::make_shared<const EditorTemplate>(current_template_data),
@@ -5373,6 +5782,65 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
+    // Every frame the map reports movement (a drag, or one repeat of a movement hotkey) restarts
+    // the window, so a whole run of nudges lands in a single step instead of one per pixel.
+    if (t && t->visual_layout_just_dragged) s_history_move_hold = TC_HISTORY_MOVE_HOLD_SECONDS;
+    else if (s_history_move_hold > 0.0f) s_history_move_hold -= ImGui::GetIO().DeltaTime;
+
+    // Takes the current state as a step when it differs from the one the history is sitting on.
+    // Called once a settled frame, and again from the undo/redo handler to flush a movement run
+    // that has not been committed yet.
+    auto history_commit_step = [&]() {
+        if (!editing_template || s_history_index < 0) return;
+        TcHistorySelection live_selection = history_capture_selection();
+        const TcHistoryEntry &current_step = s_history[s_history_index];
+        if (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_UNKNOWN) {
+            s_history_step_vs_saved =
+                    are_editor_templates_different(*current_step.data, saved_template_data)
+                        ? TC_HISTORY_VS_SAVED_DIFFERENT
+                        : TC_HISTORY_VS_SAVED_EQUAL;
+        }
+        // Reusing the flag computed at the top of this frame: with the step and the saved
+        // state being the same template, "changed since the step" and "changed since the
+        // save" are the same question. Nothing touches the template between the two points.
+        bool template_changed = (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_EQUAL)
+                                    ? editor_has_unsaved_changes
+                                    : are_editor_templates_different(current_template_data,
+                                                                    *current_step.data);
+        // Cheap while no import is staged, which is nearly always: comparing two empty maps.
+        bool imports_changed = (s_pending_lang_imports != *current_step.lang_imports);
+        bool data_changed = template_changed || imports_changed;
+        bool selection_changed = tc_history_selections_different(live_selection,
+                                                                current_step.selection);
+        // An edit is committed as soon as it settles; a bare selection change has to hold
+        // still for one more frame first (see s_history_last_seen_selection).
+        bool selection_held = !tc_history_selections_different(live_selection,
+                                                              s_history_last_seen_selection);
+        if (data_changed || (selection_changed && selection_held)) {
+            // A step that left one of them alone keeps pointing at the snapshot it was
+            // taken from, so a run of selection steps costs a selection each, not a
+            // template each.
+            std::shared_ptr<const EditorTemplate> snapshot =
+                    template_changed
+                        ? std::make_shared<const EditorTemplate>(current_template_data)
+                        : current_step.data;
+            std::shared_ptr<const TcPendingLangImports> imports =
+                    imports_changed
+                        ? std::make_shared<const TcPendingLangImports>(s_pending_lang_imports)
+                        : current_step.lang_imports;
+            // A new change after an undo is the point of no return for whatever was ahead.
+            s_history.resize(s_history_index + 1);
+            s_history.push_back({snapshot, imports, live_selection});
+            s_history_index = (int) s_history.size() - 1;
+            tc_history_trim();
+            // The step just taken is current_template_data again.
+            s_history_step_vs_saved = editor_has_unsaved_changes
+                                          ? TC_HISTORY_VS_SAVED_DIFFERENT
+                                          : TC_HISTORY_VS_SAVED_EQUAL;
+        }
+        s_history_last_seen_selection = live_selection;
+    };
+
     if (editing_template && s_history_index >= 0) {
         if (s_history_settle_frames > 0) {
             s_history_settle_frames--;
@@ -5387,62 +5855,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                            // Visual Layout Editor ever answers such a request, so outside it the
                            // wait would never end.
                            !(t && t->is_visual_layout_editing && tracker_visual_selection_is_settling());
-            if (settled) {
-                TcHistorySelection live_selection = history_capture_selection();
-                const TcHistoryEntry &current_step = s_history[s_history_index];
-                if (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_UNKNOWN) {
-                    s_history_step_vs_saved =
-                            are_editor_templates_different(*current_step.data, saved_template_data)
-                                ? TC_HISTORY_VS_SAVED_DIFFERENT
-                                : TC_HISTORY_VS_SAVED_EQUAL;
-                }
-                // Reusing the flag computed at the top of this frame: with the step and the saved
-                // state being the same template, "changed since the step" and "changed since the
-                // save" are the same question. Nothing touches the template between the two points.
-                bool template_changed = (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_EQUAL)
-                                            ? editor_has_unsaved_changes
-                                            : are_editor_templates_different(current_template_data,
-                                                                            *current_step.data);
-                // Cheap while no import is staged, which is nearly always: comparing two empty maps.
-                bool imports_changed = (s_pending_lang_imports != *current_step.lang_imports);
-                bool data_changed = template_changed || imports_changed;
-                bool selection_changed = tc_history_selections_different(live_selection,
-                                                                        current_step.selection);
-                // An edit is committed as soon as it settles; a bare selection change has to hold
-                // still for one more frame first (see s_history_last_seen_selection).
-                bool selection_held = !tc_history_selections_different(live_selection,
-                                                                      s_history_last_seen_selection);
-                if (data_changed || (selection_changed && selection_held)) {
-                    // A step that left one of them alone keeps pointing at the snapshot it was
-                    // taken from, so a run of selection steps costs a selection each, not a
-                    // template each.
-                    std::shared_ptr<const EditorTemplate> snapshot =
-                            template_changed
-                                ? std::make_shared<const EditorTemplate>(current_template_data)
-                                : current_step.data;
-                    std::shared_ptr<const TcPendingLangImports> imports =
-                            imports_changed
-                                ? std::make_shared<const TcPendingLangImports>(s_pending_lang_imports)
-                                : current_step.lang_imports;
-                    // A new change after an undo is the point of no return for whatever was ahead.
-                    s_history.resize(s_history_index + 1);
-                    s_history.push_back({snapshot, imports, live_selection});
-                    s_history_index = (int) s_history.size() - 1;
-                    tc_history_trim();
-                    // The step just taken is current_template_data again.
-                    s_history_step_vs_saved = editor_has_unsaved_changes
-                                                  ? TC_HISTORY_VS_SAVED_DIFFERENT
-                                                  : TC_HISTORY_VS_SAVED_EQUAL;
-                }
-                s_history_last_seen_selection = live_selection;
-            }
+            if (settled && s_history_move_hold <= 0.0f) history_commit_step();
         }
     }
 
     auto history_apply_step = [&](int new_index) {
         if (new_index < 0 || new_index >= (int) s_history.size()) return;
         const TcHistoryEntry &step = s_history[new_index];
-        bool data_changed = are_editor_templates_different(current_template_data, *step.data);
+        // One pass answers both "did anything change?" and "which goal changed?", the latter being
+        // where the undo jumps so the user sees what it took back. Compared while the old template
+        // is still in place, and reported in terms of the one being installed.
+        TcTemplateDiff diff = tc_find_first_template_difference(*step.data, current_template_data);
+        bool data_changed = diff.any;
+        // Coordinates, decoration thickness and the rest of what the reverse sync block copies reach
+        // the map every frame on their own, so a step that only moved things does not need the
+        // preview reload, which costs a full JSON serialise plus a re-parse of the whole template.
+        bool preview_needed = data_changed &&
+                              are_editor_templates_different(current_template_data, *step.data, true);
         // Read while the selection pointers still point into the current template, which the
         // assignment below invalidates. The restore compares against it to work out which tab the
         // step belongs to.
@@ -5454,7 +5883,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_pending_lang_imports = *step.lang_imports;
         // The step this lands on is a different template than the one the cache was answered for.
         s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
-        history_restore_selection(step.selection, previous_selection);
+        history_restore_selection(step.selection, previous_selection, diff);
         if (data_changed) {
             // A step that only moved the selection leaves the save result standing: it is still
             // an accurate report of what is on disk.
@@ -5465,12 +5894,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Coordinates reach the map through the reverse sync that runs every frame anyway; goals
         // appearing or vanishing only get there through a fresh preview.
-        if (data_changed && t && t->is_visual_layout_editing) {
+        if (preview_needed && t && t->is_visual_layout_editing) {
             tc_push_live_template_preview(creator_version_str, selected_template_info,
                                           selected_lang_flag, selected_layout_flag, current_template_data);
         }
         s_history_settle_frames = 6;
     };
+
+    // Undo and redo answer while the map has focus too, because the Visual Layout Editor edits
+    // this same template copy.
+    bool editor_hotkey_target = t && (t->is_temp_creator_focused || t->is_visual_layout_editing);
+    // A movement run still inside its window has not been committed yet. Take it as a step first,
+    // or the undo would step over it and take back the edit in front of it while the nudges stay.
+    auto history_flush_pending_move = [&]() {
+        if (s_history_move_hold <= 0.0f) return;
+        s_history_move_hold = 0.0f;
+        history_commit_step();
+    };
+    if (editor_hotkey_target && (t->editor_undo_pressed || t->editor_redo_pressed)) {
+        history_flush_pending_move();
+    }
 
     int history_undo_steps = (editing_template && s_history_index > 0) ? s_history_index : 0;
     int history_redo_steps = (editing_template && s_history_index >= 0)
@@ -5479,9 +5922,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     bool history_can_undo = history_undo_steps > 0;
     bool history_can_redo = history_redo_steps > 0;
 
-    // Undo / Redo (Ctrl+Z and Ctrl+Y by default, rebindable in Settings > Hotkeys). Both also fire
-    // while the map has focus, because the Visual Layout Editor edits this same template copy.
-    bool editor_hotkey_target = t && (t->is_temp_creator_focused || t->is_visual_layout_editing);
+    // Undo / Redo (Ctrl+Z and Ctrl+Y by default, rebindable in Settings > Hotkeys).
     if (t && t->editor_undo_pressed && editor_hotkey_target && history_can_undo) {
         history_apply_step(s_history_index - 1);
     } else if (t && t->editor_redo_pressed && editor_hotkey_target && history_can_redo) {
@@ -7426,6 +7867,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         Tracker *layout_seed_tracker = is_editing_active_template ? t : nullptr;
 
         if (is_editing_active_template) {
+            // The fields copied here are the ones are_manual_positions_different's
+            // ignore_synced_layout mode is allowed to skip. Adding one here means adding it there.
             auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
                 tracker_pos.x = editor_pos.x;
                 tracker_pos.y = editor_pos.y;
@@ -7730,6 +8173,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::BeginDisabled(!history_can_undo);
         if (ImGui::Button("Undo") && history_can_undo) {
             ImGui::ClearActiveID();
+            history_flush_pending_move();
             history_apply_step(s_history_index - 1);
         }
         ImGui::EndDisabled();
@@ -7737,8 +8181,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char undo_tooltip_buffer[512];
             snprintf(undo_tooltip_buffer, sizeof(undo_tooltip_buffer),
                      "Take back the last change made here or on the map (Ctrl+Z / Cmd+Z).\n"
-                     "A whole typing run and a whole drag each count as one step, and\n"
-                     "selecting something is a step of its own.\n"
+                     "A whole typing run, a whole drag and a whole run of nudges each count\n"
+                     "as one step. Highlighting a row in a list is not a step; ticking its\n"
+                     "checkbox is.\n"
                      "%d step%s left to undo.",
                      history_undo_steps, history_undo_steps == 1 ? "" : "s");
             ImGui::SetTooltip("%s", undo_tooltip_buffer);
@@ -7748,6 +8193,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::BeginDisabled(!history_can_redo);
         if (ImGui::Button("Redo") && history_can_redo) {
             ImGui::ClearActiveID();
+            history_flush_pending_move();
             history_apply_step(s_history_index + 1);
         }
         ImGui::EndDisabled();
@@ -7894,14 +8340,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
                 if (t->is_visual_layout_editing) {
-                    // Auto-save the template if there are unsaved changes to prevent
-                    // flickering when the settings reload re-parses the template from disk
+                    // Unsaved changes used to be force-saved here, because the settings reload below
+                    // re-parses the template from disk and would otherwise show the file instead of
+                    // what the editor holds. The live preview answers that without touching the file:
+                    // every reload from here on parses this copy, so the map opens on the unsaved
+                    // state and the user keeps the choice of whether to save it at all.
                     bool has_unsaved = are_editor_templates_different(current_template_data, saved_template_data);
                     if (has_unsaved) {
-                        validate_and_save_template(creator_version_str, selected_template_info,
-                                                   selected_lang_flag, selected_layout_flag, current_template_data,
-                                                   saved_template_data, save_message_type,
-                                                   status_message, app_settings, &s_pending_lang_imports);
+                        tc_push_live_template_preview(creator_version_str, selected_template_info,
+                                                      selected_lang_flag, selected_layout_flag,
+                                                      current_template_data);
                     }
 
                     // Remember the current hiding mode and manual layout setting before
@@ -7938,7 +8386,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
                          "Applying settings is also disabled while active to prevent template reloads.\n"
-                         "Unsaved template changes will be auto-saved when activating.\n\n"
+                         "Unsaved template changes are shown on the map without being saved.\n\n"
                          "Multi-Select:\n"
                          " - Click and drag on empty space to draw a selection rectangle.\n"
                          " - Hold Ctrl (Cmd on macOS) and click items to add/remove them individually.\n"
@@ -7972,7 +8420,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       : 0;
                 if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
-                    static std::set<int> s_adv_selection;
                     static int s_adv_last_clicked = -1;
                     for (auto it = s_adv_selection.begin(); it != s_adv_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.advancements.size())
@@ -9121,12 +9568,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, &advancement == selected_advancement)) {
-                            // Compare pointers
-                            // Check if the user is selecting a *different* item than the one currently selected
-                            if (&advancement != selected_advancement) {
-                                selected_advancement = &advancement;
-                            }
+                            selected_advancement = (&advancement == selected_advancement)
+                                                       ? nullptr
+                                                       : &advancement;
                         }
 
                         draw_goal_row_status_tags(
@@ -9597,14 +10044,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // --- Per-advancement criterion selection state (declared outside the version
                         // conditional so the per-row checkboxes and bulk-action bar below can see it).
-                        // Kept alive between frames so the criteria counter can show "N selected".
-                        static char s_crit_sel_owner[192] = "";
-                        static std::set<int> s_crit_selection;
+                        // The ticks live under this advancement's name, so leaving and coming back
+                        // finds them again; only the shift-click anchor is dropped on the way.
+                        std::set<int> &s_crit_selection = s_crit_selections[advancement.root_name];
                         static int s_crit_last_clicked = -1;
-                        if (strcmp(s_crit_sel_owner, advancement.root_name) != 0) {
-                            strncpy(s_crit_sel_owner, advancement.root_name, sizeof(s_crit_sel_owner) - 1);
-                            s_crit_sel_owner[sizeof(s_crit_sel_owner) - 1] = '\0';
-                            s_crit_selection.clear();
+                        static std::string s_crit_last_clicked_owner;
+                        if (s_crit_last_clicked_owner != advancement.root_name) {
+                            s_crit_last_clicked_owner = advancement.root_name;
                             s_crit_last_clicked = -1;
                         }
                         for (auto it = s_crit_selection.begin(); it != s_crit_selection.end();) {
@@ -10798,7 +11244,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         : 0;
                 if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
-                    static std::set<int> s_stat_selection;
                     static int s_stat_last_clicked = -1;
                     for (auto it = s_stat_selection.begin(); it != s_stat_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.stats.size())
@@ -11693,10 +12138,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, &stat == selected_stat)) {
-                            if (&stat != selected_stat) {
-                                selected_stat = &stat;
-                            }
+                            selected_stat = (&stat == selected_stat) ? nullptr : &stat;
                         }
 
                         draw_goal_row_status_tags(
@@ -12341,13 +12786,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         } else {
                             ImGui::Text("Sub-Stats");
 
-                            static char s_sub_sel_owner[192] = "";
-                            static std::set<int> s_sub_selection;
+                            std::set<int> &s_sub_selection = s_sub_selections[stat_cat.root_name];
                             static int s_sub_last_clicked = -1;
-                            if (strcmp(s_sub_sel_owner, stat_cat.root_name) != 0) {
-                                strncpy(s_sub_sel_owner, stat_cat.root_name, sizeof(s_sub_sel_owner) - 1);
-                                s_sub_sel_owner[sizeof(s_sub_sel_owner) - 1] = '\0';
-                                s_sub_selection.clear();
+                            static std::string s_sub_last_clicked_owner;
+                            if (s_sub_last_clicked_owner != stat_cat.root_name) {
+                                s_sub_last_clicked_owner = stat_cat.root_name;
                                 s_sub_last_clicked = -1;
                             }
                             for (auto it = s_sub_selection.begin(); it != s_sub_selection.end();) {
@@ -13432,7 +13875,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
-                    static std::set<int> s_unlocks_selection;
                     static int s_unlocks_last_clicked = -1;
                     for (auto it = s_unlocks_selection.begin(); it != s_unlocks_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.unlocks.size())
@@ -14065,8 +14507,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, selected_unlock_index == unl_real_i)) {
-                            selected_unlock_index = unl_real_i;
+                            selected_unlock_index = (selected_unlock_index == unl_real_i) ? -1 : unl_real_i;
                         }
 
                         draw_goal_row_status_tags(
@@ -14403,7 +14847,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem
                     ("Custom Goals", nullptr, custom_tab_flags)) {
-                    static std::set<int> s_custom_selection;
                     static int s_custom_last_clicked = -1;
                     for (auto it = s_custom_selection.begin(); it != s_custom_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.custom_goals.size())
@@ -15013,8 +15456,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, selected_custom_index == cg_real_i)) {
-                            selected_custom_index = cg_real_i;
+                            selected_custom_index = (selected_custom_index == cg_real_i) ? -1 : cg_real_i;
                         }
 
                         draw_goal_row_status_tags(
@@ -15492,7 +15937,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // This flag still tracks ALL CHANGES within multi-stage goals
                     bool ms_goal_data_changed = false;
 
-                    static std::set<int> s_msg_selection;
                     static int s_msg_last_clicked = -1;
                     for (auto it = s_msg_selection.begin(); it != s_msg_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.multi_stage_goals.size())
@@ -16311,10 +16755,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
-                            if (&goal != selected_ms_goal) {
-                                selected_ms_goal = &goal;
-                            }
+                            selected_ms_goal = (&goal == selected_ms_goal) ? nullptr : &goal;
                         }
 
                         draw_goal_row_status_tags(
@@ -16730,13 +17174,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
                         ImGui::Text("Stages");
 
-                        static char s_stage_sel_owner[192] = "";
-                        static std::set<int> s_stage_selection;
+                        std::set<int> &s_stage_selection = s_stage_selections[goal.root_name];
                         static int s_stage_last_clicked = -1;
-                        if (strcmp(s_stage_sel_owner, goal.root_name) != 0) {
-                            strncpy(s_stage_sel_owner, goal.root_name, sizeof(s_stage_sel_owner) - 1);
-                            s_stage_sel_owner[sizeof(s_stage_sel_owner) - 1] = '\0';
-                            s_stage_selection.clear();
+                        static std::string s_stage_last_clicked_owner;
+                        if (s_stage_last_clicked_owner != goal.root_name) {
+                            s_stage_last_clicked_owner = goal.root_name;
                             s_stage_last_clicked = -1;
                         }
                         for (auto it = s_stage_selection.begin(); it != s_stage_selection.end();) {
@@ -18042,7 +18484,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_COUNTERS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Counters", nullptr, counter_tab_flags)) {
-                    static std::set<int> s_ctr_selection;
                     static int s_ctr_last_clicked = -1;
                     for (auto it = s_ctr_selection.begin(); it != s_ctr_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.counter_goals.size())
@@ -18672,8 +19113,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Selectable
                         // Find actual index in the source vector
                         int actual_idx = (int) (&counter - &current_template_data.counter_goals[0]);
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, selected_counter_index == actual_idx)) {
-                            selected_counter_index = actual_idx;
+                            selected_counter_index = (selected_counter_index == actual_idx) ? -1 : actual_idx;
                         }
 
                         draw_goal_row_status_tags(
@@ -19097,7 +19540,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        : 0;
                 if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
-                    static std::set<int> s_deco_selection;
                     static int s_deco_last_clicked = -1;
                     for (auto it = s_deco_selection.begin(); it != s_deco_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.decorations.size())
@@ -19535,8 +19977,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SameLine();
 
+                        // Clicking the row that is already selected clears the selection again,
+                        // which is the only way to get the details pane back to nothing.
                         if (ImGui::Selectable(label, selected_deco_index == (int) i)) {
-                            selected_deco_index = (int) i;
+                            selected_deco_index = (selected_deco_index == (int) i) ? -1 : (int) i;
                         }
 
                         // Decorations have no Hidden/Row flags, so the row tag carries the element type
