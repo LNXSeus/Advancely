@@ -1369,7 +1369,8 @@ options:
   `ger` and `zh_cn` names), so you don't have to re-import once per language. It never creates new language files:
   the choices are strictly the languages your template already has. The language you're currently editing is always
   included (its checkbox is locked on) and is written the moment you `Save` like any other edit; the other languages
-  are merged into their existing `_lang` files on that same `Save` (and discarded if you `Revert` first). Any
+  are merged into their existing `_lang` files on that same `Save` (and discarded if you `Revert` first, or taken
+back along with the import itself by `Undo`). Any
   translation the source happens to be missing is simply left blank. If the languages don't line up (the source is
   missing one of yours, or your template has just a single language), it falls back to the single `Language` dropdown
   and imports into the language selected in the editor. Any

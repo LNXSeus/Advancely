@@ -3645,6 +3645,155 @@ static void tc_render_use_visual_selection_arrow_button(const char *id, char *go
     }
 }
 
+// --------------------------------------- EDITOR UNDO / REDO HISTORY ---------------------------------------
+
+// What was selected when a step was committed: the editor's own lists and, while the Visual
+// Layout Editor runs, the elements picked on the map. Selecting is a step in its own right, so
+// an undo can walk back to a selection that was replaced or cleared.
+// Pointer-based selections are stored by root_name because every step reassigns the vectors, and
+// the map selection by the tracker's stable element keys because a reload reallocates every
+// ManualPos it points at.
+struct TcHistorySelection {
+    char advancement[192] = "";
+    char stat[192] = "";
+    char ms_goal[192] = "";
+    int unlock_index = -1;
+    int custom_index = -1;
+    int counter_index = -1;
+    int deco_index = -1;
+    // Sorted by the tracker, so a plain vector comparison answers "same selection?".
+    std::vector<std::string> visual_keys;
+    // False for a step taken with the Visual Layout Editor off. Restoring one of those must leave
+    // the map selection alone instead of clearing a selection the step never knew about.
+    bool visual_active = false;
+};
+
+static bool tc_history_selections_different(const TcHistorySelection &a, const TcHistorySelection &b) {
+    if (strcmp(a.advancement, b.advancement) != 0 ||
+        strcmp(a.stat, b.stat) != 0 ||
+        strcmp(a.ms_goal, b.ms_goal) != 0 ||
+        a.unlock_index != b.unlock_index ||
+        a.custom_index != b.custom_index ||
+        a.counter_index != b.counter_index ||
+        a.deco_index != b.deco_index) {
+        return true;
+    }
+    // The map selection only counts when both steps were taken with the Visual Layout Editor up.
+    // Starting or stopping it is not an edit and must not become a step of its own.
+    return a.visual_active && b.visual_active && a.visual_keys != b.visual_keys;
+}
+
+// Display Names for the template's other languages, staged by an import and merged into their lang
+// files on the next Save. They are part of the editor's unsaved state, so a step carries them too.
+using TcPendingLangImports = std::map<std::string, std::map<std::string, std::string> >;
+
+// One committed step: the whole template, not a diff. Applying a step is then a plain assignment,
+// which is what keeps this independent of the hundreds of places that mutate the editor state.
+// Selecting is a step too, and those leave the template untouched, so consecutive steps share one
+// snapshot instead of each paying for a full copy of a template that can run to several MB.
+struct TcHistoryEntry {
+    std::shared_ptr<const EditorTemplate> data;
+    std::shared_ptr<const TcPendingLangImports> lang_imports;
+    TcHistorySelection selection;
+};
+
+// Whole-template steps cost a few MB each on the big all_advancements templates, so the list is
+// capped by a step count and by a rough byte budget, whichever bites first.
+static constexpr int TC_HISTORY_MAX_STEPS = 100;
+static constexpr int TC_HISTORY_MIN_STEPS = 5;
+static constexpr size_t TC_HISTORY_MAX_BYTES = 128u * 1024u * 1024u;
+
+static std::vector<TcHistoryEntry> s_history;
+static int s_history_index = -1; // s_history[s_history_index] always mirrors the live editor state
+static std::string s_history_owner; // Identity of the template/lang/layout the steps belong to
+// Frames to wait after applying a step before recording again. Applying one hands the tracker a new
+// preview whose reload lands a frame or two later; without the pause that lag can be recorded as a
+// step of its own and the user would need two undos to get anywhere.
+static int s_history_settle_frames = 0;
+// The selection as it looked on the previous settled frame. A selection-only step is committed
+// once the same selection has stood for two of them: the map registers its elements as it draws
+// them, so a rubber-band release only has every picked element identified on the frame after,
+// and committing straight away would leave a half-finished step in front of the real one.
+static TcHistorySelection s_history_last_seen_selection;
+
+// Whether the current step's snapshot is the same template as the last saved state. While it is,
+// the recorder's "did the template change?" question has the same answer as the unsaved-changes
+// flag that is computed once a frame anyway, so a second full comparison of a template holding
+// thousands of goals is skipped. UNKNOWN costs one comparison, whose result is cached here.
+// Anything that reassigns saved_template_data has to reset this; the only place that does so
+// without also changing the history's owner string is the save below.
+enum TcHistoryVsSaved {
+    TC_HISTORY_VS_SAVED_UNKNOWN = 0,
+    TC_HISTORY_VS_SAVED_EQUAL,
+    TC_HISTORY_VS_SAVED_DIFFERENT
+};
+
+static TcHistoryVsSaved s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
+
+// Approximate heap footprint of one step's template. Only used to decide when to drop the oldest
+// ones, so the vector capacities are enough and the fixed-size char members come along in
+// sizeof(). The selection's keys are a rounding error next to the template and are ignored.
+static size_t tc_history_entry_bytes(const EditorTemplate &d) {
+    auto linked_bytes = [](const std::vector<EditorCounterLinkedGoal> &v) {
+        return v.capacity() * sizeof(EditorCounterLinkedGoal);
+    };
+    auto category_bytes = [&](const std::vector<EditorTrackableCategory> &v) {
+        size_t b = v.capacity() * sizeof(EditorTrackableCategory);
+        for (const auto &category: v) {
+            b += category.criteria.capacity() * sizeof(EditorTrackableItem);
+            b += linked_bytes(category.linked_goals);
+            for (const auto &criterion: category.criteria) b += linked_bytes(criterion.linked_goals);
+        }
+        return b;
+    };
+    auto item_bytes = [&](const std::vector<EditorTrackableItem> &v) {
+        size_t b = v.capacity() * sizeof(EditorTrackableItem);
+        for (const auto &item: v) b += linked_bytes(item.linked_goals);
+        return b;
+    };
+
+    size_t bytes = sizeof(TcHistoryEntry);
+    bytes += category_bytes(d.advancements) + category_bytes(d.stats);
+    bytes += item_bytes(d.unlocks) + item_bytes(d.custom_goals);
+    bytes += d.multi_stage_goals.capacity() * sizeof(EditorMultiStageGoal);
+    for (const auto &goal: d.multi_stage_goals) {
+        bytes += goal.stages.capacity() * sizeof(EditorSubGoal);
+        for (const auto &stage: goal.stages) bytes += linked_bytes(stage.linked_goals);
+    }
+    bytes += d.counter_goals.capacity() * sizeof(EditorCounterGoal);
+    for (const auto &goal: d.counter_goals) bytes += linked_bytes(goal.linked_goals);
+    bytes += d.decorations.capacity() * sizeof(EditorDecorationElement);
+    for (const auto &deco: d.decorations) bytes += linked_bytes(deco.linked_goals);
+    return bytes;
+}
+
+// What the whole history costs. Snapshots shared by several steps are counted once, which is the
+// point of sharing them: a run of selection steps must not look like a run of full templates.
+static size_t tc_history_total_bytes() {
+    std::unordered_set<const EditorTemplate *> counted;
+    size_t total = 0;
+    for (const auto &entry: s_history) {
+        if (entry.data && counted.insert(entry.data.get()).second) {
+            total += tc_history_entry_bytes(*entry.data);
+        }
+    }
+    return total;
+}
+
+// Drops the oldest steps once either cap is exceeded. Never touches anything at or after the current
+// step, so trimming can shorten the undo reach but never the redo reach.
+static void tc_history_trim() {
+    while ((int) s_history.size() > TC_HISTORY_MAX_STEPS && s_history_index > 0) {
+        s_history.erase(s_history.begin());
+        s_history_index--;
+    }
+    while (tc_history_total_bytes() > TC_HISTORY_MAX_BYTES &&
+           (int) s_history.size() > TC_HISTORY_MIN_STEPS && s_history_index > 0) {
+        s_history.erase(s_history.begin());
+        s_history_index--;
+    }
+}
+
 // New helper function to centralize validation and saving
 static bool validate_and_save_template(const char *creator_version_str,
                                        const DiscoveredTemplate &selected_template_info,
@@ -3809,6 +3958,9 @@ static bool validate_and_save_template(const char *creator_version_str,
                                       current_template_data, status_message)) {
             // Update snapshot to new clean state
             saved_template_data = current_template_data;
+            // The undo history's steps are unchanged, but what they are being compared against is
+            // not, so its cached answer no longer holds.
+            s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
             save_message_type = MSG_SUCCESS;
             snprintf(status_message, 256, "Saved!");
 
@@ -4287,136 +4439,6 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     ImGui::PopID();
 }
 
-// --------------------------------------- EDITOR UNDO / REDO HISTORY ---------------------------------------
-
-// What was selected when a step was committed: the editor's own lists and, while the Visual
-// Layout Editor runs, the elements picked on the map. Selecting is a step in its own right, so
-// an undo can walk back to a selection that was replaced or cleared.
-// Pointer-based selections are stored by root_name because every step reassigns the vectors, and
-// the map selection by the tracker's stable element keys because a reload reallocates every
-// ManualPos it points at.
-struct TcHistorySelection {
-    char advancement[192] = "";
-    char stat[192] = "";
-    char ms_goal[192] = "";
-    int unlock_index = -1;
-    int custom_index = -1;
-    int counter_index = -1;
-    int deco_index = -1;
-    // Sorted by the tracker, so a plain vector comparison answers "same selection?".
-    std::vector<std::string> visual_keys;
-    // False for a step taken with the Visual Layout Editor off. Restoring one of those must leave
-    // the map selection alone instead of clearing a selection the step never knew about.
-    bool visual_active = false;
-};
-
-static bool tc_history_selections_different(const TcHistorySelection &a, const TcHistorySelection &b) {
-    if (strcmp(a.advancement, b.advancement) != 0 ||
-        strcmp(a.stat, b.stat) != 0 ||
-        strcmp(a.ms_goal, b.ms_goal) != 0 ||
-        a.unlock_index != b.unlock_index ||
-        a.custom_index != b.custom_index ||
-        a.counter_index != b.counter_index ||
-        a.deco_index != b.deco_index) {
-        return true;
-    }
-    // The map selection only counts when both steps were taken with the Visual Layout Editor up.
-    // Starting or stopping it is not an edit and must not become a step of its own.
-    return a.visual_active && b.visual_active && a.visual_keys != b.visual_keys;
-}
-
-// One committed step: the whole template, not a diff. Applying a step is then a plain assignment,
-// which is what keeps this independent of the hundreds of places that mutate the editor state.
-// Selecting is a step too, and those leave the template untouched, so consecutive steps share one
-// snapshot instead of each paying for a full copy of a template that can run to several MB.
-struct TcHistoryEntry {
-    std::shared_ptr<const EditorTemplate> data;
-    TcHistorySelection selection;
-};
-
-// Whole-template steps cost a few MB each on the big all_advancements templates, so the list is
-// capped by a step count and by a rough byte budget, whichever bites first.
-static constexpr int TC_HISTORY_MAX_STEPS = 100;
-static constexpr int TC_HISTORY_MIN_STEPS = 5;
-static constexpr size_t TC_HISTORY_MAX_BYTES = 128u * 1024u * 1024u;
-
-static std::vector<TcHistoryEntry> s_history;
-static int s_history_index = -1; // s_history[s_history_index] always mirrors the live editor state
-static std::string s_history_owner; // Identity of the template/lang/layout the steps belong to
-// Frames to wait after applying a step before recording again. Applying one hands the tracker a new
-// preview whose reload lands a frame or two later; without the pause that lag can be recorded as a
-// step of its own and the user would need two undos to get anywhere.
-static int s_history_settle_frames = 0;
-// The selection as it looked on the previous settled frame. A selection-only step is committed
-// once the same selection has stood for two of them: the map registers its elements as it draws
-// them, so a rubber-band release only has every picked element identified on the frame after,
-// and committing straight away would leave a half-finished step in front of the real one.
-static TcHistorySelection s_history_last_seen_selection;
-
-// Approximate heap footprint of one step's template. Only used to decide when to drop the oldest
-// ones, so the vector capacities are enough and the fixed-size char members come along in
-// sizeof(). The selection's keys are a rounding error next to the template and are ignored.
-static size_t tc_history_entry_bytes(const EditorTemplate &d) {
-    auto linked_bytes = [](const std::vector<EditorCounterLinkedGoal> &v) {
-        return v.capacity() * sizeof(EditorCounterLinkedGoal);
-    };
-    auto category_bytes = [&](const std::vector<EditorTrackableCategory> &v) {
-        size_t b = v.capacity() * sizeof(EditorTrackableCategory);
-        for (const auto &category: v) {
-            b += category.criteria.capacity() * sizeof(EditorTrackableItem);
-            b += linked_bytes(category.linked_goals);
-            for (const auto &criterion: category.criteria) b += linked_bytes(criterion.linked_goals);
-        }
-        return b;
-    };
-    auto item_bytes = [&](const std::vector<EditorTrackableItem> &v) {
-        size_t b = v.capacity() * sizeof(EditorTrackableItem);
-        for (const auto &item: v) b += linked_bytes(item.linked_goals);
-        return b;
-    };
-
-    size_t bytes = sizeof(TcHistoryEntry);
-    bytes += category_bytes(d.advancements) + category_bytes(d.stats);
-    bytes += item_bytes(d.unlocks) + item_bytes(d.custom_goals);
-    bytes += d.multi_stage_goals.capacity() * sizeof(EditorMultiStageGoal);
-    for (const auto &goal: d.multi_stage_goals) {
-        bytes += goal.stages.capacity() * sizeof(EditorSubGoal);
-        for (const auto &stage: goal.stages) bytes += linked_bytes(stage.linked_goals);
-    }
-    bytes += d.counter_goals.capacity() * sizeof(EditorCounterGoal);
-    for (const auto &goal: d.counter_goals) bytes += linked_bytes(goal.linked_goals);
-    bytes += d.decorations.capacity() * sizeof(EditorDecorationElement);
-    for (const auto &deco: d.decorations) bytes += linked_bytes(deco.linked_goals);
-    return bytes;
-}
-
-// What the whole history costs. Snapshots shared by several steps are counted once, which is the
-// point of sharing them: a run of selection steps must not look like a run of full templates.
-static size_t tc_history_total_bytes() {
-    std::unordered_set<const EditorTemplate *> counted;
-    size_t total = 0;
-    for (const auto &entry: s_history) {
-        if (entry.data && counted.insert(entry.data.get()).second) {
-            total += tc_history_entry_bytes(*entry.data);
-        }
-    }
-    return total;
-}
-
-// Drops the oldest steps once either cap is exceeded. Never touches anything at or after the current
-// step, so trimming can shorten the undo reach but never the redo reach.
-static void tc_history_trim() {
-    while ((int) s_history.size() > TC_HISTORY_MAX_STEPS && s_history_index > 0) {
-        s_history.erase(s_history.begin());
-        s_history_index--;
-    }
-    while (tc_history_total_bytes() > TC_HISTORY_MAX_BYTES &&
-           (int) s_history.size() > TC_HISTORY_MIN_STEPS && s_history_index > 0) {
-        s_history.erase(s_history.begin());
-        s_history_index--;
-    }
-}
-
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
@@ -4717,7 +4739,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<std::string> s_template_import_target_langs; // current template's languages
     static std::vector<bool> s_template_import_lang_selected; // parallel to target_langs
     static bool s_template_import_multi_available = false;
-    static std::map<std::string, std::map<std::string, std::string> > s_pending_lang_imports;
+    static TcPendingLangImports s_pending_lang_imports;
     // A save triggered while a text field is still active must wait one frame: clearing the active
     // ID lets that field's deactivation callbacks (e.g. goal rename propagation) run first, so the
     // saved snapshot is fully consistent instead of resurrecting phantom "unsaved changes".
@@ -5339,9 +5361,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (editing_template) {
             s_history.push_back({
                 std::make_shared<const EditorTemplate>(current_template_data),
+                std::make_shared<const TcPendingLangImports>(s_pending_lang_imports),
                 history_capture_selection()
             });
             s_history_index = 0;
+            // The step just taken is current_template_data, so this frame's unsaved-changes flag
+            // already says whether it matches the saved state.
+            s_history_step_vs_saved = editor_has_unsaved_changes
+                                          ? TC_HISTORY_VS_SAVED_DIFFERENT
+                                          : TC_HISTORY_VS_SAVED_EQUAL;
         }
     }
 
@@ -5362,8 +5390,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (settled) {
                 TcHistorySelection live_selection = history_capture_selection();
                 const TcHistoryEntry &current_step = s_history[s_history_index];
-                bool data_changed = are_editor_templates_different(current_template_data,
-                                                                  *current_step.data);
+                if (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_UNKNOWN) {
+                    s_history_step_vs_saved =
+                            are_editor_templates_different(*current_step.data, saved_template_data)
+                                ? TC_HISTORY_VS_SAVED_DIFFERENT
+                                : TC_HISTORY_VS_SAVED_EQUAL;
+                }
+                // Reusing the flag computed at the top of this frame: with the step and the saved
+                // state being the same template, "changed since the step" and "changed since the
+                // save" are the same question. Nothing touches the template between the two points.
+                bool template_changed = (s_history_step_vs_saved == TC_HISTORY_VS_SAVED_EQUAL)
+                                            ? editor_has_unsaved_changes
+                                            : are_editor_templates_different(current_template_data,
+                                                                            *current_step.data);
+                // Cheap while no import is staged, which is nearly always: comparing two empty maps.
+                bool imports_changed = (s_pending_lang_imports != *current_step.lang_imports);
+                bool data_changed = template_changed || imports_changed;
                 bool selection_changed = tc_history_selections_different(live_selection,
                                                                         current_step.selection);
                 // An edit is committed as soon as it settles; a bare selection change has to hold
@@ -5371,16 +5413,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 bool selection_held = !tc_history_selections_different(live_selection,
                                                                       s_history_last_seen_selection);
                 if (data_changed || (selection_changed && selection_held)) {
-                    // A selection-only step keeps pointing at the snapshot it was taken from.
+                    // A step that left one of them alone keeps pointing at the snapshot it was
+                    // taken from, so a run of selection steps costs a selection each, not a
+                    // template each.
                     std::shared_ptr<const EditorTemplate> snapshot =
-                            data_changed
+                            template_changed
                                 ? std::make_shared<const EditorTemplate>(current_template_data)
                                 : current_step.data;
+                    std::shared_ptr<const TcPendingLangImports> imports =
+                            imports_changed
+                                ? std::make_shared<const TcPendingLangImports>(s_pending_lang_imports)
+                                : current_step.lang_imports;
                     // A new change after an undo is the point of no return for whatever was ahead.
                     s_history.resize(s_history_index + 1);
-                    s_history.push_back({snapshot, live_selection});
+                    s_history.push_back({snapshot, imports, live_selection});
                     s_history_index = (int) s_history.size() - 1;
                     tc_history_trim();
+                    // The step just taken is current_template_data again.
+                    s_history_step_vs_saved = editor_has_unsaved_changes
+                                                  ? TC_HISTORY_VS_SAVED_DIFFERENT
+                                                  : TC_HISTORY_VS_SAVED_EQUAL;
                 }
                 s_history_last_seen_selection = live_selection;
             }
@@ -5399,6 +5451,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Assigned even when the comparison says nothing moved: the step is the authority on what the
         // template looked like, and a field the comparison happens not to cover must not survive it.
         current_template_data = *step.data;
+        s_pending_lang_imports = *step.lang_imports;
+        // The step this lands on is a different template than the one the cache was answered for.
+        s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
         history_restore_selection(step.selection, previous_selection);
         if (data_changed) {
             // A step that only moved the selection leaves the save result standing: it is still
