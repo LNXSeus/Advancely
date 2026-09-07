@@ -285,7 +285,7 @@
 			"y":	1035
 		}
 	},
-	"advancement.minecraft.nether.use_lodestone":	{
+	"advancement.minecraft.adventure.use_lodestone":	{
 		"icon_pos":	{
 			"x":	990,
 			"y":	1035
@@ -3436,7 +3436,7 @@
 					"root_name":	"minecraft:recipes/misc/netherite_upgrade_smithing_template",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:nether/use_lodestone",
+					"root_name":	"minecraft:adventure/use_lodestone",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:nether_wastes",

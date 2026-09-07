@@ -286,7 +286,7 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:nether/use_lodestone":	{
+		"minecraft:adventure/use_lodestone":	{
 			"icon":	"blocks/Lodestone_JE1_BE1.png",
 			"groups_enabled":	false,
 			"criteria":	{
@@ -1922,7 +1922,7 @@
 				}, {
 					"root_name":	"minecraft:husbandry/obtain_netherite_hoe"
 				}, {
-					"root_name":	"minecraft:nether/use_lodestone"
+					"root_name":	"minecraft:adventure/use_lodestone"
 				}]
 		},
 		"stat:gold_blocks_picked_up":	{
@@ -1980,7 +1980,7 @@
 					"icon":	"blocks/placeholder.png",
 					"target":	32,
 					"linked_goals":	[{
-							"root_name":	"minecraft:nether/use_lodestone",
+							"root_name":	"minecraft:adventure/use_lodestone",
 							"type":	"advancement"
 						}, {
 							"root_name":	"vex",
@@ -3814,7 +3814,7 @@
 					"root_name":	"minecraft:recipes/misc/netherite_upgrade_smithing_template",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:nether/use_lodestone",
+					"root_name":	"minecraft:adventure/use_lodestone",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:nether_wastes",
