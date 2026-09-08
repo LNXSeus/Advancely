@@ -1193,6 +1193,44 @@ static void bulk_select_all(std::set<int> &sel, int total_count) {
     for (int i = 0; i < total_count; i++) sel.insert(i);
 }
 
+// Editing a list underneath a bulk selection must not cost the user their other ticks, so these
+// move the surviving indices with the rows. The shift-click anchor travels with them.
+static void bulk_shift_after_remove(std::set<int> &sel, int &last_clicked, int removed) {
+    std::set<int> shifted;
+    for (int idx: sel) {
+        if (idx == removed) continue;
+        shifted.insert(idx > removed ? idx - 1 : idx);
+    }
+    sel = shifted;
+    if (last_clicked == removed) last_clicked = -1;
+    else if (last_clicked > removed) last_clicked--;
+}
+
+static void bulk_shift_after_insert(std::set<int> &sel, int &last_clicked, int inserted_at) {
+    std::set<int> shifted;
+    for (int idx: sel) shifted.insert(idx >= inserted_at ? idx + 1 : idx);
+    sel = shifted;
+    if (last_clicked >= inserted_at) last_clicked++;
+}
+
+// `to` is the index the row ends up at, counted in the list with the row already taken out.
+static void bulk_shift_after_move(std::set<int> &sel, int &last_clicked, int from, int to) {
+    std::set<int> shifted;
+    for (int idx: sel) {
+        int new_idx = idx;
+        if (idx == from) {
+            new_idx = to;
+        } else {
+            if (idx > from) new_idx--;
+            if (new_idx >= to) new_idx++;
+        }
+        shifted.insert(new_idx);
+    }
+    sel = shifted;
+    // A range anchor that survives a reorder would extend over rows the user never saw together.
+    last_clicked = -1;
+}
+
 // Inverts a bulk selection: every index in [0, total_count) not currently selected becomes
 // selected, and vice versa. Used by the "Invert Selection" bulk action in every tab.
 static void bulk_invert_selection(std::set<int> &sel, int total_count) {
@@ -9681,6 +9719,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorTrackableCategory &adv) {
                                                               return &adv == source_item_ptr;
                                                           });
+                            int dnd_from = (int) std::distance(current_template_data.advancements.begin(), source_it);
                             EditorTrackableCategory item_to_move = *source_item_ptr;
                             current_template_data.advancements.erase(source_it);
                             auto target_it = std::find_if(current_template_data.advancements.begin(),
@@ -9688,6 +9727,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorTrackableCategory &adv) {
                                                               return &adv == target_item_ptr;
                                                           });
+                            int dnd_to = (int) std::distance(current_template_data.advancements.begin(), target_it);
                             current_template_data.advancements.insert(target_it, item_to_move);
                             // Keep the dragged item selected at its new position (erase/insert
                             // invalidates the old pointer, so re-find it by root name).
@@ -9698,8 +9738,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     break;
                                 }
                             }
-                            s_adv_selection.clear();
-                            s_adv_last_clicked = -1;
+                            bulk_shift_after_move(s_adv_selection, s_adv_last_clicked, dnd_from, dnd_to);
                         }
                         save_message_type = MSG_NONE;
                     }
@@ -9774,6 +9813,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                });
 
                         // Insert the new copy right after the source item
+                        int copy_at = (it != current_template_data.advancements.end())
+                                          ? (int) std::distance(current_template_data.advancements.begin(), it) + 1
+                                          : (int) current_template_data.advancements.size();
                         if (it != current_template_data.advancements.end()) {
                             current_template_data.advancements.insert(it + 1, new_advancement);
                         } else {
@@ -9789,8 +9831,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         request_scroll_to_new_goal(new_advancement.root_name);
-                        s_adv_selection.clear();
-                        s_adv_last_clicked = -1;
+                        bulk_shift_after_insert(s_adv_selection, s_adv_last_clicked, copy_at);
                         save_message_type = MSG_NONE;
                     }
 
@@ -9802,6 +9843,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
+                        int removed_at = (int) (adv_to_remove - current_template_data.advancements.data());
                         if (selected_advancement == adv_to_remove) {
                             selected_advancement = nullptr;
                         }
@@ -9827,8 +9869,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
-                        s_adv_selection.clear();
-                        s_adv_last_clicked = -1;
+                        bulk_shift_after_remove(s_adv_selection, s_adv_last_clicked, removed_at);
                         save_message_type = MSG_NONE;
                     }
 
@@ -12246,6 +12287,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorTrackableCategory &s) {
                                                               return &s == source_item_ptr;
                                                           });
+                            int dnd_from = (int) std::distance(current_template_data.stats.begin(), source_it);
                             EditorTrackableCategory item_to_move = *source_item_ptr;
                             current_template_data.stats.erase(source_it);
                             auto target_it = std::find_if(current_template_data.stats.begin(),
@@ -12253,6 +12295,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorTrackableCategory &s) {
                                                               return &s == target_item_ptr;
                                                           });
+                            int dnd_to = (int) std::distance(current_template_data.stats.begin(), target_it);
                             current_template_data.stats.insert(target_it, item_to_move);
                             // Keep the dragged item selected at its new position (erase/insert
                             // invalidates the old pointer, so re-find it by root name).
@@ -12263,8 +12306,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     break;
                                 }
                             }
-                            s_stat_selection.clear();
-                            s_stat_last_clicked = -1;
+                            bulk_shift_after_move(s_stat_selection, s_stat_last_clicked, dnd_from, dnd_to);
                         }
                         save_message_type = MSG_NONE;
                     }
@@ -12331,6 +12373,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
                                                [&](const EditorTrackableCategory &s) { return &s == source_stat_ptr; });
 
+                        int copy_at = (it != current_template_data.stats.end())
+                                          ? (int) std::distance(current_template_data.stats.begin(), it) + 1
+                                          : (int) current_template_data.stats.size();
                         if (it != current_template_data.stats.end()) {
                             current_template_data.stats.insert(it + 1, new_stat);
                         } else {
@@ -12346,8 +12391,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         request_scroll_to_new_goal(new_stat.root_name);
-                        s_stat_selection.clear();
-                        s_stat_last_clicked = -1;
+                        bulk_shift_after_insert(s_stat_selection, s_stat_last_clicked, copy_at);
                         save_message_type = MSG_NONE;
                     }
 
@@ -12359,6 +12403,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
+                        int removed_at = (int) (stat_to_remove - current_template_data.stats.data());
                         if (selected_stat == stat_to_remove) {
                             selected_stat = nullptr;
                         }
@@ -12383,8 +12428,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
-                        s_stat_selection.clear();
-                        s_stat_last_clicked = -1;
+                        bulk_shift_after_remove(s_stat_selection, s_stat_last_clicked, removed_at);
                         save_message_type = MSG_NONE;
                     }
                     ImGui::EndChild();
@@ -16860,6 +16904,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorMultiStageGoal &g) {
                                                               return &g == source_item_ptr;
                                                           });
+                            int dnd_from = (int) std::distance(current_template_data.multi_stage_goals.begin(),
+                                                               source_it);
                             EditorMultiStageGoal item_to_move = *source_item_ptr;
                             current_template_data.multi_stage_goals.erase(source_it);
                             auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
@@ -16867,6 +16913,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorMultiStageGoal &g) {
                                                               return &g == target_item_ptr;
                                                           });
+                            int dnd_to = (int) std::distance(current_template_data.multi_stage_goals.begin(),
+                                                             target_it);
                             current_template_data.multi_stage_goals.insert(target_it, item_to_move);
                             // Keep the dragged item selected at its new position (erase/insert
                             // invalidates the old pointer, so re-find it by root name).
@@ -16877,8 +16925,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     break;
                                 }
                             }
-                            s_msg_selection.clear();
-                            s_msg_last_clicked = -1;
+                            bulk_shift_after_move(s_msg_selection, s_msg_last_clicked, dnd_from, dnd_to);
                         }
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
@@ -16944,6 +16991,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                current_template_data.multi_stage_goals.end(),
                                                [&](const EditorMultiStageGoal &g) { return &g == source_goal_ptr; });
 
+                        int copy_at = (it != current_template_data.multi_stage_goals.end())
+                                          ? (int) std::distance(current_template_data.multi_stage_goals.begin(), it) + 1
+                                          : (int) current_template_data.multi_stage_goals.size();
                         if (it != current_template_data.multi_stage_goals.end()) {
                             current_template_data.multi_stage_goals.insert(it + 1, new_goal);
                         } else {
@@ -16959,8 +17009,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         request_scroll_to_new_goal(new_goal.root_name);
-                        s_msg_selection.clear();
-                        s_msg_last_clicked = -1;
+                        bulk_shift_after_insert(s_msg_selection, s_msg_last_clicked, copy_at);
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
@@ -16973,6 +17022,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
+                        int removed_at = (int) (goal_to_remove - current_template_data.multi_stage_goals.data());
                         if (selected_ms_goal == goal_to_remove) {
                             selected_ms_goal = nullptr;
                         }
@@ -16995,8 +17045,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                         }
-                        s_msg_selection.clear();
-                        s_msg_last_clicked = -1;
+                        bulk_shift_after_remove(s_msg_selection, s_msg_last_clicked, removed_at);
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
@@ -19220,6 +19269,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorCounterGoal &g) {
                                                               return &g == source_item_ptr;
                                                           });
+                            int dnd_from = (int) std::distance(current_template_data.counter_goals.begin(), source_it);
                             EditorCounterGoal item_to_move = *source_item_ptr;
                             current_template_data.counter_goals.erase(source_it);
                             auto target_it = std::find_if(current_template_data.counter_goals.begin(),
@@ -19227,6 +19277,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           [&](const EditorCounterGoal &g) {
                                                               return &g == target_item_ptr;
                                                           });
+                            int dnd_to = (int) std::distance(current_template_data.counter_goals.begin(), target_it);
                             current_template_data.counter_goals.insert(target_it, item_to_move);
                             for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
                                 if (strcmp(current_template_data.counter_goals[ci].root_name,
@@ -19235,8 +19286,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     break;
                                 }
                             }
-                            s_ctr_selection.clear();
-                            s_ctr_last_clicked = -1;
+                            bulk_shift_after_move(s_ctr_selection, s_ctr_last_clicked, dnd_from, dnd_to);
                         }
                         save_message_type = MSG_NONE;
                     }
@@ -19292,8 +19342,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.counter_goals.push_back(copy);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
                         request_scroll_to_new_goal(copy.root_name);
-                        s_ctr_selection.clear();
-                        s_ctr_last_clicked = -1;
+                        // The copy lands at the end, so nothing already ticked moved.
                         save_message_type = MSG_NONE;
                     }
 
@@ -20093,8 +20142,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             current_template_data.decorations.insert(
                                 current_template_data.decorations.begin() + insert_at, item_to_move);
                             selected_deco_index = insert_at;
-                            s_deco_selection.clear();
-                            s_deco_last_clicked = -1;
+                            bulk_shift_after_move(s_deco_selection, s_deco_last_clicked,
+                                                  deco_dnd_source_index, insert_at);
                         }
                         save_message_type = MSG_NONE;
                     }
