@@ -7094,6 +7094,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
         // Signal the Editor to sync this frame!
         t->visual_layout_just_dragged = true;
+        t->visual_autopan_drag_pos = &target_pos;
         SDL_SetAtomicInt(&g_templates_changed, 1);
     }
 
@@ -12051,6 +12052,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     s_visual_parent_map_prev.swap(s_visual_parent_map);
     s_visual_parent_map.clear();
     t->visual_item_interacted_this_frame = false;
+    t->visual_autopan_drag_pos = nullptr;
 
     // This is the starting Y position for all rendering.
     // Each section will render itself and update this value for the next section.
@@ -13430,6 +13432,89 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
             t->camera_offset.x += io.MouseDelta.x;
             t->camera_offset.y += io.MouseDelta.y;
+        }
+    }
+
+    // Edge auto-pan while layout editing: dragging an element or a selection rectangle towards a
+    // window border scrolls the map that way, and the further the mouse goes past the border the
+    // faster it scrolls. Sub-pixel world movement is carried over between frames so a slow pan
+    // still moves the dragged group instead of being lost to rounding.
+    static float s_autopan_world_rem_x = 0.0f;
+    static float s_autopan_world_rem_y = 0.0f;
+    bool autopan_possible = t->is_visual_layout_editing && !t->camera_locked &&
+                            ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                            (t->visual_autopan_drag_pos != nullptr || t->visual_select_rect_active);
+    if (!autopan_possible) {
+        s_autopan_world_rem_x = 0.0f;
+        s_autopan_world_rem_y = 0.0f;
+    } else {
+        const float edge_margin = 60.0f; // Border band where auto-pan starts
+        const float base_speed = 600.0f; // Pixels per second one full band width past the inner edge
+        const float max_speed_factor = 4.0f; // Cap on how much being far outside speeds it up
+
+        ImVec2 win_min = ImGui::GetWindowPos();
+        ImVec2 win_size = ImGui::GetWindowSize();
+        ImVec2 win_max = ImVec2(win_min.x + win_size.x, win_min.y + win_size.y);
+        ImVec2 mouse = ImGui::GetMousePos();
+        float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
+
+        ImVec2 pan_delta = ImVec2(0.0f, 0.0f);
+        if (mouse.x > win_max.x - edge_margin) {
+            float p = fminf((mouse.x - (win_max.x - edge_margin)) / edge_margin, max_speed_factor);
+            pan_delta.x -= base_speed * p * dt;
+        } else if (mouse.x < win_min.x + edge_margin) {
+            float p = fminf(((win_min.x + edge_margin) - mouse.x) / edge_margin, max_speed_factor);
+            pan_delta.x += base_speed * p * dt;
+        }
+        if (mouse.y > win_max.y - edge_margin) {
+            float p = fminf((mouse.y - (win_max.y - edge_margin)) / edge_margin, max_speed_factor);
+            pan_delta.y -= base_speed * p * dt;
+        } else if (mouse.y < win_min.y + edge_margin) {
+            float p = fminf(((win_min.y + edge_margin) - mouse.y) / edge_margin, max_speed_factor);
+            pan_delta.y += base_speed * p * dt;
+        }
+
+        if (pan_delta.x != 0.0f || pan_delta.y != 0.0f) {
+            // The rects recorded while rendering belong to the camera as it was this frame.
+            ImVec2 pre_pan_camera = t->camera_offset;
+            t->camera_offset.x += pan_delta.x;
+            t->camera_offset.y += pan_delta.y;
+
+            // Keep the rectangle's origin on the world point it was started from.
+            if (t->visual_select_rect_active) {
+                t->visual_select_rect_start.x += pan_delta.x;
+                t->visual_select_rect_start.y += pan_delta.y;
+            }
+
+            if (t->visual_autopan_drag_pos) {
+                // The dragged element moves the opposite way through the world so it stays under
+                // the cursor while the camera travels.
+                float world_dx = -pan_delta.x / t->zoom_level + s_autopan_world_rem_x;
+                float world_dy = -pan_delta.y / t->zoom_level + s_autopan_world_rem_y;
+                float dx = truncf(world_dx);
+                float dy = truncf(world_dy);
+                s_autopan_world_rem_x = world_dx - dx;
+                s_autopan_world_rem_y = world_dy - dy;
+
+                if (dx != 0.0f || dy != 0.0f) {
+                    ManualPos *dragged = t->visual_autopan_drag_pos;
+                    dragged->x = fminf(fmaxf(roundf(dragged->x + dx), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                    dragged->y = fminf(fmaxf(roundf(dragged->y + dy), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+
+                    if (s_visual_selected_items.count(dragged) > 0) {
+                        for (ManualPos *sel_pos: s_visual_selected_items) {
+                            if (sel_pos == dragged) continue;
+                            if (!sel_pos->is_set && visual_pos_has_selected_ancestor(sel_pos)) continue;
+                            init_unset_pos_from_screen(sel_pos, t->zoom_level, pre_pan_camera);
+                            sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dy), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        }
+                    }
+
+                    t->visual_layout_just_dragged = true;
+                    SDL_SetAtomicInt(&g_templates_changed, 1);
+                }
+            }
         }
     }
 

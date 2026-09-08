@@ -139,6 +139,9 @@ struct Tracker {
     ImVec2 visual_select_rect_start; // Screen coords where the selection rectangle started
     ManualPos *visual_deselect_candidate;
     // Item that was already selected when pressed; a plain click (no drag) on release deselects it
+    ManualPos *visual_autopan_drag_pos;
+    // Item being dragged this frame. Set while rendering, consumed by the edge auto-pan at the end
+    // of the frame so the dragged group can follow the camera and stay under the mouse.
 
     // Keyboard-driven movement of the visual selection. The event handler accumulates the pixels a
     // hotkey asks for (key repeats included) and the layout editor applies and clears them while
