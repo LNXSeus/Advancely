@@ -1146,6 +1146,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Scrollable List
     settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
     settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
+    settings->tracker_list_incomplete_first = DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST;
 
     // View State Defaults
     settings->view_pan_x = DEFAULT_TRACKER_VIEW_PAN_X;
@@ -2744,6 +2745,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
             defaults_were_used = true;
         }
+
+        const cJSON *list_incomplete_first = cJSON_GetObjectItem(visual_settings, "tracker_list_incomplete_first");
+        if (list_incomplete_first && cJSON_IsBool(list_incomplete_first))
+            settings->tracker_list_incomplete_first = cJSON_IsTrue(list_incomplete_first);
+        else {
+            settings->tracker_list_incomplete_first = DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST;
+            defaults_were_used = true;
+        }
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
@@ -2783,6 +2792,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
         settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
+        settings->tracker_list_incomplete_first = DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST;
 
         // Custom Tracker Spacing Defaults
         for (int i = 0; i < SECTION_COUNT; i++) {
@@ -3882,6 +3892,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_list_scroll_speed");
         cJSON_AddItemToObject(visuals_obj, "tracker_list_scroll_speed",
                               cJSON_CreateNumber(settings->tracker_list_scroll_speed));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_list_incomplete_first");
+        cJSON_AddItemToObject(visuals_obj, "tracker_list_incomplete_first",
+                              cJSON_CreateBool(settings->tracker_list_incomplete_first));
     }
 
     // Update Custom Progress if provided (per-UUID schema)

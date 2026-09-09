@@ -222,6 +222,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #define DEFAULT_SCROLLABLE_LIST_THRESHOLD 16 // Items before scrolling kicks in
 #define DEFAULT_TRACKER_LIST_SCROLL_SPEED 36.0f // Default pixels per scroll step
+#define DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST true // Scrollable lists float incomplete sub-items to the top
 
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
@@ -888,6 +889,7 @@ struct AppSettings {
     // --- Custom Tracker Spacing ---
     int scrollable_list_threshold; // Number of items before list becomes scrollable
     float tracker_list_scroll_speed; // Configurable speed
+    bool tracker_list_incomplete_first; // Scrollable criteria/sub-stat lists put the incomplete ones first
     float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally
     float tracker_criteria_vertical_spacing; // Extra vertical spacing in pixels between criteria/sub-stat rows
     bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section

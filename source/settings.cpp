@@ -695,6 +695,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 
         a->scrollable_list_threshold != b->scrollable_list_threshold ||
         a->tracker_list_scroll_speed != b->tracker_list_scroll_speed ||
+        a->tracker_list_incomplete_first != b->tracker_list_incomplete_first ||
 
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
@@ -3040,6 +3041,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
                          "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
                 ImGui::SetTooltip("%s", speed_tooltip);
+            }
+
+            ImGui::Checkbox("Incomplete Sub-Goals First", &temp_settings.tracker_list_incomplete_first);
+            if (ImGui::IsItemHovered()) {
+                char incomplete_first_tooltip[768];
+                snprintf(incomplete_first_tooltip, sizeof(incomplete_first_tooltip),
+                         "In a scrollable list, criteria/sub-stats that are still missing float to the top\n"
+                         "and the finished ones sink to the bottom, so the list always opens on what is left.\n"
+                         "Items keep their template order within each of the two groups.\n"
+                         "\n"
+                         "'Invert Hiding Mode' flips this too: the completed ones come first instead.\n"
+                         "\nNote: This only affects lists that scroll, and never a goal whose\n"
+                         "criteria/sub-stats use manual coordinates.\n"
+                         "Default: %s", DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST ? "On" : "Off");
+                ImGui::SetTooltip("%s", incomplete_first_tooltip);
             }
 
             ImGui::Separator();

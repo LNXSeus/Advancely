@@ -7965,6 +7965,21 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 item_height += criteria_list_height;
             }
 
+            // A scrolling list only ever shows a window onto its sub-items, so the ones still missing
+            // are floated to the top and the finished ones sink out of sight below. Only lists that
+            // scroll are touched: every other list is fully visible anyway, and the ordering is kept
+            // away from anything carrying manual coordinates (use_scrolling_list already rules those
+            // out) so a position the user placed by hand is never re-sorted out from under them.
+            // Which side sinks follows the hiding mode's own idea of "done", so "Invert Hiding Mode"
+            // flips this along with everything else. Stable, so the template order survives inside
+            // each of the two groups.
+            if (use_scrolling_list && settings->tracker_list_incomplete_first) {
+                std::stable_partition(children_to_render.begin(), children_to_render.end(),
+                                      [settings](const TrackableItem *crit) {
+                                          return crit && !tracker_is_faded_by_mode(settings, crit->done);
+                                      });
+            }
+
 
             // --- Layout and Culling ---
             // Per-position hiding for manual layout

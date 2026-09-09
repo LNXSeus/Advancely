@@ -249,7 +249,8 @@
 		"checkbox_reveal_radius":	120,
 		"text_reveal_enabled":	false,
 		"scrollable_list_threshold":	16,
-		"tracker_list_scroll_speed":	36
+		"tracker_list_scroll_speed":	36,
+		"tracker_list_incomplete_first":	true
 	},
 	"path_mode":	"instance",
 	"manual_saves_path":	"",
