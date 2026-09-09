@@ -94,6 +94,48 @@ static std::unordered_set<ManualPos *> s_visual_selected_items;
 static std::unordered_map<ManualPos *, ManualPos *> s_visual_parent_map;
 static std::unordered_map<ManualPos *, ManualPos *> s_visual_parent_map_prev;
 
+// --- Manual-completion sweep ---
+// One manual-completion checkbox exactly as it was drawn this frame. Registered only where the
+// checkbox is both visible and actually clickable, so a sweep can never reach a box the user cannot
+// see or is not allowed to touch (co-op read-only views, host-only modes). Rebuilt every frame, so
+// the pointers only ever live for the frame that recorded them.
+enum SweepTargetKind {
+    SWEEP_TARGET_CUSTOM_GOAL, // item is the goal itself
+    SWEEP_TARGET_STAT_PARENT, // cat's own checkbox, which forces all of its criteria
+    SWEEP_TARGET_SUB_STAT // item is a criterion of cat
+};
+
+struct SweepTarget {
+    SweepTargetKind kind;
+    ImVec2 rect_min;
+    ImVec2 rect_max;
+    TrackableCategory *cat; // Parent for the two stat kinds, nullptr for custom goals
+    TrackableItem *item; // Criterion or custom goal, nullptr for a stat parent
+    bool is_on; // is_manually_completed when it was drawn, i.e. what the box showed
+};
+
+static std::vector<SweepTarget> s_sweep_targets;
+
+// True while a completion sweep rectangle is being dragged, so the checkboxes it passes over do not
+// also register the drag as a click on themselves.
+static bool s_sweep_rect_active = false;
+static ImVec2 s_sweep_rect_start = ImVec2(0.0f, 0.0f);
+// Set once the drag has grown past the click threshold. Kept for the rest of the drag so a sweep
+// that wanders back to where it started still counts as a sweep on release.
+static bool s_sweep_rect_armed = false;
+
+static void sweep_register_target(SweepTargetKind kind, const ImVec2 &rect_min, const ImVec2 &rect_max,
+                                  TrackableCategory *cat, TrackableItem *item, bool is_on) {
+    SweepTarget target{};
+    target.kind = kind;
+    target.rect_min = rect_min;
+    target.rect_max = rect_max;
+    target.cat = cat;
+    target.item = item;
+    target.is_on = is_on;
+    s_sweep_targets.push_back(target);
+}
+
 // Walks the (previous, complete) parent hierarchy and returns true if any ancestor of `pos`
 // is itself part of the current visual selection.
 static bool visual_pos_has_selected_ancestor(ManualPos *pos) {
@@ -7965,15 +8007,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 item_height += criteria_list_height;
             }
 
-            // A scrolling list only ever shows a window onto its sub-items, so the ones still missing
-            // are floated to the top and the finished ones sink out of sight below. Only lists that
-            // scroll are touched: every other list is fully visible anyway, and the ordering is kept
-            // away from anything carrying manual coordinates (use_scrolling_list already rules those
-            // out) so a position the user placed by hand is never re-sorted out from under them.
+            // Sub-items still missing are floated to the top of the auto-flowed list and the finished
+            // ones sink to the bottom. This covers every automatic list, not just the ones long enough
+            // to scroll: a two-row category reorders the same way a fifty-row one does. Anything
+            // carrying manual coordinates is left alone (has_manual_child), so a position the user
+            // placed by hand is never re-sorted out from under them, and a simple stat has no sub-item
+            // rows to order in the first place.
             // Which side sinks follows the hiding mode's own idea of "done", so "Invert Hiding Mode"
             // flips this along with everything else. Stable, so the template order survives inside
             // each of the two groups.
-            if (use_scrolling_list && settings->tracker_list_incomplete_first) {
+            if (settings->tracker_list_incomplete_first && is_complex && !is_simple_stat && !has_manual_child) {
                 std::stable_partition(children_to_render.begin(), children_to_render.end(),
                                       [settings](const TrackableItem *crit) {
                                           return crit && !tracker_is_faded_by_mode(settings, crit->done);
@@ -8746,17 +8789,35 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
 
+                            // Hoisted out of the click test below so the sweep can reuse the exact
+                            // same permission answer instead of a second copy that could drift.
+                            bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                                                 g_coop_ctx && coop_net_get_state(g_coop_ctx) ==
+                                                 COOP_NET_CONNECTED);
+                            bool rcv_can_send = rcv_in_lobby &&
+                                                (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
+                                                 viewing_own_uuid);
+
+                            // Offer this box to a completion sweep only when a real click on it would
+                            // do something: on screen, interactive, and not blocked by a co-op rule.
+                            // Deliberately not gated on the cursor reveal radius: that follows the
+                            // mouse, so it would shrink a sweep to whatever sat near the release
+                            // point. The sweep outlines every box it is about to change instead.
+                            // A sweep already under way keeps registering while the cursor sits over
+                            // another window, so releasing there still applies what the rectangle covered.
+                            if (rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
+                                (!t->map_interactions_blocked || s_sweep_rect_active) &&
+                                !t->is_visual_layout_editing &&
+                                view_editable_self && !(rcv_in_lobby && !rcv_can_send)) {
+                                sweep_register_target(SWEEP_TARGET_SUB_STAT, checkbox_rect.Min, checkbox_rect.Max,
+                                                      cat, crit, crit->is_manually_completed);
+                            }
+
                             // Deactivating left click when in visual editing mode
                             // Co-op: Receivers respect stat checkbox permission
                             if (!t->map_interactions_blocked && is_hovered &&
                                 ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                                 is_visual_layout_editing && view_editable_self) {
-                                bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
-                                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) ==
-                                                     COOP_NET_CONNECTED);
-                                bool rcv_can_send = rcv_in_lobby &&
-                                                    (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
-                                                     viewing_own_uuid);
                                 if (rcv_in_lobby && !rcv_can_send) {
                                     // Host-only mode + not viewing own UUID: clicking disabled for receivers
                                 } else if (rcv_can_send) {
@@ -9259,16 +9320,32 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         ImGui::SetTooltip("%s", tooltip_buf);
                     }
 
+                    // Hoisted out of the click test below so the sweep can reuse the exact same
+                    // permission answer instead of a second copy that could drift.
+                    bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                                         g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                    bool rcv_can_send_p = rcv_in_lobby &&
+                                          (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
+                                           viewing_own_uuid_p);
+
+                    // Offer this box to a completion sweep only when a real click on it would do
+                    // something: on screen, interactive, and not blocked by a co-op rule. Not gated on
+                    // the cursor reveal radius, which follows the mouse and would shrink the sweep.
+                    // A sweep already under way keeps registering while the cursor sits over another
+                    // window, so releasing there still applies what the rectangle covered.
+                    if (rect_on_screen(checkbox_rect_parent.Min, checkbox_rect_parent.Max, io.DisplaySize) &&
+                        (!t->map_interactions_blocked || s_sweep_rect_active) &&
+                        !t->is_visual_layout_editing &&
+                        view_editable_self_p && !(rcv_in_lobby && !rcv_can_send_p)) {
+                        sweep_register_target(SWEEP_TARGET_STAT_PARENT, checkbox_rect_parent.Min,
+                                              checkbox_rect_parent.Max, cat, nullptr, cat->is_manually_completed);
+                    }
+
                     // Deactivating left click when in visual editing mode
                     // Co-op: Receivers respect stat checkbox permission
                     if (!t->map_interactions_blocked && is_hovered_parent &&
                         ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                         is_visual_layout_editing && view_editable_self_p) {
-                        bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
-                                             g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                        bool rcv_can_send_p = rcv_in_lobby &&
-                                              (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
-                                               viewing_own_uuid_p);
                         if (rcv_in_lobby && !rcv_can_send_p) {
                             // Host-only mode + not viewing own UUID: clicking disabled for receivers
                         } else if (rcv_can_send_p) {
@@ -10373,11 +10450,27 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
 
+                // Hoisted out of the click test below so the sweep can reuse the exact same
+                // permission answer instead of a second copy that could drift.
+                bool rcv_can_send_cg = rcv_in_lobby &&
+                                       (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER ||
+                                        viewing_own_uuid_cg);
+
+                // Offer this box to a completion sweep only when a real click on it would do
+                // something: on screen, interactive, and not blocked by a co-op rule. Not gated on
+                // the cursor reveal radius, which follows the mouse and would shrink the sweep.
+                // A sweep already under way keeps registering while the cursor sits over another
+                // window, so releasing there still applies what the rectangle covered.
+                if (rect_on_screen(checkbox_rect.Min, checkbox_rect.Max, io.DisplaySize) &&
+                    (!t->map_interactions_blocked || s_sweep_rect_active) &&
+                    !t->is_visual_layout_editing &&
+                    view_editable_self_cg && !(rcv_in_lobby && !rcv_can_send_cg)) {
+                    sweep_register_target(SWEEP_TARGET_CUSTOM_GOAL, checkbox_rect.Min, checkbox_rect.Max,
+                                          nullptr, item, item->is_manually_completed);
+                }
+
                 if (!t->map_interactions_blocked && is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
                     !t->is_visual_layout_editing && view_editable_self_cg) {
-                    bool rcv_can_send_cg = rcv_in_lobby &&
-                                           (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER ||
-                                            viewing_own_uuid_cg);
                     if (rcv_in_lobby && !rcv_can_send_cg) {
                         // Host-only mode + not viewing own UUID: clicking disabled for receivers
                     } else if (rcv_can_send_cg) {
@@ -12022,6 +12115,110 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
     }
 }
 
+// Recomputes a stat category's cached completion after its own flag or its criteria were changed.
+static void sweep_refresh_stat_category(TrackableCategory *cat) {
+    if (!cat) return;
+    cat->completed_criteria_count = 0;
+    for (int k = 0; k < cat->criteria_count; ++k) {
+        if (cat->criteria[k] && cat->criteria[k]->done) cat->completed_criteria_count++;
+    }
+    bool all_children_done = (cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
+    cat->done = cat->is_manually_completed || all_children_done;
+}
+
+/**
+ * @brief Applies one entry of a completion sweep, taking the same route a click on that checkbox would.
+ *
+ * A receiver asks the host, a host mutates its own view and queues the write, and singleplayer writes
+ * straight into the template data. Only entries that disagree with want_on are handed here, which is
+ * what makes COOP_MOD_TOGGLE (the only action the protocol carries) land on the intended state.
+ *
+ * The persist step is deliberately left out: a sweep can cover hundreds of goals, and the per-click
+ * path's settings_save + broadcast per goal would rewrite the whole file that many times. The caller
+ * does it once after the whole sweep instead.
+ *
+ * @return True when the change was made locally and still needs persisting by the caller.
+ */
+static bool sweep_apply_target(Tracker *t, const AppSettings *settings, const SweepTarget &target, bool want_on) {
+    bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                         g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+    bool allow_any = (target.kind == SWEEP_TARGET_CUSTOM_GOAL)
+                         ? (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER)
+                         : (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER);
+    bool rcv_can_send = rcv_in_lobby && (allow_any || tracker_view_is_own_uuid(t, settings));
+
+    CoopCustomGoalModMsg mod = {};
+    const char *goal_root = (target.kind == SWEEP_TARGET_STAT_PARENT)
+                                ? target.cat->root_name
+                                : target.item->root_name;
+    snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", goal_root);
+    if (target.kind == SWEEP_TARGET_SUB_STAT) {
+        snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", target.cat->root_name);
+    } else {
+        mod.parent_root_name[0] = '\0';
+    }
+    mod.action = COOP_MOD_TOGGLE;
+    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+
+    if (rcv_can_send) {
+        coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+        tracker_apply_mod_to_view(t, &mod);
+        tracker_pending_mod_register(mod.parent_root_name, mod.goal_root_name, 2000);
+        return false;
+    }
+    if (settings->network_mode == NETWORK_HOST && g_coop_ctx &&
+        coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
+        tracker_apply_mod_to_view(t, &mod);
+        tracker_queue_host_mod(&mod);
+        return false;
+    }
+
+    // Singleplayer: write straight into the template data, mirroring the per-checkbox handlers.
+    switch (target.kind) {
+        case SWEEP_TARGET_CUSTOM_GOAL: {
+            TrackableItem *item = target.item;
+            item->is_manually_completed = want_on;
+            if (item->is_manually_completed) {
+                item->done = true;
+            } else {
+                item->done = (item->linked_goal_count > 0 &&
+                              check_linked_goals_satisfied(t->template_data, item->linked_goals,
+                                                           item->linked_goal_count, item->linked_goal_mode));
+            }
+            // Infinite counters keep their running total; simple toggles mirror it so they still
+            // round-trip through the legacy boolean schema.
+            if (item->goal != -1) item->progress = item->done ? 1 : 0;
+            break;
+        }
+        case SWEEP_TARGET_SUB_STAT: {
+            TrackableItem *crit = target.item;
+            crit->is_manually_completed = want_on;
+            bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+            crit->done = crit->is_manually_completed || crit_naturally_done;
+            sweep_refresh_stat_category(target.cat);
+            break;
+        }
+        case SWEEP_TARGET_STAT_PARENT: {
+            TrackableCategory *cat = target.cat;
+            cat->is_manually_completed = want_on;
+            // A simple stat hides its single criterion behind the parent and shares one override
+            // entry with it, so the child has to follow or the parent still renders as complete.
+            if (cat->criteria_count == 1 && cat->criteria[0]) {
+                cat->criteria[0]->is_manually_completed = cat->is_manually_completed;
+            }
+            for (int j = 0; j < cat->criteria_count; ++j) {
+                TrackableItem *crit = cat->criteria[j];
+                if (!crit) continue;
+                bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                crit->done = cat->is_manually_completed || crit->is_manually_completed || crit_naturally_done;
+            }
+            sweep_refresh_stat_category(cat);
+            break;
+        }
+    }
+    return true;
+}
+
 // END OF STATIC FUNCTIONS ------------------------------------
 
 // Animate overlay, display more than just advancements
@@ -12068,6 +12265,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     s_visual_parent_map.clear();
     t->visual_item_interacted_this_frame = false;
     t->visual_autopan_drag_pos = nullptr;
+
+    // Manual-completion checkboxes re-register themselves as they draw, so the sweep always works
+    // off this frame's real positions rather than a stale list.
+    s_sweep_targets.clear();
 
     // This is the starting Y position for all rendering.
     // Each section will render itself and update this value for the next section.
@@ -12355,6 +12556,124 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         tracker_clear_visual_edit_request();
         // Duplicates that never made it onto the map must not select themselves much later.
         s_visual_pending_selection.clear();
+    }
+
+    // --- Manual-Completion Sweep ---
+    // Left-drag across empty map draws a rectangle and applies one majority vote to every manual
+    // checkbox whose centre it covers: sweep mostly-unchecked boxes and they all get checked, sweep
+    // mostly-checked ones and they all get unchecked. Same rule the template editor's Bulk Actions
+    // use for hiding, so the gesture reads the same way in both places. A tie unchecks, matching the
+    // editor's `count * 2 < total` test exactly.
+    if (!t->is_visual_layout_editing) {
+        ImDrawList *sweep_draw_list = ImGui::GetWindowDrawList();
+        ImVec2 mouse_pos = ImGui::GetMousePos();
+
+        if (!s_sweep_rect_active && ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->map_interactions_blocked) {
+            // A press that lands on a checkbox belongs to that checkbox, and one that lands on a real
+            // ImGui widget (the list scrollbars, counter buttons) belongs to the widget. Only a press
+            // on bare map starts a sweep.
+            bool press_on_target = false;
+            for (const SweepTarget &target: s_sweep_targets) {
+                if (mouse_pos.x >= target.rect_min.x && mouse_pos.x <= target.rect_max.x &&
+                    mouse_pos.y >= target.rect_min.y && mouse_pos.y <= target.rect_max.y) {
+                    press_on_target = true;
+                    break;
+                }
+            }
+            if (!press_on_target && !ImGui::IsAnyItemHovered() && !t->is_hovering_scrollable_list) {
+                s_sweep_rect_active = true;
+                s_sweep_rect_start = mouse_pos;
+                s_sweep_rect_armed = false;
+            }
+        }
+
+        if (s_sweep_rect_active) {
+            ImVec2 rect_min = ImVec2(fminf(s_sweep_rect_start.x, mouse_pos.x),
+                                     fminf(s_sweep_rect_start.y, mouse_pos.y));
+            ImVec2 rect_max = ImVec2(fmaxf(s_sweep_rect_start.x, mouse_pos.x),
+                                     fmaxf(s_sweep_rect_start.y, mouse_pos.y));
+            // A plain click is not a sweep. Below the threshold nothing is drawn and nothing is
+            // applied, so clicking bare map stays the no-op it has always been.
+            const float sweep_min_drag = 4.0f;
+            if ((rect_max.x - rect_min.x >= sweep_min_drag) || (rect_max.y - rect_min.y >= sweep_min_drag)) {
+                s_sweep_rect_armed = true;
+            }
+
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (s_sweep_rect_armed) {
+                    // Count the vote live so the outline can already show which way the release will
+                    // go, and highlight exactly the boxes that are going to change.
+                    int covered = 0;
+                    int on_count = 0;
+                    for (const SweepTarget &target: s_sweep_targets) {
+                        ImVec2 center = ImVec2((target.rect_min.x + target.rect_max.x) * 0.5f,
+                                               (target.rect_min.y + target.rect_max.y) * 0.5f);
+                        if (center.x < rect_min.x || center.x > rect_max.x ||
+                            center.y < rect_min.y || center.y > rect_max.y)
+                            continue;
+                        covered++;
+                        if (target.is_on) on_count++;
+                    }
+                    bool want_on = (on_count * 2 < covered);
+
+                    ImU32 sweep_fill = want_on
+                                           ? IM_COL32(120, 220, 120, 40)
+                                           : IM_COL32(220, 120, 120, 40);
+                    ImU32 sweep_line = want_on
+                                           ? IM_COL32(120, 220, 120, 170)
+                                           : IM_COL32(220, 120, 120, 170);
+                    sweep_draw_list->AddRectFilled(rect_min, rect_max, sweep_fill);
+                    sweep_draw_list->AddRect(rect_min, rect_max, sweep_line, 0.0f, 0, 1.5f);
+
+                    for (const SweepTarget &target: s_sweep_targets) {
+                        ImVec2 center = ImVec2((target.rect_min.x + target.rect_max.x) * 0.5f,
+                                               (target.rect_min.y + target.rect_max.y) * 0.5f);
+                        if (center.x < rect_min.x || center.x > rect_max.x ||
+                            center.y < rect_min.y || center.y > rect_max.y)
+                            continue;
+                        if (target.is_on == want_on) continue; // Already there, nothing will happen to it
+                        sweep_draw_list->AddRect(target.rect_min, target.rect_max, sweep_line, 0.0f, 0, 2.0f);
+                    }
+                }
+            } else {
+                // Released: apply the vote once, then persist once for the whole sweep.
+                if (s_sweep_rect_armed) {
+                    std::vector<const SweepTarget *> covered;
+                    int on_count = 0;
+                    for (const SweepTarget &target: s_sweep_targets) {
+                        ImVec2 center = ImVec2((target.rect_min.x + target.rect_max.x) * 0.5f,
+                                               (target.rect_min.y + target.rect_max.y) * 0.5f);
+                        if (center.x < rect_min.x || center.x > rect_max.x ||
+                            center.y < rect_min.y || center.y > rect_max.y)
+                            continue;
+                        covered.push_back(&target);
+                        if (target.is_on) on_count++;
+                    }
+
+                    bool want_on = (on_count * 2 < (int) covered.size());
+                    bool local_changed = false;
+                    for (const SweepTarget *target: covered) {
+                        if (target->is_on == want_on) continue;
+                        if (sweep_apply_target(t, settings, *target, want_on)) local_changed = true;
+                    }
+
+                    // One write and one broadcast for the whole sweep, instead of the per-click
+                    // path's one of each per goal.
+                    if (local_changed) {
+                        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                        SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+                        SDL_SetAtomicInt(&g_game_data_changed, 1);
+                    }
+                }
+                s_sweep_rect_active = false;
+                s_sweep_rect_armed = false;
+            }
+        }
+    } else {
+        s_sweep_rect_active = false;
+        s_sweep_rect_armed = false;
     }
 
     // --- Cursor Reveal Ring ---
@@ -13450,15 +13769,18 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
     }
 
-    // Edge auto-pan while layout editing: dragging an element or a selection rectangle towards a
-    // window border scrolls the map that way, and the further the mouse goes past the border the
-    // faster it scrolls. Sub-pixel world movement is carried over between frames so a slow pan
-    // still moves the dragged group instead of being lost to rounding.
+    // Edge auto-pan: dragging an element or a rectangle towards a window border scrolls the map that
+    // way, and the further the mouse goes past the border the faster it scrolls. Sub-pixel world
+    // movement is carried over between frames so a slow pan still moves the dragged group instead of
+    // being lost to rounding. Serves both rectangles: the layout editor's selection marquee and the
+    // completion sweep on the normal map, so a sweep can reach goals parked off screen.
     static float s_autopan_world_rem_x = 0.0f;
     static float s_autopan_world_rem_y = 0.0f;
-    bool autopan_possible = t->is_visual_layout_editing && !t->camera_locked &&
-                            ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
-                            (t->visual_autopan_drag_pos != nullptr || t->visual_select_rect_active);
+    bool autopan_layout = t->is_visual_layout_editing &&
+                          (t->visual_autopan_drag_pos != nullptr || t->visual_select_rect_active);
+    bool autopan_sweep = !t->is_visual_layout_editing && s_sweep_rect_active;
+    bool autopan_possible = !t->camera_locked && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                            (autopan_layout || autopan_sweep);
     if (!autopan_possible) {
         s_autopan_world_rem_x = 0.0f;
         s_autopan_world_rem_y = 0.0f;
@@ -13495,10 +13817,14 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             t->camera_offset.x += pan_delta.x;
             t->camera_offset.y += pan_delta.y;
 
-            // Keep the rectangle's origin on the world point it was started from.
+            // Keep each rectangle's origin on the world point it was started from.
             if (t->visual_select_rect_active) {
                 t->visual_select_rect_start.x += pan_delta.x;
                 t->visual_select_rect_start.y += pan_delta.y;
+            }
+            if (s_sweep_rect_active) {
+                s_sweep_rect_start.x += pan_delta.x;
+                s_sweep_rect_start.y += pan_delta.y;
             }
 
             if (t->visual_autopan_drag_pos) {

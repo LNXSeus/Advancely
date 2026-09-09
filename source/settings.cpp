@@ -3047,13 +3047,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char incomplete_first_tooltip[768];
                 snprintf(incomplete_first_tooltip, sizeof(incomplete_first_tooltip),
-                         "In a scrollable list, criteria/sub-stats that are still missing float to the top\n"
-                         "and the finished ones sink to the bottom, so the list always opens on what is left.\n"
+                         "Criteria/sub-stats that are still missing float to the top of their goal's list\n"
+                         "and the finished ones sink to the bottom, so the list always leads with what is left.\n"
                          "Items keep their template order within each of the two groups.\n"
                          "\n"
                          "'Invert Hiding Mode' flips this too: the completed ones come first instead.\n"
-                         "\nNote: This only affects lists that scroll, and never a goal whose\n"
-                         "criteria/sub-stats use manual coordinates.\n"
+                         "\nNote: This applies to every automatically laid out list, scrolling or not,\n"
+                         "but never to a goal whose criteria/sub-stats use manual coordinates.\n"
                          "Default: %s", DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST ? "On" : "Off");
                 ImGui::SetTooltip("%s", incomplete_first_tooltip);
             }
