@@ -136,16 +136,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-          # 1. Manually install the x86_64 version of Homebrew into /usr/local
-          #    This is required for cross-compiling on an ARM64 runner.
-          # 2. Use that Homebrew to install the x86_64 dependencies.
+          # Homebrew stopped shipping x86_64 bottles in September 2026, so installing an x86_64
+          # Homebrew into /usr/local and running "brew install" through Rosetta compiled nine
+          # formulae from source and took ~40 minutes. The SDL libraries are cross-compiled for
+          # x86_64 by the runner's native ARM toolchain instead: no Rosetta, no second Homebrew.
+          # Advancely only loads PNG and GIF, and SDL3_image covers both without external
+          # libraries (ImageIO/stb backends for PNG, its own GIF decoder), so the
+          # jpeg-xl/webp/avif/tiff/libpng dependency chain is switched off. SDL3_ttf vendors
+          # freetype, harfbuzz and plutosvg statically, leaving only three dylibs to bundle.
         run: |
-          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
           # mbedTLS codegen needs these Python modules
           python3 -m pip install --break-system-packages jsonschema jinja2
+          DEPS_PREFIX="$HOME/x64-deps"
+          COMMON_ARGS=(
+            -DCMAKE_BUILD_TYPE=Release
+            -DBUILD_SHARED_LIBS=ON
+            -DCMAKE_OSX_ARCHITECTURES=x86_64
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+            -DCMAKE_INSTALL_PREFIX="$DEPS_PREFIX"
+            -DCMAKE_PREFIX_PATH="$DEPS_PREFIX"
+            # The runner's own Homebrew is ARM-only, so anything found there would fail to link
+            # into an x86_64 build.
+            -DCMAKE_IGNORE_PREFIX_PATH=/opt/homebrew
+          )
+          git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
+          cmake -S SDL -B SDL/build "${COMMON_ARGS[@]}" -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build SDL/build --parallel
+          cmake --install SDL/build
+
+          git clone --depth 1 https://github.com/libsdl-org/SDL_image.git -b main
+          cmake -S SDL_image -B SDL_image/build "${COMMON_ARGS[@]}" -DSDLIMAGE_SAMPLES=OFF \
+            -DSDLIMAGE_VENDORED=OFF -DSDLIMAGE_DEPS_SHARED=OFF \
+            -DSDLIMAGE_BACKEND_IMAGEIO=ON -DSDLIMAGE_BACKEND_STB=ON \
+            -DSDLIMAGE_PNG_LIBPNG=OFF \
+            -DSDLIMAGE_AVIF=OFF -DSDLIMAGE_JXL=OFF -DSDLIMAGE_TIF=OFF -DSDLIMAGE_WEBP=OFF
+          cmake --build SDL_image/build --parallel
+          cmake --install SDL_image/build
+
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/libsdl-org/SDL_ttf.git -b main
+          cmake -S SDL_ttf -B SDL_ttf/build "${COMMON_ARGS[@]}" -DSDLTTF_SAMPLES=OFF -DSDLTTF_VENDORED=ON
+          cmake --build SDL_ttf/build --parallel
+          cmake --install SDL_ttf/build
       - name: Configure CMake (macOS)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0" -DCMAKE_OSX_ARCHITECTURES="x86_64"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$HOME/x64-deps" -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0" -DCMAKE_OSX_ARCHITECTURES="x86_64"
       - name: Build Project
         run: cmake --build build --config Release
       - name: Install gtimeout (GNU Coreutils)
@@ -156,8 +189,10 @@ jobs:
           BUNDLE_PATH="build/Advancely.app"
           EXE_PATH="$BUNDLE_PATH/Contents/MacOS/Advancely"
           LIBS_DEST_DIR="$BUNDLE_PATH/Contents/MacOS"
-          BREW_PREFIX="/usr/local" # Hardcode the Intel (x86_64) Homebrew prefix
-          LIBS_TO_PROCESS=($(otool -L "$EXE_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
+          BREW_PREFIX="$HOME/x64-deps" # Prefix the x86_64 SDL libraries were cross-compiled into
+          # CMake-built SDL libraries carry @rpath install names rather than absolute prefix
+          # paths, so the executable's dependencies are matched on @rpath as well.
+          LIBS_TO_PROCESS=($(otool -L "$EXE_PATH" | grep -E "$BREW_PREFIX|@rpath" | awk '{gsub(/:$/, ""); print $1}'))
           TEMP_DEPS_LIST=()
           i=0
           while [ $i -lt ${#LIBS_TO_PROCESS[@]} ]; do
