@@ -12617,12 +12617,23 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                     }
                     bool want_on = (on_count * 2 < covered);
 
-                    ImU32 sweep_fill = want_on
-                                           ? IM_COL32(120, 220, 120, 40)
-                                           : IM_COL32(220, 120, 120, 40);
-                    ImU32 sweep_line = want_on
-                                           ? IM_COL32(120, 220, 120, 170)
-                                           : IM_COL32(220, 120, 120, 170);
+                    // With nothing covered there is no vote to show, so the rectangle stays neutral
+                    // in the tracker's text color instead of claiming a check or an uncheck.
+                    ImU32 sweep_fill;
+                    ImU32 sweep_line;
+                    if (covered == 0) {
+                        sweep_fill = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                              settings->text_color.b, 40);
+                        sweep_line = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                              settings->text_color.b, 150);
+                    } else {
+                        sweep_fill = want_on
+                                         ? IM_COL32(120, 220, 120, 40)
+                                         : IM_COL32(220, 120, 120, 40);
+                        sweep_line = want_on
+                                         ? IM_COL32(120, 220, 120, 170)
+                                         : IM_COL32(220, 120, 120, 170);
+                    }
                     sweep_draw_list->AddRectFilled(rect_min, rect_max, sweep_fill);
                     sweep_draw_list->AddRect(rect_min, rect_max, sweep_line, 0.0f, 0, 1.5f);
 
