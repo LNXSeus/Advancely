@@ -324,13 +324,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install dependencies (macOS)
+      # This job only assembles and tests prebuilt bundles, so it needs no SDL libraries and no
+      # CMake run. The version is read straight from main.h, the same way the Linux job does it.
+      - name: Get project version
         run: |
-          brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
-          # mbedTLS codegen needs these Python modules
-          python3 -m pip install --break-system-packages jsonschema jinja2
-      - name: Configure CMake to get version
-        run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
+          VERSION=$(grep '#define ADVANCELY_VERSION' source/main.h | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "Detected Version: $VERSION"
+          echo "PROJECT_VERSION=$VERSION" >> "$GITHUB_ENV"
       - name: Download Intel build
         uses: actions/download-artifact@v4
         with:
@@ -408,13 +408,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install dependencies (macOS)
+      # This job only assembles and tests prebuilt bundles, so it needs no SDL libraries and no
+      # CMake run. The version is read straight from main.h, the same way the Linux job does it.
+      - name: Get project version
         run: |
-          brew install sdl3 sdl3_image sdl3_ttf jpeg-xl webp
-          # mbedTLS codegen needs these Python modules
-          python3 -m pip install --break-system-packages jsonschema jinja2
-      - name: Configure CMake to get version
-        run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
+          VERSION=$(grep '#define ADVANCELY_VERSION' source/main.h | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "Detected Version: $VERSION"
+          echo "PROJECT_VERSION=$VERSION" >> "$GITHUB_ENV"
       - name: Download Universal macOS Artifact
         uses: actions/download-artifact@v4
         with:
