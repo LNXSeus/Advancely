@@ -15,6 +15,22 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.7.1" date="2026-09-11">
+      <description>
+        <p>Undo/redo in the template editor, a selection rectangle with auto-pan in the visual layout editor, bulk grid positioning, and overlay and tracker fixes.</p>
+        <ul>
+          <li>Template editor undo and redo: Undo and Redo buttons next to Save, plus Ctrl+Z and Ctrl+Y. Every step is reversible, selections and drags in the visual layout editor included, and undoing jumps to the goal that changed.</li>
+          <li>Visual layout editor: drag a selection rectangle to bulk-select goals, the view auto-pans at the edges while dragging, and new goals are placed in the center of the current view. Entering the editor no longer forces a save.</li>
+          <li>Bulk positioning: the Layout Coordinates popup has a Fill order setting (left to right then next row, or top to bottom then next column), with the Rows/Columns field setting how many rows or columns the selection is spread over.</li>
+          <li>New setting to push completed criteria and sub-stats to the bottom of automatic lists (to the top in inverted mode), and a vertical spacing option for criteria in the automatic layout.</li>
+          <li>Shared icons are available in the main tracker window too. Hermes is on by default.</li>
+          <li>Timer: a completed run stops on record.json when the template is also complete, otherwise it freezes on the next game save (without SpeedRunIGT) or keeps counting from stats while the template is incomplete.</li>
+          <li>Overlay fixes: restarting after changing overlay settings is reliable now and no longer shuts Advancely down on big templates, stats no longer re-pop in the compact stack on pause with Hermes on, and the Hermes replay no longer cuts off at 5 minutes.</li>
+          <li>Fixes: Advancely no longer keeps play.log.enc open, so deleting a world in Minecraft works while it is tracked. Settings presets preserve the compact overlay stack selection.</li>
+          <li>Templates: updated and added all_advancements and _categorical templates for 1.12 through 26.3, with small fixes in the 1.16.1 and 1.21.6+ categorical templates.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.7.0" date="2026-08-23">
       <description>
         <p>The Hotkey Update: OS-level global hotkeys, configurable shortcuts throughout the app, a transparent overlay, and major tracker performance work.</p>
