@@ -1186,11 +1186,17 @@ list has a `Show Display Names` checkbox to toggle between display names and roo
     so the applied progress text stays aligned with Icon Pos. and Text Pos. instead of shifting forward. Each
     coordinate exposes the usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X`
     / `+Y` stride next to each base. The stride distributes values across the selection in template/list order. The
-    neighbouring `Columns` field controls the math: `0` lays items out linearly (`item N` gets `base + N * stride` on
-    both axes, useful for rows, columns, and diagonals), while `1` or higher wraps into a grid (`X` uses
-    `N mod Columns`, `Y` uses `N div Columns`). Each section has its own `Apply ... to selected` button so you can
-    tune Icon Pos. without touching Text Pos. (or vice versa). The Apply button is also field-aware: it only writes
-    the buckets (`Enable`, `Hide`, `Position` (X/Y/stride/columns), or `Anchor`) you actually changed since opening
+    `Fill order` dropdown at the top of the popup picks the walking direction: `Left to right, then next row` (the
+    default) or `Top to bottom, then next column`. The neighbouring field is `Rows` in the horizontal order and
+    `Columns` in the vertical one and is the number of rows (or columns) the selection gets spread over: `0` lays
+    items out linearly (`item N` gets `base + N * stride` on both axes, useful for rows, columns, and diagonals),
+    while `1` or higher makes a grid with exactly that many rows (or columns), each holding
+    `ceil(count / Rows)` (or `ceil(count / Columns)`) items. Horizontal: `X` uses `N mod PerRow`, `Y` uses
+    `N div PerRow`; vertical: `Y` uses `N mod PerColumn`, `X` uses `N div PerColumn`. The fill order is shared by
+    every section and every bulk layout popup. Each section has its own
+    `Apply ... to selected` button so you can tune Icon Pos. without touching Text Pos. (or vice versa). The Apply
+    button is also field-aware: it only writes the buckets (`Enable`, `Hide`, `Position` (X/Y/stride/columns/fill
+    order), or `Anchor`) you actually changed since opening
     the popup, leaving the rest untouched on each selected goal, and its label updates to show what will be applied
     (for example `Apply Text Pos. (Hide)`). Change nothing, or change all four buckets, and it applies everything
     (labelled `(Everything)`), which is also how you stamp the default values onto a selection. Available wherever the goal type has at least one

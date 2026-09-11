@@ -4477,6 +4477,75 @@ static void bulk_layout_apply_decide(const char *section_label, const char *id,
     snprintf(out_label, out_cap, "Apply %s (%s)##%s", section_label, parts, id);
 }
 
+// Fill order shared by every bulk Layout Coordinates popup once a wrap count is set:
+// 0 walks left to right and wraps to the next row, 1 walks top to bottom and wraps to the next column.
+static int s_bulk_layout_fill_order = 0;
+static int s_bulk_layout_fill_order_base = 0;
+
+// Description lines plus the fill-order combo at the top of a bulk Layout Coordinates popup.
+// Snapshots the fill order when the popup opens so a change counts as touching the Position bucket.
+static void bulk_layout_fill_order_ui() {
+    static const char *fill_order_labels[] = {"Left to right, then next row", "Top to bottom, then next column"};
+    if (ImGui::IsWindowAppearing()) s_bulk_layout_fill_order_base = s_bulk_layout_fill_order;
+    ImGui::TextDisabled("Rows/Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
+    ImGui::TextDisabled("Rows/Columns >= 1 = grid with exactly that many rows (or columns), walked in the fill order.");
+    ImGui::SetNextItemWidth(230);
+    ImGui::Combo("Fill order", &s_bulk_layout_fill_order, fill_order_labels, IM_ARRAYSIZE(fill_order_labels));
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s",
+                          "Left to right, then next row: spread the selection over 'Rows' rows, stepping down by +Y.\n"
+                          "Top to bottom, then next column: spread the selection over 'Columns' columns, stepping right by +X.\n"
+                          "Items per line = ceil(selected count / Rows or Columns).\n"
+                          "Shared by every section and every bulk layout popup.");
+}
+
+static bool bulk_layout_fill_order_touched() {
+    return s_bulk_layout_fill_order != s_bulk_layout_fill_order_base;
+}
+
+// Line count field of a bulk-layout section: the number of rows (horizontal fill) or columns (vertical fill)
+// the selection gets spread over.
+static void bulk_layout_wrap_ui(int *p_lines) {
+    bool rows_first = (s_bulk_layout_fill_order == 0);
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::DragInt(rows_first ? "Rows" : "Columns", p_lines, 0.1f, 0, 1024)) {
+        if (*p_lines < 0) *p_lines = 0;
+    }
+    if (ImGui::IsItemHovered()) {
+        if (rows_first)
+            ImGui::SetTooltip("%s",
+                              "Number of rows.\n"
+                              "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                              "1+ = grid with that many rows, PerRow = ceil(count / Rows):\n"
+                              "X uses (N mod PerRow) * +X, Y uses (N div PerRow) * +Y.");
+        else
+            ImGui::SetTooltip("%s",
+                              "Number of columns.\n"
+                              "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
+                              "1+ = grid with that many columns, PerColumn = ceil(count / Columns):\n"
+                              "Y uses (N mod PerColumn) * +Y, X uses (N div PerColumn) * +X.");
+    }
+}
+
+// Stride multipliers of the N-th of count selected items, spread over the given number of lines
+// (rows or columns, per the shared fill order).
+static void bulk_layout_multipliers(int n, int lines, int count, int *x_mult, int *y_mult) {
+    if (lines < 1) {
+        *x_mult = n;
+        *y_mult = n;
+        return;
+    }
+    int per_line = (count + lines - 1) / lines;
+    if (per_line < 1) per_line = 1;
+    if (s_bulk_layout_fill_order == 0) {
+        *x_mult = n % per_line;
+        *y_mult = n / per_line;
+    } else {
+        *x_mult = n / per_line;
+        *y_mult = n % per_line;
+    }
+}
+
 // Identifies the goal a manual position belongs to. Lets the editor seed the coordinates from the
 // spot the element currently occupies on the tracker, and describe how it relates to its parent.
 struct ManualPosContext {
@@ -9047,8 +9116,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                     ? advancements_label_singular_lower
                                                     : advancements_label_plural_lower);
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_adv_selection.begin(), s_adv_selection.end());
@@ -9140,22 +9208,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Combo("Anchor##adv_bl_icon", &s_adv_bl_icon_anchor, anchor_point_labels,
                                          IM_ARRAYSIZE(anchor_point_labels));
                             ImGui::SameLine();
-                            ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragInt("Columns", &s_adv_bl_icon_cols, 0.1f, 0, 1024)) {
-                                if (s_adv_bl_icon_cols < 0) s_adv_bl_icon_cols = 0;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("%s",
-                                                  "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                  "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                            }
+                            bulk_layout_wrap_ui(&s_adv_bl_icon_cols);
                             bool icon_t_en = (s_adv_bl_icon_set != s_adv_bl_base_set[0]);
                             bool icon_t_hi = (s_adv_bl_icon_hide != s_adv_bl_base_hide[0]);
                             bool icon_t_po = (s_adv_bl_icon_x != s_adv_bl_base_x[0]) || (
                                                  s_adv_bl_icon_y != s_adv_bl_base_y[0]) ||
                                              (s_adv_bl_icon_xs != s_adv_bl_base_xs[0]) || (
                                                  s_adv_bl_icon_ys != s_adv_bl_base_ys[0]) ||
-                                             (s_adv_bl_icon_cols != s_adv_bl_base_cols[0]);
+                                             (s_adv_bl_icon_cols != s_adv_bl_base_cols[0] || bulk_layout_fill_order_touched());
                             bool icon_t_an = (s_adv_bl_icon_anchor != s_adv_bl_base_anchor[0]);
                             bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
                             char icon_applabel[96];
@@ -9168,8 +9228,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int idx: bulk_layout_sorted) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
-                                    int x_mult = (s_adv_bl_icon_cols >= 1) ? (n % s_adv_bl_icon_cols) : n;
-                                    int y_mult = (s_adv_bl_icon_cols >= 1) ? (n / s_adv_bl_icon_cols) : n;
+                                    int x_mult, y_mult;
+                                    bulk_layout_multipliers(n, s_adv_bl_icon_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                     if (icon_w_en) a.icon_pos.is_set = s_adv_bl_icon_set;
                                     if (icon_w_hi) a.icon_pos.is_hidden_in_layout = s_adv_bl_icon_hide;
                                     if (icon_w_po) {
@@ -9251,22 +9311,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Combo("Anchor##adv_bl_text", &s_adv_bl_text_anchor, anchor_point_labels,
                                          IM_ARRAYSIZE(anchor_point_labels));
                             ImGui::SameLine();
-                            ImGui::SetNextItemWidth(70);
-                            if (ImGui::DragInt("Columns", &s_adv_bl_text_cols, 0.1f, 0, 1024)) {
-                                if (s_adv_bl_text_cols < 0) s_adv_bl_text_cols = 0;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("%s",
-                                                  "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                  "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                            }
+                            bulk_layout_wrap_ui(&s_adv_bl_text_cols);
                             bool text_t_en = (s_adv_bl_text_set != s_adv_bl_base_set[1]);
                             bool text_t_hi = (s_adv_bl_text_hide != s_adv_bl_base_hide[1]);
                             bool text_t_po = (s_adv_bl_text_x != s_adv_bl_base_x[1]) || (
                                                  s_adv_bl_text_y != s_adv_bl_base_y[1]) ||
                                              (s_adv_bl_text_xs != s_adv_bl_base_xs[1]) || (
                                                  s_adv_bl_text_ys != s_adv_bl_base_ys[1]) ||
-                                             (s_adv_bl_text_cols != s_adv_bl_base_cols[1]);
+                                             (s_adv_bl_text_cols != s_adv_bl_base_cols[1] || bulk_layout_fill_order_touched());
                             bool text_t_an = (s_adv_bl_text_anchor != s_adv_bl_base_anchor[1]);
                             bool text_w_en, text_w_hi, text_w_po, text_w_an;
                             char text_applabel[96];
@@ -9279,8 +9331,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (int idx: bulk_layout_sorted) {
                                     if (idx < 0 || (size_t) idx >= current_template_data.advancements.size()) continue;
                                     auto &a = current_template_data.advancements[idx];
-                                    int x_mult = (s_adv_bl_text_cols >= 1) ? (n % s_adv_bl_text_cols) : n;
-                                    int y_mult = (s_adv_bl_text_cols >= 1) ? (n / s_adv_bl_text_cols) : n;
+                                    int x_mult, y_mult;
+                                    bulk_layout_multipliers(n, s_adv_bl_text_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                     if (text_w_en) a.text_pos.is_set = s_adv_bl_text_set;
                                     if (text_w_hi) a.text_pos.is_hidden_in_layout = s_adv_bl_text_hide;
                                     if (text_w_po) {
@@ -9373,15 +9425,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo("Anchor##adv_bl_prog", &s_adv_bl_prog_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", &s_adv_bl_prog_cols, 0.1f, 0, 1024)) {
-                                    if (s_adv_bl_prog_cols < 0) s_adv_bl_prog_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
-                                }
+                                bulk_layout_wrap_ui(&s_adv_bl_prog_cols);
                                 bool prog_t_en = (s_adv_bl_prog_set != s_adv_bl_base_set[2]);
                                 bool prog_t_hi = (s_adv_bl_prog_hide != s_adv_bl_base_hide[2]);
                                 bool prog_t_po =
@@ -9389,7 +9433,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             s_adv_bl_prog_y != s_adv_bl_base_y[2]) ||
                                         (s_adv_bl_prog_xs != s_adv_bl_base_xs[2]) || (
                                             s_adv_bl_prog_ys != s_adv_bl_base_ys[2]) ||
-                                        (s_adv_bl_prog_cols != s_adv_bl_base_cols[2]);
+                                        (s_adv_bl_prog_cols != s_adv_bl_base_cols[2] || bulk_layout_fill_order_touched());
                                 bool prog_t_an = (s_adv_bl_prog_anchor != s_adv_bl_base_anchor[2]);
                                 bool prog_w_en, prog_w_hi, prog_w_po, prog_w_an;
                                 char prog_applabel[96];
@@ -9404,8 +9448,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             continue;
                                         auto &a = current_template_data.advancements[idx];
                                         if (!a.criteria.empty()) {
-                                            int x_mult = (s_adv_bl_prog_cols >= 1) ? (n % s_adv_bl_prog_cols) : n;
-                                            int y_mult = (s_adv_bl_prog_cols >= 1) ? (n / s_adv_bl_prog_cols) : n;
+                                            int x_mult, y_mult;
+                                            bulk_layout_multipliers(n, s_adv_bl_prog_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                             if (prog_w_en) a.progress_pos.is_set = s_adv_bl_prog_set;
                                             if (prog_w_hi) a.progress_pos.is_hidden_in_layout = s_adv_bl_prog_hide;
                                             if (prog_w_po) {
@@ -10511,9 +10555,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::TextDisabled("Layout coordinates for %d selected criteria",
                                                     (int) s_crit_selection.size());
                                 ImGui::TextDisabled("Strides distribute values in template order.");
-                                ImGui::TextDisabled(
-                                    "Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                                ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                                bulk_layout_fill_order_ui();
                                 ImGui::Separator();
 
                                 std::vector<int> bulk_layout_sorted(s_crit_selection.begin(), s_crit_selection.end());
@@ -10583,14 +10625,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", &s_crit_bl_icon_cols, 0.1f, 0, 1024)) {
-                                    if (s_crit_bl_icon_cols < 0) s_crit_bl_icon_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(&s_crit_bl_icon_cols);
                                 bool icon_t_en = (s_crit_bl_icon_set != s_crit_bl_base_set[0]);
                                 bool icon_t_hi = (s_crit_bl_icon_hide != s_crit_bl_base_hide[0]);
                                 bool icon_t_po =
@@ -10598,7 +10633,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             s_crit_bl_icon_y != s_crit_bl_base_y[0]) ||
                                         (s_crit_bl_icon_xs != s_crit_bl_base_xs[0]) || (
                                             s_crit_bl_icon_ys != s_crit_bl_base_ys[0]) ||
-                                        (s_crit_bl_icon_cols != s_crit_bl_base_cols[0]);
+                                        (s_crit_bl_icon_cols != s_crit_bl_base_cols[0] || bulk_layout_fill_order_touched());
                                 bool icon_t_an = (s_crit_bl_icon_anchor != s_crit_bl_base_anchor[0]);
                                 bool icon_w_en, icon_w_hi, icon_w_po, icon_w_an;
                                 char icon_applabel[96];
@@ -10611,8 +10646,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     for (int idx: bulk_layout_sorted) {
                                         if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
-                                        int x_mult = (s_crit_bl_icon_cols >= 1) ? (n % s_crit_bl_icon_cols) : n;
-                                        int y_mult = (s_crit_bl_icon_cols >= 1) ? (n / s_crit_bl_icon_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, s_crit_bl_icon_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (icon_w_en) c.icon_pos.is_set = s_crit_bl_icon_set;
                                         if (icon_w_hi) c.icon_pos.is_hidden_in_layout = s_crit_bl_icon_hide;
                                         if (icon_w_po) {
@@ -10683,14 +10718,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", &s_crit_bl_text_cols, 0.1f, 0, 1024)) {
-                                    if (s_crit_bl_text_cols < 0) s_crit_bl_text_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(&s_crit_bl_text_cols);
                                 bool text_t_en = (s_crit_bl_text_set != s_crit_bl_base_set[1]);
                                 bool text_t_hi = (s_crit_bl_text_hide != s_crit_bl_base_hide[1]);
                                 bool text_t_po =
@@ -10698,7 +10726,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             s_crit_bl_text_y != s_crit_bl_base_y[1]) ||
                                         (s_crit_bl_text_xs != s_crit_bl_base_xs[1]) || (
                                             s_crit_bl_text_ys != s_crit_bl_base_ys[1]) ||
-                                        (s_crit_bl_text_cols != s_crit_bl_base_cols[1]);
+                                        (s_crit_bl_text_cols != s_crit_bl_base_cols[1] || bulk_layout_fill_order_touched());
                                 bool text_t_an = (s_crit_bl_text_anchor != s_crit_bl_base_anchor[1]);
                                 bool text_w_en, text_w_hi, text_w_po, text_w_an;
                                 char text_applabel[96];
@@ -10711,8 +10739,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     for (int idx: bulk_layout_sorted) {
                                         if (idx < 0 || (size_t) idx >= advancement.criteria.size()) continue;
                                         auto &c = advancement.criteria[idx];
-                                        int x_mult = (s_crit_bl_text_cols >= 1) ? (n % s_crit_bl_text_cols) : n;
-                                        int y_mult = (s_crit_bl_text_cols >= 1) ? (n / s_crit_bl_text_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, s_crit_bl_text_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (text_w_en) c.text_pos.is_set = s_crit_bl_text_set;
                                         if (text_w_hi) c.text_pos.is_hidden_in_layout = s_crit_bl_text_hide;
                                         if (text_w_po) {
@@ -11884,8 +11912,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("Layout coordinates for %d selected stats",
                                                 (int) s_stat_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_stat_selection.begin(), s_stat_selection.end());
@@ -11977,19 +12004,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                    if (*s.p_cols < 0) *s.p_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                             (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                            (*s.p_cols != s_bl_base_cols[si]);
+                                            (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                 bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                 bool w_en, w_hi, w_po, w_an;
                                 char applabel[96];
@@ -12005,8 +12025,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                 : (si == 1)
                                                                       ? &st.text_pos
                                                                       : &st.progress_pos;
-                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
@@ -13209,10 +13229,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::TextDisabled("Layout coordinates for %d selected sub-stats",
                                                         (int) s_sub_selection.size());
                                     ImGui::TextDisabled("Strides distribute values in template order.");
-                                    ImGui::TextDisabled(
-                                        "Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                                    ImGui::TextDisabled(
-                                        "Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                                    bulk_layout_fill_order_ui();
                                     ImGui::Separator();
 
                                     std::vector<int> bulk_layout_sorted(s_sub_selection.begin(), s_sub_selection.end());
@@ -13308,19 +13325,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                                      IM_ARRAYSIZE(anchor_point_labels));
                                         ImGui::SameLine();
-                                        ImGui::SetNextItemWidth(70);
-                                        if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                            if (*s.p_cols < 0) *s.p_cols = 0;
-                                        }
-                                        if (ImGui::IsItemHovered())
-                                            ImGui::SetTooltip("%s",
-                                                              "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                              "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                        bulk_layout_wrap_ui(s.p_cols);
                                         bool t_en = (*s.p_set != s_bl_base_set[si]);
                                         bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                         bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                                     (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                                    (*s.p_cols != s_bl_base_cols[si]);
+                                                    (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                         bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                         bool w_en, w_hi, w_po, w_an;
                                         char applabel[96];
@@ -13336,8 +13346,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                         : (si == 1)
                                                                               ? &c.text_pos
                                                                               : &c.progress_pos;
-                                                int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                                int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                                int x_mult, y_mult;
+                                                bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                                 if (w_en) target->is_set = *s.p_set;
                                                 if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                                 if (w_po) {
@@ -14267,8 +14277,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("Layout coordinates for %d selected unlocks",
                                                 (int) s_unlocks_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_unlocks_selection.begin(), s_unlocks_selection.end());
@@ -14350,19 +14359,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                    if (*s.p_cols < 0) *s.p_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                             (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                            (*s.p_cols != s_bl_base_cols[si]);
+                                            (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                 bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                 bool w_en, w_hi, w_po, w_an;
                                 char applabel[96];
@@ -14374,8 +14376,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (idx < 0 || (size_t) idx >= current_template_data.unlocks.size()) continue;
                                         auto &u = current_template_data.unlocks[idx];
                                         ManualPos *target = (si == 0) ? &u.icon_pos : &u.text_pos;
-                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
@@ -15215,8 +15217,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("Layout coordinates for %d selected custom goals",
                                                 (int) s_custom_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_custom_selection.begin(), s_custom_selection.end());
@@ -15298,19 +15299,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                    if (*s.p_cols < 0) *s.p_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                             (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                            (*s.p_cols != s_bl_base_cols[si]);
+                                            (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                 bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                 bool w_en, w_hi, w_po, w_an;
                                 char applabel[96];
@@ -15323,8 +15317,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             continue;
                                         auto &g = current_template_data.custom_goals[idx];
                                         ManualPos *target = (si == 0) ? &g.icon_pos : &g.text_pos;
-                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
@@ -16503,8 +16497,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("Layout coordinates for %d selected multi-stage goals",
                                                 (int) s_msg_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_msg_selection.begin(), s_msg_selection.end());
@@ -16593,19 +16586,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                    if (*s.p_cols < 0) *s.p_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                             (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                            (*s.p_cols != s_bl_base_cols[si]);
+                                            (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                 bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                 bool w_en, w_hi, w_po, w_an;
                                 char applabel[96];
@@ -16622,8 +16608,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                 : (si == 1)
                                                                       ? &g.text_pos
                                                                       : &g.progress_pos;
-                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
@@ -18862,8 +18848,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("Layout coordinates for %d selected counters",
                                                 (int) s_ctr_selection.size());
                             ImGui::TextDisabled("Strides distribute values in template order.");
-                            ImGui::TextDisabled("Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
-                            ImGui::TextDisabled("Columns >= 1 = grid: X uses (N mod cols), Y uses (N div cols).");
+                            bulk_layout_fill_order_ui();
                             ImGui::Separator();
 
                             std::vector<int> bulk_layout_sorted(s_ctr_selection.begin(), s_ctr_selection.end());
@@ -18952,19 +18937,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
                                              IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
-                                ImGui::SetNextItemWidth(70);
-                                if (ImGui::DragInt("Columns", s.p_cols, 0.1f, 0, 1024)) {
-                                    if (*s.p_cols < 0) *s.p_cols = 0;
-                                }
-                                if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s",
-                                                      "0 = linear: every item's X uses N * +X, Y uses N * +Y (diagonals possible).\n"
-                                                      "1+ = grid wrap: X uses (N mod Columns) * +X, Y uses (N div Columns) * +Y.");
+                                bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
                                 bool t_hi = (*s.p_hide != s_bl_base_hide[si]);
                                 bool t_po = (*s.p_x != s_bl_base_x[si]) || (*s.p_y != s_bl_base_y[si]) ||
                                             (*s.p_xs != s_bl_base_xs[si]) || (*s.p_ys != s_bl_base_ys[si]) ||
-                                            (*s.p_cols != s_bl_base_cols[si]);
+                                            (*s.p_cols != s_bl_base_cols[si] || bulk_layout_fill_order_touched());
                                 bool t_an = (*s.p_anchor != s_bl_base_anchor[si]);
                                 bool w_en, w_hi, w_po, w_an;
                                 char applabel[96];
@@ -18981,8 +18959,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                 : (si == 1)
                                                                       ? &g.text_pos
                                                                       : &g.progress_pos;
-                                        int x_mult = (*s.p_cols >= 1) ? (n % *s.p_cols) : n;
-                                        int y_mult = (*s.p_cols >= 1) ? (n / *s.p_cols) : n;
+                                        int x_mult, y_mult;
+                                        bulk_layout_multipliers(n, *s.p_cols, (int) bulk_layout_sorted.size(), &x_mult, &y_mult);
                                         if (w_en) target->is_set = *s.p_set;
                                         if (w_hi) target->is_hidden_in_layout = *s.p_hide;
                                         if (w_po) {
