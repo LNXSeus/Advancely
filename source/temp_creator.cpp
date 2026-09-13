@@ -178,6 +178,12 @@ struct EditorTrackableItem {
     int sort_order = 0;
     char group[64] = ""; // Per-advancement criterion group ID (free-form). Empty = ungrouped.
 
+    // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
+    // file under the goal's own key plus ".desc", so it translates with everything else.
+    // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
+    // description has to cost nothing in a template holding thousands of goals.
+    std::string description;
+
     // Stat auto-completion via linked goals (only used for sub-stats)
     std::vector<EditorCounterLinkedGoal> linked_goals;
     LinkedGoalMode linked_goal_mode = LINKED_GOAL_AND;
@@ -201,6 +207,12 @@ struct EditorTrackableCategory {
     bool groups_enabled = false; // If true, show criterion grouping UI and persist groups_enabled flag.
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
+
+    // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
+    // file under the goal's own key plus ".desc", so it translates with everything else.
+    // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
+    // description has to cost nothing in a template holding thousands of goals.
+    std::string description;
 
     // Stat auto-completion via linked goals (only used for stat categories)
     std::vector<EditorCounterLinkedGoal> linked_goals;
@@ -228,6 +240,12 @@ struct EditorSubGoal {
 
     // When true, this (non-final) stage auto-completes if the next stage is completed.
     bool complete_with_next = false;
+
+    // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
+    // file under the goal's own key plus ".desc", so it translates with everything else.
+    // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
+    // description has to cost nothing in a template holding thousands of goals.
+    std::string description;
 };
 
 struct EditorMultiStageGoal {
@@ -239,6 +257,12 @@ struct EditorMultiStageGoal {
     bool use_stage_icons;
     std::vector<EditorSubGoal> stages;
     int sort_order = 0;
+
+    // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
+    // file under the goal's own key plus ".desc", so it translates with everything else.
+    // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
+    // description has to cost nothing in a template holding thousands of goals.
+    std::string description;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -253,6 +277,12 @@ struct EditorCounterGoal {
     bool in_2nd_row;
     std::vector<EditorCounterLinkedGoal> linked_goals;
     int sort_order = 0;
+
+    // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
+    // file under the goal's own key plus ".desc", so it translates with everything else.
+    // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
+    // description has to cost nothing in a template holding thousands of goals.
+    std::string description;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -296,6 +326,141 @@ struct EditorTemplate {
     std::vector<EditorDecorationElement> decorations;
     char display_category[MAX_PATH_LENGTH] = {0}; // Per-language override for the settings Display Category prefill
 };
+
+
+// Descriptions are free text, newlines included, so the cap is generous, but it is a cap: the
+// tooltip that shows one on the tracker map has to stay a glance rather than a wall of text.
+static constexpr int TC_DESCRIPTION_MAX_CHARS = 1024;
+// Counted in characters, buffered in bytes. Four bytes per character is UTF-8's worst case, so the
+// character cap is always the one the user runs into and never the buffer, whatever they type in.
+static constexpr size_t TC_DESCRIPTION_BUFFER_BYTES = (size_t) TC_DESCRIPTION_MAX_CHARS * 4 + 1;
+// How close to full a field gets before its countdown appears. Stay inside the limit, as a
+// description normally does, and the counter is never on screen at all.
+static constexpr int TC_CHAR_COUNTER_SHOW_WITHIN = TC_DESCRIPTION_MAX_CHARS / 8;
+
+// How many characters a UTF-8 string holds. Continuation bytes (10xxxxxx) belong to the character
+// before them, so counting everything else counts what the user sees rather than bytes.
+static int tc_utf8_char_count(const char *s) {
+    int count = 0;
+    for (const unsigned char *p = (const unsigned char *) s; *p; p++) {
+        if ((*p & 0xC0) != 0x80) count++;
+    }
+    return count;
+}
+
+// Cuts a string down to at most max_chars characters, always on a character boundary so a
+// multi-byte character is never left half written.
+static void tc_utf8_truncate(char *s, int max_chars) {
+    int count = 0;
+    for (unsigned char *p = (unsigned char *) s; *p; p++) {
+        if ((*p & 0xC0) != 0x80) {
+            if (count >= max_chars) {
+                *p = '\0';
+                return;
+            }
+            count++;
+        }
+    }
+}
+
+// Right-aligned countdown to a text field's character limit, in the UI font colour faded to
+// ADVANCELY_FADED_ALPHA, turning solid once the field is full. Only drawn once the field is within
+// show_within characters of the limit. Call it directly after the input it belongs to: the
+// alignment reads that item's rectangle.
+static void draw_char_counter(int used, int limit, int show_within) {
+    const int remaining = limit - used;
+    if (remaining > show_within) return;
+
+    char counter_text[32];
+    snprintf(counter_text, sizeof(counter_text), "%d", remaining);
+
+    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    if (remaining <= 0) {
+        color = ImVec4(0.9f, 0.4f, 0.4f, 1.0f); // Full, so no longer a hint the user can ignore
+    } else {
+        color.w = (float) ADVANCELY_FADED_ALPHA / 255.0f;
+    }
+
+    const float input_right_edge = ImGui::GetItemRectMax().x;
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    pos.x = input_right_edge - ImGui::CalcTextSize(counter_text).x;
+    ImGui::SetCursorScreenPos(pos);
+    ImGui::TextColored(color, "%s", counter_text);
+}
+
+// One scratch buffer for the description box being typed into, one shared by every other box drawn
+// this frame. A multi-stage goal puts several boxes on screen at once, and a single shared buffer
+// would let the last one drawn clobber the text of the one that has focus. Inactive boxes only
+// render what they are handed, so they can all share.
+static char s_description_active_buffer[TC_DESCRIPTION_BUFFER_BYTES];
+static ImGuiID s_description_active_id = 0;
+static char s_description_scratch_buffer[TC_DESCRIPTION_BUFFER_BYTES];
+
+// The collapsible Description box for one goal. Collapsed by default: a description is an optional
+// extra, not something the user should have to look past while editing the goal itself. Returns
+// true on the frames the text actually changed.
+//
+// The text lives in a std::string on the goal and a scratch buffer bridges it to ImGui, refilled
+// from the goal on every frame the box is not being typed into. That is what makes switching goals
+// and stepping through the undo history show up here without any bookkeeping of their own.
+static bool draw_editor_description_box(const char *id, std::string &description, const char *what) {
+    bool changed = false;
+    ImGui::PushID(id);
+
+    // The header carries the same tooltip as the field inside it: collapsed is its normal state, so
+    // that is where someone who has not used the feature will go looking for what it does.
+    const bool expanded = ImGui::CollapsingHeader("Description");
+    bool explain = ImGui::IsItemHovered();
+
+    if (expanded) {
+        const ImGuiID field_id = ImGui::GetID("##description");
+        const bool is_active = (ImGui::GetActiveID() == field_id);
+
+        char *buffer;
+        if (is_active) {
+            buffer = s_description_active_buffer;
+            if (s_description_active_id != field_id) {
+                // Just took focus: seed the field's own buffer from the goal once, then leave it
+                // alone so what the user types is not overwritten on the next frame.
+                strncpy(buffer, description.c_str(), TC_DESCRIPTION_BUFFER_BYTES - 1);
+                buffer[TC_DESCRIPTION_BUFFER_BYTES - 1] = '\0';
+                s_description_active_id = field_id;
+            }
+        } else {
+            buffer = s_description_scratch_buffer;
+            strncpy(buffer, description.c_str(), TC_DESCRIPTION_BUFFER_BYTES - 1);
+            buffer[TC_DESCRIPTION_BUFFER_BYTES - 1] = '\0';
+            if (s_description_active_id == field_id) s_description_active_id = 0;
+        }
+
+        const ImVec2 box_size(-FLT_MIN, ImGui::GetTextLineHeight() * 5.0f);
+        ImGui::InputTextMultiline("##description", buffer, TC_DESCRIPTION_BUFFER_BYTES, box_size);
+        const bool input_hovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemEdited()) {
+            tc_utf8_truncate(buffer, TC_DESCRIPTION_MAX_CHARS);
+            if (description != buffer) {
+                description = buffer;
+                changed = true;
+            }
+        }
+        draw_char_counter(tc_utf8_char_count(buffer), TC_DESCRIPTION_MAX_CHARS, TC_CHAR_COUNTER_SHOW_WITHIN);
+
+        if (input_hovered) explain = true;
+    }
+
+    if (explain) {
+        char description_tooltip_buffer[256];
+        snprintf(description_tooltip_buffer, sizeof(description_tooltip_buffer),
+                 "An optional explanation of this %s, shown as a tooltip when you hover it\n"
+                 "on the tracker map. Newlines are allowed. Up to %d characters.\n"
+                 "Stored in the language file, so it can be translated.",
+                 what, TC_DESCRIPTION_MAX_CHARS);
+        ImGui::SetTooltip("%s", description_tooltip_buffer);
+    }
+
+    ImGui::PopID();
+    return changed;
+}
 
 // A single compact status tag drawn at the right edge of a goal-list row.
 struct EditorRowTag {
@@ -658,6 +823,17 @@ static void build_goal_display_label(const EditorTemplate &data, const char *roo
     out[out_size - 1] = '\0';
 }
 
+// Reads a goal's description back out of the lang file, from its display key plus ".desc".
+// A template without the key simply has no description, which is the normal case.
+static void load_editor_lang_description(cJSON *lang_json, const char *display_key, std::string &out) {
+    out.clear();
+    if (!lang_json || !display_key) return;
+    char desc_key[576];
+    snprintf(desc_key, sizeof(desc_key), "%s.desc", display_key);
+    cJSON *entry = cJSON_GetObjectItem(lang_json, desc_key);
+    if (cJSON_IsString(entry) && entry->valuestring) out = entry->valuestring;
+}
+
 // Helper to compare two linked goal vectors
 static bool are_linked_goals_different(const std::vector<EditorCounterLinkedGoal> &a,
                                        const std::vector<EditorCounterLinkedGoal> &b) {
@@ -687,7 +863,8 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            are_linked_goals_different(a.linked_goals, b.linked_goals) ||
            are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
            are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
-           strcmp(a.group, b.group) != 0;
+           strcmp(a.group, b.group) != 0 ||
+           a.description != b.description;
 }
 
 // Helper function to compare two EditorTrackableCategory structs, advancements and stats
@@ -708,6 +885,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
+        a.description != b.description ||
         a.criteria.size() != b.criteria.size()) {
         return true;
     }
@@ -730,6 +908,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.linked_goal_mode != b.linked_goal_mode ||
            a.complete_with_next != b.complete_with_next ||
+           a.description != b.description ||
            are_linked_goals_different(a.linked_goals, b.linked_goals);
 }
 
@@ -745,6 +924,7 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
         are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
+        a.description != b.description ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -768,6 +948,7 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
         are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
+        a.description != b.description ||
         a.linked_goals.size() != b.linked_goals.size()) {
         return true;
     }
@@ -1613,6 +1794,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
             strncpy(new_item.display_name, new_item.root_name, sizeof(new_item.display_name) - 1);
             new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
         }
+        load_editor_lang_description(lang_json, lang_key, new_item.description);
 
         // Parse manual positions
         parse_editor_manual_pos(item_json, "icon_pos", &new_item.icon_pos);
@@ -1680,6 +1862,7 @@ static void parse_editor_trackable_categories(cJSON *json_object,
             strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
             new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
         }
+        load_editor_lang_description(lang_json, lang_key, new_cat.description);
 
 
         // Parse the nested criteria using existing helper function
@@ -1789,6 +1972,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
             new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
         }
+        load_editor_lang_description(lang_json, cat_lang_key, new_cat.description);
 
 
         cJSON *criteria_object = cJSON_GetObjectItem(category_json, "criteria");
@@ -1902,6 +2086,15 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
             strncpy(new_goal.display_name, new_goal.root_name, sizeof(new_goal.display_name) - 1);
             new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
         }
+        {
+            char goal_desc_key[256];
+            snprintf(goal_desc_key, sizeof(goal_desc_key), "multi_stage_goal.%s.desc", new_goal.root_name);
+            cJSON *goal_desc_entry = cJSON_GetObjectItem(lang_json, goal_desc_key);
+            new_goal.description.clear();
+            if (cJSON_IsString(goal_desc_entry) && goal_desc_entry->valuestring) {
+                new_goal.description = goal_desc_entry->valuestring;
+            }
+        }
 
         cJSON *stages_array = cJSON_GetObjectItem(goal_json, "stages");
         if (stages_array) {
@@ -1949,6 +2142,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     strncpy(new_stage.display_text, new_stage.stage_id, sizeof(new_stage.display_text) - 1);
                     new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
                 }
+                load_editor_lang_description(lang_json, stage_lang_key, new_stage.description);
 
                 if (cJSON_IsString(type)) {
                     if (strcmp(type->valuestring, "stat") == 0) new_stage.type = SUBGOAL_STAT;
@@ -2008,6 +2202,7 @@ static void parse_editor_counter_goals(cJSON *json_array, std::vector<EditorCoun
         } else {
             strncpy(goal.display_name, goal.root_name, sizeof(goal.display_name) - 1);
         }
+        load_editor_lang_description(lang_json, lang_key, goal.description);
 
         // Parse linked goals
         cJSON *linked_json = cJSON_GetObjectItem(goal_json, "linked_goals");
@@ -2805,6 +3000,16 @@ static cJSON *build_editor_template_json(const EditorTemplate &editor_data, cons
     return root;
 }
 
+// Writes a goal's description under its own lang key plus ".desc", beside the display name it
+// belongs to. Skipped when empty so a template nobody wrote descriptions for keeps the lang file
+// it always had.
+static void add_editor_lang_description(cJSON *lang_json, const char *display_key, const std::string &description) {
+    if (description.empty()) return;
+    char desc_key[576];
+    snprintf(desc_key, sizeof(desc_key), "%s.desc", display_key);
+    cJSON_AddStringToObject(lang_json, desc_key, description.c_str());
+}
+
 // Builds the language file contents for the editor's template, in the same order a save writes them.
 // Split out from the save so the live preview can hand the tracker the display names of goals that
 // only exist in memory.
@@ -2827,6 +3032,7 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
         snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
         cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
+        add_editor_lang_description(lang_json, cat_lang_key, cat.description);
 
         for (const auto &crit: cat.criteria) {
             char crit_lang_key[512];
@@ -2840,6 +3046,7 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         char cat_lang_key[256];
         snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
         cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
+        add_editor_lang_description(lang_json, cat_lang_key, cat.description);
         if (!cat.is_simple_stat) {
             for (const auto &crit: cat.criteria) {
                 char crit_lang_key[512];
@@ -2854,6 +3061,7 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         char lang_key[256];
         snprintf(lang_key, sizeof(lang_key), "unlock.%s", item.root_name);
         cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
+        add_editor_lang_description(lang_json, lang_key, item.description);
     }
 
     // 4. Custom Goals
@@ -2861,6 +3069,7 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         char lang_key[256];
         snprintf(lang_key, sizeof(lang_key), "custom.%s", item.root_name);
         cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
+        add_editor_lang_description(lang_json, lang_key, item.description);
     }
 
     // 5. Multi-Stage Goals (Parent then Stages)
@@ -2868,11 +3077,17 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         char goal_lang_key[256];
         snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
         cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
+        if (!goal.description.empty()) {
+            char goal_desc_key[256];
+            snprintf(goal_desc_key, sizeof(goal_desc_key), "multi_stage_goal.%s.desc", goal.root_name);
+            cJSON_AddStringToObject(lang_json, goal_desc_key, goal.description.c_str());
+        }
         for (const auto &stage: goal.stages) {
             char stage_lang_key[512];
             snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name,
                      stage.stage_id);
             cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
+            add_editor_lang_description(lang_json, stage_lang_key, stage.description);
         }
     }
 
@@ -2881,6 +3096,7 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         char lang_key[256];
         snprintf(lang_key, sizeof(lang_key), "counter.%s", goal.root_name);
         cJSON_AddStringToObject(lang_json, lang_key, goal.display_name);
+        add_editor_lang_description(lang_json, lang_key, goal.description);
     }
 
     // 7. Decorations (Text Headers, Lines, Arrows)
@@ -3977,13 +4193,20 @@ static size_t tc_history_entry_bytes(const EditorTemplate &d) {
         for (const auto &category: v) {
             b += category.criteria.capacity() * sizeof(EditorTrackableItem);
             b += linked_bytes(category.linked_goals);
-            for (const auto &criterion: category.criteria) b += linked_bytes(criterion.linked_goals);
+            b += category.description.capacity();
+            for (const auto &criterion: category.criteria) {
+                b += linked_bytes(criterion.linked_goals);
+                b += criterion.description.capacity();
+            }
         }
         return b;
     };
     auto item_bytes = [&](const std::vector<EditorTrackableItem> &v) {
         size_t b = v.capacity() * sizeof(EditorTrackableItem);
-        for (const auto &item: v) b += linked_bytes(item.linked_goals);
+        for (const auto &item: v) {
+            b += linked_bytes(item.linked_goals);
+            b += item.description.capacity();
+        }
         return b;
     };
 
@@ -3993,10 +4216,17 @@ static size_t tc_history_entry_bytes(const EditorTemplate &d) {
     bytes += d.multi_stage_goals.capacity() * sizeof(EditorMultiStageGoal);
     for (const auto &goal: d.multi_stage_goals) {
         bytes += goal.stages.capacity() * sizeof(EditorSubGoal);
-        for (const auto &stage: goal.stages) bytes += linked_bytes(stage.linked_goals);
+        bytes += goal.description.capacity();
+        for (const auto &stage: goal.stages) {
+            bytes += linked_bytes(stage.linked_goals);
+            bytes += stage.description.capacity();
+        }
     }
     bytes += d.counter_goals.capacity() * sizeof(EditorCounterGoal);
-    for (const auto &goal: d.counter_goals) bytes += linked_bytes(goal.linked_goals);
+    for (const auto &goal: d.counter_goals) {
+        bytes += linked_bytes(goal.linked_goals);
+        bytes += goal.description.capacity();
+    }
     bytes += d.decorations.capacity() * sizeof(EditorDecorationElement);
     for (const auto &deco: d.decorations) bytes += linked_bytes(deco.linked_goals);
     return bytes;
@@ -10018,6 +10248,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The user-facing name that appears on the tracker/overlay.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
+                        if (draw_editor_description_box("AdvDesc", advancement.description,
+                                                        advancements_label_singular_lower)) {
+                            save_message_type = MSG_NONE;
+                        }
                         if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
                             save_message_type = MSG_NONE;
                         }
@@ -12532,6 +12766,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The user-facing name for this single stat or stat category.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
+                        if (draw_editor_description_box("StatDesc", stat_cat.description, "stat")) {
+                            save_message_type = MSG_NONE;
+                        }
                         if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
                             save_message_type = MSG_NONE;
                         }
@@ -14814,6 +15051,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The user-facing name for this unlock.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
+                        if (draw_editor_description_box("UnlockDesc", unlock.description, "unlock")) {
+                            save_message_type = MSG_NONE;
+                        }
 
                         // Icon Path + Browse
                         if (ImGui::InputText("Icon Path##Unlock", unlock.icon_path, sizeof(unlock.icon_path))) {
@@ -15763,6 +16003,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "If target value isn't 0 you'll find this name at the bottom\n"
                                      "of the settings window to configure hotkeys.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+                        if (draw_editor_description_box("CustomGoalDesc", goal.description, "custom goal")) {
+                            save_message_type = MSG_NONE;
                         }
 
                         // Icon Path + Browse
@@ -17105,6 +17348,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The user-facing name for this multi-stage goal.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
+                        if (draw_editor_description_box("MSGoalDesc", goal.description, "multi-stage goal")) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
                         if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
@@ -17705,6 +17952,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "The text that appears on the tracker/overlay for this stage.\n"
                                          "For the 'Final' stage, put something like 'Stages Done!'.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            if (draw_editor_description_box("MSStageDesc", stage.description, "stage")) {
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
                             }
                             // Conditional Icon Input per stage if enabled
                             if (goal.use_stage_icons) {
@@ -19403,6 +19654,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "The user-facing name for this counter.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        if (draw_editor_description_box("CounterDesc", counter.description, "counter")) {
+                            save_message_type = MSG_NONE;
                         }
 
                         // Icon Path + Browse
@@ -25247,8 +25501,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_template_import_focus_search = true;
             }
 
-            // Source pickers (Language + Layout) share one line. Language sources the display names;
-            // Layout sources the manual positions / decorations.
+            // Source pickers (Language + Layout) share one line. Language sources the display names
+            // and the goal descriptions; Layout sources the manual positions / decorations.
             // When the source has all of the current template's languages, offer the multi-language
             // checklist instead of the single-source dropdown (see s_template_import_multi_available).
             bool show_import_lang_multi = s_template_import_multi_available &&
@@ -25268,8 +25522,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::TextUnformatted("Import languages:");
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s",
-                                      "Import Display Names for every ticked language in one go. These are the\n"
-                                      "languages your current template already has (the source has them all too).\n"
+                                      "Import Display Names and Descriptions for every ticked language in one go.\n"
+                                      "These are the languages your current template already has (the source has\n"
+                                      "them all too).\n"
                                       "The language you're editing is always included and saved as usual; the\n"
                                       "others are merged into their language files when you next Save. Any\n"
                                       "translation the source is missing is left blank.");
@@ -25325,7 +25580,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s",
                                       "Pick which language file inside the source template provides the\n"
-                                      "display names for imported items. '(default)' is the un-flagged\n"
+                                      "display names and descriptions for imported items. '(default)' is the un-flagged\n"
                                       "_lang.json. Changing this re-reads the source data; your current\n"
                                       "selections are kept.");
                 }
@@ -26195,6 +26450,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // (source_key, target_key) pairs mirroring save_template_from_editor's lang keys.
                             // They differ only for the parented scopes, where the source and destination
                             // parents differ (criteria/sub-stats/stages move under a different owner).
+                            // Main goals also carry their ".desc" companion key; criteria and sub-stats
+                            // have no descriptions, so they get the display name alone.
                             std::vector<std::pair<std::string, std::string> > key_pairs;
                             switch (s_template_import_scope) {
                                 case IFTS_ADVANCEMENTS:
@@ -26203,6 +26460,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         const auto &src = s_template_import_data.advancements[i];
                                         std::string k = "advancement." + san_adv(src.root_name);
                                         key_pairs.emplace_back(k, k);
+                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
                                         for (const auto &c: src.criteria) {
                                             std::string ck = k + ".criteria." + c.root_name;
                                             key_pairs.emplace_back(ck, ck);
@@ -26215,6 +26473,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         const auto &src = s_template_import_data.stats[i];
                                         std::string k = std::string("stat.") + src.root_name;
                                         key_pairs.emplace_back(k, k);
+                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
                                         if (!src.is_simple_stat) {
                                             for (const auto &c: src.criteria) {
                                                 std::string ck = k + ".criteria." + c.root_name;
@@ -26229,6 +26488,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         std::string k = std::string("unlock.") +
                                                         s_template_import_data.unlocks[i].root_name;
                                         key_pairs.emplace_back(k, k);
+                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
                                     }
                                     break;
                                 case IFTS_CUSTOM_GOALS:
@@ -26237,6 +26497,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         std::string k = std::string("custom.") +
                                                         s_template_import_data.custom_goals[i].root_name;
                                         key_pairs.emplace_back(k, k);
+                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
                                     }
                                     break;
                                 case IFTS_COUNTERS:
@@ -26245,6 +26506,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         std::string k = std::string("counter.") +
                                                         s_template_import_data.counter_goals[i].root_name;
                                         key_pairs.emplace_back(k, k);
+                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
                                     }
                                     break;
                                 case IFTS_MS_GOALS:
@@ -26253,9 +26515,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         const auto &g = s_template_import_data.multi_stage_goals[i];
                                         std::string base = std::string("multi_stage_goal.") + g.root_name;
                                         key_pairs.emplace_back(base + ".display_name", base + ".display_name");
+                                        // The goal's own description hangs off the root, not off
+                                        // ".display_name", mirroring build_editor_lang_json.
+                                        key_pairs.emplace_back(base + ".desc", base + ".desc");
                                         for (const auto &st: g.stages) {
                                             std::string sk = base + ".stage." + st.stage_id;
                                             key_pairs.emplace_back(sk, sk);
+                                            key_pairs.emplace_back(sk + ".desc", sk + ".desc");
                                         }
                                     }
                                     break;
@@ -26321,6 +26587,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             const char *sid = src_goal.stages[i].stage_id;
                                             key_pairs.emplace_back(src_base + ".stage." + sid,
                                                                    dst_base + ".stage." + sid);
+                                            key_pairs.emplace_back(src_base + ".stage." + sid + ".desc",
+                                                                   dst_base + ".stage." + sid + ".desc");
                                         }
                                     }
                                     break;

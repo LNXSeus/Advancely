@@ -296,6 +296,193 @@ static bool visual_link_same(const CounterLinkedGoal &a, const CounterLinkedGoal
 static std::unordered_set<std::string> s_linked_top; // Top-level items (root_name, no parent_root)
 static std::unordered_set<std::string> s_linked_sub; // Sub-items: composite key "parent_root\troot_name"
 
+
+// --------- GOAL DESCRIPTIONS ---------
+
+// Optional per-goal explanations, shown as a tooltip while the cursor is over that goal on the map.
+// Deliberately kept here instead of on TrackableCategory/TrackableItem: serialize_template_data()
+// memcpys those structs into the shared buffer on every push to the overlay, so an inline field
+// would cost hundreds of kilobytes per push on a large template for text the overlay never shows.
+// Only the descriptions that actually exist take up any room here.
+//
+// Keyed by a type tag plus the goal's root name, plus the stage ID for a multi-stage goal's stage,
+// because a root name is only unique within its own goal type. Tabs separate the parts; a root name
+// can never contain one.
+static std::unordered_map<std::string, std::string> s_goal_descriptions;
+
+// Maximum width of a description tooltip, as a multiple of the UI font size. Wide enough to read
+// comfortably, narrow enough that a long description wraps into a block instead of one line running
+// the width of the screen.
+static constexpr float TRACKER_DESCRIPTION_WRAP_EM = 24.0f;
+
+// Builds one description lookup key. The same function serves the load side and the hover side, so
+// the two can never disagree about where a description lives.
+static void tracker_description_key(char *out, size_t out_size, char type_tag,
+                                    const char *root_name, const char *stage_id) {
+    if (stage_id && stage_id[0] != '\0') {
+        snprintf(out, out_size, "%c\t%s\t%s", type_tag, root_name ? root_name : "", stage_id);
+    } else {
+        snprintf(out, out_size, "%c\t%s", type_tag, root_name ? root_name : "");
+    }
+}
+
+// Files a goal's description, if the language file has one, under the key the map will ask for. The
+// language key is whatever the goal's display name was read from plus ".desc", which is exactly
+// what the template editor writes.
+static void tracker_store_goal_description(cJSON *lang_json, const char *lang_key, char type_tag,
+                                           const char *root_name, const char *stage_id) {
+    if (!lang_json || !lang_key) return;
+
+    char desc_lang_key[576];
+    snprintf(desc_lang_key, sizeof(desc_lang_key), "%s.desc", lang_key);
+    cJSON *entry = cJSON_GetObjectItem(lang_json, desc_lang_key);
+    if (!cJSON_IsString(entry) || !entry->valuestring || entry->valuestring[0] == '\0') return;
+
+    char key[448];
+    tracker_description_key(key, sizeof(key), type_tag, root_name, stage_id);
+    s_goal_descriptions[key] = entry->valuestring;
+}
+
+// Dotted form of an advancement root name, the shape its language keys use: "minecraft:story/root"
+// becomes "minecraft.story.root". Mirrors what the parser does when it reads display names.
+static void tracker_advancement_lang_root(char *out, size_t out_size, const char *root_name) {
+    strncpy(out, root_name ? root_name : "", out_size - 1);
+    out[out_size - 1] = '\0';
+    for (char *p = out; *p; p++) {
+        if (*p == ':' || *p == '/') *p = '.';
+    }
+}
+
+// Rebuilds the description lookup for a freshly parsed template. Walking the goals rather than the
+// language file drops descriptions left behind by goals that no longer exist, and puts every entry
+// under a key the map can actually ask for. Runs once per template load, never per frame.
+//
+// Criteria and sub-stats are skipped: descriptions are a main-goal feature, and a tooltip on every
+// little sub-icon would fire constantly while the cursor crosses the map.
+static void tracker_build_goal_descriptions(const TemplateData *td, cJSON *lang_json) {
+    s_goal_descriptions.clear();
+    if (!td || !lang_json) return;
+
+    char lang_key[512];
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        const TrackableCategory *cat = td->advancements ? td->advancements[i] : nullptr;
+        if (!cat) continue;
+        char dotted_root[256];
+        tracker_advancement_lang_root(dotted_root, sizeof(dotted_root), cat->root_name);
+        snprintf(lang_key, sizeof(lang_key), "advancement.%s", dotted_root);
+        tracker_store_goal_description(lang_json, lang_key, 'a', cat->root_name, nullptr);
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *cat = td->stats ? td->stats[i] : nullptr;
+        if (!cat) continue;
+        snprintf(lang_key, sizeof(lang_key), "stat.%s", cat->root_name);
+        tracker_store_goal_description(lang_json, lang_key, 's', cat->root_name, nullptr);
+    }
+
+    for (int i = 0; i < td->unlock_count; i++) {
+        const TrackableItem *item = td->unlocks ? td->unlocks[i] : nullptr;
+        if (!item) continue;
+        snprintf(lang_key, sizeof(lang_key), "unlock.%s", item->root_name);
+        tracker_store_goal_description(lang_json, lang_key, 'u', item->root_name, nullptr);
+    }
+
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        const TrackableItem *item = td->custom_goals ? td->custom_goals[i] : nullptr;
+        if (!item) continue;
+        snprintf(lang_key, sizeof(lang_key), "custom.%s", item->root_name);
+        tracker_store_goal_description(lang_json, lang_key, 'c', item->root_name, nullptr);
+    }
+
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        const CounterGoal *goal = td->counter_goals ? td->counter_goals[i] : nullptr;
+        if (!goal) continue;
+        snprintf(lang_key, sizeof(lang_key), "counter.%s", goal->root_name);
+        tracker_store_goal_description(lang_json, lang_key, 'n', goal->root_name, nullptr);
+    }
+
+    // Multi-stage goals carry a description of their own plus one per stage. The parent's display
+    // name key already ends in ".display_name", so its description sits on a sibling key instead.
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        const MultiStageGoal *goal = td->multi_stage_goals ? td->multi_stage_goals[i] : nullptr;
+        if (!goal) continue;
+        snprintf(lang_key, sizeof(lang_key), "multi_stage_goal.%s", goal->root_name);
+        tracker_store_goal_description(lang_json, lang_key, 'm', goal->root_name, nullptr);
+
+        for (int j = 0; j < goal->stage_count; j++) {
+            const SubGoal *stage = goal->stages ? goal->stages[j] : nullptr;
+            if (!stage) continue;
+            snprintf(lang_key, sizeof(lang_key), "multi_stage_goal.%s.stage.%s",
+                     goal->root_name, stage->stage_id);
+            tracker_store_goal_description(lang_json, lang_key, 'm', goal->root_name, stage->stage_id);
+        }
+    }
+
+    if (!s_goal_descriptions.empty()) {
+        log_message(LOG_INFO, "[TRACKER] Loaded %d goal description(s).\n", (int) s_goal_descriptions.size());
+    }
+}
+
+// Whether a description tooltip is allowed right now and the cursor is over this goal. The empty
+// check comes first so a template without a single description costs nothing at all per goal.
+static bool tracker_description_hover_ok(const Tracker *t, const ImVec2 &rect_min, const ImVec2 &rect_max) {
+    if (s_goal_descriptions.empty()) return false;
+    // The Visual Layout Editor is for placing goals, and a tooltip trailing the cursor there would
+    // cover the very goals being dragged.
+    if (!t || t->is_visual_layout_editing) return false;
+    // Another window sits over the map under the cursor, so the goal is not really being hovered.
+    if (t->map_interactions_blocked) return false;
+    return ImGui::IsMouseHoveringRect(rect_min, rect_max);
+}
+
+// The description filed under this key, or nullptr when the goal has none.
+static const std::string *tracker_find_description(char type_tag, const char *root_name, const char *stage_id) {
+    char key[448];
+    tracker_description_key(key, sizeof(key), type_tag, root_name, stage_id);
+    auto it = s_goal_descriptions.find(key);
+    return (it == s_goal_descriptions.end()) ? nullptr : &it->second;
+}
+
+static void tracker_draw_description_tooltip(const std::string &description) {
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * TRACKER_DESCRIPTION_WRAP_EM);
+    ImGui::TextUnformatted(description.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+// Shows a goal's description while the cursor is over the given rectangle. The lookup only runs
+// once the hover test has passed, so nothing but the one goal under the cursor is ever touched.
+//
+// Called before the goal's checkbox is drawn, on purpose. A checkbox sets its own, more specific
+// tooltip and ImGui keeps whichever was set last, so on the small area where the two overlap the
+// checkbox wins without either site needing to know about the other.
+static void tracker_show_goal_description(const Tracker *t, const ImVec2 &rect_min, const ImVec2 &rect_max,
+                                          char type_tag, const char *root_name) {
+    if (!tracker_description_hover_ok(t, rect_min, rect_max)) return;
+    const std::string *description = tracker_find_description(type_tag, root_name, nullptr);
+    if (description) tracker_draw_description_tooltip(*description);
+}
+
+// A multi-stage goal shows the description of the stage it is currently on, falling back to the
+// goal's own when that stage has none. current_stage is whatever the active view already computed,
+// so the coop Per-Player view shows each player's own stage without this knowing about coop at all.
+static void tracker_show_multi_stage_description(const Tracker *t, const ImVec2 &rect_min, const ImVec2 &rect_max,
+                                                 const MultiStageGoal *goal) {
+    if (!goal || !tracker_description_hover_ok(t, rect_min, rect_max)) return;
+
+    const char *stage_id = nullptr;
+    if (goal->stages && goal->current_stage >= 0 && goal->current_stage < goal->stage_count &&
+        goal->stages[goal->current_stage]) {
+        stage_id = goal->stages[goal->current_stage]->stage_id;
+    }
+
+    const std::string *description = tracker_find_description('m', goal->root_name, stage_id);
+    if (!description && stage_id) description = tracker_find_description('m', goal->root_name, nullptr);
+    if (description) tracker_draw_description_tooltip(*description);
+}
+
 // Mirrors the colored status tags shown in the template editor (Hidden, Row 1/2/3, recipe,
 // multi-stat, hidden sub-stats, manual position). The search term must exactly equal a recognized
 // keyword for the matching flag to count, so typing e.g. "hidden" or "pos" filters the list down to
@@ -4118,6 +4305,11 @@ static void free_multi_stage_goals(MultiStageGoal **goals, int count) {
  */
 static void tracker_free_template_data(TemplateData *td) {
     if (!td) return;
+
+    // The description lookup is keyed by the goals that are going away, so it goes with them. A
+    // successful reload rebuilds it; a failed one must not leave the previous template's text
+    // behind to surface under a same-named goal in the next.
+    s_goal_descriptions.clear();
 
 
     // Free categories
@@ -8333,6 +8525,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                               ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                               cat->icon_pos, cat_type, cat->display_name, "Icon",
                                               cat->root_name);
+                // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
+                if (!hide_icon_in_layout) {
+                    tracker_show_goal_description(t, screen_pos, bg_max, is_stat_section ? 's' : 'a',
+                                                  cat->root_name);
+                }
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -8372,6 +8569,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     handle_visual_layout_dragging(t, drag_id, main_text_pos, main_text_screen_size,
                                                   cat->text_pos, cat_type, cat->display_name, "Text",
                                                   cat->root_name, nullptr, nullptr, &cat->icon_pos);
+                    tracker_show_goal_description(t, main_text_pos,
+                                                  ImVec2(main_text_pos.x + main_text_screen_size.x,
+                                                         main_text_pos.y + main_text_screen_size.y),
+                                                  is_stat_section ? 's' : 'a', cat->root_name);
                 }
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
@@ -9766,6 +9967,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                           item->icon_pos, "Unlock", item->display_name, "Icon",
                                           item->root_name);
+            // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
+            if (!hide_item_icon_in_layout) {
+                tracker_show_goal_description(t, screen_pos, bg_max, 'u', item->root_name);
+            }
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
@@ -9808,6 +10013,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     handle_visual_layout_dragging(t, drag_id, unlock_text_pos, unlock_text_screen_size,
                                                   item->text_pos, "Unlock", item->display_name, "Text",
                                                   item->root_name, nullptr, nullptr, &item->icon_pos);
+                    tracker_show_goal_description(t, unlock_text_pos,
+                                                  ImVec2(unlock_text_pos.x + unlock_text_screen_size.x,
+                                                         unlock_text_pos.y + unlock_text_screen_size.y),
+                                                  'u', item->root_name);
 
                     // Draw Progress Text below main name (if applicable, centered)
                     if (has_progress_text && !hide_item_progress_in_layout) {
@@ -10221,6 +10430,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                           item->icon_pos, "Custom Goal", item->display_name, "Icon",
                                           item->root_name);
+            // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
+            if (!hide_item_icon_in_layout) {
+                tracker_show_goal_description(t, screen_pos, bg_max, 'c', item->root_name);
+            }
 
             // Coop: counter-value contributor face in bottom-right of the 96x96
             // background. Only meaningful for counter goals (goal != 0); pure
@@ -10310,6 +10523,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     handle_visual_layout_dragging(t, drag_id, cg_text_pos, cg_text_screen_size,
                                                   item->text_pos, "Custom Goal", item->display_name, "Text",
                                                   item->root_name, nullptr, nullptr, &item->icon_pos);
+                    tracker_show_goal_description(t, cg_text_pos,
+                                                  ImVec2(cg_text_pos.x + cg_text_screen_size.x,
+                                                         cg_text_pos.y + cg_text_screen_size.y),
+                                                  'c', item->root_name);
                 }
 
                 // Draw Progress Text below main name (if applicable, centered)
@@ -10817,6 +11034,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                           goal->icon_pos, "Counter", goal->display_name, "Icon",
                                           goal->root_name);
+            // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
+            if (!hide_goal_icon_in_layout) {
+                tracker_show_goal_description(t, screen_pos, bg_max, 'n', goal->root_name);
+            }
 
             // Render Text
             bool draw_counter_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_goal_text_in_layout;
@@ -10858,6 +11079,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                     handle_visual_layout_dragging(t, drag_id, counter_text_pos, counter_text_screen_size,
                                                   goal->text_pos, "Counter", goal->display_name, "Text",
                                                   goal->root_name, nullptr, nullptr, &goal->icon_pos);
+                    tracker_show_goal_description(t, counter_text_pos,
+                                                  ImVec2(counter_text_pos.x + counter_text_screen_size.x,
+                                                         counter_text_pos.y + counter_text_screen_size.y),
+                                                  'n', goal->root_name);
                 }
 
                 // Draw Progress Text
@@ -11340,6 +11565,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                           goal->icon_pos, "Multi-Stage Goal", goal->display_name, "Icon",
                                           goal->root_name);
+            // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
+            if (!hide_goal_icon_in_layout) {
+                tracker_show_multi_stage_description(t, screen_pos, bg_max, goal);
+            }
 
             // Render Text (Main Name and Current Stage Text)
             float main_font_size = settings->tracker_font_size;
@@ -11381,6 +11610,12 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 handle_visual_layout_dragging(t, drag_id, ms_text_pos, ms_text_screen_size,
                                               goal->text_pos, "Multi-Stage Goal", goal->display_name, "Text",
                                               goal->root_name, nullptr, nullptr, &goal->icon_pos);
+                if (!hide_goal_text_in_layout) {
+                    tracker_show_multi_stage_description(t, ms_text_pos,
+                                                         ImVec2(ms_text_pos.x + ms_text_screen_size.x,
+                                                                ms_text_pos.y + ms_text_screen_size.y),
+                                                         goal);
+                }
             }
 
             // Draw Current Stage Text (uses sub_font_size)
@@ -11419,6 +11654,12 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 handle_visual_layout_dragging(t, drag_id, ms_stage_pos, ms_stage_screen_size,
                                               goal->progress_pos, "Multi-Stage Goal", goal->display_name, "Progress",
                                               goal->root_name, nullptr, nullptr, &goal->text_pos);
+                if (!hide_goal_progress_in_layout) {
+                    tracker_show_multi_stage_description(t, ms_stage_pos,
+                                                         ImVec2(ms_stage_pos.x + ms_stage_screen_size.x,
+                                                                ms_stage_pos.y + ms_stage_screen_size.y),
+                                                         goal);
+                }
             }
         } // End if (is_visible_on_screen)
 
@@ -15569,6 +15810,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         tracker_apply_layout_overlay(t->template_data, layout_json);
     }
 
+
+    // The map's hover tooltips read from here. Built after parsing so goals dropped from the
+    // template take their descriptions with them, and from the same lang_json the display names
+    // came from, so the editor's unsaved preview carries its descriptions too.
+    tracker_build_goal_descriptions(t->template_data, lang_json);
 
     // Detect and flag criteria that are shared between multiple advancements
     tracker_detect_shared_icons(t, settings);
