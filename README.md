@@ -168,8 +168,9 @@ import, create, copy, and modify any template directly within Advancely.
 * **Criteria Grouping:** Collapse multiple criteria of one advancement into a single progress unit. Enable the
   per-advancement `Groups` checkbox (next to `Row 3` in the Template Editor) to expose the grouping UI for that
   advancement, then assign criteria a shared `Group` ID (per-criterion `Add to group` button next to the field, or
-  tick the row checkboxes and use `Add selection to group` to bulk-assign with auto-naming). Any one member
-  completing in-game then marks the whole group done on the tracker, overlay, and manual layout. Useful for
+  tick the row checkboxes and use `Add selection to group` to bulk-assign with auto-naming). Each group is then
+  shown as a single criterion on the tracker map, the overlay rows and the compact stack, using the name and icon
+  of its first member, and any one member completing in-game marks that group done. Useful for
   advancement packs where multiple ways to satisfy a single objective each appear as separate criteria. For example,
   the **Ultimate Enchanter** advancement from the
   [Blaze and Caves](https://modrinth.com/datapack/blazeandcaves-advancements-pack) datapack has 256 criteria split

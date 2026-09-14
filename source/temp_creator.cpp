@@ -10543,13 +10543,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char groups_tooltip_buffer[512];
+                                char groups_tooltip_buffer[768];
                                 snprintf(groups_tooltip_buffer, sizeof(groups_tooltip_buffer),
                                          "Enable criterion grouping for this %s.\n"
                                          "When enabled, criteria can be assigned to a shared group ID:\n"
                                          "all criteria in a group collapse into one progress unit, so\n"
                                          "completing any one marks the entire group as done (used by\n"
-                                         "special blaze and caves advancements like Ultimate Enchanter).",
+                                         "special blaze and caves advancements like Ultimate Enchanter).\n"
+                                         "The tracker and overlay show each group as a single criterion,\n"
+                                         "using the display name and icon of the group's first member\n"
+                                         "(the topmost one in this list).",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", groups_tooltip_buffer);
                             }
@@ -10917,7 +10920,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SetTooltip("%s",
                                                           "Assign every selected criterion to a group.\n"
                                                           "Either click an existing group, or type a new name.\n"
-                                                          "Criteria sharing a group collapse into one progress unit.");
+                                                          "Criteria sharing a group collapse into one progress unit,\n"
+                                                          "shown with the display name and icon of the group's first member.");
                                     }
                                     if (ImGui::Selectable("Ungroup selection##crit_ba")) ba_do_ungroup = true;
                                     if (ImGui::IsItemHovered()) {
@@ -11362,11 +11366,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char tip[384];
+                                    char tip[512];
                                     snprintf(tip, sizeof(tip),
                                              "Optional group ID. Criteria in this %s sharing the same group\n"
-                                             "collapse into one progress unit: one done marks the whole group done\n"
-                                             "and renders every member as completed. Leave empty for default behaviour.",
+                                             "collapse into one progress unit: one done marks the whole group done.\n"
+                                             "The group is shown as a single criterion with the display name and\n"
+                                             "icon of its first member (topmost in this list). Leave empty for default behaviour.",
                                              advancements_label_singular_lower);
                                     ImGui::SetTooltip("%s", tip);
                                 }

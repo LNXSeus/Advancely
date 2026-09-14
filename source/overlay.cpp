@@ -1510,7 +1510,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             int adv_newly_done = 0;
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || goal_is_hidden(c->is_hidden, settings) || !c->done) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings) || !c->done) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
                 auto it = eng.prev.find(key);
                 unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
@@ -1519,7 +1519,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             int adv_shown = a->completed_criteria_count - adv_newly_done; // completed before this batch
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings)) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
                 int shown = a->completed_criteria_count;
                 if (c->done) {
@@ -1924,7 +1924,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             measure(buf);
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings)) continue;
                 measure(compact_display_name(c->display_name, c->root_name));
             }
         }
@@ -2326,7 +2326,10 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *cat = t->template_data->advancements[i];
-        for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
+        for (int j = 0; j < cat->criteria_count; j++) {
+            if (cat->criteria[j]->hidden_by_group) continue;
+            items.push_back({cat->criteria[j], cat});
+        }
     }
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
@@ -3073,7 +3076,10 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *cat = t->template_data->advancements[i];
-        for (int j = 0; j < cat->criteria_count; j++) row1_items.push_back({cat->criteria[j], cat});
+        for (int j = 0; j < cat->criteria_count; j++) {
+            if (cat->criteria[j]->hidden_by_group) continue;
+            row1_items.push_back({cat->criteria[j], cat});
+        }
     }
 
     for (int i = 0; i < t->template_data->stat_count; i++) {

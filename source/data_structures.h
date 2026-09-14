@@ -268,6 +268,10 @@ struct TrackableItem {
     // group ID inside one advancement collapse into a single progress unit:
     // one done means the whole group is done. Empty = ungrouped.
     char group[64];
+    // Set on every grouped criterion except the first member of its group (when grouping is
+    // active on the parent). The first member stands in for the whole group on the tracker map,
+    // the overlay rows and the compact stack, so these are skipped wherever criteria are shown.
+    bool hidden_by_group;
 
     bool done; // For advancements/unlocks: Is it completed?
     int progress; // For stats: The current value, e.g., 5.

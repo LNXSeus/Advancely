@@ -2240,6 +2240,20 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         }
                     }
                 }
+                // With grouping active, only the first member of each group is displayed; the
+                // rest are marked so every criteria listing (map, overlay, compact stack) skips them.
+                if (!is_stat_category && new_cat->groups_enabled) {
+                    for (int gi = 0; gi < new_cat->criteria_count; gi++) {
+                        TrackableItem *gc = new_cat->criteria[gi];
+                        if (!gc || gc->group[0] == '\0') continue;
+                        for (int gj = 0; gj < gi; gj++) {
+                            if (new_cat->criteria[gj] && strcmp(new_cat->criteria[gj]->group, gc->group) == 0) {
+                                gc->hidden_by_group = true;
+                                break;
+                            }
+                        }
+                    }
+                }
                 // Group-collapse the progress denominator for advancements; stats keep raw count.
                 new_cat->criteria_progress_total = is_stat_category
                                                        ? new_cat->criteria_count
@@ -7423,6 +7437,14 @@ static inline bool tracker_should_hide_by_mode(const AppSettings *settings, bool
 }
 
 /**
+ * @brief Hiding test for a criterion / sub-stat: the hiding mode, plus grouped criteria that are
+ * represented by the first member of their group (see TrackableItem::hidden_by_group).
+ */
+static inline bool tracker_should_hide_criterion(const AppSettings *settings, const TrackableItem *crit) {
+    return crit->hidden_by_group || tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+}
+
+/**
  * @brief Decides whether an element marked "Hidden" in the Visual Layout Editor stays hidden.
  *
  * Manual layout has its own per-element hidden flag, which is the manual-layout counterpart of the
@@ -7719,7 +7741,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Determine if child should be hidden based *only* on hiding mode + template hidden status
                 bool should_hide_child_based_on_mode = false;
-                should_hide_child_based_on_mode = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                should_hide_child_based_on_mode = tracker_should_hide_criterion(settings, crit);
 
                 if (should_hide_child_based_on_mode) continue; // Skip hidden child
 
@@ -7799,7 +7821,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (!crit) continue;
 
                 bool should_hide_crit_render = false;
-                should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                should_hide_crit_render = tracker_should_hide_criterion(settings, crit);
 
                 if (should_hide_crit_render) continue;
 
@@ -7906,7 +7928,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Apply the same hiding logic here as in the rendering pass
                     bool crit_should_hide_render = false;
-                    crit_should_hide_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                    crit_should_hide_render = tracker_should_hide_criterion(settings, crit);
 
                     if (crit_should_hide_render) continue;
 
@@ -7974,7 +7996,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     TrackableItem *crit = cat->criteria[j];
                     // Child Hiding Logic (for width calculation)
                     bool crit_should_hide_width = false;
-                    crit_should_hide_width = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                    crit_should_hide_width = tracker_should_hide_criterion(settings, crit);
 
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
@@ -8096,7 +8118,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (!crit) continue;
 
                     bool should_hide_crit_render = false;
-                    should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                    should_hide_crit_render = tracker_should_hide_criterion(settings, crit);
 
                     if (should_hide_crit_render) continue;
 
@@ -8123,7 +8145,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     TrackableItem *crit = cat->criteria[j];
                     if (!crit) continue;
                     bool should_hide_crit_render = false;
-                    should_hide_crit_render = tracker_should_hide_by_mode(settings, crit->is_hidden, crit->done);
+                    should_hide_crit_render = tracker_should_hide_criterion(settings, crit);
                     if (!should_hide_crit_render) children_to_render.push_back(crit);
                 }
             } else {
