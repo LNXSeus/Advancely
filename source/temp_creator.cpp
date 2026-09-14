@@ -166,6 +166,81 @@ struct EditorCounterLinkedGoal {
     LinkedGoalType type = LINK_TYPE_ANY; // Section to resolve in; stamped when the link is added
 };
 
+// One goal's display name and description in a language the editor is NOT currently showing.
+//
+// The editor only ever displays and regenerates one language file, so everything the other languages
+// say about a goal is carried here, on the goal, for as long as it is being edited. That is what
+// makes a rename safe: a lang key is derived from root names the user is free to change, and a key
+// recorded anywhere else goes stale the moment they do. Renaming a goal used to rewrite the key in
+// the active language file only, leaving every other language pointing at a key the template no
+// longer has, which is why those languages fell back to showing the raw root name. Carried on the
+// goal, the text follows it through renames, copies and deletions with no bookkeeping at all, and
+// the key is worked out at save time by the same walk that writes the active language.
+struct EditorLanguageText {
+    std::string lang_flag; // "" is the default, un-flagged lang file
+    // Present means the file has the key, whatever it says: an explicit "" is a real value (icon-only
+    // stats are blanked that way on purpose) and has to come back out as "", not vanish.
+    bool has_display_name = false;
+    bool has_description = false;
+    std::string display_name;
+    std::string description;
+};
+
+// Shared and treated as immutable, so the hundreds of whole-template snapshots the undo history
+// keeps cost one pointer per goal instead of a copy of every translation in the template. Writes go
+// through tc_set_language_text, which clones first when a snapshot is still looking at the old
+// value. Null means the goal has no text in any other language, which is the case for a goal the
+// user just created and for every template with a single language file.
+using EditorLanguageTextRef = std::shared_ptr<const std::vector<EditorLanguageText> >;
+
+// What the walk turns those into at save time: lang flag -> (lang key, text) in the order the
+// walk visits them, which is the order the active language file is written in. A map keyed by lang
+// key would sort them alphabetically, and the other language files are meant to read exactly like
+// the active one.
+using TcLangFileWrites = std::map<std::string, std::vector<std::pair<std::string, std::string> > >;
+
+// Sets one language's text on a goal, replacing what that language said before. Null means the
+// language has no such key; a pointer to an empty string means it has the key and it is blank.
+// Copy-on-write: an entry shared with an undo snapshot is cloned rather than edited in place.
+static void tc_set_language_text(EditorLanguageTextRef &slot, const std::string &lang_flag,
+                                 const std::string *display_name, const std::string *description) {
+    if (!display_name && !description) return;
+    auto edited = slot
+                      ? std::make_shared<std::vector<EditorLanguageText> >(*slot)
+                      : std::make_shared<std::vector<EditorLanguageText> >();
+    EditorLanguageText *entry = nullptr;
+    for (auto &existing: *edited) {
+        if (existing.lang_flag == lang_flag) {
+            entry = &existing;
+            break;
+        }
+    }
+    if (!entry) {
+        edited->push_back({});
+        entry = &edited->back();
+        entry->lang_flag = lang_flag;
+    }
+    entry->has_display_name = display_name != nullptr;
+    entry->display_name = display_name ? *display_name : std::string();
+    entry->has_description = description != nullptr;
+    entry->description = description ? *description : std::string();
+    slot = edited;
+}
+
+static bool tc_language_text_different(const EditorLanguageTextRef &a, const EditorLanguageTextRef &b) {
+    if (a == b) return false; // Shared with the snapshot being compared against, so untouched
+    if (!a || !b) return (a ? a->size() : 0) != (b ? b->size() : 0);
+    if (a->size() != b->size()) return true;
+    for (size_t i = 0; i < a->size(); i++) {
+        if ((*a)[i].lang_flag != (*b)[i].lang_flag) return true;
+        if ((*a)[i].has_display_name != (*b)[i].has_display_name) return true;
+        if ((*a)[i].has_description != (*b)[i].has_description) return true;
+        if ((*a)[i].display_name != (*b)[i].display_name) return true;
+        if ((*a)[i].description != (*b)[i].description) return true;
+    }
+    return false;
+}
+
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
     char root_name[192];
@@ -183,6 +258,9 @@ struct EditorTrackableItem {
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
     // description has to cost nothing in a template holding thousands of goals.
     std::string description;
+
+    // What the template's OTHER language files say about this goal (see EditorLanguageText).
+    EditorLanguageTextRef language_text;
 
     // Stat auto-completion via linked goals (only used for sub-stats)
     std::vector<EditorCounterLinkedGoal> linked_goals;
@@ -213,6 +291,9 @@ struct EditorTrackableCategory {
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
     // description has to cost nothing in a template holding thousands of goals.
     std::string description;
+
+    // What the template's OTHER language files say about this goal (see EditorLanguageText).
+    EditorLanguageTextRef language_text;
 
     // Stat auto-completion via linked goals (only used for stat categories)
     std::vector<EditorCounterLinkedGoal> linked_goals;
@@ -246,6 +327,9 @@ struct EditorSubGoal {
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
     // description has to cost nothing in a template holding thousands of goals.
     std::string description;
+
+    // What the template's OTHER language files say about this goal (see EditorLanguageText).
+    EditorLanguageTextRef language_text;
 };
 
 struct EditorMultiStageGoal {
@@ -263,6 +347,9 @@ struct EditorMultiStageGoal {
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
     // description has to cost nothing in a template holding thousands of goals.
     std::string description;
+
+    // What the template's OTHER language files say about this goal (see EditorLanguageText).
+    EditorLanguageTextRef language_text;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -283,6 +370,9 @@ struct EditorCounterGoal {
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
     // description has to cost nothing in a template holding thousands of goals.
     std::string description;
+
+    // What the template's OTHER language files say about this goal (see EditorLanguageText).
+    EditorLanguageTextRef language_text;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -314,6 +404,10 @@ struct EditorDecorationElement {
 
     // Text header goal linking: linked items remain visible when searching for the header's display text
     std::vector<EditorCounterLinkedGoal> linked_goals;
+
+    // What the template's OTHER language files say about this header (see EditorLanguageText).
+    // Text headers only; the other decoration types have no display text.
+    EditorLanguageTextRef language_text;
 };
 
 struct EditorTemplate {
@@ -864,7 +958,8 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
            are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
            strcmp(a.group, b.group) != 0 ||
-           a.description != b.description;
+           a.description != b.description ||
+           tc_language_text_different(a.language_text, b.language_text);
 }
 
 // Helper function to compare two EditorTrackableCategory structs, advancements and stats
@@ -886,6 +981,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.description != b.description ||
+        tc_language_text_different(a.language_text, b.language_text) ||
         a.criteria.size() != b.criteria.size()) {
         return true;
     }
@@ -909,6 +1005,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            a.linked_goal_mode != b.linked_goal_mode ||
            a.complete_with_next != b.complete_with_next ||
            a.description != b.description ||
+           tc_language_text_different(a.language_text, b.language_text) ||
            are_linked_goals_different(a.linked_goals, b.linked_goals);
 }
 
@@ -925,6 +1022,7 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.description != b.description ||
+        tc_language_text_different(a.language_text, b.language_text) ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -949,6 +1047,7 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos, ignore_synced_layout) ||
         a.description != b.description ||
+        tc_language_text_different(a.language_text, b.language_text) ||
         a.linked_goals.size() != b.linked_goals.size()) {
         return true;
     }
@@ -1000,6 +1099,7 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
         }
     }
     if (a.type == DECORATION_TEXT_HEADER) {
+        if (tc_language_text_different(a.language_text, b.language_text)) return true;
         if (a.linked_goals.size() != b.linked_goals.size()) return true;
         for (size_t i = 0; i < a.linked_goals.size(); ++i) {
             if (strcmp(a.linked_goals[i].root_name, b.linked_goals[i].root_name) != 0 ||
@@ -2434,6 +2534,170 @@ static void apply_layout_to_editor(EditorTemplate &ed, cJSON *layout_json) {
 }
 
 // Main function to load a whole template for editing
+// Visits every goal that owns an entry in the language files, in the order a lang file writes them.
+//
+// This is the ONE place a lang key is spelled. The file builder, the loader that pulls in the other
+// languages and the save that writes them all walk through here, so a key cannot drift between what
+// one of them writes and what another reads back. Getting that wrong is what stranded translations
+// on renamed goals in the first place.
+//
+// The visitor is handed the goal's display key, its description key (empty when that kind of goal
+// has no description), the text the active language shows, the description the active language
+// shows (null when it has none), and the goal's other-language slot.
+template<typename TemplateRef, typename Fn>
+static void tc_for_each_lang_entry(TemplateRef &editor_data, Fn &&visit) {
+    // 1. Advancements (Parent then Criteria)
+    for (auto &cat: editor_data.advancements) {
+        char cat_lang_key[256];
+        char temp_root_name[192];
+        strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
+        temp_root_name[sizeof(temp_root_name) - 1] = '\0';
+        char *p = temp_root_name;
+        while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
+        char cat_desc_key[576];
+        snprintf(cat_desc_key, sizeof(cat_desc_key), "%s.desc", cat_lang_key);
+        visit(cat_lang_key, cat_desc_key, cat.display_name, &cat.description, cat.language_text);
+
+        for (auto &crit: cat.criteria) {
+            char crit_lang_key[512];
+            snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
+            // Criteria have no descriptions of their own.
+            visit(crit_lang_key, "", crit.display_name, nullptr, crit.language_text);
+        }
+    }
+
+    // 2. Stats (Parent then Criteria)
+    for (auto &cat: editor_data.stats) {
+        char cat_lang_key[256];
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
+        char cat_desc_key[576];
+        snprintf(cat_desc_key, sizeof(cat_desc_key), "%s.desc", cat_lang_key);
+        visit(cat_lang_key, cat_desc_key, cat.display_name, &cat.description, cat.language_text);
+        if (!cat.is_simple_stat) {
+            for (auto &crit: cat.criteria) {
+                char crit_lang_key[512];
+                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
+                visit(crit_lang_key, "", crit.display_name, nullptr, crit.language_text);
+            }
+        }
+    }
+
+    // 3. Unlocks
+    for (auto &item: editor_data.unlocks) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "unlock.%s", item.root_name);
+        char desc_key[576];
+        snprintf(desc_key, sizeof(desc_key), "%s.desc", lang_key);
+        visit(lang_key, desc_key, item.display_name, &item.description, item.language_text);
+    }
+
+    // 4. Custom Goals
+    for (auto &item: editor_data.custom_goals) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "custom.%s", item.root_name);
+        char desc_key[576];
+        snprintf(desc_key, sizeof(desc_key), "%s.desc", lang_key);
+        visit(lang_key, desc_key, item.display_name, &item.description, item.language_text);
+    }
+
+    // 5. Multi-Stage Goals (Parent then Stages)
+    for (auto &goal: editor_data.multi_stage_goals) {
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
+        // The goal's own description hangs off the root, not off the ".display_name" its title uses.
+        char goal_desc_key[256];
+        snprintf(goal_desc_key, sizeof(goal_desc_key), "multi_stage_goal.%s.desc", goal.root_name);
+        visit(goal_lang_key, goal_desc_key, goal.display_name, &goal.description, goal.language_text);
+        for (auto &stage: goal.stages) {
+            char stage_lang_key[512];
+            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name,
+                     stage.stage_id);
+            char stage_desc_key[576];
+            snprintf(stage_desc_key, sizeof(stage_desc_key), "%s.desc", stage_lang_key);
+            visit(stage_lang_key, stage_desc_key, stage.display_text, &stage.description, stage.language_text);
+        }
+    }
+
+    // 6. Counter Goals
+    for (auto &goal: editor_data.counter_goals) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "counter.%s", goal.root_name);
+        char desc_key[576];
+        snprintf(desc_key, sizeof(desc_key), "%s.desc", lang_key);
+        visit(lang_key, desc_key, goal.display_name, &goal.description, goal.language_text);
+    }
+
+    // 7. Decorations (Text Headers only; lines and arrows carry no text)
+    for (auto &deco: editor_data.decorations) {
+        if (deco.type != DECORATION_TEXT_HEADER || deco.display_text[0] == '\0') continue;
+        char deco_lang_key[256];
+        snprintf(deco_lang_key, sizeof(deco_lang_key), "decoration.%s", deco.id);
+        visit(deco_lang_key, "", deco.display_text, nullptr, deco.language_text);
+    }
+}
+
+// Every key the template owns right now. The save compares this against the keys it owned when the
+// file was last written, and drops the difference from the other language files: those are the
+// entries a rename or a deletion left behind, and nothing else in the file is touched.
+static std::set<std::string> tc_collect_lang_keys(const EditorTemplate &editor_data) {
+    std::set<std::string> keys;
+    tc_for_each_lang_entry(editor_data, [&](const char *display_key, const char *desc_key,
+                                            const char *, const std::string *,
+                                            const EditorLanguageTextRef &) {
+        keys.insert(display_key);
+        if (desc_key[0] != '\0') keys.insert(desc_key);
+    });
+    return keys;
+}
+
+// Pulls in what every OTHER language file says about each goal, so the editor carries all of them
+// while only ever showing one. This is what lets a rename reach the other languages: the text is on
+// the goal, so the save writes it back under whatever key that goal has by then.
+static void tc_load_other_language_text(const char *base_path_str, const DiscoveredTemplate &template_info,
+                                        const std::string &active_lang_flag, EditorTemplate &editor_data) {
+    for (const auto &flag: template_info.available_lang_flags) {
+        if (flag == active_lang_flag) continue;
+
+        char lang_path[MAX_PATH_LENGTH];
+        if (!flag.empty()) {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path_str, flag.c_str());
+        } else {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path_str);
+        }
+        cJSON *other = cJSON_from_file(lang_path);
+        if (!other) continue;
+
+        // cJSON_GetObjectItem walks the object's children, so looking every key up directly would be
+        // quadratic on the big templates (thousands of keys against thousands of children, once per
+        // language). One pass into a hash map instead.
+        std::unordered_map<std::string, const cJSON *> by_key;
+        for (const cJSON *entry = other->child; entry; entry = entry->next) {
+            if (entry->string) by_key.emplace(entry->string, entry);
+        }
+        // True when the file has the key as a string, blank or not; the text lands in out.
+        auto lookup = [&](const char *key, std::string &out) -> bool {
+            if (key[0] == '\0') return false;
+            auto it = by_key.find(key);
+            if (it == by_key.end()) return false;
+            const cJSON *entry = it->second;
+            if (!cJSON_IsString(entry) || !entry->valuestring) return false;
+            out = entry->valuestring;
+            return true;
+        };
+
+        tc_for_each_lang_entry(editor_data, [&](const char *display_key, const char *desc_key,
+                                                const char *, const std::string *,
+                                                EditorLanguageTextRef &slot) {
+            std::string name, desc;
+            bool has_name = lookup(display_key, name);
+            bool has_desc = lookup(desc_key, desc);
+            tc_set_language_text(slot, flag, has_name ? &name : nullptr, has_desc ? &desc : nullptr);
+        });
+        cJSON_Delete(other);
+    }
+}
+
 static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag, const std::string &layout_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
@@ -2516,6 +2780,10 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
 
     // Override the inline positions parsed above with the layout file's positions.
     apply_layout_to_editor(editor_data, layout_json);
+
+    // Last, because it walks the goals the parses above created. The editor shows one language but
+    // has to carry them all, or a rename would only ever reach the file it is showing.
+    tc_load_other_language_text(base_path_str, template_info, lang_flag, editor_data);
 
     cJSON_Delete(root);
     cJSON_Delete(lang_json);
@@ -3000,20 +3268,15 @@ static cJSON *build_editor_template_json(const EditorTemplate &editor_data, cons
     return root;
 }
 
-// Writes a goal's description under its own lang key plus ".desc", beside the display name it
-// belongs to. Skipped when empty so a template nobody wrote descriptions for keeps the lang file
-// it always had.
-static void add_editor_lang_description(cJSON *lang_json, const char *display_key, const std::string &description) {
-    if (description.empty()) return;
-    char desc_key[576];
-    snprintf(desc_key, sizeof(desc_key), "%s.desc", display_key);
-    cJSON_AddStringToObject(lang_json, desc_key, description.c_str());
-}
-
 // Builds the language file contents for the editor's template, in the same order a save writes them.
 // Split out from the save so the live preview can hand the tracker the display names of goals that
 // only exist in memory.
-static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
+//
+// out_other_languages, when given, collects what the template's OTHER languages say, keyed exactly
+// like the file being built here. The save writes those into their own lang files; the live preview
+// passes nullptr and ignores them.
+static cJSON *build_editor_lang_json(const EditorTemplate &editor_data,
+                                     TcLangFileWrites *out_other_languages = nullptr) {
     // LANG FILE WITH SPECIFIC ORDER
     cJSON *lang_json = cJSON_CreateObject();
 
@@ -3022,91 +3285,26 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data) {
         cJSON_AddStringToObject(lang_json, "display_category", editor_data.display_category);
     }
 
-    // 1. Advancements (Parent then Criteria)
-    for (const auto &cat: editor_data.advancements) {
-        char cat_lang_key[256];
-        char temp_root_name[192];
-        strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
-        temp_root_name[sizeof(temp_root_name) - 1] = '\0';
-        char *p = temp_root_name;
-        while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
-        snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
-        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
-        add_editor_lang_description(lang_json, cat_lang_key, cat.description);
-
-        for (const auto &crit: cat.criteria) {
-            char crit_lang_key[512];
-            snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
-            cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
+    tc_for_each_lang_entry(editor_data, [&](const char *display_key, const char *desc_key,
+                                            const char *display_text, const std::string *description,
+                                            const EditorLanguageTextRef &language_text) {
+        cJSON_AddStringToObject(lang_json, display_key, display_text);
+        // Skipped when empty so a template nobody wrote descriptions for keeps the lang file it
+        // always had.
+        if (description && !description->empty()) {
+            cJSON_AddStringToObject(lang_json, desc_key, description->c_str());
         }
-    }
-
-    // 2. Stats (Parent then Criteria)
-    for (const auto &cat: editor_data.stats) {
-        char cat_lang_key[256];
-        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
-        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
-        add_editor_lang_description(lang_json, cat_lang_key, cat.description);
-        if (!cat.is_simple_stat) {
-            for (const auto &crit: cat.criteria) {
-                char crit_lang_key[512];
-                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
-                cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
+        if (!out_other_languages || !language_text) return;
+        for (const auto &entry: *language_text) {
+            auto &lang_writes = (*out_other_languages)[entry.lang_flag];
+            // A language that has no key for this goal stays without one rather than being blanked.
+            if (entry.has_display_name) lang_writes.emplace_back(display_key, entry.display_name);
+            // Descriptions follow the active file's rule: an empty one is left out.
+            if (desc_key[0] != '\0' && entry.has_description && !entry.description.empty()) {
+                lang_writes.emplace_back(desc_key, entry.description);
             }
         }
-    }
-
-    // 3. Unlocks
-    for (const auto &item: editor_data.unlocks) {
-        char lang_key[256];
-        snprintf(lang_key, sizeof(lang_key), "unlock.%s", item.root_name);
-        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
-        add_editor_lang_description(lang_json, lang_key, item.description);
-    }
-
-    // 4. Custom Goals
-    for (const auto &item: editor_data.custom_goals) {
-        char lang_key[256];
-        snprintf(lang_key, sizeof(lang_key), "custom.%s", item.root_name);
-        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
-        add_editor_lang_description(lang_json, lang_key, item.description);
-    }
-
-    // 5. Multi-Stage Goals (Parent then Stages)
-    for (const auto &goal: editor_data.multi_stage_goals) {
-        char goal_lang_key[256];
-        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
-        cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
-        if (!goal.description.empty()) {
-            char goal_desc_key[256];
-            snprintf(goal_desc_key, sizeof(goal_desc_key), "multi_stage_goal.%s.desc", goal.root_name);
-            cJSON_AddStringToObject(lang_json, goal_desc_key, goal.description.c_str());
-        }
-        for (const auto &stage: goal.stages) {
-            char stage_lang_key[512];
-            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name,
-                     stage.stage_id);
-            cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
-            add_editor_lang_description(lang_json, stage_lang_key, stage.description);
-        }
-    }
-
-    // 6. Counter Goals
-    for (const auto &goal: editor_data.counter_goals) {
-        char lang_key[256];
-        snprintf(lang_key, sizeof(lang_key), "counter.%s", goal.root_name);
-        cJSON_AddStringToObject(lang_json, lang_key, goal.display_name);
-        add_editor_lang_description(lang_json, lang_key, goal.description);
-    }
-
-    // 7. Decorations (Text Headers, Lines, Arrows)
-    for (const auto &deco: editor_data.decorations) {
-        if (deco.type == DECORATION_TEXT_HEADER && deco.display_text[0] != '\0') {
-            char deco_lang_key[256];
-            snprintf(deco_lang_key, sizeof(deco_lang_key), "decoration.%s", deco.id);
-            cJSON_AddStringToObject(lang_json, deco_lang_key, deco.display_text);
-        }
-    }
+    });
 
     return lang_json;
 }
@@ -3149,9 +3347,104 @@ static void tc_drop_live_template_preview(bool trigger_reload) {
     if (trigger_reload) SDL_SetAtomicInt(&g_template_preview_changed, 1);
 }
 
+// Writes the template's OTHER language files so each reads exactly like the active one: the same
+// keys in the same order, minus whatever that language has no translation for.
+//
+// `writes` maps a language flag ("" = default) to (lang key, text) pairs in file order, display
+// names and goal descriptions alike, as collected by build_editor_lang_json from the goals
+// themselves. Each file is rebuilt from those, then anything the file holds that the template does
+// not own is kept after them in its original order, so hand-written entries survive. The one thing
+// dropped is `stale_keys`: keys the template owned when the file was last written and no longer
+// does, which is what a rename or a deletion leaves behind. A file that would come out identical is
+// not touched at all.
+//
+// It never creates a language file that doesn't already exist. Best-effort: I/O failures are logged
+// and skipped so one bad file can't abort a save that already succeeded.
+static void write_other_language_files(const char *version, const DiscoveredTemplate &template_info,
+                                       const std::string &active_lang_flag,
+                                       const TcLangFileWrites &writes,
+                                       const std::set<std::string> &current_keys,
+                                       const std::set<std::string> &stale_keys) {
+    char version_filename[64];
+    strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char base_path_str[MAX_PATH_LENGTH];
+    snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
+             version, template_info.category, version_filename, template_info.category,
+             template_info.optional_flag);
+
+    static const std::vector<std::pair<std::string, std::string> > no_writes;
+
+    for (const auto &flag: template_info.available_lang_flags) {
+        if (flag == active_lang_flag) continue; // Fully regenerated by the save itself
+
+        auto write_entry = writes.find(flag);
+        const auto &lang_writes = (write_entry != writes.end()) ? write_entry->second : no_writes;
+
+        char lang_path[MAX_PATH_LENGTH];
+        if (!flag.empty()) {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path_str, flag.c_str());
+        } else {
+            snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path_str);
+        }
+
+        cJSON *existing = cJSON_from_file(lang_path);
+        if (!existing) continue; // Never create a language the template doesn't have
+
+        cJSON *rebuilt = cJSON_CreateObject();
+        // display_category leads the active file too, and is per language, so it stays where it is.
+        cJSON *display_category = cJSON_GetObjectItem(existing, "display_category");
+        if (display_category) {
+            cJSON_AddItemToObject(rebuilt, "display_category", cJSON_Duplicate(display_category, 1));
+        }
+        for (const auto &kv: lang_writes) {
+            cJSON_AddStringToObject(rebuilt, kv.first.c_str(), kv.second.c_str());
+        }
+        // Whatever the template does not own comes along untouched, after the owned keys, in the
+        // order it had. Stale keys are the exception: those are the template's own leftovers.
+        for (const cJSON *entry = existing->child; entry; entry = entry->next) {
+            if (!entry->string) continue;
+            if (strcmp(entry->string, "display_category") == 0) continue;
+            if (current_keys.count(entry->string) || stale_keys.count(entry->string)) continue;
+            cJSON_AddItemToObject(rebuilt, entry->string, cJSON_Duplicate(entry, 1));
+        }
+
+        // Left alone when nothing would change: these are hand-maintained files, and a rewrite that
+        // only reflows the line endings is a diff the user has to read for nothing.
+        char *before = cJSON_PrintUnformatted(existing);
+        char *after = cJSON_PrintUnformatted(rebuilt);
+        bool unchanged = before && after && strcmp(before, after) == 0;
+        if (before) free(before);
+        if (after) free(after);
+        cJSON_Delete(existing);
+        if (unchanged) {
+            cJSON_Delete(rebuilt);
+            continue;
+        }
+
+        FILE *f = fopen(lang_path, "w");
+        if (f) {
+            char *printed = cJSON_Print(rebuilt);
+            if (printed) {
+                fputs(printed, f);
+                free(printed);
+            }
+            fclose(f);
+            log_message(LOG_INFO, "[TEMP CREATOR] Rewrote language file %s (%zu owned entries).\n",
+                        lang_path, lang_writes.size());
+        } else {
+            log_message(LOG_ERROR, "[TEMP CREATOR] Failed to write language file: %s\n", lang_path);
+        }
+        cJSON_Delete(rebuilt);
+    }
+}
+
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag, const std::string &layout_flag,
-                                      EditorTemplate &editor_data, char *status_message_buffer) {
+                                      EditorTemplate &editor_data, char *status_message_buffer,
+                                      const std::set<std::string> &lang_keys_on_disk) {
     char template_path[MAX_PATH_LENGTH];
     char lang_path[MAX_PATH_LENGTH];
     char layout_path[MAX_PATH_LENGTH];
@@ -3208,7 +3501,10 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
 
 
-    cJSON *lang_json = build_editor_lang_json(editor_data);
+    // The same walk that writes the active language collects what the other languages say, so every
+    // key it hands back is the one this template writes today.
+    TcLangFileWrites other_language_writes;
+    cJSON *lang_json = build_editor_lang_json(editor_data, &other_language_writes);
 
     FILE *lang_file = fopen(lang_path, "w");
     if (lang_file) {
@@ -3225,63 +3521,19 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
     cJSON_Delete(lang_json);
 
-    return true;
-}
-
-// Merge deferred multi-language import translations into the current template's OTHER language files.
-// `pending` maps a language flag ("" = default) to (lang_key -> display_name). Each target file is
-// read, the pending keys merged in (replacing any existing entry), and written back. It never creates
-// a language file that doesn't already exist, because the caller only ever populates flags the current
-// template already has. Best-effort: I/O failures are logged and skipped so one bad file can't abort a
-// save that already succeeded.
-static void write_pending_lang_imports(const char *version, const DiscoveredTemplate &template_info,
-                                       const std::map<std::string, std::map<std::string, std::string> > &pending) {
-    if (pending.empty()) return;
-
-    char version_filename[64];
-    strncpy(version_filename, version, sizeof(version_filename) - 1);
-    version_filename[sizeof(version_filename) - 1] = '\0';
-    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
-
-    char base_path_str[MAX_PATH_LENGTH];
-    snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
-             version, template_info.category, version_filename, template_info.category,
-             template_info.optional_flag);
-
-    for (const auto &lang_entry: pending) {
-        const std::string &flag = lang_entry.first;
-        if (lang_entry.second.empty()) continue;
-
-        char lang_path[MAX_PATH_LENGTH];
-        if (!flag.empty()) {
-            snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path_str, flag.c_str());
-        } else {
-            snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path_str);
-        }
-
-        // Merge into the existing file (preserving unrelated entries) rather than regenerating it.
-        cJSON *lang_json = cJSON_from_file(lang_path);
-        if (!lang_json) lang_json = cJSON_CreateObject();
-        for (const auto &kv: lang_entry.second) {
-            cJSON_DeleteItemFromObject(lang_json, kv.first.c_str()); // replace if already present
-            cJSON_AddStringToObject(lang_json, kv.first.c_str(), kv.second.c_str());
-        }
-
-        FILE *f = fopen(lang_path, "w");
-        if (f) {
-            char *s = cJSON_Print(lang_json);
-            if (s) {
-                fputs(s, f);
-                free(s);
-            }
-            fclose(f);
-            log_message(LOG_INFO, "[IMPORT FROM TEMPLATE] Merged %zu translation(s) into %s\n",
-                        lang_entry.second.size(), lang_path);
-        } else {
-            log_message(LOG_ERROR, "[IMPORT FROM TEMPLATE] Failed to write language file: %s\n", lang_path);
-        }
-        cJSON_Delete(lang_json);
+    // Only once the active language and the structure are safely on disk. Keys the template owned
+    // when it was last written and no longer has are the ones a rename or a deletion orphaned, so
+    // they go with it.
+    other_language_writes.erase(lang_flag);
+    std::set<std::string> current_keys = tc_collect_lang_keys(editor_data);
+    std::set<std::string> stale_keys;
+    for (const auto &key: lang_keys_on_disk) {
+        if (!current_keys.count(key)) stale_keys.insert(key);
     }
+    write_other_language_files(version, template_info, lang_flag, other_language_writes, current_keys,
+                               stale_keys);
+
+    return true;
 }
 
 enum SaveMessageType {
@@ -4127,17 +4379,14 @@ static bool tc_history_selections_different(const TcHistorySelection &a, const T
     return a.visual_active && b.visual_active && a.visual_keys != b.visual_keys;
 }
 
-// Display Names for the template's other languages, staged by an import and merged into their lang
-// files on the next Save. They are part of the editor's unsaved state, so a step carries them too.
-using TcPendingLangImports = std::map<std::string, std::map<std::string, std::string> >;
-
 // One committed step: the whole template, not a diff. Applying a step is then a plain assignment,
 // which is what keeps this independent of the hundreds of places that mutate the editor state.
 // Selecting is a step too, and those leave the template untouched, so consecutive steps share one
 // snapshot instead of each paying for a full copy of a template that can run to several MB.
+// Translations staged for the template's other languages need no slot of their own: they live on
+// the goals (see EditorLanguageText), so the template snapshot already carries them.
 struct TcHistoryEntry {
     std::shared_ptr<const EditorTemplate> data;
-    std::shared_ptr<const TcPendingLangImports> lang_imports;
     TcHistorySelection selection;
 };
 
@@ -4183,7 +4432,9 @@ static TcHistoryVsSaved s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
 
 // Approximate heap footprint of one step's template. Only used to decide when to drop the oldest
 // ones, so the vector capacities are enough and the fixed-size char members come along in
-// sizeof(). The selection's keys are a rounding error next to the template and are ignored.
+// sizeof(). The selection's keys are a rounding error next to the template and are ignored, and so
+// is each goal's other-language text: every step shares one copy of it (see EditorLanguageTextRef),
+// so a step costs the pointer that is already inside sizeof() and nothing more.
 static size_t tc_history_entry_bytes(const EditorTemplate &d) {
     auto linked_bytes = [](const std::vector<EditorCounterLinkedGoal> &v) {
         return v.capacity() * sizeof(EditorCounterLinkedGoal);
@@ -4265,9 +4516,7 @@ static bool validate_and_save_template(const char *creator_version_str,
                                        const std::string &lang_flag, const std::string &layout_flag,
                                        EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
                                        SaveMessageType &save_message_type, char *status_message,
-                                       AppSettings *app_settings,
-                                       std::map<std::string, std::map<std::string, std::string> > *pending_lang_imports
-                                               = nullptr) {
+                                       AppSettings *app_settings) {
     // Reset message state on new save attempt
     save_message_type = MSG_NONE;
     status_message[0] = '\0';
@@ -4419,8 +4668,11 @@ static bool validate_and_save_template(const char *creator_version_str,
 
     // If all checks passed, attempt to save
     if (validation_passed) {
+        // Taken before saved_template_data is replaced below: it is the template as the language
+        // files on disk currently spell it, which is what the stale-key comparison needs.
+        const std::set<std::string> lang_keys_on_disk = tc_collect_lang_keys(saved_template_data);
         if (save_template_from_editor(creator_version_str, selected_template_info, lang_flag, layout_flag,
-                                      current_template_data, status_message)) {
+                                      current_template_data, status_message, lang_keys_on_disk)) {
             // Update snapshot to new clean state
             saved_template_data = current_template_data;
             // The undo history's steps are unchanged, but what they are being compared against is
@@ -4434,14 +4686,6 @@ static bool validate_and_save_template(const char *creator_version_str,
                                        strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                        strcmp(selected_template_info.optional_flag,
                                               app_settings->optional_flag) == 0);
-
-            // Flush any deferred multi-language import translations into the template's OTHER language
-            // files now that the active language and structure are safely on disk. Cleared afterwards so
-            // a subsequent Save doesn't rewrite them, and so Revert (which clears the map) discards them.
-            if (pending_lang_imports && !pending_lang_imports->empty()) {
-                write_pending_lang_imports(creator_version_str, selected_template_info, *pending_lang_imports);
-                pending_lang_imports->clear();
-            }
 
             // The files now hold what the preview was showing, so the map goes back to reading them.
             // The reload below already covers the active template; only a template the tracker isn't
@@ -5267,13 +5511,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<std::string> s_template_import_lang_flags;
     static int s_template_import_lang_index = 0;
     // Multi-language import: when the current template's languages are all present in the source
-    // (subset), the user can import Display Names for several languages at once. Targets are strictly
-    // the current template's existing languages (never create new ones). The non-active languages'
-    // translations are held here until the next Save, then merged into their lang files on disk.
+    // (subset), the user can import Display Names and Descriptions for several languages at once.
+    // Targets are strictly the current template's existing languages (never create new ones). The
+    // non-active languages' text is staged on the imported goals themselves (see
+    // EditorLanguageText) and written to their lang files on the next Save.
     static std::vector<std::string> s_template_import_target_langs; // current template's languages
     static std::vector<bool> s_template_import_lang_selected; // parallel to target_langs
     static bool s_template_import_multi_available = false;
-    static TcPendingLangImports s_pending_lang_imports;
     // A save triggered while a text field is still active must wait one frame: clearing the active
     // ID lets that field's deactivation callbacks (e.g. goal rename propagation) run first, so the
     // saved snapshot is fully consistent instead of resurrecting phantom "unsaved changes".
@@ -6107,7 +6351,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (editing_template) {
             s_history.push_back({
                 std::make_shared<const EditorTemplate>(current_template_data),
-                std::make_shared<const TcPendingLangImports>(s_pending_lang_imports),
                 history_capture_selection()
             });
             s_history_index = 0;
@@ -6144,16 +6387,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ? editor_has_unsaved_changes
                                     : are_editor_templates_different(current_template_data,
                                                                     *current_step.data);
-        // Cheap while no import is staged, which is nearly always: comparing two empty maps.
-        bool imports_changed = (s_pending_lang_imports != *current_step.lang_imports);
-        bool data_changed = template_changed || imports_changed;
         bool selection_changed = tc_history_selections_different(live_selection,
                                                                 current_step.selection);
         // An edit is committed as soon as it settles; a bare selection change has to hold
         // still for one more frame first (see s_history_last_seen_selection).
         bool selection_held = !tc_history_selections_different(live_selection,
                                                               s_history_last_seen_selection);
-        if (data_changed || (selection_changed && selection_held)) {
+        if (template_changed || (selection_changed && selection_held)) {
             // A step that left one of them alone keeps pointing at the snapshot it was
             // taken from, so a run of selection steps costs a selection each, not a
             // template each.
@@ -6161,13 +6401,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     template_changed
                         ? std::make_shared<const EditorTemplate>(current_template_data)
                         : current_step.data;
-            std::shared_ptr<const TcPendingLangImports> imports =
-                    imports_changed
-                        ? std::make_shared<const TcPendingLangImports>(s_pending_lang_imports)
-                        : current_step.lang_imports;
             // A new change after an undo is the point of no return for whatever was ahead.
             s_history.resize(s_history_index + 1);
-            s_history.push_back({snapshot, imports, live_selection});
+            s_history.push_back({snapshot, live_selection});
             s_history_index = (int) s_history.size() - 1;
             tc_history_trim();
             // The step just taken is current_template_data again.
@@ -6217,7 +6453,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Assigned even when the comparison says nothing moved: the step is the authority on what the
         // template looked like, and a field the comparison happens not to cover must not survive it.
         current_template_data = *step.data;
-        s_pending_lang_imports = *step.lang_imports;
         // The step this lands on is a different template than the one the cache was answered for.
         s_history_step_vs_saved = TC_HISTORY_VS_SAVED_UNKNOWN;
         history_restore_selection(step.selection, previous_selection, diff);
@@ -6273,7 +6508,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (editing_template) {
             validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
                                        selected_layout_flag, current_template_data, saved_template_data,
-                                       save_message_type, status_message, app_settings, &s_pending_lang_imports);
+                                       save_message_type, status_message, app_settings);
         }
     }
 
@@ -6648,7 +6883,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                               status_message)) {
                     // Also update the 'saved' snapshot to reflect the newly loaded state
                     saved_template_data = current_template_data;
-                    s_pending_lang_imports.clear(); // deferred imports belonged to the previous template
 
                     // Exit editor to prevent confusion
                     editing_template = false;
@@ -6776,7 +7010,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
                                           selected_layout_flag, current_template_data, status_message)) {
                 saved_template_data = current_template_data;
-                s_pending_lang_imports.clear(); // fresh editor session; no deferred imports carry over
             }
         }
     }
@@ -8401,7 +8634,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Select the language file for editing display names.\n\n"
                          "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
                          "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
-                         "This keeps the template's core structure separate from its translations.");
+                         "This keeps the template's core structure separate from its translations.\n\n"
+                         "Switching clears the Undo/Redo history.");
             }
             ImGui::SetTooltip("%s", select_lang_file_tooltip_buffer);
         }
@@ -8476,7 +8710,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "• Saving: Position and decoration edits are saved to the layout selected here when you click the main 'Save' button.\n\n"
                          "While editing, this template is the applied one, so changing the layout here\n"
                          "updates the tracker and the Settings layout immediately.\n\n"
-                         "This keeps the template's core structure separate from its visual layout.");
+                         "This keeps the template's core structure separate from its visual layout.\n\n"
+                         "Switching clears the Undo/Redo history.");
             }
             ImGui::SetTooltip("%s", select_layout_file_tooltip_buffer);
         }
@@ -8563,7 +8798,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 save_message_type = MSG_NONE; // Clear any existing message
                 status_message[0] = '\0'; // Clear the message text
                 s_visual_edit_message[0] = '\0'; // The reverted visibility changes are gone with it
-                s_pending_lang_imports.clear(); // discard deferred multi-language imports along with the revert
 
                 // Reloading template on revert changes -> matters for visual editor mode
                 bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -10026,26 +10260,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Get a pointer to the source item to copy from the filtered list
                         const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
 
-                        // Perform a manual, safe copy to prevent memory corruption.
-                        EditorTrackableCategory new_advancement;
-                        strncpy(new_advancement.root_name, source_adv_ptr->root_name,
-                                sizeof(new_advancement.root_name));
-                        new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
-                        strncpy(new_advancement.display_name, source_adv_ptr->display_name,
-                                sizeof(new_advancement.display_name));
-                        new_advancement.display_name[sizeof(new_advancement.display_name) - 1] = '\0';
-                        strncpy(new_advancement.icon_path, source_adv_ptr->icon_path,
-                                sizeof(new_advancement.icon_path));
-                        new_advancement.icon_path[sizeof(new_advancement.icon_path) - 1] = '\0';
-                        new_advancement.is_hidden = source_adv_ptr->is_hidden;
-                        new_advancement.in_3rd_row = source_adv_ptr->in_3rd_row;
-                        new_advancement.is_recipe = source_adv_ptr->is_recipe;
-                        new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
-                        new_advancement.groups_enabled = source_adv_ptr->groups_enabled;
-                        new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
-                        new_advancement.icon_pos = source_adv_ptr->icon_pos;
-                        new_advancement.text_pos = source_adv_ptr->text_pos;
-                        new_advancement.progress_pos = source_adv_ptr->progress_pos;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorTrackableCategory new_advancement = *source_adv_ptr;
 
                         new_advancement.sort_order = 0;
                         for (auto &crit: new_advancement.criteria) {
@@ -11478,24 +11695,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const auto &source_criterion = advancement.criteria[criterion_to_copy];
 
 
-                            // Perform a manual, safe copy.
-                            EditorTrackableItem new_criterion;
-                            strncpy(new_criterion.root_name, source_criterion.root_name,
-                                    sizeof(new_criterion.root_name));
-                            new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
-                            strncpy(new_criterion.display_name, source_criterion.display_name,
-                                    sizeof(new_criterion.display_name));
-                            new_criterion.display_name[sizeof(new_criterion.display_name) - 1] = '\0';
-                            strncpy(new_criterion.icon_path, source_criterion.icon_path,
-                                    sizeof(new_criterion.icon_path));
-                            new_criterion.icon_path[sizeof(new_criterion.icon_path) - 1] = '\0';
-                            new_criterion.goal = source_criterion.goal;
-                            new_criterion.is_hidden = source_criterion.is_hidden;
-                            new_criterion.icon_pos = source_criterion.icon_pos;
-                            new_criterion.text_pos = source_criterion.text_pos;
-                            new_criterion.progress_pos = source_criterion.progress_pos;
-                            strncpy(new_criterion.group, source_criterion.group, sizeof(new_criterion.group) - 1);
-                            new_criterion.group[sizeof(new_criterion.group) - 1] = '\0';
+                            // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                            // duplicate must not inherit are reset explicitly below.
+                            EditorTrackableItem new_criterion = source_criterion;
 
                             new_criterion.sort_order = 0;
 
@@ -12574,24 +12776,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
 
-                        // Perform a manual, safe copy to prevent memory corruption from non-null-terminated strings.
-                        EditorTrackableCategory new_stat;
-                        strncpy(new_stat.root_name, source_stat_ptr->root_name, sizeof(new_stat.root_name));
-                        new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
-                        strncpy(new_stat.display_name, source_stat_ptr->display_name, sizeof(new_stat.display_name));
-                        new_stat.display_name[sizeof(new_stat.display_name) - 1] = '\0';
-                        strncpy(new_stat.icon_path, source_stat_ptr->icon_path, sizeof(new_stat.icon_path));
-                        new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
-                        new_stat.is_hidden = source_stat_ptr->is_hidden;
-                        new_stat.in_2nd_row = source_stat_ptr->in_2nd_row;
-                        new_stat.in_3rd_row = source_stat_ptr->in_3rd_row;
-                        new_stat.is_recipe = source_stat_ptr->is_recipe;
-                        new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
-                        new_stat.hide_substats_in_row1 = source_stat_ptr->hide_substats_in_row1;
-                        new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
-                        new_stat.icon_pos = source_stat_ptr->icon_pos;
-                        new_stat.text_pos = source_stat_ptr->text_pos;
-                        new_stat.progress_pos = source_stat_ptr->progress_pos;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorTrackableCategory new_stat = *source_stat_ptr;
 
                         new_stat.sort_order = 0;
                         for (auto &crit: new_stat.criteria) {
@@ -14103,20 +14290,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (crit_to_copy != -1) {
                                 const auto &source_criterion = stat_cat.criteria[crit_to_copy];
 
-                                // Perform a manual, safe copy.
-                                EditorTrackableItem new_crit;
-                                strncpy(new_crit.root_name, source_criterion.root_name, sizeof(new_crit.root_name));
-                                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                                strncpy(new_crit.display_name, source_criterion.display_name,
-                                        sizeof(new_crit.display_name));
-                                new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
-                                strncpy(new_crit.icon_path, source_criterion.icon_path, sizeof(new_crit.icon_path));
-                                new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
-                                new_crit.goal = source_criterion.goal;
-                                new_crit.is_hidden = source_criterion.is_hidden;
-                                new_crit.icon_pos = source_criterion.icon_pos;
-                                new_crit.text_pos = source_criterion.text_pos;
-                                new_crit.progress_pos = source_criterion.progress_pos;
+                                // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                                // duplicate must not inherit are reset explicitly below.
+                                EditorTrackableItem new_crit = source_criterion;
 
                                 new_crit.sort_order = 0;
 
@@ -14926,20 +15102,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const auto *source_item = unlocks_to_render[unl_to_copy_idx];
                         int actual_idx = (int) (source_item - &current_template_data.unlocks[0]);
 
-                        // Perform a manual, safe copy.
-                        EditorTrackableItem new_item = {};
-                        strncpy(new_item.root_name, source_item->root_name, sizeof(new_item.root_name));
-                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        strncpy(new_item.display_name, source_item->display_name, sizeof(new_item.display_name));
-                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
-                        strncpy(new_item.icon_path, source_item->icon_path, sizeof(new_item.icon_path));
-                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
-                        new_item.goal = source_item->goal;
-                        new_item.is_hidden = source_item->is_hidden;
-                        new_item.in_3rd_row = source_item->in_3rd_row;
-                        new_item.icon_pos = source_item->icon_pos;
-                        new_item.text_pos = source_item->text_pos;
-                        new_item.progress_pos = source_item->progress_pos;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorTrackableItem new_item = *source_item;
 
                         new_item.sort_order = 0;
 
@@ -15872,22 +16037,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const auto *source_item = goals_to_render[cg_to_copy_idx];
                         int actual_idx = (int) (source_item - &current_template_data.custom_goals[0]);
 
-                        // Perform a manual, safe copy.
-                        EditorTrackableItem new_item = {};
-                        strncpy(new_item.root_name, source_item->root_name, sizeof(new_item.root_name));
-                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                        strncpy(new_item.display_name, source_item->display_name, sizeof(new_item.display_name));
-                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
-                        strncpy(new_item.icon_path, source_item->icon_path, sizeof(new_item.icon_path));
-                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
-                        new_item.goal = source_item->goal;
-                        new_item.is_hidden = source_item->is_hidden;
-                        new_item.in_2nd_row = source_item->in_2nd_row;
-                        new_item.icon_pos = source_item->icon_pos;
-                        new_item.text_pos = source_item->text_pos;
-                        new_item.progress_pos = source_item->progress_pos;
-                        new_item.linked_goals = source_item->linked_goals;
-                        new_item.linked_goal_mode = source_item->linked_goal_mode;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorTrackableItem new_item = *source_item;
 
                         new_item.sort_order = 0;
 
@@ -17169,21 +17321,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
 
-                        // Perform a manual, safe copy to prevent memory corruption.
-                        EditorMultiStageGoal new_goal = {}; // Zero-initialize to prevent garbage in unset fields
-                        strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
-                        new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
-                        strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
-                        new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
-                        strncpy(new_goal.icon_path, source_goal_ptr->icon_path, sizeof(new_goal.icon_path));
-                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
-                        new_goal.is_hidden = source_goal_ptr->is_hidden;
-                        new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
-                        new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
-                        new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
-                        new_goal.icon_pos = source_goal_ptr->icon_pos;
-                        new_goal.text_pos = source_goal_ptr->text_pos;
-                        new_goal.progress_pos = source_goal_ptr->progress_pos;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorMultiStageGoal new_goal = *source_goal_ptr;
 
                         new_goal.sort_order = 0;
                         for (auto &stage: new_goal.stages) {
@@ -18691,24 +18831,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (stage_to_copy != -1) {
                             const auto &source_stage = goal.stages[stage_to_copy];
 
-                            // Perform a manual, safe copy.
-                            EditorSubGoal new_stage;
-                            strncpy(new_stage.stage_id, source_stage.stage_id, sizeof(new_stage.stage_id));
-                            new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
-                            strncpy(new_stage.display_text, source_stage.display_text, sizeof(new_stage.display_text));
-                            new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
-                            strncpy(new_stage.icon_path, source_stage.icon_path, sizeof(new_stage.icon_path));
-                            new_stage.icon_path[sizeof(new_stage.icon_path) - 1] = '\0';
-                            strncpy(new_stage.parent_advancement, source_stage.parent_advancement,
-                                    sizeof(new_stage.parent_advancement));
-                            new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';
-                            strncpy(new_stage.root_name, source_stage.root_name, sizeof(new_stage.root_name));
-                            new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
-                            new_stage.type = source_stage.type;
-                            new_stage.required_progress = source_stage.required_progress;
-                            new_stage.linked_goals = source_stage.linked_goals;
-                            new_stage.linked_goal_mode = source_stage.linked_goal_mode;
-                            new_stage.complete_with_next = source_stage.complete_with_next;
+                            // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                            // duplicate must not inherit are reset explicitly below.
+                            EditorSubGoal new_stage = source_stage;
 
                             new_stage.sort_order = 0;
 
@@ -20396,38 +20521,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     } else if (deco_to_copy != -1) {
                         const auto &source = current_template_data.decorations[deco_to_copy];
-                        EditorDecorationElement new_elem = {};
-                        new_elem.type = source.type;
-                        strncpy(new_elem.display_text, source.display_text, sizeof(new_elem.display_text));
-                        new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
-                        new_elem.pos = source.pos;
-                        new_elem.pos2 = source.pos2;
-                        new_elem.thickness = source.thickness;
-                        new_elem.opacity = source.opacity;
+                        // A whole-struct copy, so every field the goal has now or ever gains comes along; the fields a
+                        // duplicate must not inherit are reset explicitly below.
+                        EditorDecorationElement new_elem = source;
                         new_elem.sort_order = 0;
-                        new_elem.linked_goals = source.linked_goals;
-
-                        // Copy arrow-specific fields
-                        if (source.type == DECORATION_ARROW) {
-                            new_elem.arrowhead_size = source.arrowhead_size;
-                            new_elem.bend_count = source.bend_count;
-                            for (int b = 0; b < source.bend_count; b++) {
-                                new_elem.bends[b] = source.bends[b];
-                            }
-                            strncpy(new_elem.start_goal_root, source.start_goal_root,
-                                    sizeof(new_elem.start_goal_root) - 1);
-                            new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
-                            strncpy(new_elem.start_goal_stage, source.start_goal_stage,
-                                    sizeof(new_elem.start_goal_stage) - 1);
-                            new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
-                            strncpy(new_elem.end_goal_root, source.end_goal_root, sizeof(new_elem.end_goal_root) - 1);
-                            new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
-                            strncpy(new_elem.end_goal_stage, source.end_goal_stage,
-                                    sizeof(new_elem.end_goal_stage) - 1);
-                            new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
-                            new_elem.opacity_before = source.opacity_before;
-                            new_elem.opacity_after = source.opacity_after;
-                        }
 
                         // Generate unique ID
                         char base_id[64];
@@ -26438,32 +26535,67 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     sel_count, extracted);
 
                         // Deferred multi-language import: for every SELECTED non-active target language,
-                        // copy the source's translations for the just-imported items into the pending map,
-                        // to be merged into that language file on the next Save. The active editor language
-                        // is handled in-memory via each item's display_name, exactly as a single import.
+                        // copy the source's translations for the just-imported items onto those items,
+                        // to be merged into that language file on the next Save. The active editor
+                        // language is handled in-memory via each item's display_name and description,
+                        // exactly as a single import.
+                        //
+                        // What a translation is hung on is the imported goal itself, never a lang key:
+                        // the user is free to rename, copy or delete that goal before saving, and the
+                        // staged text has to follow it. The key is worked out at save time by the walk
+                        // that writes the active language (see tc_for_each_lang_entry).
                         if (s_template_import_multi_available) {
                             auto san_adv = [](const char *root) -> std::string {
                                 std::string s(root);
                                 for (char &c: s) if (c == ':' || c == '/') c = '.';
                                 return s;
                             };
-                            // (source_key, target_key) pairs mirroring save_template_from_editor's lang keys.
-                            // They differ only for the parented scopes, where the source and destination
-                            // parents differ (criteria/sub-stats/stages move under a different owner).
-                            // Main goals also carry their ".desc" companion key; criteria and sub-stats
-                            // have no descriptions, so they get the display name alone.
-                            std::vector<std::pair<std::string, std::string> > key_pairs;
+                            // Where to read a translation from in the source, and which imported goal to
+                            // hang it on. The description key is empty for criteria, sub-stats and
+                            // decorations, which have no descriptions.
+                            struct ImportTranslationTarget {
+                                std::string src_display_key;
+                                std::string src_desc_key;
+                                EditorLanguageTextRef *slot;
+                            };
+                            std::vector<ImportTranslationTarget> targets;
+                            auto add_target = [&](const std::string &display_key, const std::string &desc_key,
+                                                  EditorLanguageTextRef *slot) {
+                                if (slot) targets.push_back({display_key, desc_key, slot});
+                            };
+                            // The imported goals went into their list a few lines above, so each one is
+                            // found back by the id it was imported under, unique within that list.
+                            auto find_category = [](std::vector<EditorTrackableCategory> &list,
+                                                    const char *root) -> EditorTrackableCategory * {
+                                for (auto &entry: list) if (strcmp(entry.root_name, root) == 0) return &entry;
+                                return nullptr;
+                            };
+                            auto find_item = [](std::vector<EditorTrackableItem> &list,
+                                                const char *root) -> EditorTrackableItem * {
+                                for (auto &entry: list) if (strcmp(entry.root_name, root) == 0) return &entry;
+                                return nullptr;
+                            };
+                            auto find_stage = [](std::vector<EditorSubGoal> &list,
+                                                 const char *stage_id) -> EditorSubGoal * {
+                                for (auto &entry: list) if (strcmp(entry.stage_id, stage_id) == 0) return &entry;
+                                return nullptr;
+                            };
+                            auto slot_of = [](auto *goal) -> EditorLanguageTextRef * {
+                                return goal ? &goal->language_text : nullptr;
+                            };
                             switch (s_template_import_scope) {
                                 case IFTS_ADVANCEMENTS:
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
                                         const auto &src = s_template_import_data.advancements[i];
+                                        EditorTrackableCategory *dst =
+                                                find_category(current_template_data.advancements, src.root_name);
+                                        if (!dst) continue;
                                         std::string k = "advancement." + san_adv(src.root_name);
-                                        key_pairs.emplace_back(k, k);
-                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
+                                        add_target(k, k + ".desc", slot_of(dst));
                                         for (const auto &c: src.criteria) {
-                                            std::string ck = k + ".criteria." + c.root_name;
-                                            key_pairs.emplace_back(ck, ck);
+                                            add_target(k + ".criteria." + c.root_name, std::string(),
+                                                       slot_of(find_item(dst->criteria, c.root_name)));
                                         }
                                     }
                                     break;
@@ -26471,13 +26603,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
                                         const auto &src = s_template_import_data.stats[i];
+                                        EditorTrackableCategory *dst =
+                                                find_category(current_template_data.stats, src.root_name);
+                                        if (!dst) continue;
                                         std::string k = std::string("stat.") + src.root_name;
-                                        key_pairs.emplace_back(k, k);
-                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
+                                        add_target(k, k + ".desc", slot_of(dst));
                                         if (!src.is_simple_stat) {
                                             for (const auto &c: src.criteria) {
-                                                std::string ck = k + ".criteria." + c.root_name;
-                                                key_pairs.emplace_back(ck, ck);
+                                                add_target(k + ".criteria." + c.root_name, std::string(),
+                                                           slot_of(find_item(dst->criteria, c.root_name)));
                                             }
                                         }
                                     }
@@ -26485,43 +26619,56 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 case IFTS_UNLOCKS:
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i]) continue;
-                                        std::string k = std::string("unlock.") +
-                                                        s_template_import_data.unlocks[i].root_name;
-                                        key_pairs.emplace_back(k, k);
-                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
+                                        const char *root = s_template_import_data.unlocks[i].root_name;
+                                        std::string k = std::string("unlock.") + root;
+                                        add_target(k, k + ".desc",
+                                                   slot_of(find_item(current_template_data.unlocks, root)));
                                     }
                                     break;
                                 case IFTS_CUSTOM_GOALS:
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i]) continue;
-                                        std::string k = std::string("custom.") +
-                                                        s_template_import_data.custom_goals[i].root_name;
-                                        key_pairs.emplace_back(k, k);
-                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
+                                        const char *root = s_template_import_data.custom_goals[i].root_name;
+                                        std::string k = std::string("custom.") + root;
+                                        add_target(k, k + ".desc",
+                                                   slot_of(find_item(current_template_data.custom_goals, root)));
                                     }
                                     break;
                                 case IFTS_COUNTERS:
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i]) continue;
-                                        std::string k = std::string("counter.") +
-                                                        s_template_import_data.counter_goals[i].root_name;
-                                        key_pairs.emplace_back(k, k);
-                                        key_pairs.emplace_back(k + ".desc", k + ".desc");
+                                        const char *root = s_template_import_data.counter_goals[i].root_name;
+                                        EditorCounterGoal *dst = nullptr;
+                                        for (auto &entry: current_template_data.counter_goals) {
+                                            if (strcmp(entry.root_name, root) == 0) {
+                                                dst = &entry;
+                                                break;
+                                            }
+                                        }
+                                        std::string k = std::string("counter.") + root;
+                                        add_target(k, k + ".desc", slot_of(dst));
                                     }
                                     break;
                                 case IFTS_MS_GOALS:
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i]) continue;
                                         const auto &g = s_template_import_data.multi_stage_goals[i];
+                                        EditorMultiStageGoal *dst = nullptr;
+                                        for (auto &entry: current_template_data.multi_stage_goals) {
+                                            if (strcmp(entry.root_name, g.root_name) == 0) {
+                                                dst = &entry;
+                                                break;
+                                            }
+                                        }
+                                        if (!dst) continue;
                                         std::string base = std::string("multi_stage_goal.") + g.root_name;
-                                        key_pairs.emplace_back(base + ".display_name", base + ".display_name");
-                                        // The goal's own description hangs off the root, not off
-                                        // ".display_name", mirroring build_editor_lang_json.
-                                        key_pairs.emplace_back(base + ".desc", base + ".desc");
+                                        // The goal's own description hangs off the root, not off the
+                                        // ".display_name" its title uses.
+                                        add_target(base + ".display_name", base + ".desc", slot_of(dst));
                                         for (const auto &st: g.stages) {
                                             std::string sk = base + ".stage." + st.stage_id;
-                                            key_pairs.emplace_back(sk, sk);
-                                            key_pairs.emplace_back(sk + ".desc", sk + ".desc");
+                                            add_target(sk, sk + ".desc",
+                                                       slot_of(find_stage(dst->stages, st.stage_id)));
                                         }
                                     }
                                     break;
@@ -26529,10 +26676,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     for (int i = 0; i < item_count; i++) {
                                         if (!s_template_import_selected[i]) continue;
                                         const auto &d = s_template_import_data.decorations[i];
-                                        if (d.type == DECORATION_TEXT_HEADER) {
-                                            std::string k = std::string("decoration.") + d.id;
-                                            key_pairs.emplace_back(k, k);
+                                        if (d.type != DECORATION_TEXT_HEADER) continue;
+                                        EditorDecorationElement *dst = nullptr;
+                                        for (auto &entry: current_template_data.decorations) {
+                                            if (strcmp(entry.id, d.id) == 0) {
+                                                dst = &entry;
+                                                break;
+                                            }
                                         }
+                                        add_target(std::string("decoration.") + d.id, std::string(),
+                                                   slot_of(dst));
                                     }
                                     break;
                                 case IFTS_TEMPLATE_CRITERIA: {
@@ -26541,14 +26694,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         p < (int) s_template_import_data.advancements.size()) {
                                         const auto &src_adv = s_template_import_data.advancements[p];
                                         std::string src_base = "advancement." + san_adv(src_adv.root_name);
-                                        std::string dst_base = "advancement." +
-                                                               san_adv(s_template_import_target_adv->root_name);
                                         for (int i = 0; i < item_count; i++) {
                                             if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
                                             if (i >= (int) src_adv.criteria.size()) continue;
                                             const char *cr = src_adv.criteria[i].root_name;
-                                            key_pairs.emplace_back(src_base + ".criteria." + cr,
-                                                                   dst_base + ".criteria." + cr);
+                                            add_target(src_base + ".criteria." + cr, std::string(),
+                                                       slot_of(find_item(s_template_import_target_adv->criteria,
+                                                                         cr)));
                                         }
                                     }
                                     break;
@@ -26559,14 +26711,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         p < (int) s_template_import_data.stats.size()) {
                                         const auto &src_stat = s_template_import_data.stats[p];
                                         std::string src_base = std::string("stat.") + src_stat.root_name;
-                                        std::string dst_base = std::string("stat.") +
-                                                               s_template_import_target_stat->root_name;
                                         for (int i = 0; i < item_count; i++) {
                                             if (!s_template_import_selected[i] || entry_blocking_reason(i)) continue;
                                             if (i >= (int) src_stat.criteria.size()) continue;
                                             const char *cr = src_stat.criteria[i].root_name;
-                                            key_pairs.emplace_back(src_base + ".criteria." + cr,
-                                                                   dst_base + ".criteria." + cr);
+                                            add_target(src_base + ".criteria." + cr, std::string(),
+                                                       slot_of(find_item(s_template_import_target_stat->criteria,
+                                                                         cr)));
                                         }
                                     }
                                     break;
@@ -26577,41 +26728,49 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         p < (int) s_template_import_data.multi_stage_goals.size()) {
                                         const auto &src_goal = s_template_import_data.multi_stage_goals[p];
                                         std::string src_base = std::string("multi_stage_goal.") + src_goal.root_name;
-                                        std::string dst_base = std::string("multi_stage_goal.") +
-                                                               s_template_import_target_ms->root_name;
                                         for (int i = 0; i < item_count; i++) {
                                             if (!s_template_import_selected[i] || entry_is_final_stage(i) ||
                                                 entry_blocking_reason(i))
                                                 continue;
                                             if (i >= (int) src_goal.stages.size()) continue;
                                             const char *sid = src_goal.stages[i].stage_id;
-                                            key_pairs.emplace_back(src_base + ".stage." + sid,
-                                                                   dst_base + ".stage." + sid);
-                                            key_pairs.emplace_back(src_base + ".stage." + sid + ".desc",
-                                                                   dst_base + ".stage." + sid + ".desc");
+                                            std::string sk = src_base + ".stage." + sid;
+                                            add_target(sk, sk + ".desc",
+                                                       slot_of(find_stage(s_template_import_target_ms->stages,
+                                                                          sid)));
                                         }
                                     }
                                     break;
                                 }
                             }
 
-                            if (!key_pairs.empty()) {
-                                for (size_t li = 0; li < s_template_import_target_langs.size(); li++) {
-                                    if (!s_template_import_lang_selected[li]) continue;
-                                    const std::string &L = s_template_import_target_langs[li];
-                                    if (L == selected_lang_flag) continue; // active handled in-memory
-                                    cJSON *src_lang = read_lang_json_from_zip(s_template_import_zip_path,
-                                                                              L.empty() ? nullptr : L.c_str());
-                                    if (!src_lang) continue;
-                                    for (const auto &kp: key_pairs) {
-                                        cJSON *e = cJSON_GetObjectItem(src_lang, kp.first.c_str());
-                                        // Missing translations stay missing (skip rather than blanking).
-                                        if (cJSON_IsString(e) && e->valuestring && e->valuestring[0] != '\0') {
-                                            s_pending_lang_imports[L][kp.second] = e->valuestring;
-                                        }
+                            for (size_t li = 0; !targets.empty() && li < s_template_import_target_langs.size();
+                                 li++) {
+                                if (!s_template_import_lang_selected[li]) continue;
+                                const std::string &L = s_template_import_target_langs[li];
+                                if (L == selected_lang_flag) continue; // active handled in-memory
+                                cJSON *src_lang = read_lang_json_from_zip(s_template_import_zip_path,
+                                                                          L.empty() ? nullptr : L.c_str());
+                                if (!src_lang) continue;
+                                // Missing and blank translations stay missing rather than being
+                                // blanked over: only text the source actually has is brought along.
+                                auto read_key = [&](const std::string &key, std::string &out) -> bool {
+                                    if (key.empty()) return false;
+                                    cJSON *e = cJSON_GetObjectItem(src_lang, key.c_str());
+                                    if (!cJSON_IsString(e) || !e->valuestring || e->valuestring[0] == '\0') {
+                                        return false;
                                     }
-                                    cJSON_Delete(src_lang);
+                                    out = e->valuestring;
+                                    return true;
+                                };
+                                for (const auto &target: targets) {
+                                    std::string name, desc;
+                                    bool has_name = read_key(target.src_display_key, name);
+                                    bool has_desc = read_key(target.src_desc_key, desc);
+                                    tc_set_language_text(*target.slot, L, has_name ? &name : nullptr,
+                                                         has_desc ? &desc : nullptr);
                                 }
+                                cJSON_Delete(src_lang);
                             }
                         }
 
