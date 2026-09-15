@@ -654,10 +654,10 @@ the [settings window](#the-settings-window-esc).
 You can manipulate the view using several intuitive controls:
 
 * **View Menu**: The `View` button in the bottom-right corner opens everything that decides how the map is drawn: the
-  `Zoom` slider, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Manual Layout` and the goal visibility dropdown.
-  Keeping them in one menu leaves the bar over the map to the search box and the `Notes` checkbox. `Lock Camera`,
-  `Lock Layout` and `Manual Layout` also have shortcuts (`Shift+C`, `Space` and `Shift+M` by default), and using one
-  opens the menu so you can see the checkbox that changed. A menu opened that way fades out after five seconds, unless
+  `Zoom` slider, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Selection Rectangle`, `Manual Layout` and the goal
+  visibility dropdown. Keeping them in one menu leaves the bar over the map to the search box and the `Notes`
+  checkbox. `Lock Camera`, `Lock Layout`, `Selection Rectangle` and `Manual Layout` also have shortcuts (`Shift+C`,
+  `Space`, `Shift+S` and `Shift+M` by default), and using one opens the menu so you can see the checkbox that changed. A menu opened that way fades out after five seconds, unless
   you move the mouse onto it.
 * **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
 * **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
@@ -672,6 +672,9 @@ You can manipulate the view using several intuitive controls:
   ticked ones and they all get unticked. The rectangle is green when it will tick and red when it will untick, and
   every box that is about to change is outlined. Dragging towards a window edge pans the map, so the rectangle can
   reach goals that are off screen. Boxes you are not allowed to edit (co-op read-only views) are never touched.
+  The `Selection Rectangle` checkbox in the `View` menu (`Shift+S` by default) turns the gesture off entirely; the
+  setting is remembered across restarts. It is locked while the Visual Layout Editor runs, which has its own
+  selection rectangle that this toggle does not affect.
 * **Lock Camera**: The `Lock Camera` checkbox in the `View` menu (`Shift+C` by default) makes the map ignore wheel zooming and
   drag panning, so a view you have set up cannot be nudged out of place by accident. The `Zoom` slider and
   `Reset Camera` still work, since those are deliberate actions.
@@ -1583,6 +1586,7 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 |                          | `Shift+C`                  | Toggle `Lock Camera` in the `View` menu, which makes the map ignore wheel zooming and drag panning. Opens the menu to show the new state.                                                                                                                     |
 |                          | `Space`                    | Toggle `Lock Layout` in the `View` menu. Opens the menu to show the new state.                                                                                                                                                                                |
 |                          | `Shift+M`                  | Toggle `Manual Layout` in the `View` menu. Does nothing while the Visual Layout Editor runs, which forces it on. Opens the menu to show the new state.                                                                                                        |
+|                          | `Shift+S`                  | Toggle `Selection Rectangle` in the `View` menu, which enables or disables the left-drag sweep over manual completion checkboxes. Does nothing while the Visual Layout Editor runs. Opens the menu to show the new state.                                     |
 | **Settings Window**      | `Ctrl+S`                   | Apply Settings.                                                                                                                                                                                                                                               |
 |                          | `Ctrl+Z`                   | Revert Changes.                                                                                                                                                                                                                                               |
 | **Overlay Window**       | `Space`                    | Belt mode: hold to scroll faster. Page and Compact mode: press to cut to the next page or cycle entry (in Compact mode it advances the Row 1 icon strip too).                                                                                                 |
