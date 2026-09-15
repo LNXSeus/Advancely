@@ -433,6 +433,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_MANUAL_LAYOUT, view_key, view_mods)) {
                 t->view_toggle_manual_layout_pressed = true;
             }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_SWEEP, view_key, view_mods)) {
+                t->view_toggle_sweep_pressed = true;
+            }
         }
 
         // --- Dispatch keyboard/mouse events ---

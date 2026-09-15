@@ -4624,6 +4624,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     if (t->zoom_level > TRACKER_ZOOM_MAX) t->zoom_level = TRACKER_ZOOM_MAX;
     t->layout_locked = settings->view_locked;
     t->camera_locked = settings->view_camera_locked;
+    t->sweep_enabled = settings->view_sweep_enabled;
     t->locked_layout_width = (settings->view_locked_width > 0.0f) ? settings->view_locked_width : 0.0f;
 
     // Initialize time since last update
@@ -12827,7 +12828,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // mostly-checked ones and they all get unchecked. Same rule the template editor's Bulk Actions
     // use for hiding, so the gesture reads the same way in both places. A tie unchecks, matching the
     // editor's `count * 2 < total` test exactly.
-    if (!t->is_visual_layout_editing) {
+    // The "Selection Rectangle" toggle in the View menu turns the whole gesture off.
+    if (!t->is_visual_layout_editing && t->sweep_enabled) {
         ImDrawList *sweep_draw_list = ImGui::GetWindowDrawList();
         ImVec2 mouse_pos = ImGui::GetMousePos();
 
@@ -13579,6 +13581,14 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
         t->view_toggle_manual_layout_pressed = false;
     }
+    if (t->view_toggle_sweep_pressed) {
+        // Same gate as the checkbox: the Visual Layout Editor has a selection rectangle of its own.
+        if (!t->is_visual_layout_editing) {
+            t->sweep_enabled = !t->sweep_enabled;
+            t->view_menu_open_requested = true;
+        }
+        t->view_toggle_sweep_pressed = false;
+    }
 
     // Counts down while a shortcut-opened menu is on screen. Zero means the menu stays put, which
     // is what clicking the button gives.
@@ -13734,6 +13744,31 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                      "position of their own, the ones pushed into the grid to the right of\n"
                      "everything you placed by hand.", lock_layout_hotkey_label);
             ImGui::SetTooltip("%s", lock_layout_tooltip_buffer);
+        }
+
+        // "Selection Rectangle" checkbox. Sits with the two locks since, like them, it is about
+        // keeping stray mouse input from changing something. Greyed out while the Visual Layout
+        // Editor runs, which draws its own selection rectangle that this toggle does not touch.
+        ImGui::BeginDisabled(t->is_visual_layout_editing);
+        ImGui::Checkbox("Selection Rectangle", &t->sweep_enabled);
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char sweep_tooltip_buffer[1024];
+            if (t->is_visual_layout_editing) {
+                snprintf(sweep_tooltip_buffer, sizeof(sweep_tooltip_buffer),
+                         "Locked while the Visual Layout Editor is active.\n"
+                         "The editor has its own selection rectangle, which is always available.");
+            } else {
+                char sweep_hotkey_label[96];
+                app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_TOGGLE_SWEEP],
+                                         sweep_hotkey_label, sizeof(sweep_hotkey_label));
+                snprintf(sweep_tooltip_buffer, sizeof(sweep_tooltip_buffer),
+                         "Left-drag across empty map to draw a rectangle that checks or unchecks\n"
+                         "every manual checkbox it covers at once. Mostly unchecked boxes get\n"
+                         "checked, mostly checked ones get unchecked.\n"
+                         "Hotkey: %s (configurable in Settings > Hotkeys).", sweep_hotkey_label);
+            }
+            ImGui::SetTooltip("%s", sweep_tooltip_buffer);
         }
 
         ImGui::Separator();
@@ -16118,6 +16153,7 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             settings->view_zoom = t->zoom_level;
             settings->view_locked = t->layout_locked;
             settings->view_camera_locked = t->camera_locked;
+            settings->view_sweep_enabled = t->sweep_enabled;
             settings->view_locked_width = t->locked_layout_width;
 
             // Save settings immediately

@@ -1156,6 +1156,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->view_camera_locked = DEFAULT_TRACKER_VIEW_CAMERA_LOCKED;
     settings->view_locked_width = DEFAULT_TRACKER_VIEW_LOCKED_WIDTH;
     settings->use_manual_layout = DEFAULT_TRACKER_USE_MANUAL_LAYOUT;
+    settings->view_sweep_enabled = DEFAULT_TRACKER_VIEW_SWEEP_ENABLED;
 
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
@@ -3182,6 +3183,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         cJSON *use_manual_layout = cJSON_GetObjectItem(view_state_json, "use_manual_layout");
         if (cJSON_IsBool(use_manual_layout)) settings->use_manual_layout = cJSON_IsTrue(use_manual_layout);
+
+        cJSON *sweep_enabled = cJSON_GetObjectItem(view_state_json, "sweep_enabled");
+        if (cJSON_IsBool(sweep_enabled)) settings->view_sweep_enabled = cJSON_IsTrue(sweep_enabled);
     }
 
     return defaults_were_used;
@@ -4005,6 +4009,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddBoolToObject(view_state_obj, "camera_locked", settings->view_camera_locked);
         cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
         cJSON_AddBoolToObject(view_state_obj, "use_manual_layout", settings->use_manual_layout);
+        cJSON_AddBoolToObject(view_state_obj, "sweep_enabled", settings->view_sweep_enabled);
 
         // Safely replace or add view_state
         cJSON_DeleteItemFromObject(root, "view_state");

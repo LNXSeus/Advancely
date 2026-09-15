@@ -329,6 +329,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_VIEW_CAMERA_LOCKED false
 #define DEFAULT_TRACKER_VIEW_LOCKED_WIDTH 0.0f
 #define DEFAULT_TRACKER_USE_MANUAL_LAYOUT true
+#define DEFAULT_TRACKER_VIEW_SWEEP_ENABLED true
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
@@ -491,25 +492,27 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Flips the \"Lock Camera\" checkbox in the View menu, which makes the map ignore mouse\n" \
       "wheel zooming and right/middle mouse dragging.\n" \
       "The Zoom slider and \"Reset Camera\" keep working while locked.\n" \
-      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
-      "seconds unless the mouse reaches it.\n" \
       "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_LOCK_LAYOUT, "lock_layout", "Space", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
       "Lock Layout", \
       "Flips the \"Lock Layout\" checkbox in the View menu, freezing the width the automatic\n" \
       "grid wraps at so goals stop rearranging when the window is resized or zoomed.\n" \
-      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
-      "seconds unless the mouse reaches it.\n" \
       "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_TOGGLE_MANUAL_LAYOUT, "toggle_manual_layout", "M", HOTKEY_MOD_SHIFT, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
       "Toggle Manual Layout", \
       "Flips the \"Manual Layout\" checkbox in the View menu, switching between the procedural\n" \
       "grid and the positions stored in the template's layout file.\n" \
-      "Opens the View menu so the new state is visible, which fades out again after a few\n" \
-      "seconds unless the mouse reaches it.\n" \
       "Does nothing while the Visual Layout Editor is running, which forces Manual Layout on.\n" \
+      "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
+    X(APP_HOTKEY_TOGGLE_SWEEP, "toggle_sweep", "S", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER, APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Selection Rectangle", \
+      "Flips the \"Selection Rectangle\" checkbox in the View menu, which lets a left-drag across\n" \
+      "empty map check or uncheck every manual checkbox it covers at once.\n" \
+      "Does nothing while the Visual Layout Editor is running, which has its own selection\n" \
+      "rectangle that is always available.\n" \
       "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_SETTINGS_APPLY, "settings_apply", "S", HOTKEY_MOD_CTRL, \
       APP_HOTKEY_CTX_SETTINGS, APP_HOTKEY_GROUP_SETTINGS, \
@@ -955,6 +958,7 @@ struct AppSettings {
     bool view_camera_locked; // Zooming and panning the tracker map are ignored while this is set.
     float view_locked_width;
     bool use_manual_layout; // Manual Layout or Auto Layout
+    bool view_sweep_enabled; // Left-drag on empty map sweeps manual checkboxes. Off disables the rectangle.
 
     // --- Overlay Text Sections ---
     bool overlay_show_world; // If true, the world name is shown in the overlay.
