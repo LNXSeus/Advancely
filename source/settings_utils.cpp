@@ -3998,6 +3998,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         // belonging to this template are rewritten, so another template's baselines survive a switch.
         // The world and the stat are stored alongside the value: a stored entry is only honored again
         // if both still match, which is what invalidates it after a world change or a template edit.
+        //
+        // A stage with no baseline in memory leaves its entry alone rather than deleting it. That is
+        // what makes leaving a world and coming back resume where it left off; an entry that really is
+        // void says so through stat_baseline_forget, and only then is it removed.
         cJSON *baseline_root = get_or_create_object(root, "stat_stage_baselines");
         cJSON *baseline_obj = settings_get_player_progress_subobj(baseline_root, local_uuid, local_uuid);
         if (baseline_obj) {
@@ -4010,14 +4014,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
                     char baseline_key[256];
                     snprintf(baseline_key, sizeof(baseline_key), "%s/%s", goal->root_name, stage->stage_id);
-                    cJSON_DeleteItemFromObject(baseline_obj, baseline_key);
-                    if (!stage->count_from_stage || !stage->stat_baseline_set) continue;
 
-                    cJSON *entry = cJSON_CreateObject();
-                    cJSON_AddStringToObject(entry, "world", td->last_known_world_name);
-                    cJSON_AddStringToObject(entry, "stat", stage->root_name);
-                    cJSON_AddNumberToObject(entry, "value", stage->stat_baseline);
-                    cJSON_AddItemToObject(baseline_obj, baseline_key, entry);
+                    if (stage->count_from_stage && stage->stat_baseline_set) {
+                        cJSON_DeleteItemFromObject(baseline_obj, baseline_key);
+                        cJSON *entry = cJSON_CreateObject();
+                        cJSON_AddStringToObject(entry, "world", td->last_known_world_name);
+                        cJSON_AddStringToObject(entry, "stat", stage->root_name);
+                        cJSON_AddNumberToObject(entry, "value", stage->stat_baseline);
+                        cJSON_AddItemToObject(baseline_obj, baseline_key, entry);
+                    } else if (!stage->count_from_stage || stage->stat_baseline_forget) {
+                        // The option was turned off, or the goal regressed past this stage.
+                        cJSON_DeleteItemFromObject(baseline_obj, baseline_key);
+                    }
                 }
             }
         }

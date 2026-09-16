@@ -18543,9 +18543,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Count this stat from the value it holds the moment this stage is reached,\n"
                                                  "instead of from its absolute value. That value becomes the zero point, so\n"
                                                  "the stage starts at 0 and the target above is how much MORE is needed.\n\n"
-                                                 "The zero point belongs to one world and survives restarting Advancely.\n"
+                                                 "The zero point belongs to one world and survives restarting Advancely\n"
+                                                 "and switching worlds away and back.\n"
                                                  "A stage that has not been reached yet shows 0, so a stat that is already\n"
                                                  "high can never complete a later stage before the goal gets there.\n\n"
+                                                 "Because such a stage is only ever complete while its zero point is known,\n"
+                                                 "ticking 'Auto-complete if next stage is completed' below on it is worth it:\n"
+                                                 "the goal then stays where it is even if the zero point is ever lost.\n\n"
                                                  "Not applied in co-op yet: in a lobby the stage counts absolutely.");
                                         ImGui::SetTooltip("%s", cfs_tooltip_buffer);
                                     }

@@ -1254,8 +1254,10 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
         }
     }
 
-    // Drop every count_from_stage baseline: they belong to the world that was just left, and the
-    // stages re-snapshot against the new world on the first update that reaches them.
+    // Forget every count_from_stage baseline in memory: they belong to the world just left. The
+    // entries on file are deliberately kept - each is stamped with its world, so it is ignored while
+    // another world is open and picked back up on returning, which keeps the stages that had already
+    // been cleared there cleared instead of collapsing the goal back to the first baselined stage.
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
@@ -1266,9 +1268,9 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
             stage->stat_baseline_set = false;
             stage->stat_raw_value = 0;
             stage->stat_raw_read = false;
+            stage->stat_baseline_forget = false;
         }
     }
-    t->stat_stage_baselines_dirty = true;
 
     // Save the reset progress back to the settings file
     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
@@ -3539,6 +3541,9 @@ static bool ms_clear_stat_baselines_from(MultiStageGoal *goal, int first) {
         stage->stat_baseline_set = false;
         stage->stat_baseline = 0;
         stage->current_stat_progress = 0;
+        // This baseline is wrong, not just out of scope, so it goes from the file too. Otherwise the
+        // seeding pass would hand it straight back and the stage would never re-snapshot.
+        stage->stat_baseline_forget = true;
         cleared = true;
     }
     return cleared;
@@ -5691,6 +5696,26 @@ static void tracker_load_stat_stage_baselines(Tracker *t, cJSON *settings_json, 
     }
 }
 
+// Writes the baselines back to settings.json. Called whenever one is captured or dropped, from the
+// full update and from the Hermes poll alike, because the gap between the two can be a whole autosave.
+static void tracker_flush_stat_stage_baselines(Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data) return;
+    t->stat_stage_baselines_dirty = false;
+
+    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+
+    // The delete has happened, so the flag has done its job; leaving it set would keep deleting the
+    // entry the stage writes the next time it is reached.
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        for (int j = 0; j < goal->stage_count; j++) {
+            if (goal->stages[j]) goal->stages[j]->stat_baseline_forget = false;
+        }
+    }
+}
+
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
@@ -5839,9 +5864,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // A stage that just started counting (or stopped) has to reach the file now: the whole point of
     // the baseline is that it survives a restart. Stage entry is rare, so this write is too.
     if (t->stat_stage_baselines_dirty) {
-        t->stat_stage_baselines_dirty = false;
-        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+        tracker_flush_stat_stage_baselines(t, settings);
     }
 
     // Clean up the parsed JSON objects
@@ -14618,6 +14641,29 @@ static bool hermes_parse_stat_key(const char *hermes_key,
 }
 
 
+// Whether a multi-stage stat stage tracks the stat a Hermes event just reported. Modern templates
+// spell the stat "category/item" and are matched against the event's already-split halves; mid-era
+// and legacy ones are a plain key compared directly.
+static bool hermes_stat_key_matches(const char *stage_root, bool is_modern,
+                                    const char *h_cat, const char *h_item, const char *hermes_key) {
+    if (!stage_root || stage_root[0] == '\0') return false;
+    if (!is_modern) return strcmp(stage_root, hermes_key) == 0;
+
+    const char *slash = strchr(stage_root, '/');
+    if (!slash) return false;
+
+    char s_cat[192], s_item[192];
+    size_t cat_len = (size_t) (slash - stage_root);
+    if (cat_len == 0 || cat_len >= sizeof(s_cat)) return false;
+
+    strncpy(s_cat, stage_root, cat_len);
+    s_cat[cat_len] = '\0';
+    strncpy(s_item, slash + 1, sizeof(s_item) - 1);
+    s_item[sizeof(s_item) - 1] = '\0';
+
+    return strcmp(s_cat, h_cat) == 0 && strcmp(s_item, h_item) == 0;
+}
+
 /**
  * Applies a single Hermes "stat" event to in-memory template data.
  *
@@ -14715,45 +14761,33 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_mul
             if (!goal) continue;
             if (goal->current_stage >= goal->stage_count) continue;
 
-            SubGoal *stage = goal->stages[goal->current_stage];
-            if (!stage || stage->type != SUBGOAL_STAT) continue;
-
-            bool matches = false;
-            if (is_modern) {
-                // Modern template format: "minecraft:picked_up/minecraft:wither_skeleton_skull"
-                const char *slash = strchr(stage->root_name, '/');
-                if (!slash) continue;
-
-                char s_cat[192], s_item[192];
-                size_t cat_len = (size_t) (slash - stage->root_name);
-                if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
-
-                strncpy(s_cat, stage->root_name, cat_len);
-                s_cat[cat_len] = '\0';
-                strncpy(s_item, slash + 1, sizeof(s_item) - 1);
-                s_item[sizeof(s_item) - 1] = '\0';
-
-                matches = (strcmp(s_cat, h_cat) == 0 &&
-                           strcmp(s_item, h_item) == 0);
-            } else {
-                // Legacy/mid-era: direct compare, e.g. "5242881" or "stat.pickup.minecraft.skull"
-                matches = (strcmp(stage->root_name, hermes_key) == 0);
+            // Every stat stage of this goal that tracks the event's stat gets its raw value refreshed,
+            // not just the active one. Between game saves Hermes is the only live source, so a stage
+            // entered later would otherwise take its baseline from whatever the last save reported -
+            // or, if it was never read from disk, have nothing to take at all and sit at 0 until the
+            // next save. Only the active stage turns that value into progress, below.
+            for (int j = 0; j < goal->stage_count; j++) {
+                SubGoal *s = goal->stages[j];
+                if (!s || s->type != SUBGOAL_STAT) continue;
+                if (!hermes_stat_key_matches(s->root_name, is_modern, h_cat, h_item, hermes_key)) continue;
+                if (!s->stat_raw_read || new_value > s->stat_raw_value) {
+                    s->stat_raw_value = new_value;
+                    s->stat_raw_read = true;
+                }
             }
 
-            if (!matches) continue;
+            SubGoal *stage = goal->stages[goal->current_stage];
+            if (!stage || stage->type != SUBGOAL_STAT) continue;
+            if (!hermes_stat_key_matches(stage->root_name, is_modern, h_cat, h_item, hermes_key)) continue;
 
             // Hermes reports the stat's raw value, so the baseline is applied here exactly as it is on
             // the disk path. Settings are not in scope, but they are not needed: co-op always passes
             // skip_multi_stage, so reaching this point means the singleplayer path, which is the only
             // one where a baseline is active anyway.
-            if (!stage->stat_raw_read || new_value > stage->stat_raw_value) {
-                stage->stat_raw_value = new_value;
-                stage->stat_raw_read = true;
-                int effective = ms_stat_effective_progress(stage, nullptr, new_value);
-                if (effective > stage->current_stat_progress) {
-                    stage->current_stat_progress = effective;
-                    changed = true;
-                }
+            int effective = ms_stat_effective_progress(stage, nullptr, stage->stat_raw_value);
+            if (effective > stage->current_stat_progress) {
+                stage->current_stat_progress = effective;
+                changed = true;
             }
 
             if (stage->required_progress > 0 &&
@@ -14764,6 +14798,12 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_mul
                     log_message(LOG_INFO,
                                 "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
                                 goal->root_name, goal->current_stage);
+                    // The stage just entered takes its baseline from the live value kept above, so it
+                    // starts counting on the very next Hermes event instead of waiting for a save.
+                    if (ms_capture_stat_baseline(goal, nullptr)) {
+                        t->stat_stage_baselines_dirty = true;
+                        changed = true;
+                    }
                 }
             }
         }
@@ -15613,6 +15653,12 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         if (snapshots_changed) {
             SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
         }
+    }
+
+    // A stage entered off a Hermes event owns a fresh baseline, and the next full update can be a
+    // whole autosave away. Write it now so quitting in between does not lose the zero point.
+    if (t->stat_stage_baselines_dirty) {
+        tracker_flush_stat_stage_baselines(t, settings);
     }
 
     if (workbuf) free(workbuf);

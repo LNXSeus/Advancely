@@ -450,6 +450,10 @@ struct SubGoal {
     bool stat_baseline_set; // False until a baseline has been captured for the current world.
     int stat_raw_value; // Last raw (pre-baseline) value read, used for the capture and the Hermes floor.
     bool stat_raw_read; // True once a raw value has actually been read, so 0 is a real 0 and not "unknown".
+    // The stored baseline is wrong rather than merely out of scope, so the settings entry is deleted
+    // instead of being left for a later return. A world change only drops the in-memory copy: the
+    // entry stays on file, stamped with its world, so coming back to that world resumes from it.
+    bool stat_baseline_forget;
     bool coop_completed; // Co-op: true if any player completed this stage (non-stat types)
     bool game_trigger_met; // True if this stage's natural trigger (advancement/criterion/unlock) is met.
     // Stored so recalculation paths (e.g. manual custom-goal toggles) that lack player files can re-derive
