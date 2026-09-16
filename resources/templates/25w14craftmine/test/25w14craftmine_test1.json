@@ -164,7 +164,8 @@
 					"stage_id":	"3",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:sand",
-					"target":	4
+					"target":	4,
+					"count_from_stage":	true
 				}, {
 					"stage_id":	"final",
 					"type":	"final",

@@ -1254,6 +1254,22 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
         }
     }
 
+    // Drop every count_from_stage baseline: they belong to the world that was just left, and the
+    // stages re-snapshot against the new world on the first update that reaches them.
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage = goal->stages[j];
+            if (!stage) continue;
+            stage->stat_baseline = 0;
+            stage->stat_baseline_set = false;
+            stage->stat_raw_value = 0;
+            stage->stat_raw_read = false;
+        }
+    }
+    t->stat_stage_baselines_dirty = true;
+
     // Save the reset progress back to the settings file
     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
 }
@@ -2810,6 +2826,10 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                 cJSON *complete_with_next = cJSON_GetObjectItem(stage_item_json, "complete_with_next");
                 new_stage->complete_with_next = cJSON_IsTrue(complete_with_next);
 
+                // Stat stages can count from the value held when the stage was reached (see SubGoal).
+                new_stage->count_from_stage = (new_stage->type == SUBGOAL_STAT) &&
+                                              cJSON_IsTrue(cJSON_GetObjectItem(stage_item_json, "count_from_stage"));
+
                 // Add the stage to the goal
                 new_goal->stages[j++] = new_stage;
             }
@@ -3463,6 +3483,67 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
     }
 }
 
+// --- Stat stage baselines (count_from_stage) -----------------------------
+// A stat stage can count from the value the stat held when the stage was reached rather than from
+// the stat's absolute value. The baseline is captured the first time the stage is the active one
+// and persists in settings.json, so a restart mid-run keeps counting from the same point.
+//
+// Not yet wired up for co-op: multi-stage stats are summed across players, so the baseline has to
+// be the sum of per-player baselines, each captured when that player is first seen in the stage.
+// Until that lands, a lobby ignores the flag and the stage counts absolutely (see the log line in
+// ms_capture_stat_baseline).
+static bool ms_stage_baseline_active(const SubGoal *stage, const AppSettings *settings) {
+    if (!stage || !stage->count_from_stage || stage->type != SUBGOAL_STAT) return false;
+    return !settings || settings->network_mode == NETWORK_SINGLEPLAYER;
+}
+
+// Whether a stat stage's current_stat_progress is a real count yet. A baselined stage that has not
+// been reached reports 0, so an already-high stat can never satisfy a stage the goal has not got to.
+static bool ms_stat_stage_counts(const SubGoal *stage) {
+    if (!stage || !stage->count_from_stage || stage->type != SUBGOAL_STAT) return true;
+    return stage->stat_baseline_set;
+}
+
+// Turns a raw stat value into what the stage should display and complete on.
+static int ms_stat_effective_progress(const SubGoal *stage, const AppSettings *settings, int raw) {
+    if (!ms_stage_baseline_active(stage, settings)) return raw;
+    if (!stage->stat_baseline_set) return 0; // stage not reached yet: nothing has been counted
+    int value = raw - stage->stat_baseline;
+    return (value > 0) ? value : 0;
+}
+
+// Captures the active stage's baseline if it is a count_from_stage stat that has none yet, and zeroes
+// its progress so the stage starts counting from here. Returns true if a baseline was written.
+static bool ms_capture_stat_baseline(MultiStageGoal *goal, const AppSettings *settings) {
+    if (!goal || goal->current_stage < 0 || goal->current_stage >= goal->stage_count) return false;
+    SubGoal *stage = goal->stages[goal->current_stage];
+    if (!ms_stage_baseline_active(stage, settings) || stage->stat_baseline_set) return false;
+
+    if (!stage->stat_raw_read) return false; // no read yet: 0 would be a guess, not the stat's value
+    stage->stat_baseline = stage->stat_raw_value;
+    stage->stat_baseline_set = true;
+    stage->current_stat_progress = 0;
+    log_message(LOG_INFO, "[TRACKER] Multi-stage goal '%s' stage '%s' now counts from %d.\n",
+                goal->root_name, stage->stage_id, stage->stat_baseline);
+    return true;
+}
+
+// Drops the baselines of every stage from `first` onward, so a goal that regressed re-snapshots when
+// it reaches them again. Returns true if anything was cleared.
+static bool ms_clear_stat_baselines_from(MultiStageGoal *goal, int first) {
+    if (!goal) return false;
+    bool cleared = false;
+    for (int j = first; j < goal->stage_count; j++) {
+        SubGoal *stage = goal->stages[j];
+        if (!stage || !stage->stat_baseline_set) continue;
+        stage->stat_baseline_set = false;
+        stage->stat_baseline = 0;
+        stage->current_stat_progress = 0;
+        cleared = true;
+    }
+    return cleared;
+}
+
 // Computes a multi-stage goal's current_stage as the leading run of satisfied stages.
 // base_satisfied[j] holds each stage's own satisfaction (game trigger OR linked goals); the
 // final MANUAL stage must be left false. Stages flagged complete_with_next are additionally
@@ -3502,7 +3583,6 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
                                                 MC_Version version, const AppSettings *settings,
                                                 bool hermes_stat_floor) {
-    (void) settings;
     if (t->template_data->multi_stage_goal_count == 0) return false;
 
     if (!player_adv_json && !player_stats_json) {
@@ -3560,6 +3640,7 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                 // every other type falls back to the flag the last successful read stored.
                 bool game_met = (stage_to_check->type == SUBGOAL_STAT)
                                     ? (stage_to_check->required_progress > 0 &&
+                                       ms_stat_stage_counts(stage_to_check) &&
                                        stage_to_check->current_stat_progress >= stage_to_check->required_progress)
                                     : stage_to_check->game_trigger_met;
                 base_satisfied[j] = game_met ||
@@ -3570,7 +3651,7 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                 continue;
             }
 
-            const int stored_stat_progress = stage_to_check->current_stat_progress;
+            const int stored_stat_raw = stage_to_check->stat_raw_value;
             stage_to_check->current_stat_progress = 0;
 
             switch (stage_to_check->type) {
@@ -3653,14 +3734,23 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                     // A stats file that hasn't been rewritten yet reports the previous save's number,
                     // which would drop the stage back and re-pop it in the compact stack once Hermes
                     // raises it again. Stats only count up inside a world, so keep the stored value.
-                    if (hermes_stat_floor && current_progress < stored_stat_progress) {
-                        current_progress = stored_stat_progress;
+                    // The floor compares raw to raw: a baselined stage's stored progress is an offset
+                    // count, so stat_raw_value is what the previous read actually saw.
+                    if (hermes_stat_floor && current_progress < stored_stat_raw) {
+                        current_progress = stored_stat_raw;
                         stat_found = true;
                     }
+
+                    // The raw value is kept so the baseline can be captured from it below (and so the
+                    // floor above has something raw to compare against next pass).
+                    stage_to_check->stat_raw_value = current_progress;
+                    stage_to_check->stat_raw_read = true;
+                    current_progress = ms_stat_effective_progress(stage_to_check, settings, current_progress);
 
                     // Check for completion. A required_progress of -1 is an infinite counter
                     // that never completes on its own (only via linked goals or complete_with_next).
                     if (stat_found && stage_to_check->required_progress > 0 &&
+                        ms_stat_stage_counts(stage_to_check) &&
                         current_progress >= stage_to_check->required_progress) {
                         stage_completed = true;
                     }
@@ -3738,6 +3828,21 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
 
         goal->current_stage = ms_compute_current_stage(goal, base_satisfied);
         if (goal->current_stage != previous_stage) any_changed = true;
+
+        // The stage the goal just landed on is the one that owns a baseline. Capturing here rather
+        // than inside the walk above is deliberate: which stage is active is only known once
+        // ms_compute_current_stage has run. Stage 0 on a fresh world, a stage entered right now and
+        // a tracker started mid-stage all arrive here the same way - no baseline yet, so the value
+        // read this pass becomes the zero point.
+        if (ms_capture_stat_baseline(goal, settings)) {
+            t->stat_stage_baselines_dirty = true;
+            any_changed = true;
+        }
+        // A goal that regressed (an undone linked goal, a world swap) drops the baselines of every
+        // stage past the one it now stands on, so re-entering one snapshots afresh.
+        if (ms_clear_stat_baselines_from(goal, goal->current_stage + 1)) {
+            t->stat_stage_baselines_dirty = true;
+        }
     }
 
     return any_changed;
@@ -3882,6 +3987,7 @@ static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
             // stage types rely on the stored game_trigger_met flag.
             bool game_met = (stage->type == SUBGOAL_STAT)
                                 ? (stage->required_progress > 0 &&
+                                   ms_stat_stage_counts(stage) &&
                                    stage->current_stat_progress >= stage->required_progress)
                                 : stage->game_trigger_met;
             base_satisfied[j] = game_met ||
@@ -5551,6 +5657,40 @@ static bool world_names_match(const char *a, const char *b) {
     return strcmp(a, b) == 0;
 }
 
+// Seeds count_from_stage baselines from settings.json so a restart mid-run keeps counting from the
+// same point. Only stages with no baseline in memory are seeded, so the running state always wins
+// over the file; a stored entry is ignored unless it belongs to this world and this exact stat.
+static void tracker_load_stat_stage_baselines(Tracker *t, cJSON *settings_json, const AppSettings *settings) {
+    if (!t || !t->template_data || !settings_json || !settings) return;
+    cJSON *section = get_per_uuid_progress_obj(settings_json, "stat_stage_baselines",
+                                               settings->local_player.uuid);
+    if (!section) return;
+
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage = goal->stages[j];
+            if (!stage || !stage->count_from_stage || stage->stat_baseline_set) continue;
+
+            char key[256];
+            snprintf(key, sizeof(key), "%s/%s", goal->root_name, stage->stage_id);
+            cJSON *entry = cJSON_GetObjectItem(section, key);
+            if (!cJSON_IsObject(entry)) continue;
+
+            cJSON *world = cJSON_GetObjectItem(entry, "world");
+            cJSON *stat = cJSON_GetObjectItem(entry, "stat");
+            cJSON *value = cJSON_GetObjectItem(entry, "value");
+            if (!cJSON_IsString(world) || !cJSON_IsString(stat) || !cJSON_IsNumber(value)) continue;
+            if (!world_names_match(t->world_name, world->valuestring)) continue;
+            if (strcmp(stat->valuestring, stage->root_name) != 0) continue;
+
+            stage->stat_baseline = value->valueint;
+            stage->stat_baseline_set = true;
+        }
+    }
+}
+
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
@@ -5675,6 +5815,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
 
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings, settings->local_player.uuid);
+    tracker_load_stat_stage_baselines(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings,
                                         hermes_stat_floor);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
@@ -5694,6 +5835,14 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     }
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
     tracker_refresh_igt(t, settings);
+
+    // A stage that just started counting (or stopped) has to reach the file now: the whole point of
+    // the baseline is that it survives a restart. Stage entry is rare, so this write is too.
+    if (t->stat_stage_baselines_dirty) {
+        t->stat_stage_baselines_dirty = false;
+        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+    }
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -14593,12 +14742,22 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_mul
 
             if (!matches) continue;
 
-            if (new_value > stage->current_stat_progress) {
-                stage->current_stat_progress = new_value;
-                changed = true;
+            // Hermes reports the stat's raw value, so the baseline is applied here exactly as it is on
+            // the disk path. Settings are not in scope, but they are not needed: co-op always passes
+            // skip_multi_stage, so reaching this point means the singleplayer path, which is the only
+            // one where a baseline is active anyway.
+            if (!stage->stat_raw_read || new_value > stage->stat_raw_value) {
+                stage->stat_raw_value = new_value;
+                stage->stat_raw_read = true;
+                int effective = ms_stat_effective_progress(stage, nullptr, new_value);
+                if (effective > stage->current_stat_progress) {
+                    stage->current_stat_progress = effective;
+                    changed = true;
+                }
             }
 
             if (stage->required_progress > 0 &&
+                ms_stat_stage_counts(stage) &&
                 stage->current_stat_progress >= stage->required_progress) {
                 if (goal->current_stage + 1 < goal->stage_count) {
                     goal->current_stage++;
@@ -14750,7 +14909,10 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
 
         if (!matches) continue;
 
+        // Co-op path: baselines are not applied here (see ms_stage_baseline_active), so the raw value
+        // is kept in step with the progress purely so the two agree if the session leaves the lobby.
         stage->current_stat_progress += delta;
+        stage->stat_raw_value += delta;
         changed = true;
 
         if (stage->required_progress > 0 &&

@@ -184,6 +184,10 @@ struct Tracker {
     char selected_coop_ghost_uuid[48]; // UUID of the selected ghost (index is unstable across refreshes; match by UUID)
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
+    // A count_from_stage stat stage captured or dropped a baseline this update, so the
+    // stat_stage_baselines section of settings.json is out of date and tracker_update writes it back.
+    bool stat_stage_baselines_dirty;
+
     // Host-side cache of serialized per-player and merged snapshots. Populated
     // during tracker_update_coop_merged so the player dropdown can switch views
     // without triggering a full disk reload (which would zero stale players

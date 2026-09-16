@@ -144,7 +144,8 @@ extern "C" {
     X(MC_VERSION_26_1_2, "26.1.2") \
     X(MC_VERSION_26_2, "26.2") \
     X(MC_VERSION_26_3, "26.3") \
-    X(MC_VERSION_26_4, "26.4")
+    X(MC_VERSION_26_4, "26.4") \
+    X(MC_VERSION_27_1, "27.1")
 
 #ifdef __cplusplus
 extern "C" {
@@ -438,6 +439,17 @@ struct SubGoal {
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
+
+    // Stat stages only: count from the value the stat held when this stage was reached, instead of
+    // from the stat's absolute value. The value at stage entry is captured as the baseline and
+    // subtracted from every later read, so current_stat_progress starts at 0 when the stage begins.
+    // A stage that has not been reached yet reports 0 rather than its raw value, so an already-high
+    // stat can never satisfy a future stage before the goal gets there.
+    bool count_from_stage;
+    int stat_baseline; // Raw stat value captured when the stage was entered.
+    bool stat_baseline_set; // False until a baseline has been captured for the current world.
+    int stat_raw_value; // Last raw (pre-baseline) value read, used for the capture and the Hermes floor.
+    bool stat_raw_read; // True once a raw value has actually been read, so 0 is a real 0 and not "unknown".
     bool coop_completed; // Co-op: true if any player completed this stage (non-stat types)
     bool game_trigger_met; // True if this stage's natural trigger (advancement/criterion/unlock) is met.
     // Stored so recalculation paths (e.g. manual custom-goal toggles) that lack player files can re-derive

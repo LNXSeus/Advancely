@@ -74,6 +74,7 @@ static void update_coop_template_sync(const AppSettings *s) {
 static const char *PRESET_PROGRESS_SECTIONS[] = {
     "custom_progress",
     "stat_progress_override",
+    "stat_stage_baselines",
 };
 
 // Overwrites the progress sections in settings.json with the given preset's versions.

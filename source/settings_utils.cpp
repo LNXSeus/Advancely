@@ -3993,6 +3993,34 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 }
             }
         }
+
+        // Baselines for stat stages set to count from the stage they were reached in. Only the keys
+        // belonging to this template are rewritten, so another template's baselines survive a switch.
+        // The world and the stat are stored alongside the value: a stored entry is only honored again
+        // if both still match, which is what invalidates it after a world change or a template edit.
+        cJSON *baseline_root = get_or_create_object(root, "stat_stage_baselines");
+        cJSON *baseline_obj = settings_get_player_progress_subobj(baseline_root, local_uuid, local_uuid);
+        if (baseline_obj) {
+            for (int i = 0; i < td->multi_stage_goal_count; i++) {
+                const MultiStageGoal *goal = td->multi_stage_goals[i];
+                if (!goal) continue;
+                for (int j = 0; j < goal->stage_count; j++) {
+                    const SubGoal *stage = goal->stages[j];
+                    if (!stage) continue;
+
+                    char baseline_key[256];
+                    snprintf(baseline_key, sizeof(baseline_key), "%s/%s", goal->root_name, stage->stage_id);
+                    cJSON_DeleteItemFromObject(baseline_obj, baseline_key);
+                    if (!stage->count_from_stage || !stage->stat_baseline_set) continue;
+
+                    cJSON *entry = cJSON_CreateObject();
+                    cJSON_AddStringToObject(entry, "world", td->last_known_world_name);
+                    cJSON_AddStringToObject(entry, "stat", stage->root_name);
+                    cJSON_AddNumberToObject(entry, "value", stage->stat_baseline);
+                    cJSON_AddItemToObject(baseline_obj, baseline_key, entry);
+                }
+            }
+        }
     }
 
     // Hotkeys and view_state are tracker-owned state. Gating by SAVE_CONTEXT_ALL

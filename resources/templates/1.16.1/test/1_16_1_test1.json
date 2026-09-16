@@ -986,7 +986,9 @@
 					"stage_id":	"one",
 					"type":	"stat",
 					"root_name":	"minecraft:custom/minecraft:jump",
-					"target":	17
+					"target":	17,
+					"complete_with_next":	true,
+					"count_from_stage":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"criterion",
@@ -997,7 +999,9 @@
 					"stage_id":	"3",
 					"type":	"stat",
 					"root_name":	"minecraft:mined/minecraft:dirt",
-					"target":	64
+					"target":	64,
+					"complete_with_next":	true,
+					"count_from_stage":	true
 				}, {
 					"stage_id":	"4",
 					"type":	"advancement",

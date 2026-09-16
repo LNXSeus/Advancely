@@ -618,6 +618,9 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     // "complete with next stage" auto-completion flag
                     cJSON *cwn = cJSON_GetObjectItem(stage, "complete_with_next");
                     hash = fnv1a_int(hash, cJSON_IsTrue(cwn) ? 1 : 0);
+                    // "start counting when stage is reached" flag (stat stages)
+                    cJSON *cfs = cJSON_GetObjectItem(stage, "count_from_stage");
+                    hash = fnv1a_int(hash, cJSON_IsTrue(cfs) ? 1 : 0);
                 }
             }
         }

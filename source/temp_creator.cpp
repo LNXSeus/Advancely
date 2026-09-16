@@ -322,6 +322,10 @@ struct EditorSubGoal {
     // When true, this (non-final) stage auto-completes if the next stage is completed.
     bool complete_with_next = false;
 
+    // Stat stages only: count from the value the stat held when this stage was reached instead of
+    // from its absolute value (see SubGoal::count_from_stage).
+    bool count_from_stage = false;
+
     // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
     // file under the goal's own key plus ".desc", so it translates with everything else.
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
@@ -1004,6 +1008,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.linked_goal_mode != b.linked_goal_mode ||
            a.complete_with_next != b.complete_with_next ||
+           a.count_from_stage != b.count_from_stage ||
            a.description != b.description ||
            tc_language_text_different(a.language_text, b.language_text) ||
            are_linked_goals_different(a.linked_goals, b.linked_goals);
@@ -2260,6 +2265,10 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                 // Parse "complete with next stage" auto-completion flag (non-final stages)
                 new_stage.complete_with_next = cJSON_IsTrue(cJSON_GetObjectItem(stage_json, "complete_with_next"));
 
+                // Only meaningful on a stat stage; a stray flag on another type is dropped on load.
+                new_stage.count_from_stage = (new_stage.type == SUBGOAL_STAT) &&
+                                             cJSON_IsTrue(cJSON_GetObjectItem(stage_json, "count_from_stage"));
+
                 new_goal.stages.push_back(new_stage);
             }
         }
@@ -3009,6 +3018,10 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 // keeping it means moving the stage back out of that slot restores the setting.
                 if (stage.complete_with_next) {
                     cJSON_AddBoolToObject(stage_json, "complete_with_next", true);
+                }
+                // Stat stages only: count from the value held when the stage was reached.
+                if (stage.type == SUBGOAL_STAT && stage.count_from_stage) {
+                    cJSON_AddBoolToObject(stage_json, "count_from_stage", true);
                 }
             }
 
@@ -18513,6 +18526,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Something else must complete it: a linked auto-complete goal, or the\n"
                                                  "'Auto-complete if next stage is completed' checkbox on this stage.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+
+                                    // Count the stat from the value it held when the stage was reached.
+                                    char cfs_id[128];
+                                    snprintf(cfs_id, sizeof(cfs_id),
+                                             "Start counting when stage is reached##cfs_%s_%zu",
+                                             goal.root_name, j);
+                                    if (ImGui::Checkbox(cfs_id, &stage.count_from_stage)) {
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char cfs_tooltip_buffer[768];
+                                        snprintf(cfs_tooltip_buffer, sizeof(cfs_tooltip_buffer),
+                                                 "Count this stat from the value it holds the moment this stage is reached,\n"
+                                                 "instead of from its absolute value. That value becomes the zero point, so\n"
+                                                 "the stage starts at 0 and the target above is how much MORE is needed.\n\n"
+                                                 "The zero point belongs to one world and survives restarting Advancely.\n"
+                                                 "A stage that has not been reached yet shows 0, so a stat that is already\n"
+                                                 "high can never complete a later stage before the goal gets there.\n\n"
+                                                 "Not applied in co-op yet: in a lobby the stage counts absolutely.");
+                                        ImGui::SetTooltip("%s", cfs_tooltip_buffer);
                                     }
                                 }
 
