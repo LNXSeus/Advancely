@@ -636,6 +636,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
         a->compact_row1_fade_enabled != b->compact_row1_fade_enabled ||
         a->compact_row1_fade_time != b->compact_row1_fade_time ||
+        a->compact_row1_settle_time != b->compact_row1_settle_time ||
         a->compact_icon_shared_size != b->compact_icon_shared_size ||
         compact_stack_different(a, b) ||
         a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -678,6 +679,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_clear_animation != b->overlay_clear_animation ||
         a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
         a->overlay_clear_fade_time != b->overlay_clear_fade_time ||
+        a->overlay_settle_time != b->overlay_settle_time ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
         a->tracker_criteria_vertical_spacing != b->tracker_criteria_vertical_spacing ||
         a->adv_icon_size != b->adv_icon_size ||
@@ -893,6 +895,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->compact_row1_clear_animation != b->compact_row1_clear_animation ||
             a->compact_row1_fade_enabled != b->compact_row1_fade_enabled ||
             a->compact_row1_fade_time != b->compact_row1_fade_time ||
+            a->compact_row1_settle_time != b->compact_row1_settle_time ||
             a->compact_icon_shared_size != b->compact_icon_shared_size ||
             compact_stack_different(a, b) ||
             a->compact_show_completion_markers != b->compact_show_completion_markers ||
@@ -927,6 +930,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_clear_animation != b->overlay_clear_animation ||
             a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
             a->overlay_clear_fade_time != b->overlay_clear_fade_time ||
+            a->overlay_settle_time != b->overlay_settle_time ||
             a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
 
             // Row spacing / sizing.
@@ -4192,6 +4196,27 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::SetTooltip("%s", clear_fade_time_tooltip_buffer);
                         }
                     }
+
+                    // Closing the gap a cleared goal leaves behind. Only a static row can slide:
+                    // a scrolling belt already moves, so this applies to a frozen row and to Page
+                    // mode once every remaining goal fits a single page.
+                    if (ImGui::DragFloat("Settle Animation (s)", &temp_settings.overlay_settle_time, 0.01f,
+                                         OVERLAY_SETTLE_TIME_MIN, OVERLAY_SETTLE_TIME_MAX, "%.2f s")) {
+                        if (temp_settings.overlay_settle_time < OVERLAY_SETTLE_TIME_MIN)
+                            temp_settings.overlay_settle_time = OVERLAY_SETTLE_TIME_MIN;
+                        if (temp_settings.overlay_settle_time > OVERLAY_SETTLE_TIME_MAX)
+                            temp_settings.overlay_settle_time = OVERLAY_SETTLE_TIME_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char settle_tooltip_buffer[512];
+                        snprintf(settle_tooltip_buffer, sizeof(settle_tooltip_buffer),
+                                 "How long the remaining goals take to slide over into the gap a cleared\n"
+                                 "goal leaves behind, instead of jumping into place. 0.0 jumps.\n"
+                                 "A row held by its Auto-Freeze\n"
+                                 "option, or a Page mode row once every remaining goal fits one page.\n"
+                                 "Default: %.2f s", DEFAULT_OVERLAY_SETTLE_TIME);
+                        ImGui::SetTooltip("%s", settle_tooltip_buffer);
+                    }
                 } // End of Content & Behavior (belt/page only; hidden in Compact mode)
 
                 // Only relevant to Page mode; reveal the page-flip interval when it is selected.
@@ -4422,6 +4447,26 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Default: %.2f s", DEFAULT_COMPACT_ROW1_FADE_TIME);
                                 ImGui::SetTooltip("%s", compact_row1_fade_time_tooltip_buffer);
                             }
+                        }
+
+                        // Closing the gap a cleared icon leaves behind. The strip only slides while it
+                        // is standing still, which is once every remaining icon fits a single page.
+                        if (ImGui::DragFloat("Settle Animation (s)##CompactRow1Icons",
+                                             &temp_settings.compact_row1_settle_time, 0.01f,
+                                             OVERLAY_SETTLE_TIME_MIN, OVERLAY_SETTLE_TIME_MAX, "%.2f s")) {
+                            if (temp_settings.compact_row1_settle_time < OVERLAY_SETTLE_TIME_MIN)
+                                temp_settings.compact_row1_settle_time = OVERLAY_SETTLE_TIME_MIN;
+                            if (temp_settings.compact_row1_settle_time > OVERLAY_SETTLE_TIME_MAX)
+                                temp_settings.compact_row1_settle_time = OVERLAY_SETTLE_TIME_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_row1_settle_tooltip_buffer[512];
+                            snprintf(compact_row1_settle_tooltip_buffer, sizeof(compact_row1_settle_tooltip_buffer),
+                                     "How long the remaining icons take to slide over into the gap a cleared\n"
+                                     "icon leaves behind, instead of jumping into place. 0.0 jumps.\n"
+                                     "Only once every remaining icon fits one page.\n"
+                                     "Default: %.2f s", DEFAULT_COMPACT_ROW1_SETTLE_TIME);
+                            ImGui::SetTooltip("%s", compact_row1_settle_tooltip_buffer);
                         }
                     }
 

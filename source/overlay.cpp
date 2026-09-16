@@ -480,6 +480,104 @@ static const char *overlay_item_root(const OverlayDisplayItem &di) {
     return "";
 }
 
+// --- Settle animation ----------------------------------------------------
+// A row that stands still (frozen, or a Page-mode page that already holds every
+// remaining item) would otherwise jump when a cleared item's slot disappears and the
+// rest close the gap. The settle pass slides them over that distance instead: it
+// remembers where each item was drawn last frame and eases it towards the layout the
+// row just computed. Because it works off the finished layout it needs no knowledge of
+// the alignment - whatever the alignment moved, and only that far, is what it animates.
+struct SettleView {
+    unsigned long long signature = 0;
+    bool init = false;
+
+    std::vector<float> cur_x; // where each item is drawn right now
+    std::vector<float> from_x; // where it was when the current slide started
+    std::vector<float> target_x; // where the layout wants it
+    std::vector<char> present; // item had a tile last frame (a new one never slides in)
+    float elapsed = 0.0f; // seconds into the current slide
+    Uint32 anim_prev = 0;
+};
+
+// Smoothstep: starts and ends at zero speed, so the slide eases in and out like the
+// compact stack's rise instead of running at a constant rate.
+static inline float settle_ease(float t) {
+    if (t <= 0.0f) return 0.0f;
+    if (t >= 1.0f) return 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
+// Rewrites the x of every tile in `out` so the row eases into its new layout over
+// `duration` seconds. A duration of 0 (or a row that should not settle) leaves the
+// tiles untouched and resets the state, so the row jumps exactly as before.
+static void settle_apply(SettleView &sv, bool settle_enabled, int F, float duration,
+                         unsigned long long signature, std::vector<BeltTile> &out) {
+    if (!settle_enabled || duration <= 0.0f || F <= 0) {
+        sv.init = false;
+        return;
+    }
+
+    Uint32 now = SDL_GetTicks();
+
+    // Reset on first use, template change or item-count change: the row appears where
+    // the layout put it rather than sliding in from a stale position.
+    if (!sv.init || sv.signature != signature || (int) sv.cur_x.size() != F) {
+        sv.signature = signature;
+        sv.cur_x.assign((size_t) F, 0.0f);
+        sv.from_x.assign((size_t) F, 0.0f);
+        sv.target_x.assign((size_t) F, 0.0f);
+        sv.present.assign((size_t) F, 0);
+        sv.elapsed = duration;
+        sv.anim_prev = now;
+        sv.init = true;
+        for (const auto &tile: out) {
+            if (tile.idx < 0) continue;
+            sv.cur_x[tile.idx] = sv.from_x[tile.idx] = sv.target_x[tile.idx] = tile.x;
+            sv.present[tile.idx] = 1;
+        }
+        return;
+    }
+
+    float dt = (float) (now - sv.anim_prev) / 1000.0f;
+    sv.anim_prev = now;
+    if (dt < 0.0f) dt = 0.0f;
+    if (dt > 0.25f) dt = 0.25f; // ignore long stalls (window minimized, etc.)
+    sv.elapsed += dt;
+
+    // An item that was not on screen last frame starts at its new place, so a page that
+    // brings fresh items in never drags them across the window.
+    for (const auto &tile: out) {
+        if (tile.idx < 0 || sv.present[tile.idx]) continue;
+        sv.cur_x[tile.idx] = sv.from_x[tile.idx] = sv.target_x[tile.idx] = tile.x;
+    }
+
+    // The layout moved: restart the slide from wherever the items currently stand.
+    bool moved = false;
+    for (const auto &tile: out) {
+        if (tile.idx >= 0 && fabsf(tile.x - sv.target_x[tile.idx]) > 0.5f) {
+            moved = true;
+            break;
+        }
+    }
+    if (moved) {
+        for (int i = 0; i < F; i++) sv.from_x[i] = sv.cur_x[i];
+        for (const auto &tile: out) {
+            if (tile.idx >= 0) sv.target_x[tile.idx] = tile.x;
+        }
+        sv.elapsed = 0.0f;
+    }
+
+    float e = settle_ease(sv.elapsed / duration);
+    for (int i = 0; i < F; i++) sv.cur_x[i] = sv.from_x[i] + (sv.target_x[i] - sv.from_x[i]) * e;
+
+    sv.present.assign((size_t) F, 0);
+    for (auto &tile: out) {
+        if (tile.idx < 0) continue;
+        tile.x = snap_px(sv.cur_x[tile.idx]);
+        sv.present[tile.idx] = 1;
+    }
+}
+
 // Per-row state for the frozen layout, mirroring ScrollBelt/PageView so a cleared
 // item can play its crop or fade animation in place before the row closes the gap.
 struct FreezeView {
@@ -685,7 +783,9 @@ static void page_snapshot(PageView &p, int per_page, bool repeat, int F, const s
 // is full (no empty space); once every remaining item fits a single page they stop
 // repeating and simply clear away as they complete (aligned per `align`). This removes
 // the old manual "repeat to fill" toggle.
-static void page_update(PageView &p, int page_index, OverlayProgressTextAlignment align,
+// Returns true while every remaining (not yet cleared) item fits a single page, which is
+// when the page stops flipping to anything new and the row is effectively standing still.
+static bool page_update(PageView &p, int page_index, OverlayProgressTextAlignment align,
                         int window_w, float iw, float cell,
                         int F, const std::vector<char> &removed,
                         float crop_duration, float fade_duration,
@@ -695,7 +795,7 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
     if (F <= 0 || iw <= 0.0f) {
         p.tiles.clear();
         p.init = false;
-        return;
+        return false;
     }
 
     int per_page = page_capacity(window_w, iw, cell);
@@ -751,7 +851,7 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
     }
 
     int slots = (int) p.tiles.size();
-    if (slots <= 0) return;
+    if (slots <= 0) return !repeat;
 
     // The slot count is fixed for the page's lifetime, so a cleared item leaving a
     // gap does not shift the remaining items. A not-full page is aligned relative to
@@ -791,6 +891,7 @@ static void page_update(PageView &p, int page_index, OverlayProgressTextAlignmen
         }
         out.push_back({idx, x, clear, alpha});
     }
+    return !repeat;
 }
 
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
@@ -2654,16 +2755,21 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // a transparent overlay, like the pop-out stack's fade.
     if (have_icons) {
         static PageView page_compact_icons;
+        static SettleView settle_compact_icons;
         std::vector<BeltTile> icon_tiles;
         int icon_F = (int) icon_items.size();
         float icon_fade = (settings->overlay_transparent && settings->compact_row1_fade_enabled)
                               ? settings->compact_row1_fade_time
                               : 0.0f;
         float icon_crop = (icon_fade > 0.0f) ? 0.0f : fabsf(settings->compact_row1_clear_animation);
-        page_update(page_compact_icons, o->compact_icon_page_index, settings->compact_panel_align,
-                    (int) panel_w, icon_full_w, icon_size,
-                    icon_F, icon_removed, icon_crop, icon_fade,
-                    icon_sig, icon_tiles);
+        // Once every remaining icon fits one page the strip stands still, so it slides the
+        // leftovers over into a cleared icon's gap instead of jumping them into place.
+        bool icons_settle = page_update(page_compact_icons, o->compact_icon_page_index, settings->compact_panel_align,
+                                        (int) panel_w, icon_full_w, icon_size,
+                                        icon_F, icon_removed, icon_crop, icon_fade,
+                                        icon_sig, icon_tiles);
+        settle_apply(settle_compact_icons, icons_settle, icon_F, settings->compact_row1_settle_time,
+                     icon_sig, icon_tiles);
         float icon_y = snap_px(pad);
         for (const auto &tile: icon_tiles) {
             if (tile.idx < 0) continue; // gap (item completed mid-page)
@@ -3525,12 +3631,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             static ScrollBelt belt_row1;
             static PageView page_row1;
             static FreezeView freeze_row1;
+            static SettleView settle_row1;
             std::vector<BeltTile> tiles;
+            // A standing-still row closes a cleared item's gap with the settle slide below; a
+            // scrolling belt is already moving, so it keeps jumping the gap shut as before.
+            bool settle_on = false;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                page_update(page_row1, o->page_index, settings->overlay_page_align,
-                            window_w, item_full_width, ROW1_ICON_SIZE,
-                            F, removed, clear_crop_duration, clear_fade_duration,
-                            signature, tiles);
+                settle_on = page_update(page_row1, o->page_index, settings->overlay_page_align,
+                                        window_w, item_full_width, ROW1_ICON_SIZE,
+                                        F, removed, clear_crop_duration, clear_fade_duration,
+                                        signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                 freeze_row1.init = false;
             } else if (freeze_layout(freeze_row1, settings->overlay_row1_freeze_enabled,
@@ -3538,6 +3648,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                      window_w, item_full_width, ROW1_ICON_SIZE, F, removed,
                                      clear_crop_duration, clear_fade_duration, signature, tiles)) {
                 belt_row1.init = false; // reset so scrolling re-initialises cleanly if it resumes
+                settle_on = true;
             } else {
                 belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
                             -item_full_width, (float) window_w + item_full_width,
@@ -3546,6 +3657,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                                    settings->overlay_row1_scroll_speed,
                                                    settings->overlay_scroll_speed) > 0, signature, tiles);
             }
+            settle_apply(settle_row1, settle_on, F, settings->overlay_settle_time, signature, tiles);
 
             for (const auto &tile: tiles) {
                 if (tile.idx < 0) continue; // gap
@@ -4004,12 +4116,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 static ScrollBelt belt_row2;
                 static PageView page_row2;
                 static FreezeView freeze_row2;
+                static SettleView settle_row2;
                 std::vector<BeltTile> tiles;
+                // A standing-still row closes a cleared item's gap with the settle slide below; a
+                // scrolling belt is already moving, so it keeps jumping the gap shut as before.
+                bool settle_on = false;
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                    page_update(page_row2, o->page_index, settings->overlay_page_align,
-                                window_w, item_full_width_row2, cell_width_row2,
-                                F, removed, clear_crop_duration, clear_fade_duration,
-                                signature, tiles);
+                    settle_on = page_update(page_row2, o->page_index, settings->overlay_page_align,
+                                            window_w, item_full_width_row2, cell_width_row2,
+                                            F, removed, clear_crop_duration, clear_fade_duration,
+                                            signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                     freeze_row2.init = false;
                 } else if (freeze_layout(freeze_row2, settings->overlay_row2_freeze_enabled,
@@ -4017,6 +4133,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                          window_w, item_full_width_row2, cell_width_row2, F, removed,
                                          clear_crop_duration, clear_fade_duration, signature, tiles)) {
                     belt_row2.init = false; // reset so scrolling re-initialises cleanly if it resumes
+                    settle_on = true;
                 } else {
                     belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
                                 -coverage, (float) window_w + coverage,
@@ -4025,6 +4142,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                                        settings->overlay_row2_scroll_speed,
                                                        settings->overlay_scroll_speed) > 0, signature, tiles);
                 }
+                settle_apply(settle_row2, settle_on, F, settings->overlay_settle_time, signature, tiles);
 
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap left by a cleared item
@@ -4510,12 +4628,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             static ScrollBelt belt_row3;
             static PageView page_row3;
             static FreezeView freeze_row3;
+            static SettleView settle_row3;
             std::vector<BeltTile> tiles;
+            // A standing-still row closes a cleared item's gap with the settle slide below; a
+            // scrolling belt is already moving, so it keeps jumping the gap shut as before.
+            bool settle_on = false;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
-                page_update(page_row3, o->page_index, settings->overlay_page_align,
-                            window_w, item_full_width_row3, cell_width_row3,
-                            F, removed, clear_crop_duration, clear_fade_duration,
-                            signature, tiles);
+                settle_on = page_update(page_row3, o->page_index, settings->overlay_page_align,
+                                        window_w, item_full_width_row3, cell_width_row3,
+                                        F, removed, clear_crop_duration, clear_fade_duration,
+                                        signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
                 freeze_row3.init = false;
             } else if (freeze_layout(freeze_row3, settings->overlay_row3_freeze_enabled,
@@ -4523,6 +4645,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                      window_w, item_full_width_row3, cell_width_row3, F, removed,
                                      clear_crop_duration, clear_fade_duration, signature, tiles)) {
                 belt_row3.init = false; // reset so scrolling re-initialises cleanly if it resumes
+                settle_on = true;
             } else {
                 belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
                             -coverage, (float) window_w + coverage,
@@ -4531,6 +4654,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                                    settings->overlay_row3_scroll_speed,
                                                    settings->overlay_scroll_speed) > 0, signature, tiles);
             }
+            settle_apply(settle_row3, settle_on, F, settings->overlay_settle_time, signature, tiles);
 
             for (size_t ti = 0; ti < tiles.size(); ++ti) {
                 if (tiles[ti].idx < 0) continue; // gap left by a cleared item
