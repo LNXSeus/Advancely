@@ -441,19 +441,16 @@ struct SubGoal {
     int current_stat_progress; // Current value of stat within multi-stage goal
 
     // Stat stages only: count from the value the stat held when this stage was reached, instead of
-    // from the stat's absolute value. The value at stage entry is captured as the baseline and
-    // subtracted from every later read, so current_stat_progress starts at 0 when the stage begins.
-    // A stage that has not been reached yet reports 0 rather than its raw value, so an already-high
-    // stat can never satisfy a future stage before the goal gets there.
+    // from the stat's absolute value. current_stat_progress then starts at 0 when the stage begins,
+    // and a stage that has not been reached yet reports 0 rather than its raw value, so an
+    // already-high stat can never satisfy a future stage before the goal gets there.
     bool count_from_stage;
-    int stat_baseline; // Raw stat value captured when the stage was entered.
-    bool stat_baseline_set; // False until a baseline has been captured for the current world.
-    int stat_raw_value; // Last raw (pre-baseline) value read, used for the capture and the Hermes floor.
-    bool stat_raw_read; // True once a raw value has actually been read, so 0 is a real 0 and not "unknown".
-    // The stored baseline is wrong rather than merely out of scope, so the settings entry is deleted
-    // instead of being left for a later return. A world change only drops the in-memory copy: the
-    // entry stays on file, stamped with its world, so coming back to that world resumes from it.
-    bool stat_baseline_forget;
+    // Whether current_stat_progress is a real count yet, i.e. whoever it is being shown for has a
+    // zero point. The zero points themselves are per player and live in the tracker's own store, NOT
+    // here: in co-op this struct is a display buffer that is swapped between views, so anything kept
+    // here belongs to whichever view was rendered last. This flag is carried alongside the progress
+    // it describes (see merge_coop_progress) precisely so the two can never disagree.
+    bool stat_counting;
     bool coop_completed; // Co-op: true if any player completed this stage (non-stat types)
     bool game_trigger_met; // True if this stage's natural trigger (advancement/criterion/unlock) is met.
     // Stored so recalculation paths (e.g. manual custom-goal toggles) that lack player files can re-derive

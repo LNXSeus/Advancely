@@ -600,6 +600,9 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             SubGoal *dst_stage = dst->stages ? dst->stages[j] : nullptr;
             if (!dst_stage) continue;
             dst_stage->current_stat_progress = in_stage.current_stat_progress;
+            // Travels with the progress: it says whether that number is a real count-since-entry for
+            // the player this snapshot belongs to, and the two are meaningless apart.
+            dst_stage->stat_counting = in_stage.stat_counting;
             // Carry the stage's game-trigger state so a following recalculation re-derives the same
             // current_stage (the recompute reads game_trigger_met for non-stat stages) instead of regressing.
             dst_stage->coop_completed = in_stage.coop_completed;

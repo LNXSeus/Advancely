@@ -18540,17 +18540,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     if (ImGui::IsItemHovered()) {
                                         char cfs_tooltip_buffer[768];
                                         snprintf(cfs_tooltip_buffer, sizeof(cfs_tooltip_buffer),
-                                                 "Count this stat from the value it holds the moment this stage is reached,\n"
-                                                 "instead of from its absolute value. That value becomes the zero point, so\n"
-                                                 "the stage starts at 0 and the target above is how much MORE is needed.\n\n"
-                                                 "The zero point belongs to one world and survives restarting Advancely\n"
-                                                 "and switching worlds away and back.\n"
+                                                 "The stage starts at 0 when it is reached and the target above becomes\n"
+                                                 "how much MORE of the stat is needed, instead of what it must reach in\n"
+                                                 "total. Whatever the stat already stood at simply does not count.\n\n"
                                                  "A stage that has not been reached yet shows 0, so a stat that is already\n"
-                                                 "high can never complete a later stage before the goal gets there.\n\n"
-                                                 "Because such a stage is only ever complete while its zero point is known,\n"
-                                                 "ticking 'Auto-complete if next stage is completed' below on it is worth it:\n"
-                                                 "the goal then stays where it is even if the zero point is ever lost.\n\n"
-                                                 "Not applied in co-op yet: in a lobby the stage counts absolutely.");
+                                                 "high can never complete a later stage before the goal gets there.\n"
+                                                 "In co-op every player starts at 0 when they reach the stage and the\n"
+                                                 "stage shows what the lobby has gained since, so a player joining midway\n"
+                                                 "brings nothing with them.\n\n"
+                                                 "Where each player started is remembered per world: it survives\n"
+                                                 "restarting Advancely and leaving the world and coming back.\n"
+                                                 "Ticking 'Auto-complete if next stage is completed' below is worth it\n"
+                                                 "here, so the goal stays put even if that is ever lost.");
                                         ImGui::SetTooltip("%s", cfs_tooltip_buffer);
                                     }
                                 }

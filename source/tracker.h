@@ -252,6 +252,16 @@ struct Tracker {
     // Type: std::unordered_map<std::string, PlayerLegacySnapshot>* (managed in tracker.cpp).
     void *legacy_player_snapshots;
 
+    // Per-player zero points for stat stages set to "start counting when stage is reached".
+    // Keyed "<uuid>|<goal_root>/<stage_id>", so a co-op stage subtracts the sum of the baselines of
+    // the players contributing to it and each player counts from when they themselves reached it.
+    // Solo tracking is the same store with one player in it.
+    // Type: std::unordered_map<std::string, StatStageBaseline>* (managed in tracker.cpp).
+    void *stat_stage_baselines;
+    // Bumped once per co-op merge pass. An entry stamped with the current value belongs to a player
+    // who contributed to this pass, which is how a stage sums only the players actually in the lobby.
+    unsigned long long coop_merge_cycle;
+
     // Hermes live-update support
     HermesRotator hermes_rotator; // cipher tables, built once
     // Path to the restricted play.log.enc. Only the path is kept, never an open handle: on Windows an

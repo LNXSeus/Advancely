@@ -1207,6 +1207,228 @@ static void tracker_clear_legacy_player_snapshots(Tracker *t) {
     if (map) map->clear();
 }
 
+// --- Stat stage baselines (count_from_stage) -----------------------------
+// A stat stage can count from the value the stat held when the stage was reached rather than from
+// the stat's absolute value. The zero point is captured the first time the stage is the active one
+// and persists in settings.json, so a restart mid-run keeps counting from the same point.
+//
+// Zero points are per player, because a multi-stage stat is summed across the lobby: each player
+// counts from the value they held when they themselves first contributed to the stage, and the
+// stage shows the sum of those counts. A player who joins later therefore brings 0 with them
+// instead of their whole lifetime total. Solo tracking is the same store with one player in it.
+static bool ms_stage_baseline_active(const SubGoal *stage) {
+    return stage && stage->count_from_stage && stage->type == SUBGOAL_STAT;
+}
+
+// One player's zero point for one stat stage. `raw` is that player's own value for the stage's stat,
+// recorded by the co-op merge so the zero point can be taken from it once the stage is reached, and
+// `merge_cycle` says which merge pass last saw them, which is what separates the players currently
+// contributing from ones who are no longer in the lobby.
+struct StatStageBaseline {
+    int raw = 0;
+    bool raw_read = false;
+    int baseline = 0;
+    bool baseline_set = false;
+    bool forget = false; // stored entry is void, not merely out of scope: delete it from the file
+    unsigned long long merge_cycle = 0;
+    std::string world; // world the zero point was taken in
+    std::string stat; // stage root_name it was taken for
+};
+
+static std::unordered_map<std::string, StatStageBaseline> *stat_stage_baseline_map(Tracker *t) {
+    if (!t || !t->stat_stage_baselines) return nullptr;
+    return static_cast<std::unordered_map<std::string, StatStageBaseline> *>(t->stat_stage_baselines);
+}
+
+// "<uuid>|<goal_root>/<stage_id>". The part after the bar is exactly the key the entry is stored
+// under inside that player's settings.json subtree.
+static std::string stat_stage_key(const char *uuid, const MultiStageGoal *goal, const SubGoal *stage) {
+    std::string key = (uuid && uuid[0]) ? uuid : "?";
+    key += '|';
+    key += goal->root_name;
+    key += '/';
+    key += stage->stage_id;
+    return key;
+}
+
+static std::string stat_stage_file_key(const MultiStageGoal *goal, const SubGoal *stage) {
+    std::string key = goal->root_name;
+    key += '/';
+    key += stage->stage_id;
+    return key;
+}
+
+// Whether a map key belongs to this goal/stage, whichever player it is keyed under.
+static bool stat_stage_key_is(const std::string &key, const std::string &file_key) {
+    if (key.size() <= file_key.size()) return false;
+    size_t at = key.size() - file_key.size();
+    return key[at - 1] == '|' && key.compare(at, file_key.size(), file_key) == 0;
+}
+
+// Records one player's own value for a stat stage. Called for every player the co-op merge walks, so
+// that a zero point can be taken from it the moment the stage turns out to be the one being worked on.
+static void coop_record_stat_stage_raw(Tracker *t, const char *uuid, const MultiStageGoal *goal,
+                                       const SubGoal *stage, int raw) {
+    auto *map = stat_stage_baseline_map(t);
+    if (!map || !ms_stage_baseline_active(stage)) return;
+
+    StatStageBaseline &e = (*map)[stat_stage_key(uuid, goal, stage)];
+    e.raw = raw;
+    e.raw_read = true;
+    e.merge_cycle = t->coop_merge_cycle;
+    // The stat the stage tracks can be edited in the template; a zero point taken for the old one
+    // means nothing for the new one.
+    if (e.baseline_set && e.stat != stage->root_name) {
+        e.baseline_set = false;
+        e.forget = true;
+        t->stat_stage_baselines_dirty = true;
+    }
+}
+
+// Turns the raw per-player sums the merge accumulated into counts-since-entry, and hands a zero point
+// to any player contributing to `active_stage` who does not have one yet - which is what makes a
+// player who joins midway bring 0 with them instead of their whole total. A player with no zero point
+// contributes nothing, so a stage nobody has reached reads 0 rather than the lobby's lifetime total.
+static void coop_apply_stat_stage_baselines(Tracker *t, MultiStageGoal *goal, int active_stage) {
+    auto *map = stat_stage_baseline_map(t);
+    if (!map || !goal) return;
+
+    for (int j = 0; j < goal->stage_count; j++) {
+        SubGoal *stage = goal->stages[j];
+        if (!ms_stage_baseline_active(stage)) continue;
+
+        const std::string file_key = stat_stage_file_key(goal, stage);
+        int effective = 0;
+        bool any_baseline = false;
+
+        for (auto &kv: *map) {
+            StatStageBaseline &e = kv.second;
+            if (e.merge_cycle != t->coop_merge_cycle) continue; // not contributing this pass
+            if (!stat_stage_key_is(kv.first, file_key)) continue;
+
+            if (j == active_stage && !e.baseline_set && e.raw_read) {
+                e.baseline = e.raw;
+                e.baseline_set = true;
+                e.forget = false;
+                e.world = t->world_name;
+                e.stat = stage->root_name;
+                t->stat_stage_baselines_dirty = true;
+            }
+            if (!e.baseline_set) continue;
+
+            any_baseline = true;
+            int gained = e.raw - e.baseline;
+            if (gained > 0) effective += gained;
+        }
+
+        stage->stat_counting = any_baseline;
+        stage->current_stat_progress = effective;
+    }
+}
+
+// Whether a stat stage's current_stat_progress is a real count yet. A stage counting from when it
+// was reached reports 0 until whoever it is shown for has a zero point, so an already-high stat can
+// never satisfy a stage the goal has not got to.
+static bool ms_stat_stage_counts(const SubGoal *stage) {
+    if (!stage || !stage->count_from_stage || stage->type != SUBGOAL_STAT) return true;
+    return stage->stat_counting;
+}
+
+// Records one player's own value for a stage and returns what the stage should show for them: the
+// gain since their zero point, or 0 while they have none. Single-player tracking is this with one
+// player; the co-op merge sums the same per-player numbers in coop_apply_stat_stage_baselines.
+static int ms_stat_progress_for_player(Tracker *t, const char *uuid, const MultiStageGoal *goal,
+                                       SubGoal *stage, int raw, bool *counting) {
+    if (counting) *counting = true;
+    if (!ms_stage_baseline_active(stage)) return raw;
+
+    coop_record_stat_stage_raw(t, uuid, goal, stage, raw);
+
+    auto *map = stat_stage_baseline_map(t);
+    if (!map) {
+        if (counting) *counting = false;
+        return 0;
+    }
+    auto it = map->find(stat_stage_key(uuid, goal, stage));
+    if (it == map->end() || !it->second.baseline_set) {
+        if (counting) *counting = false;
+        return 0; // stage not reached by this player yet: nothing has been counted
+    }
+
+    int gained = raw - it->second.baseline;
+    return (gained > 0) ? gained : 0;
+}
+
+// The raw value this player was last seen at for a stage, and whether one has ever been seen. The
+// Hermes floor needs it: a stage's progress is a count, so only raw compares meaningfully to raw.
+static bool ms_stat_raw_for_player(Tracker *t, const char *uuid, const MultiStageGoal *goal,
+                                   const SubGoal *stage, int *out_raw) {
+    auto *map = stat_stage_baseline_map(t);
+    if (!map) return false;
+    auto it = map->find(stat_stage_key(uuid, goal, stage));
+    if (it == map->end() || !it->second.raw_read) return false;
+    if (out_raw) *out_raw = it->second.raw;
+    return true;
+}
+
+// Gives the player their zero point for the stage the goal now stands on, if they are missing one,
+// and zeroes what the stage shows. Returns true if a zero point was written.
+static bool ms_capture_stat_baseline(Tracker *t, const char *uuid, MultiStageGoal *goal) {
+    if (!goal || goal->current_stage < 0 || goal->current_stage >= goal->stage_count) return false;
+    SubGoal *stage = goal->stages[goal->current_stage];
+    if (!ms_stage_baseline_active(stage)) return false;
+
+    auto *map = stat_stage_baseline_map(t);
+    if (!map) return false;
+    auto it = map->find(stat_stage_key(uuid, goal, stage));
+    // No value seen yet means 0 would be a guess rather than the stat's value, so wait for a read.
+    if (it == map->end() || !it->second.raw_read || it->second.baseline_set) return false;
+
+    it->second.baseline = it->second.raw;
+    it->second.baseline_set = true;
+    it->second.forget = false;
+    it->second.world = t->world_name;
+    it->second.stat = stage->root_name;
+
+    stage->current_stat_progress = 0;
+    stage->stat_counting = true;
+
+    log_message(LOG_INFO, "[TRACKER] Multi-stage goal '%s' stage '%s' now counts from %d.\n",
+                goal->root_name, stage->stage_id, it->second.baseline);
+    return true;
+}
+
+// Drops the zero points of every stage from `first` onward - for every player, since the goal moved
+// back for all of them - so re-reaching one takes a fresh zero point. Returns true if anything went.
+static bool ms_clear_stat_baselines_from(Tracker *t, MultiStageGoal *goal, int first) {
+    if (!goal) return false;
+    auto *map = stat_stage_baseline_map(t);
+    if (!map) return false;
+    bool cleared = false;
+
+    for (int j = first; j < goal->stage_count; j++) {
+        SubGoal *stage = goal->stages[j];
+        if (!ms_stage_baseline_active(stage)) continue;
+
+        const std::string file_key = stat_stage_file_key(goal, stage);
+        bool stage_cleared = false;
+        for (auto &kv: *map) {
+            if (!stat_stage_key_is(kv.first, file_key) || !kv.second.baseline_set) continue;
+            // Wrong rather than merely out of scope, so these go from the file as well. Left in
+            // place, the loading pass would hand them straight back.
+            kv.second.baseline_set = false;
+            kv.second.forget = true;
+            stage_cleared = true;
+        }
+        if (stage_cleared) {
+            stage->current_stat_progress = 0;
+            stage->stat_counting = false;
+            cleared = true;
+        }
+    }
+    return cleared;
+}
+
 /**
  * @brief Resets all manual progress when a world change is detected.
  * This includes custom goal progress and manual stat overrides. It then
@@ -1254,23 +1476,21 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
         }
     }
 
-    // Forget every count_from_stage baseline in memory: they belong to the world just left. The
-    // entries on file are deliberately kept - each is stamped with its world, so it is ignored while
-    // another world is open and picked back up on returning, which keeps the stages that had already
-    // been cleared there cleared instead of collapsing the goal back to the first baselined stage.
+    // Forget every zero point in memory: they belong to the world just left. The entries on file are
+    // deliberately kept - each is stamped with its world, so it is ignored while another world is open
+    // and picked back up on returning, which keeps the stages that had already been cleared there
+    // cleared instead of collapsing the goal back to the first stage that counts from being reached.
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
             if (!stage) continue;
-            stage->stat_baseline = 0;
-            stage->stat_baseline_set = false;
-            stage->stat_raw_value = 0;
-            stage->stat_raw_read = false;
-            stage->stat_baseline_forget = false;
+            stage->current_stat_progress = 0;
+            stage->stat_counting = false;
         }
     }
+    if (auto *baselines = stat_stage_baseline_map(t)) baselines->clear();
 
     // Save the reset progress back to the settings file
     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
@@ -3485,70 +3705,6 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
     }
 }
 
-// --- Stat stage baselines (count_from_stage) -----------------------------
-// A stat stage can count from the value the stat held when the stage was reached rather than from
-// the stat's absolute value. The baseline is captured the first time the stage is the active one
-// and persists in settings.json, so a restart mid-run keeps counting from the same point.
-//
-// Not yet wired up for co-op: multi-stage stats are summed across players, so the baseline has to
-// be the sum of per-player baselines, each captured when that player is first seen in the stage.
-// Until that lands, a lobby ignores the flag and the stage counts absolutely (see the log line in
-// ms_capture_stat_baseline).
-static bool ms_stage_baseline_active(const SubGoal *stage, const AppSettings *settings) {
-    if (!stage || !stage->count_from_stage || stage->type != SUBGOAL_STAT) return false;
-    return !settings || settings->network_mode == NETWORK_SINGLEPLAYER;
-}
-
-// Whether a stat stage's current_stat_progress is a real count yet. A baselined stage that has not
-// been reached reports 0, so an already-high stat can never satisfy a stage the goal has not got to.
-static bool ms_stat_stage_counts(const SubGoal *stage) {
-    if (!stage || !stage->count_from_stage || stage->type != SUBGOAL_STAT) return true;
-    return stage->stat_baseline_set;
-}
-
-// Turns a raw stat value into what the stage should display and complete on.
-static int ms_stat_effective_progress(const SubGoal *stage, const AppSettings *settings, int raw) {
-    if (!ms_stage_baseline_active(stage, settings)) return raw;
-    if (!stage->stat_baseline_set) return 0; // stage not reached yet: nothing has been counted
-    int value = raw - stage->stat_baseline;
-    return (value > 0) ? value : 0;
-}
-
-// Captures the active stage's baseline if it is a count_from_stage stat that has none yet, and zeroes
-// its progress so the stage starts counting from here. Returns true if a baseline was written.
-static bool ms_capture_stat_baseline(MultiStageGoal *goal, const AppSettings *settings) {
-    if (!goal || goal->current_stage < 0 || goal->current_stage >= goal->stage_count) return false;
-    SubGoal *stage = goal->stages[goal->current_stage];
-    if (!ms_stage_baseline_active(stage, settings) || stage->stat_baseline_set) return false;
-
-    if (!stage->stat_raw_read) return false; // no read yet: 0 would be a guess, not the stat's value
-    stage->stat_baseline = stage->stat_raw_value;
-    stage->stat_baseline_set = true;
-    stage->current_stat_progress = 0;
-    log_message(LOG_INFO, "[TRACKER] Multi-stage goal '%s' stage '%s' now counts from %d.\n",
-                goal->root_name, stage->stage_id, stage->stat_baseline);
-    return true;
-}
-
-// Drops the baselines of every stage from `first` onward, so a goal that regressed re-snapshots when
-// it reaches them again. Returns true if anything was cleared.
-static bool ms_clear_stat_baselines_from(MultiStageGoal *goal, int first) {
-    if (!goal) return false;
-    bool cleared = false;
-    for (int j = first; j < goal->stage_count; j++) {
-        SubGoal *stage = goal->stages[j];
-        if (!stage || !stage->stat_baseline_set) continue;
-        stage->stat_baseline_set = false;
-        stage->stat_baseline = 0;
-        stage->current_stat_progress = 0;
-        // This baseline is wrong, not just out of scope, so it goes from the file too. Otherwise the
-        // seeding pass would hand it straight back and the stage would never re-snapshot.
-        stage->stat_baseline_forget = true;
-        cleared = true;
-    }
-    return cleared;
-}
-
 // Computes a multi-stage goal's current_stage as the leading run of satisfied stages.
 // base_satisfied[j] holds each stage's own satisfaction (game trigger OR linked goals); the
 // final MANUAL stage must be left false. Stages flagged complete_with_next are additionally
@@ -3589,6 +3745,10 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                                                 MC_Version version, const AppSettings *settings,
                                                 bool hermes_stat_floor) {
     if (t->template_data->multi_stage_goal_count == 0) return false;
+
+    // Single-player tracking is one player's view, so every zero point read or written here is keyed
+    // under them. Co-op goes through coop_apply_stat_stage_baselines instead, which sums the lobby.
+    const char *self_uuid = settings ? settings->local_player.uuid : "";
 
     if (!player_adv_json && !player_stats_json) {
         log_message(LOG_INFO,
@@ -3656,7 +3816,11 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                 continue;
             }
 
-            const int stored_stat_raw = stage_to_check->stat_raw_value;
+            // Only raw compares meaningfully against raw: a stage counting from when it was reached
+            // holds a count, and the value this player was last seen at lives in the store.
+            int stored_stat_raw = 0;
+            const bool had_stat_raw = ms_stat_raw_for_player(t, self_uuid, goal, stage_to_check,
+                                                             &stored_stat_raw);
             stage_to_check->current_stat_progress = 0;
 
             switch (stage_to_check->type) {
@@ -3739,23 +3903,21 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                     // A stats file that hasn't been rewritten yet reports the previous save's number,
                     // which would drop the stage back and re-pop it in the compact stack once Hermes
                     // raises it again. Stats only count up inside a world, so keep the stored value.
-                    // The floor compares raw to raw: a baselined stage's stored progress is an offset
-                    // count, so stat_raw_value is what the previous read actually saw.
-                    if (hermes_stat_floor && current_progress < stored_stat_raw) {
+                    if (hermes_stat_floor && had_stat_raw && current_progress < stored_stat_raw) {
                         current_progress = stored_stat_raw;
                         stat_found = true;
                     }
 
-                    // The raw value is kept so the baseline can be captured from it below (and so the
-                    // floor above has something raw to compare against next pass).
-                    stage_to_check->stat_raw_value = current_progress;
-                    stage_to_check->stat_raw_read = true;
-                    current_progress = ms_stat_effective_progress(stage_to_check, settings, current_progress);
+                    // Records the value for this player and hands back what the stage shows them,
+                    // which for a stage counting from when it was reached is the gain since then.
+                    bool counting = true;
+                    current_progress = ms_stat_progress_for_player(t, self_uuid, goal, stage_to_check,
+                                                                   current_progress, &counting);
+                    stage_to_check->stat_counting = counting;
 
                     // Check for completion. A required_progress of -1 is an infinite counter
                     // that never completes on its own (only via linked goals or complete_with_next).
-                    if (stat_found && stage_to_check->required_progress > 0 &&
-                        ms_stat_stage_counts(stage_to_check) &&
+                    if (stat_found && stage_to_check->required_progress > 0 && counting &&
                         current_progress >= stage_to_check->required_progress) {
                         stage_completed = true;
                     }
@@ -3839,13 +4001,13 @@ static bool tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
         // ms_compute_current_stage has run. Stage 0 on a fresh world, a stage entered right now and
         // a tracker started mid-stage all arrive here the same way - no baseline yet, so the value
         // read this pass becomes the zero point.
-        if (ms_capture_stat_baseline(goal, settings)) {
+        if (ms_capture_stat_baseline(t, self_uuid, goal)) {
             t->stat_stage_baselines_dirty = true;
             any_changed = true;
         }
         // A goal that regressed (an undone linked goal, a world swap) drops the baselines of every
         // stage past the one it now stands on, so re-entering one snapshots afresh.
-        if (ms_clear_stat_baselines_from(goal, goal->current_stage + 1)) {
+        if (ms_clear_stat_baselines_from(t, goal, goal->current_stage + 1)) {
             t->stat_stage_baselines_dirty = true;
         }
     }
@@ -4726,6 +4888,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->stats_path[0] = '\0';
 
     t->legacy_player_snapshots = new std::unordered_map<std::string, PlayerLegacySnapshot>();
+    t->stat_stage_baselines = new std::unordered_map<std::string, StatStageBaseline>();
 
     // Initialize camera and zoom from settings.json
     t->camera_offset = ImVec2(settings->view_pan_x, settings->view_pan_y);
@@ -4856,7 +5019,11 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 /**
  * @brief Resets all progress fields in TemplateData to zero/false before co-op merge.
  */
-static void coop_reset_template_progress(TemplateData *td) {
+static void coop_reset_template_progress(Tracker *t, TemplateData *td) {
+    // A new merge pass: entries stamped with an older cycle belong to players who are no longer
+    // contributing, so they stop counting towards a stage without being forgotten.
+    t->coop_merge_cycle++;
+
     td->advancements_completed_count = 0;
     td->completed_criteria_count = 0;
     td->stats_completed_count = 0;
@@ -4903,6 +5070,7 @@ static void coop_reset_template_progress(TemplateData *td) {
             td->multi_stage_goals[i]->stages[j]->current_stat_progress = 0;
             td->multi_stage_goals[i]->stages[j]->coop_completed = false;
             td->multi_stage_goals[i]->stages[j]->game_trigger_met = false;
+            td->multi_stage_goals[i]->stages[j]->stat_counting = false;
         }
     }
 }
@@ -5344,7 +5512,8 @@ static void coop_finalize_unlocks(TemplateData *td) {
  * completion is OR'd across players. The actual stage progression is evaluated
  * globally in coop_finalize_multi_stage() after all players have been merged.
  */
-static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_json,
+static void coop_merge_multi_stage(Tracker *t, const char *uuid, TemplateData *td,
+                                   const cJSON *player_adv_json,
                                    const cJSON *player_stats_json, const cJSON *player_unlocks_json,
                                    MC_Version version) {
     if (td->multi_stage_goal_count == 0) return;
@@ -5408,7 +5577,11 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                         }
                     }
 
-                    // Stats in multi-stage goals are ALWAYS cumulative (summed across players)
+                    // Stats in multi-stage goals are ALWAYS cumulative (summed across players).
+                    // A stage counting from when it was reached instead replaces this sum with the
+                    // per-player counts in coop_apply_stat_stage_baselines, which needs each player's
+                    // own value, so it is recorded here while we still have it on its own.
+                    coop_record_stat_stage_raw(t, uuid, goal, stage, player_progress);
                     stage->current_stat_progress += player_progress;
                     break;
                 }
@@ -5461,12 +5634,18 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
     }
 }
 
-static bool coop_finalize_multi_stage(TemplateData *td) {
+static bool coop_finalize_multi_stage(Tracker *t) {
+    TemplateData *td = t->template_data;
     bool any_changed = false;
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = td->multi_stage_goals[i];
         int previous_stage = goal->current_stage;
         std::vector<bool> base_satisfied(goal->stage_count, false);
+
+        // Stages counting from when they were reached hold a raw sum until now; turn it into the
+        // per-player counts before anything is judged complete. The stage the goal stood on is the
+        // one being worked on, so a player contributing to it without a zero point gets one here.
+        coop_apply_stat_stage_baselines(t, goal, goal->current_stage);
 
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
@@ -5477,6 +5656,7 @@ static bool coop_finalize_multi_stage(TemplateData *td) {
             if (stage->type == SUBGOAL_STAT) {
                 // A required_progress of -1 is an infinite counter that never completes on its own.
                 stage_completed = (stage->required_progress > 0 &&
+                                   ms_stat_stage_counts(stage) &&
                                    stage->current_stat_progress >= stage->required_progress);
             } else {
                 stage_completed = stage->coop_completed;
@@ -5496,7 +5676,11 @@ static bool coop_finalize_multi_stage(TemplateData *td) {
         }
 
         goal->current_stage = ms_compute_current_stage(goal, base_satisfied);
-        if (goal->current_stage != previous_stage) any_changed = true;
+        if (goal->current_stage != previous_stage) {
+            any_changed = true;
+            // The stage the lobby just moved onto starts everyone at 0 from here.
+            coop_apply_stat_stage_baselines(t, goal, goal->current_stage);
+        }
     }
 
     return any_changed;
@@ -5662,58 +5846,114 @@ static bool world_names_match(const char *a, const char *b) {
     return strcmp(a, b) == 0;
 }
 
-// Seeds count_from_stage baselines from settings.json so a restart mid-run keeps counting from the
-// same point. Only stages with no baseline in memory are seeded, so the running state always wins
-// over the file; a stored entry is ignored unless it belongs to this world and this exact stat.
-static void tracker_load_stat_stage_baselines(Tracker *t, cJSON *settings_json, const AppSettings *settings) {
-    if (!t || !t->template_data || !settings_json || !settings) return;
-    cJSON *section = get_per_uuid_progress_obj(settings_json, "stat_stage_baselines",
-                                               settings->local_player.uuid);
-    if (!section) return;
+// Reads the stored zero points into the per-player store. Every player's subtree is read, not just
+// the local one, because a co-op stage sums the counts of everyone contributing to it. An entry only
+// applies if it belongs to this world and to the stat the stage still tracks; anything else is left
+// on file untouched, which is what lets leaving a world and coming back resume where it left off.
+// A zero point already held in memory wins, so the running state is never overwritten by the file.
+static void tracker_load_stat_stage_baselines(Tracker *t, cJSON *settings_json) {
+    auto *map = stat_stage_baseline_map(t);
+    if (!t || !map || !t->template_data || !settings_json) return;
+
+    cJSON *section = cJSON_GetObjectItem(settings_json, "stat_stage_baselines");
+    if (!cJSON_IsObject(section)) return;
 
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
-            if (!stage || !stage->count_from_stage || stage->stat_baseline_set) continue;
+            if (!stage || !stage->count_from_stage) continue;
 
-            char key[256];
-            snprintf(key, sizeof(key), "%s/%s", goal->root_name, stage->stage_id);
-            cJSON *entry = cJSON_GetObjectItem(section, key);
-            if (!cJSON_IsObject(entry)) continue;
+            const std::string file_key = stat_stage_file_key(goal, stage);
+            for (cJSON *player = section->child; player; player = player->next) {
+                if (!cJSON_IsObject(player) || !player->string) continue;
 
-            cJSON *world = cJSON_GetObjectItem(entry, "world");
-            cJSON *stat = cJSON_GetObjectItem(entry, "stat");
-            cJSON *value = cJSON_GetObjectItem(entry, "value");
-            if (!cJSON_IsString(world) || !cJSON_IsString(stat) || !cJSON_IsNumber(value)) continue;
-            if (!world_names_match(t->world_name, world->valuestring)) continue;
-            if (strcmp(stat->valuestring, stage->root_name) != 0) continue;
+                cJSON *entry = cJSON_GetObjectItem(player, file_key.c_str());
+                if (!cJSON_IsObject(entry)) continue;
 
-            stage->stat_baseline = value->valueint;
-            stage->stat_baseline_set = true;
+                cJSON *world = cJSON_GetObjectItem(entry, "world");
+                cJSON *stat = cJSON_GetObjectItem(entry, "stat");
+                cJSON *value = cJSON_GetObjectItem(entry, "value");
+                if (!cJSON_IsString(world) || !cJSON_IsString(stat) || !cJSON_IsNumber(value)) continue;
+                if (!world_names_match(t->world_name, world->valuestring)) continue;
+                if (strcmp(stat->valuestring, stage->root_name) != 0) continue;
+
+                std::string key = player->string;
+                key += '|';
+                key += file_key;
+
+                StatStageBaseline &e = (*map)[key];
+                if (e.baseline_set) continue; // memory wins over the file
+
+                e.baseline = value->valueint;
+                e.baseline_set = true;
+                e.forget = false;
+                e.world = world->valuestring;
+                e.stat = stat->valuestring;
+            }
         }
     }
 }
 
-// Writes the baselines back to settings.json. Called whenever one is captured or dropped, from the
+// Writes the store back to settings.json. Called whenever a zero point is taken or dropped, from the
 // full update and from the Hermes poll alike, because the gap between the two can be a whole autosave.
-static void tracker_flush_stat_stage_baselines(Tracker *t, const AppSettings *settings) {
-    if (!t || !t->template_data) return;
+// Keys the store knows nothing about are left exactly as they are: those belong to other worlds and
+// other templates, and deleting them is what would lose a world on the way back to it.
+static void tracker_flush_stat_stage_baselines(Tracker *t) {
+    auto *map = stat_stage_baseline_map(t);
+    if (!t || !map) return;
     t->stat_stage_baselines_dirty = false;
 
-    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) return;
 
-    // The delete has happened, so the flag has done its job; leaving it set would keep deleting the
-    // entry the stage writes the next time it is reached.
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        if (!goal) continue;
-        for (int j = 0; j < goal->stage_count; j++) {
-            if (goal->stages[j]) goal->stages[j]->stat_baseline_forget = false;
+    cJSON *section = cJSON_GetObjectItem(root, "stat_stage_baselines");
+    if (!cJSON_IsObject(section)) {
+        cJSON_DeleteItemFromObject(root, "stat_stage_baselines");
+        section = cJSON_AddObjectToObject(root, "stat_stage_baselines");
+    }
+    if (!section) {
+        cJSON_Delete(root);
+        return;
+    }
+
+    for (auto it = map->begin(); it != map->end();) {
+        size_t bar = it->first.find('|');
+        if (bar == std::string::npos || bar == 0) {
+            ++it;
+            continue;
+        }
+        const std::string uuid = it->first.substr(0, bar);
+        const std::string file_key = it->first.substr(bar + 1);
+
+        cJSON *sub = settings_get_player_progress_subobj(section, uuid.c_str(), nullptr);
+        if (!sub) {
+            ++it;
+            continue;
+        }
+
+        if (it->second.baseline_set) {
+            cJSON_DeleteItemFromObject(sub, file_key.c_str());
+            cJSON *entry = cJSON_CreateObject();
+            cJSON_AddStringToObject(entry, "world", it->second.world.c_str());
+            cJSON_AddStringToObject(entry, "stat", it->second.stat.c_str());
+            cJSON_AddNumberToObject(entry, "value", it->second.baseline);
+            cJSON_AddItemToObject(sub, file_key.c_str(), entry);
+            ++it;
+        } else if (it->second.forget) {
+            // Void rather than merely out of scope: off the file and out of the store, so the stage
+            // takes a fresh zero point the next time it is reached.
+            cJSON_DeleteItemFromObject(sub, file_key.c_str());
+            it = map->erase(it);
+        } else {
+            ++it;
         }
     }
+
+    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+    cJSON_write_to_file_atomic(get_settings_file_path(), root);
+    cJSON_Delete(root);
 }
 
 // Periodically recheck file changes
@@ -5840,7 +6080,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
 
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings, settings->local_player.uuid);
-    tracker_load_stat_stage_baselines(t, settings_json, settings);
+    tracker_load_stat_stage_baselines(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings,
                                         hermes_stat_floor);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
@@ -5864,7 +6104,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // A stage that just started counting (or stopped) has to reach the file now: the whole point of
     // the baseline is that it survives a restart. Stage entry is rare, so this write is too.
     if (t->stat_stage_baselines_dirty) {
-        tracker_flush_stat_stage_baselines(t, settings);
+        tracker_flush_stat_stage_baselines(t);
     }
 
     // Clean up the parsed JSON objects
@@ -5961,7 +6201,7 @@ static void coop_merge_one_player_from_disk(Tracker *t, const AppSettings *setti
     }
 
     // Merge multi-stage goals (global — any player any stage)
-    coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
+    coop_merge_multi_stage(t, uuid, t->template_data, player_adv_json, player_stats_json,
                            player_unlocks_json, version);
 
     // Seed the Hermes per-player stat cache with this player's current values.
@@ -6315,7 +6555,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
 
     // 1. Reset all progress to zero before merging
-    coop_reset_template_progress(t->template_data);
+    coop_reset_template_progress(t, t->template_data);
 
     // Resolve per-advancement owner assignments from settings onto each complex
     // advancement so the merge functions can scope it to a single player. Empty =
@@ -6397,6 +6637,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
     // 3. Finalize after all players are merged
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+    tracker_load_stat_stage_baselines(t, settings_json);
 
     coop_finalize_advancements(t->template_data);
     // All-Players view: ANY_PLAYER => OR across all UUIDs; HOST_ONLY => host subtree only.
@@ -6404,7 +6645,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
                                 ? nullptr
                                 : settings->local_player.uuid;
     coop_finalize_stats(t->template_data, settings_json, stat_uuid);
-    coop_finalize_multi_stage(t->template_data);
+    coop_finalize_multi_stage(t);
     if (version == MC_VERSION_25W14CRAFTMINE) coop_finalize_unlocks(t->template_data);
 
     const char *custom_uuid = (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER)
@@ -6420,9 +6661,12 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
-            changed |= coop_finalize_multi_stage(t->template_data);
+            changed |= coop_finalize_multi_stage(t);
         } while (changed && ++guard < 32);
     }
+
+    // A player who just reached a stage that counts from when it was reached now owns a zero point.
+    if (t->stat_stage_baselines_dirty) tracker_flush_stat_stage_baselines(t);
 
     // Preserve prior completion latch for the All-Players view so the frozen
     // timer doesn't re-freeze to the latest play time on every merge cycle.
@@ -6447,7 +6691,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
     // Reset all progress to zero
-    coop_reset_template_progress(t->template_data);
+    coop_reset_template_progress(t, t->template_data);
 
     // Merge only the selected player
     const CoopPlayer *player = &settings->coop_players[player_idx];
@@ -6504,7 +6748,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
         coop_finalize_unlocks(t->template_data);
     }
 
-    coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
+    coop_merge_multi_stage(t, player->uuid, t->template_data, player_adv_json, player_stats_json,
                            player_unlocks_json, version);
 
     cJSON_Delete(player_adv_json);
@@ -6514,10 +6758,11 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
 
     // Finalize
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+    tracker_load_stat_stage_baselines(t, settings_json);
 
     coop_finalize_advancements(t->template_data);
     coop_finalize_stats(t->template_data, settings_json, player->uuid);
-    coop_finalize_multi_stage(t->template_data);
+    coop_finalize_multi_stage(t);
 
     tracker_update_custom_progress(t, settings_json, settings, player->uuid); {
         bool changed;
@@ -6526,9 +6771,12 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
-            changed |= coop_finalize_multi_stage(t->template_data);
+            changed |= coop_finalize_multi_stage(t);
         } while (changed && ++guard < 32);
     }
+
+    // A player who just reached a stage that counts from when it was reached now owns a zero point.
+    if (t->stat_stage_baselines_dirty) tracker_flush_stat_stage_baselines(t);
 
     // Preserve prior completion latch for this per-player view so the frozen
     // timer doesn't re-freeze to the latest play time on every merge cycle.
@@ -6557,7 +6805,7 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    coop_reset_template_progress(t->template_data);
+    coop_reset_template_progress(t, t->template_data);
 
     // Merge just this UUID. Pass nullptr for the Hermes cache: this is a transient
     // display rebuild, and seeding the cumulative cache here would corrupt the
@@ -6565,9 +6813,10 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
     coop_merge_one_player_from_disk(t, settings, version, uuid, username ? username : "", nullptr, true);
 
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+    tracker_load_stat_stage_baselines(t, settings_json);
     coop_finalize_advancements(t->template_data);
     coop_finalize_stats(t->template_data, settings_json, uuid);
-    coop_finalize_multi_stage(t->template_data);
+    coop_finalize_multi_stage(t);
     if (version == MC_VERSION_25W14CRAFTMINE) coop_finalize_unlocks(t->template_data);
 
     tracker_update_custom_progress(t, settings_json, settings, uuid); {
@@ -6577,9 +6826,12 @@ void tracker_update_coop_single_player_by_uuid(Tracker *t, const AppSettings *se
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
             changed |= tracker_update_counter_goals(t);
-            changed |= coop_finalize_multi_stage(t->template_data);
+            changed |= coop_finalize_multi_stage(t);
         } while (changed && ++guard < 32);
     }
+
+    // A player who just reached a stage that counts from when it was reached now owns a zero point.
+    if (t->stat_stage_baselines_dirty) tracker_flush_stat_stage_baselines(t);
 
     tracker_calculate_overall_progress(t, version, settings);
     tracker_refresh_igt(t, settings);
@@ -14677,7 +14929,8 @@ static bool hermes_stat_key_matches(const char *stage_root, bool is_modern,
  *
  * Returns true if at least one in-memory value changed.
  */
-static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_multi_stage = false,
+static bool hermes_apply_stat_event(Tracker *t, const AppSettings *settings, const cJSON *data,
+                                    bool skip_multi_stage = false,
                                     const char *player_uuid = nullptr) {
     cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
     cJSON *value_json = cJSON_GetObjectItem(data, "value");
@@ -14755,52 +15008,58 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_mul
     // --- Active SUBGOAL_STAT stage in multi-stage goals ---
     // In coop HOST mode, multi-stage stages are handled by the cumulative function
     // (always summed across players, independent of the stat merge setting).
+    //
+    // Whose data this is matters: the per-player snapshot path loads another player's state into the
+    // template and applies their events through here, so zero points key off the event's own player
+    // and only fall back to the local one when the caller did not name anybody (solo tracking).
+    const char *event_uuid = (player_uuid && player_uuid[0] != '\0')
+                                 ? player_uuid
+                                 : (settings ? settings->local_player.uuid : "");
     if (!skip_multi_stage) {
         for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
             MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
             if (!goal) continue;
             if (goal->current_stage >= goal->stage_count) continue;
 
-            // Every stat stage of this goal that tracks the event's stat gets its raw value refreshed,
-            // not just the active one. Between game saves Hermes is the only live source, so a stage
-            // entered later would otherwise take its baseline from whatever the last save reported -
-            // or, if it was never read from disk, have nothing to take at all and sit at 0 until the
+            // Every stat stage of this goal that tracks the event's stat gets this player's value
+            // refreshed, not just the active one. Between game saves Hermes is the only live source,
+            // so a stage entered later would otherwise take its zero point from whatever the last save
+            // reported - or, with nothing read at all, have nothing to take and sit at 0 until the
             // next save. Only the active stage turns that value into progress, below.
             for (int j = 0; j < goal->stage_count; j++) {
                 SubGoal *s = goal->stages[j];
-                if (!s || s->type != SUBGOAL_STAT) continue;
+                if (!ms_stage_baseline_active(s)) continue;
                 if (!hermes_stat_key_matches(s->root_name, is_modern, h_cat, h_item, hermes_key)) continue;
-                if (!s->stat_raw_read || new_value > s->stat_raw_value) {
-                    s->stat_raw_value = new_value;
-                    s->stat_raw_read = true;
-                }
+                int seen = 0;
+                if (ms_stat_raw_for_player(t, event_uuid, goal, s, &seen) && new_value <= seen) continue;
+                coop_record_stat_stage_raw(t, event_uuid, goal, s, new_value);
             }
 
             SubGoal *stage = goal->stages[goal->current_stage];
             if (!stage || stage->type != SUBGOAL_STAT) continue;
             if (!hermes_stat_key_matches(stage->root_name, is_modern, h_cat, h_item, hermes_key)) continue;
 
-            // Hermes reports the stat's raw value, so the baseline is applied here exactly as it is on
-            // the disk path. Settings are not in scope, but they are not needed: co-op always passes
-            // skip_multi_stage, so reaching this point means the singleplayer path, which is the only
-            // one where a baseline is active anyway.
-            int effective = ms_stat_effective_progress(stage, nullptr, stage->stat_raw_value);
+            // Hermes reports the stat's raw value, so it converts exactly as the disk path does. The
+            // conversion is keyed to the player this event (and the loaded view) belongs to, never to
+            // whoever happens to be the local player.
+            bool counting = true;
+            int effective = ms_stat_progress_for_player(t, event_uuid, goal, stage, new_value, &counting);
+            stage->stat_counting = counting;
             if (effective > stage->current_stat_progress) {
                 stage->current_stat_progress = effective;
                 changed = true;
             }
 
-            if (stage->required_progress > 0 &&
-                ms_stat_stage_counts(stage) &&
+            if (stage->required_progress > 0 && counting &&
                 stage->current_stat_progress >= stage->required_progress) {
                 if (goal->current_stage + 1 < goal->stage_count) {
                     goal->current_stage++;
                     log_message(LOG_INFO,
                                 "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
                                 goal->root_name, goal->current_stage);
-                    // The stage just entered takes its baseline from the live value kept above, so it
-                    // starts counting on the very next Hermes event instead of waiting for a save.
-                    if (ms_capture_stat_baseline(goal, nullptr)) {
+                    // The stage just entered takes its zero point from the live value kept above, so
+                    // it starts counting on the very next Hermes event instead of waiting for a save.
+                    if (ms_capture_stat_baseline(t, event_uuid, goal)) {
                         t->stat_stage_baselines_dirty = true;
                         changed = true;
                     }
@@ -14949,19 +15208,30 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
 
         if (!matches) continue;
 
-        // Co-op path: baselines are not applied here (see ms_stage_baseline_active), so the raw value
-        // is kept in step with the progress purely so the two agree if the session leaves the lobby.
+        // The delta is already a count of what just happened, so it lands on the stage's total
+        // whether or not the stage counts from when it was reached. The player's own value moves with
+        // it, so the zero point taken for a stage reached next is current rather than a save old.
         stage->current_stat_progress += delta;
-        stage->stat_raw_value += delta;
+        if (ms_stage_baseline_active(stage)) {
+            auto *baselines = stat_stage_baseline_map(t);
+            if (baselines) {
+                auto it = baselines->find(stat_stage_key(player_uuid, goal, stage));
+                if (it != baselines->end()) it->second.raw += delta;
+            }
+        }
         changed = true;
 
         if (stage->required_progress > 0 &&
+            ms_stat_stage_counts(stage) &&
             stage->current_stat_progress >= stage->required_progress) {
             if (goal->current_stage + 1 < goal->stage_count) {
                 goal->current_stage++;
                 log_message(LOG_INFO,
                             "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d (cumulative).\n",
                             goal->root_name, goal->current_stage);
+                // Everyone contributing to the stage just entered starts at 0 from here, instead of
+                // waiting for the next game save.
+                coop_apply_stat_stage_baselines(t, goal, goal->current_stage);
             }
         }
     }
@@ -15193,7 +15463,9 @@ static bool hermes_apply_event_to_coop_snapshots(
         if (merge_coop_progress(*src_snap, t->template_data)) {
             bool changed = false;
             if (is_stat) {
-                changed = hermes_apply_stat_event(t, data, false);
+                // This is that player's own snapshot loaded into the template, so the event is
+                // attributed to them - not to whoever is running Advancely.
+                changed = hermes_apply_stat_event(t, settings, data, false, source_uuid);
             } else {
                 changed = hermes_apply_advancement_event(t, data, source_uuid);
             }
@@ -15224,7 +15496,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                 if (settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
                     changed = hermes_apply_stat_event_cumulative(t, data, ev_uuid, false);
                 } else {
-                    bool c1 = hermes_apply_stat_event(t, data, true, ev_uuid);
+                    bool c1 = hermes_apply_stat_event(t, settings, data, true, ev_uuid);
                     bool c2 = hermes_apply_stat_event_cumulative(t, data, ev_uuid, true);
                     changed = c1 || c2;
                 }
@@ -15559,11 +15831,11 @@ static bool hermes_process_decrypted_line(
             if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
                 any_changed = true;
         } else if (is_coop_host) {
-            if (hermes_apply_stat_event(t, data, true, event_player_uuid)) any_changed = true;
+            if (hermes_apply_stat_event(t, settings, data, true, event_player_uuid)) any_changed = true;
             if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true))
                 any_changed = true;
         } else {
-            if (hermes_apply_stat_event(t, data)) any_changed = true;
+            if (hermes_apply_stat_event(t, settings, data)) any_changed = true;
         }
     } else if (strcmp(type, "advancement") == 0) {
         if (!suppress_adv && hermes_apply_advancement_event(t, data, event_player_uuid)) any_changed = true;
@@ -15658,7 +15930,7 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     // A stage entered off a Hermes event owns a fresh baseline, and the next full update can be a
     // whole autosave away. Write it now so quitting in between does not lose the zero point.
     if (t->stat_stage_baselines_dirty) {
-        tracker_flush_stat_stage_baselines(t, settings);
+        tracker_flush_stat_stage_baselines(t);
     }
 
     if (workbuf) free(workbuf);
@@ -16434,6 +16706,11 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
         if (t->legacy_player_snapshots) {
             delete static_cast<std::unordered_map<std::string, PlayerLegacySnapshot> *>(t->legacy_player_snapshots);
             t->legacy_player_snapshots = nullptr;
+        }
+
+        if (t->stat_stage_baselines) {
+            delete static_cast<std::unordered_map<std::string, StatStageBaseline> *>(t->stat_stage_baselines);
+            t->stat_stage_baselines = nullptr;
         }
 
         // Free coop snapshot caches

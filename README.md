@@ -1261,7 +1261,14 @@ active template), so enabling manual positioning never teleports the element.
       `stats` folder). A `Target Value` above `0` completes the stage when the stat reaches it. A `Target Value` of `-1`
       makes it an infinite counter that never completes on its own, so it must be completed by a linked goal or the
       `Auto-complete if next stage is completed` checkbox instead. A `Target Value` of `0` is not allowed and is flagged
-      as an error on save.
+      as an error on save. `Start counting when stage is reached` makes the `Target Value` mean "this much *more*"
+      rather than a total the stat must reach: whatever it already stood at doesn't count. A stage you haven't reached
+      yet reports `0` rather than its real value, so a stat that is already high can never complete a later stage
+      before the goal gets to it. In co-op each player starts at `0` when they reach the stage and the stage shows
+      what the lobby has gained since, so a player joining midway brings nothing with them. Where each player started
+      is kept per world in `settings.json`, so it survives restarting Advancely and leaving the world and coming back
+      (reaching that same stage in the other world replaces it). Because such a stage only counts as complete while
+      that is known, it is worth also ticking `Auto-complete if next stage is completed` on it.
     * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
     * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
       biome for "Adventuring Time").
@@ -1870,7 +1877,8 @@ _The hash **INCLUDES** (these must match exactly on host and receiver):_
 * **Custom goals:** each `root_name`, each `target`, and — only when `target <= 0` (manual/infinite) - the
   `linked_goals` array and `linked_goal_mode`.
 * **Multi-stage goals:** each goal's `root_name`, every stage's `stage_id`, `type`, `root_name`,
-  `parent_advancement`, and `target`.
+  `parent_advancement`, `target`, the stage's `linked_goals` array + `linked_goal_mode`, its
+  `Auto-complete if next stage is completed` flag, and its `Start counting when stage is reached` flag.
 * **Counter goals:** each `root_name` and its `linked_goals` array.
 
 _The hash **IGNORES** (cosmetic/layout-only, free to differ between host and receiver):_
