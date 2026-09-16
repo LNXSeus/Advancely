@@ -480,21 +480,87 @@ static const char *overlay_item_root(const OverlayDisplayItem &di) {
     return "";
 }
 
+// Per-row state for the frozen layout, mirroring ScrollBelt/PageView so a cleared
+// item can play its crop or fade animation in place before the row closes the gap.
+struct FreezeView {
+    unsigned long long signature = 0;
+    bool init = false;
+
+    std::vector<float> clear_elapsed;
+    std::vector<char> was_removed;
+    Uint32 anim_prev = 0;
+};
+
 // When a row is set to freeze once its items fit, lay them out statically instead
 // of scrolling: each still-visible item is drawn once, in template order, aligned
 // within the window. `iw` is the per-item cell + spacing (matching the belt), and
 // `cell` is the item cell width (icon or text cell) used to size the content block.
+// A cleared item keeps its slot while it animates out (cropping over `crop_duration`
+// seconds and/or fading over `fade_duration` seconds), so the remaining items only
+// snap over once the animation has played; both <= 0 clears instantly. The timers run
+// on every frame the feature is enabled, even while the row is still scrolling, so an
+// item that clears during the scroll finishes its animation there and the row freezes
+// only after the gap is really gone.
 // Returns true and fills `out` when the row should be frozen (feature enabled and
-// all visible items fit); otherwise returns false and leaves `out` untouched so the
-// caller falls back to the scrolling belt.
-static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment align,
+// all still-present items fit); otherwise returns false and leaves `out` untouched so
+// the caller falls back to the scrolling belt.
+static bool freeze_layout(FreezeView &fv, bool freeze_enabled, OverlayProgressTextAlignment align,
                           int window_w, float iw, float cell,
                           int F, const std::vector<char> &removed,
+                          float crop_duration, float fade_duration,
+                          unsigned long long signature,
                           std::vector<BeltTile> &out) {
-    if (!freeze_enabled) return false;
+    if (!freeze_enabled) {
+        fv.init = false;
+        return false;
+    }
 
+    float duration = fmaxf(crop_duration, fade_duration); // how long a cleared slot lives
+    if (F <= 0 || iw <= 0.0f) {
+        fv.init = false;
+        return false;
+    }
+
+    Uint32 now = SDL_GetTicks();
+
+    // Reset on first use, template change or item-count change.
+    if (!fv.init || fv.signature != signature || (int) fv.clear_elapsed.size() != F) {
+        fv.signature = signature;
+        fv.clear_elapsed.assign((size_t) F, 0.0f);
+        fv.was_removed.assign((size_t) F, 0);
+        // Items already cleared start fully gone so they never animate on startup.
+        for (int i = 0; i < F; i++) {
+            if (removed[i]) {
+                fv.was_removed[i] = 1;
+                fv.clear_elapsed[i] = duration;
+            }
+        }
+        fv.anim_prev = now;
+        fv.init = true;
+    }
+
+    // Advance the per-item clear timers and decide which items are fully gone.
+    float adt = (float) (now - fv.anim_prev) / 1000.0f;
+    fv.anim_prev = now;
+    if (adt < 0.0f) adt = 0.0f;
+    if (adt > 0.25f) adt = 0.25f; // ignore long stalls (window minimized, etc.)
+
+    std::vector<char> gone((size_t) F);
+    for (int i = 0; i < F; i++) {
+        if (removed[i]) {
+            if (!fv.was_removed[i]) fv.clear_elapsed[i] = 0.0f; // just cleared
+            else fv.clear_elapsed[i] += adt;
+            gone[i] = (duration <= 0.0f || fv.clear_elapsed[i] >= duration) ? 1 : 0;
+        } else {
+            fv.clear_elapsed[i] = 0.0f;
+            gone[i] = 0;
+        }
+        fv.was_removed[i] = removed[i];
+    }
+
+    // An item still animating out keeps its slot, so it counts towards the fit test.
     int visible = 0;
-    for (int i = 0; i < F; i++) if (!removed[i]) visible++;
+    for (int i = 0; i < F; i++) if (!gone[i]) visible++;
     if (visible <= 0) return false;
 
     // Total width of the visible items laid out edge to edge (no trailing gap).
@@ -515,10 +581,25 @@ static bool freeze_layout(bool freeze_enabled, OverlayProgressTextAlignment alig
         start_x = edge_padding;
 
     out.clear();
+    out.reserve((size_t) visible);
     int slot = 0;
     for (int i = 0; i < F; i++) {
-        if (removed[i]) continue;
-        out.push_back({i, snap_px(start_x + (float) slot * iw), 0.0f, 1.0f});
+        if (gone[i]) continue;
+        float clear = 0.0f;
+        float alpha = 1.0f;
+        if (removed[i]) {
+            if (crop_duration > 0.0f) {
+                clear = fv.clear_elapsed[i] / crop_duration;
+                if (clear < 0.0f) clear = 0.0f;
+                if (clear > 1.0f) clear = 1.0f;
+            }
+            if (fade_duration > 0.0f) {
+                alpha = 1.0f - fv.clear_elapsed[i] / fade_duration;
+                if (alpha < 0.0f) alpha = 0.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+            }
+        }
+        out.push_back({i, snap_px(start_x + (float) slot * iw), clear, alpha});
         slot++;
     }
     return true;
@@ -3443,6 +3524,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (F > 0 && item_full_width > 0) {
             static ScrollBelt belt_row1;
             static PageView page_row1;
+            static FreezeView freeze_row1;
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row1, o->page_index, settings->overlay_page_align,
@@ -3450,8 +3532,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             F, removed, clear_crop_duration, clear_fade_duration,
                             signature, tiles);
                 belt_row1.init = false; // reset so the belt re-initialises cleanly if the mode switches back
-            } else if (freeze_layout(settings->overlay_row1_freeze_enabled, settings->overlay_row1_freeze_align,
-                                     window_w, item_full_width, ROW1_ICON_SIZE, F, removed, tiles)) {
+                freeze_row1.init = false;
+            } else if (freeze_layout(freeze_row1, settings->overlay_row1_freeze_enabled,
+                                     settings->overlay_row1_freeze_align,
+                                     window_w, item_full_width, ROW1_ICON_SIZE, F, removed,
+                                     clear_crop_duration, clear_fade_duration, signature, tiles)) {
                 belt_row1.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {
                 belt_update(belt_row1, o->scroll_offset_row1, item_full_width,
@@ -3918,6 +4003,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                               o->font);
                 static ScrollBelt belt_row2;
                 static PageView page_row2;
+                static FreezeView freeze_row2;
                 std::vector<BeltTile> tiles;
                 if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                     page_update(page_row2, o->page_index, settings->overlay_page_align,
@@ -3925,8 +4011,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 F, removed, clear_crop_duration, clear_fade_duration,
                                 signature, tiles);
                     belt_row2.init = false; // reset so the belt re-initialises cleanly if the mode switches back
-                } else if (freeze_layout(settings->overlay_row2_freeze_enabled, settings->overlay_row2_freeze_align,
-                                         window_w, item_full_width_row2, cell_width_row2, F, removed, tiles)) {
+                    freeze_row2.init = false;
+                } else if (freeze_layout(freeze_row2, settings->overlay_row2_freeze_enabled,
+                                         settings->overlay_row2_freeze_align,
+                                         window_w, item_full_width_row2, cell_width_row2, F, removed,
+                                         clear_crop_duration, clear_fade_duration, signature, tiles)) {
                     belt_row2.init = false; // reset so scrolling re-initialises cleanly if it resumes
                 } else {
                     belt_update(belt_row2, o->scroll_offset_row2, item_full_width_row2,
@@ -4420,6 +4509,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                           o->font);
             static ScrollBelt belt_row3;
             static PageView page_row3;
+            static FreezeView freeze_row3;
             std::vector<BeltTile> tiles;
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 page_update(page_row3, o->page_index, settings->overlay_page_align,
@@ -4427,8 +4517,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             F, removed, clear_crop_duration, clear_fade_duration,
                             signature, tiles);
                 belt_row3.init = false; // reset so the belt re-initialises cleanly if the mode switches back
-            } else if (freeze_layout(settings->overlay_row3_freeze_enabled, settings->overlay_row3_freeze_align,
-                                     window_w, item_full_width_row3, cell_width_row3, F, removed, tiles)) {
+                freeze_row3.init = false;
+            } else if (freeze_layout(freeze_row3, settings->overlay_row3_freeze_enabled,
+                                     settings->overlay_row3_freeze_align,
+                                     window_w, item_full_width_row3, cell_width_row3, F, removed,
+                                     clear_crop_duration, clear_fade_duration, signature, tiles)) {
                 belt_row3.init = false; // reset so scrolling re-initialises cleanly if it resumes
             } else {
                 belt_update(belt_row3, o->scroll_offset_row3, item_full_width_row3,
