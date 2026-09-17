@@ -621,6 +621,18 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     // "start counting when stage is reached" flag (stat stages)
                     cJSON *cfs = cJSON_GetObjectItem(stage, "count_from_stage");
                     hash = fnv1a_int(hash, cJSON_IsTrue(cfs) ? 1 : 0);
+                    // The goal a mirror stage reflects (same shape as one linked_goals entry)
+                    cJSON *mirror = cJSON_GetObjectItem(stage, "mirror_goal");
+                    if (mirror) {
+                        cJSON *mr = cJSON_GetObjectItem(mirror, "root_name");
+                        if (mr && mr->valuestring) hash = fnv1a_str(hash, mr->valuestring);
+                        cJSON *msid = cJSON_GetObjectItem(mirror, "stage_id");
+                        if (msid && msid->valuestring) hash = fnv1a_str(hash, msid->valuestring);
+                        cJSON *mpr = cJSON_GetObjectItem(mirror, "parent_root");
+                        if (mpr && mpr->valuestring) hash = fnv1a_str(hash, mpr->valuestring);
+                        cJSON *mty = cJSON_GetObjectItem(mirror, "type");
+                        if (mty && mty->valuestring) hash = fnv1a_str(hash, mty->valuestring);
+                    }
                 }
             }
         }

@@ -1273,6 +1273,15 @@ active template), so enabling manual positioning never teleports the element.
     * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
       biome for "Adventuring Time").
     * **Unlock**: Triggers when a specific player unlock is obtained (read from the `unlocks` folder).
+    * **Mirror Another Goal**: Tick `Mirror another goal` on any non-final stage and pick one goal with
+      `Select Goal` instead of giving the stage a trigger of its own. The stage completes exactly when that goal
+      does, and whatever value that goal shows is appended right after the stage's display text on the tracker and the
+      overlay alike, while the goal's own name stays on the first
+      line as always. Anything in the template can be mirrored: an advancement or one of its criteria, a stat
+      or sub-stat, an unlock, a custom goal, a counter, another multi-stage goal or one of its stages. Goals
+      with no value of their own (criteria, unlocks, simple toggles) just show the display text. The goal being
+      edited is greyed out in the popup, since a stage can't mirror its own goal. A mirror counts as a linked
+      goal. Chains of linked goals fail beyond a depth of 32.
     * **Auto-Complete via Linked Goals**: Every non-final stage also supports automatic completion through linked goals.
       Use the `Select Goals` button to pick any combination of advancements, criteria, stats, sub-stats, unlocks, custom
       goals, or multi-stage goal stages, and choose `AND` mode (all selected goals must be completed) or `OR` mode (at

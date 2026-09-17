@@ -3038,13 +3038,45 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                         }
                     }
                 }
-                // Parse stage linked goals for auto-completion (non-final stages)
-                if (new_stage->type != SUBGOAL_MANUAL) {
+                // A "mirror_goal" object turns the stage into a mirror of that goal, whatever trigger
+                // type the template kept for it. The mirrored goal becomes the stage's only linked
+                // goal, so every path that resolves linked goals completes the stage from it.
+                cJSON *mirror_json = cJSON_GetObjectItem(stage_item_json, "mirror_goal");
+                cJSON *mirror_root = mirror_json ? cJSON_GetObjectItem(mirror_json, "root_name") : nullptr;
+                bool is_mirror = cJSON_IsString(mirror_root) && mirror_root->valuestring[0] != '\0';
+
+                if (is_mirror) {
+                    new_stage->type = SUBGOAL_MIRROR;
+                    CounterLinkedGoal *mt = &new_stage->mirror_target;
+                    strncpy(mt->root_name, mirror_root->valuestring, sizeof(mt->root_name) - 1);
+                    mt->root_name[sizeof(mt->root_name) - 1] = '\0';
+                    cJSON *ms = cJSON_GetObjectItem(mirror_json, "stage_id");
+                    if (cJSON_IsString(ms)) {
+                        strncpy(mt->stage_id, ms->valuestring, sizeof(mt->stage_id) - 1);
+                        mt->stage_id[sizeof(mt->stage_id) - 1] = '\0';
+                    }
+                    cJSON *mp = cJSON_GetObjectItem(mirror_json, "parent_root");
+                    if (cJSON_IsString(mp)) {
+                        strncpy(mt->parent_root, mp->valuestring, sizeof(mt->parent_root) - 1);
+                        mt->parent_root[sizeof(mt->parent_root) - 1] = '\0';
+                    }
+                    cJSON *mtype = cJSON_GetObjectItem(mirror_json, "type");
+                    mt->type = cJSON_IsString(mtype) ? linked_goal_type_from_string(mtype->valuestring) : LINK_TYPE_ANY;
+
+                    new_stage->linked_goals = (CounterLinkedGoal *) calloc(1, sizeof(CounterLinkedGoal));
+                    if (new_stage->linked_goals) {
+                        new_stage->linked_goals[0] = *mt;
+                        new_stage->linked_goal_count = 1;
+                    }
+                    new_stage->linked_goal_mode = LINKED_GOAL_AND;
+                } else if (new_stage->type != SUBGOAL_MANUAL) {
+                    // Parse stage linked goals for auto-completion (non-final stages)
                     parse_runtime_linked_goals(stage_item_json, &new_stage->linked_goal_count,
                                                &new_stage->linked_goals, &new_stage->linked_goal_mode);
                 }
 
-                // Parse "complete with next stage" auto-completion flag (non-final stages)
+                // Parse "complete with next stage" auto-completion flag (non-final stages). It says
+                // nothing about how a stage is triggered, so it applies to a mirror stage as well.
                 cJSON *complete_with_next = cJSON_GetObjectItem(stage_item_json, "complete_with_next");
                 new_stage->complete_with_next = cJSON_IsTrue(complete_with_next);
 
@@ -3705,6 +3737,166 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
     }
 }
 
+/**
+ * @brief Resolves the numbers a goal shows next to its name, for a mirror stage to borrow.
+ *
+ * Each section reports what it already shows on the tracker: a stat's value against its target, an
+ * advancement's completed criteria, a custom goal's count, a multi-stage goal's stage, a counter's
+ * completed links. Goals that show no number at all (advancement criteria, unlocks, plain toggles)
+ * report a target of 0, and an open-ended custom goal reports -1.
+ */
+static void resolve_goal_numbers_by_root(const TemplateData *td, const CounterLinkedGoal *lg,
+                                         int *out_progress, int *out_target) {
+    *out_progress = 0;
+    *out_target = 0;
+    if (!td || !lg || lg->root_name[0] == '\0') return;
+
+    const char *root_name = lg->root_name;
+    const char *parent_root = lg->parent_root;
+    const char *stage_id = lg->stage_id;
+    const LinkedGoalType type = lg->type;
+    const bool has_parent = (parent_root[0] != '\0');
+
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_ADVANCEMENT) {
+        for (int j = 0; j < td->advancement_count; j++) {
+            TrackableCategory *adv = td->advancements[j];
+            if (!adv) continue;
+            if (!has_parent && strcmp(adv->root_name, root_name) == 0) {
+                // A recipe or a single-criterion advancement has nothing to count.
+                if (adv->criteria_progress_total > 1) {
+                    *out_progress = adv->completed_criteria_count;
+                    *out_target = adv->criteria_progress_total;
+                }
+                return;
+            }
+            // A single criterion is done or not; it carries no value of its own.
+            for (int k = 0; k < adv->criteria_count; k++) {
+                if (adv->criteria[k] && strcmp(adv->criteria[k]->root_name, root_name) == 0 &&
+                    (!has_parent || strcmp(adv->root_name, parent_root) == 0))
+                    return;
+            }
+        }
+    }
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_STAT) {
+        for (int j = 0; j < td->stat_count; j++) {
+            TrackableCategory *stat = td->stats[j];
+            if (!stat) continue;
+            if (!has_parent && strcmp(stat->root_name, root_name) == 0) {
+                // A lone sub-stat is the category's own value (that is how the tracker draws it);
+                // a category holding several counts how many of them are done.
+                if (stat->criteria_count == 1 && stat->criteria[0]) {
+                    *out_progress = stat->criteria[0]->progress;
+                    *out_target = (stat->criteria[0]->goal > 0) ? stat->criteria[0]->goal : -1;
+                } else if (stat->criteria_count > 1) {
+                    *out_progress = stat->completed_criteria_count;
+                    *out_target = stat->criteria_count;
+                }
+                return;
+            }
+            for (int k = 0; k < stat->criteria_count; k++) {
+                TrackableItem *sub = stat->criteria[k];
+                if (!sub || strcmp(sub->root_name, root_name) != 0) continue;
+                if (has_parent && strcmp(stat->root_name, parent_root) != 0) continue;
+                *out_progress = sub->progress;
+                *out_target = (sub->goal > 0) ? sub->goal : -1;
+                return;
+            }
+        }
+    }
+    // An unlock is done or not.
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_UNLOCK) {
+        for (int j = 0; j < td->unlock_count; j++) {
+            if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0) return;
+        }
+    }
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_CUSTOM) {
+        for (int j = 0; j < td->custom_goal_count; j++) {
+            TrackableItem *cg = td->custom_goals[j];
+            if (!cg || strcmp(cg->root_name, root_name) != 0) continue;
+            // A plain on/off goal has no count; a targeted or open-ended one does.
+            if (cg->goal > 0) {
+                *out_progress = cg->progress;
+                *out_target = cg->goal;
+            } else if (cg->goal == -1) {
+                *out_progress = cg->progress;
+                *out_target = -1;
+            }
+            return;
+        }
+    }
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_MULTI_STAGE) {
+        for (int j = 0; j < td->multi_stage_goal_count; j++) {
+            MultiStageGoal *msg = td->multi_stage_goals[j];
+            if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
+            if (stage_id[0] == '\0') {
+                // The whole goal counts the stages it has cleared; the final stage is the finish line.
+                if (msg->stage_count > 1) {
+                    *out_progress = msg->current_stage;
+                    *out_target = msg->stage_count - 1;
+                }
+                return;
+            }
+            for (int k = 0; k < msg->stage_count; k++) {
+                SubGoal *stage = msg->stages ? msg->stages[k] : nullptr;
+                if (!stage || strcmp(stage->stage_id, stage_id) != 0) continue;
+                // Whatever that stage shows, including a stage that is itself a mirror (its numbers
+                // are already resolved, so this never recurses).
+                *out_progress = ms_stage_shown_progress(stage);
+                *out_target = ms_stage_shown_target(stage);
+                return;
+            }
+            return;
+        }
+    }
+    if (type == LINK_TYPE_ANY || type == LINK_TYPE_COUNTER) {
+        for (int j = 0; j < td->counter_goal_count; j++) {
+            CounterGoal *counter = td->counter_goals[j];
+            if (!counter || strcmp(counter->root_name, root_name) != 0) continue;
+            // A counter is its count of completed links out of all of them, as it reads everywhere else.
+            if (counter->linked_goal_count > 0) {
+                *out_progress = counter->completed_count;
+                *out_target = counter->linked_goal_count;
+            }
+            return;
+        }
+    }
+}
+
+/**
+ * @brief Re-resolves what every mirror stage shows from the goal it mirrors.
+ *
+ * Called from tracker_calculate_overall_progress, which every update path ends with, so the numbers
+ * are fresh before the tracker draws them and before they go over IPC to the overlay. Completion is
+ * not touched here: a mirror stage carries its target as its only linked goal, which the linked-goal
+ * passes have already resolved, under the same 32-deep chain limit as every other linked goal.
+ */
+static void tracker_update_mirror_stages(TemplateData *td) {
+    if (!td) return;
+    // A mirror can point at another mirror, and template order says nothing about which of the two
+    // resolves first, so repeat until the numbers stop moving. Same 32-deep guard the linked-goal
+    // passes use, and for the same reason: it bounds a circular reference.
+    for (int guard = 0; guard < 32; guard++) {
+        bool changed = false;
+        for (int i = 0; i < td->multi_stage_goal_count; i++) {
+            MultiStageGoal *goal = td->multi_stage_goals[i];
+            if (!goal) continue;
+            for (int j = 0; j < goal->stage_count; j++) {
+                SubGoal *stage = goal->stages ? goal->stages[j] : nullptr;
+                if (!stage || stage->type != SUBGOAL_MIRROR) continue;
+                int progress = 0;
+                int required = 0;
+                resolve_goal_numbers_by_root(td, &stage->mirror_target, &progress, &required);
+                if (progress != stage->mirror_progress || required != stage->mirror_required) {
+                    stage->mirror_progress = progress;
+                    stage->mirror_required = required;
+                    changed = true;
+                }
+            }
+        }
+        if (!changed) break;
+    }
+}
+
 // Computes a multi-stage goal's current_stage as the leading run of satisfied stages.
 // base_satisfied[j] holds each stage's own satisfaction (game trigger OR linked goals); the
 // final MANUAL stage must be left false. Stages flagged complete_with_next are additionally
@@ -4195,6 +4387,10 @@ bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *set
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
+
+    // Every update path ends here, so this is where a mirror stage picks up the numbers of the goal
+    // it reflects, after that goal's own progress has settled.
+    tracker_update_mirror_stages(t->template_data);
 
     // calculate the total number of "steps"
     int total_steps = 0;
@@ -11739,17 +11935,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
                 // Format stage text including progress if applicable
                 char stage_text_width_calc[256];
-                if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress > 0) {
-                    snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d/%d)",
-                             active_stage_width->display_text,
-                             active_stage_width->current_stat_progress, active_stage_width->required_progress);
-                } else if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress == -1) {
-                    snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d)",
-                             active_stage_width->display_text, active_stage_width->current_stat_progress);
-                } else {
-                    strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
-                    stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
-                }
+                char stage_suffix_width_calc[48];
+                ms_stage_progress_suffix(stage_suffix_width_calc, sizeof(stage_suffix_width_calc),
+                                         active_stage_width);
+                snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s%s",
+                         active_stage_width->display_text, stage_suffix_width_calc);
                 // Scale for stage text width calculation
                 float stage_width = tracker_cached_text_width(stage_text_width_calc, goal->cached_prog_text,
                                                               (int) sizeof(goal->cached_prog_text), goal->cached_prog_w,
@@ -11863,16 +12053,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         if (is_visible_on_screen) {
             // --- String Formatting and Text Sizing (Only if visible) ---
             char stage_text[256];
-            if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
-                snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
-                         active_stage_render->current_stat_progress, active_stage_render->required_progress);
-            } else if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress == -1) {
-                snprintf(stage_text, sizeof(stage_text), "%s (%d)", active_stage_render->display_text,
-                         active_stage_render->current_stat_progress);
-            } else {
-                strncpy(stage_text, active_stage_render->display_text, sizeof(stage_text) - 1);
-                stage_text[sizeof(stage_text) - 1] = '\0';
-            }
+            char stage_suffix[48];
+            ms_stage_progress_suffix(stage_suffix, sizeof(stage_suffix), active_stage_render);
+            snprintf(stage_text, sizeof(stage_text), "%s%s", active_stage_render->display_text, stage_suffix);
 
             // Only measure if drawn. text_size is also needed whenever the stage text shows,
             // since the stage is positioned below the (reserved) main-name height.
@@ -15258,10 +15441,18 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
  * already persisted (see hermes_process_decrypted_line), so a revoked advancement
  * stays revoked once Minecraft writes it out.
  *
+ * merged_view says which template_data this is running against, which only matters for the zero
+ * point of a stat stage the goal steps onto here. False is one player's own state (singleplayer, or
+ * a per-player snapshot loaded for the event's player): that one player gets the zero point. True is
+ * the lobby's merged view, where a multi-stage stat stage is the sum across players, so every player
+ * contributing to the stage gets one - the same split the stat path gets from having
+ * hermes_apply_stat_event and hermes_apply_stat_event_cumulative as separate functions.
+ *
  * Returns true if at least one in-memory value changed.
  */
-static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
-                                           const char *player_uuid = nullptr) {
+static bool hermes_apply_advancement_event(Tracker *t, const AppSettings *settings, const cJSON *data,
+                                           const char *player_uuid = nullptr,
+                                           bool merged_view = false) {
     cJSON *id_json = cJSON_GetObjectItem(data, "id");
     cJSON *criterion_json = cJSON_GetObjectItem(data, "criterion_name");
     cJSON *completed_json = cJSON_GetObjectItem(data, "completed");
@@ -15352,6 +15543,13 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
     //   Note: criterion events always arrive before the parent advancement
     //   completion event, so we handle them here independently.
     // -----------------------------------------------------------------------
+
+    // Whose data this is, for the zero point of a stat stage the goal may step onto below. Same rule
+    // as the stat path: the event's own player, falling back to the local one when the caller named
+    // nobody (solo tracking).
+    const char *event_uuid = (player_uuid && player_uuid[0] != '\0')
+                                 ? player_uuid
+                                 : (settings ? settings->local_player.uuid : "");
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
@@ -15382,6 +15580,18 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
             log_message(LOG_INFO,
                         "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d via advancement event.\n",
                         goal->root_name, goal->current_stage);
+            // The stage just entered takes its zero point now, from the value that stat was last
+            // seen at, exactly as the stat path does when a stat stage advances the goal. Without
+            // this a stage counting from when it was reached has no zero point, so it reports 0 for
+            // every Hermes event until the next game save hands it one.
+            if (merged_view) {
+                // The merged stage is the lobby's sum, so everyone contributing to it gets a zero
+                // point, not just whoever set this event off, and the stage's total is rebuilt from
+                // all of them. Same call the cumulative stat path makes when it advances a goal.
+                coop_apply_stat_stage_baselines(t, goal, goal->current_stage);
+            } else if (ms_capture_stat_baseline(t, event_uuid, goal)) {
+                t->stat_stage_baselines_dirty = true;
+            }
         }
     }
 
@@ -15467,7 +15677,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                 // attributed to them - not to whoever is running Advancely.
                 changed = hermes_apply_stat_event(t, settings, data, false, source_uuid);
             } else {
-                changed = hermes_apply_advancement_event(t, data, source_uuid);
+                changed = hermes_apply_advancement_event(t, settings, data, source_uuid);
             }
             if (changed) {
                 tracker_recalculate_progress(t, settings);
@@ -15517,7 +15727,7 @@ static bool hermes_apply_event_to_coop_snapshots(
 
                 if (adv && adv->criteria_count > 0) {
                     // Let the standard handler update multi-stage goals normally
-                    changed = hermes_apply_advancement_event(t, data);
+                    changed = hermes_apply_advancement_event(t, settings, data, nullptr, true);
 
                     // If this advancement is assigned to a specific player, only that
                     // player's snapshot drives it (mirrors the disk-merge ASSIGN_TAKE
@@ -15621,7 +15831,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                     }
                 } else {
                     // It's a simple advancement with no criteria, regular OR-merge is fine
-                    changed = hermes_apply_advancement_event(t, data, ev_uuid);
+                    changed = hermes_apply_advancement_event(t, settings, data, ev_uuid, true);
                 }
             }
             if (changed) {
@@ -15838,7 +16048,9 @@ static bool hermes_process_decrypted_line(
             if (hermes_apply_stat_event(t, settings, data)) any_changed = true;
         }
     } else if (strcmp(type, "advancement") == 0) {
-        if (!suppress_adv && hermes_apply_advancement_event(t, data, event_player_uuid)) any_changed = true;
+        if (!suppress_adv && hermes_apply_advancement_event(t, settings, data, event_player_uuid,
+                                                            is_coop_host))
+            any_changed = true;
     }
     // ALL OTHER EVENT TYPES ARE IGNORED - speedrun legal this way.
 
@@ -17113,23 +17325,11 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
             if (goal && goal->stages && goal->current_stage < goal->stage_count) {
                 SubGoal *active_stage = goal->stages[goal->current_stage];
 
-                // Check if the active stage is a stat and print its progress
-                if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
-                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s (%d/%d)\n",
-                                goal->display_name,
-                                active_stage->display_text,
-                                active_stage->current_stat_progress,
-                                active_stage->required_progress);
-                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -1) {
-                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s (%d)\n",
-                                goal->display_name,
-                                active_stage->display_text,
-                                active_stage->current_stat_progress);
-                } else {
-                    // If it's not "stat" print this
-                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s\n", goal->display_name,
-                                active_stage->display_text);
-                }
+                // A stat or mirror stage carries a value, the other types are text only
+                char stage_suffix[48];
+                ms_stage_progress_suffix(stage_suffix, sizeof(stage_suffix), active_stage);
+                log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s%s\n", goal->display_name,
+                            active_stage->display_text, stage_suffix);
             }
         }
 

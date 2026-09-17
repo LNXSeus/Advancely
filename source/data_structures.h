@@ -14,6 +14,7 @@
 
 
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <string.h>
 
 extern "C" {
@@ -247,8 +248,14 @@ inline const char *linked_goal_type_to_string(LinkedGoalType t) {
     }
 }
 
-// Forward declaration (defined below in the counter goals section)
-struct CounterLinkedGoal;
+// Represents a reference to another goal in the template: what a counter counts, what
+// auto-completes a stat or custom goal, and what a multi-stage stage mirrors.
+struct CounterLinkedGoal {
+    char root_name[192]; // The root_name of the linked goal
+    char stage_id[64]; // For multi-stage goal stages (empty = whole goal)
+    char parent_root[192]; // Parent root_name for sub-items (criteria, sub-stats) (empty = top-level)
+    LinkedGoalType type; // Which section to resolve root_name in (LINK_TYPE_ANY = legacy search order)
+};
 
 // A generic struct for a sub-item, like and advancement's criterion or a stat
 struct TrackableItem {
@@ -427,7 +434,12 @@ enum SubGoalType {
     SUBGOAL_CRITERION,
     // Allows to complete a stage based on a specific advancement/achievement criterion, e.g., visit plains biome
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
-    SUBGOAL_MANUAL // When it's the final stage, so not "stat", "advancement", "unlock", "criterion"
+    SUBGOAL_MANUAL, // When it's the final stage, so not "stat", "advancement", "unlock", "criterion"
+    // The stage simply reflects another goal in the template (see SubGoal::mirror_target). Runtime
+    // only: the template file keeps whatever trigger type the stage had, and the presence of the
+    // stage's "mirror_goal" object is what turns it into this on load, so unticking the editor's
+    // mirror checkbox brings the old type back.
+    SUBGOAL_MIRROR
 };
 
 // Represents one step in a multi-stage goal
@@ -466,11 +478,59 @@ struct SubGoal {
     // Propagated backward, so a completed later stage pulls earlier opted-in stages forward.
     bool complete_with_next;
 
+    // --- Mirror stages (type == SUBGOAL_MIRROR) ---
+    // The goal this stage reflects. Completion comes from it alone: the loader puts it in
+    // linked_goals as the stage's only entry, so every path that already resolves linked goals
+    // satisfies a mirror stage too. The stage's own trigger fields are left as the template had
+    // them and ignored.
+    CounterLinkedGoal mirror_target;
+    // The mirrored goal's numbers, re-resolved on every update so they reach the overlay with the
+    // rest of the stage (see tracker_update_mirror_stages). mirror_required of 0 means the mirrored
+    // goal shows no number at all, -1 that it counts up without a target.
+    int mirror_progress;
+    int mirror_required;
+
     char icon_path[256];
     SDL_Texture *texture;
     AnimatedTexture *anim_texture;
     uint64_t icon_hash;
 };
+
+// The value a stage puts after its display text, and the target it is counting towards. A stat
+// stage counts towards its own target; a mirror stage borrows the numbers of the goal it reflects.
+// A target of 0 means the stage shows no number, -1 that it counts up without one.
+inline int ms_stage_shown_progress(const SubGoal *stage) {
+    if (!stage) return 0;
+    return (stage->type == SUBGOAL_MIRROR) ? stage->mirror_progress : stage->current_stat_progress;
+}
+
+inline int ms_stage_shown_target(const SubGoal *stage) {
+    if (!stage) return 0;
+    if (stage->type == SUBGOAL_MIRROR) return stage->mirror_required;
+    if (stage->type == SUBGOAL_STAT) return stage->required_progress;
+    return 0;
+}
+
+// Formats the " (3/10)" or " (7)" that follows a stage's display text, or an empty string when the
+// stage shows no number. Every width calculation and every draw of a stage goes through this, so
+// the tracker, the overlay rows and the compact stack all measure and show the same text.
+inline void ms_stage_progress_suffix(char *out, size_t out_size, const SubGoal *stage) {
+    if (!out || out_size == 0) return;
+    const int target = ms_stage_shown_target(stage);
+    if (target > 0) snprintf(out, out_size, " (%d/%d)", ms_stage_shown_progress(stage), target);
+    else if (target == -1) snprintf(out, out_size, " (%d)", ms_stage_shown_progress(stage));
+    else out[0] = '\0';
+}
+
+// The widest that suffix can ever get, for the layout passes that reserve room up front instead of
+// measuring the value a stage happens to show right now.
+inline void ms_stage_progress_suffix_widest(char *out, size_t out_size, const SubGoal *stage) {
+    if (!out || out_size == 0) return;
+    const int target = ms_stage_shown_target(stage);
+    if (target > 0) snprintf(out, out_size, " (%d/%d)", target, target);
+    else if (target == -1) snprintf(out, out_size, " (%d)", ms_stage_shown_progress(stage));
+    else out[0] = '\0';
+}
 
 // Represents a complete multi-stage goal
 struct MultiStageGoal {
@@ -509,14 +569,6 @@ struct MultiStageGoal {
 };
 
 // --------- COUNTER GOALS (Completion Counters) ---------
-
-// Represents a reference to a linked goal within a counter
-struct CounterLinkedGoal {
-    char root_name[192]; // The root_name of the linked goal
-    char stage_id[64]; // For multi-stage goal stages (empty = whole goal)
-    char parent_root[192]; // Parent root_name for sub-items (criteria, sub-stats) (empty = top-level)
-    LinkedGoalType type; // Which section to resolve root_name in (LINK_TYPE_ANY = legacy search order)
-};
 
 // Represents a counter goal that tracks how many of a set of goals are completed
 struct CounterGoal {

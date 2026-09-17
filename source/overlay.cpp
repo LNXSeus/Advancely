@@ -1867,19 +1867,13 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             if (stage >= 0 && stage < g->stage_count && g->stages && g->stages[stage]) {
                 const SubGoal *st = g->stages[stage];
                 if (g->use_stage_icons && st->icon_path[0]) icon = st->icon_path;
-                // A stat stage counts up inside the stage, so it shows its value and pops on every
-                // increment, like the Belt and Page rows do. Other stage types only move on a stage
-                // change, so they stay text-only.
-                if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
-                    stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s%s%s (%d/%d)", gname, gsep, st->display_text, stat_prog,
-                             st->required_progress);
-                } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
-                    stat_prog = st->current_stat_progress;
-                    snprintf(itext, sizeof(itext), "%s%s%s (%d)", gname, gsep, st->display_text, stat_prog);
-                } else {
-                    snprintf(itext, sizeof(itext), "%s%s%s", gname, gsep, st->display_text);
-                }
+                // A stat stage counts up inside the stage, and a mirror stage follows the goal it
+                // reflects, so either shows its value and pops on every increment, like the Belt and
+                // Page rows do. Other stage types only move on a stage change, so they stay text-only.
+                char st_suffix[48];
+                ms_stage_progress_suffix(st_suffix, sizeof(st_suffix), st);
+                if (st_suffix[0] != '\0') stat_prog = ms_stage_shown_progress(st);
+                snprintf(itext, sizeof(itext), "%s%s%s%s", gname, gsep, st->display_text, st_suffix);
             }
             snprintf(key, sizeof(key), "ms|%s", g->root_name);
             // Only the in-stage stat counts as this goal's progress; the stage index always moves the
@@ -2177,10 +2171,11 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         for (int j = 0; j < g->stage_count; j++) {
             const SubGoal *st = (g->stages) ? g->stages[j] : nullptr;
             if (!st) continue;
-            if (st->type == SUBGOAL_STAT && st->required_progress > 0) {
-                compact_worst_count(cnt, sizeof(cnt), st->required_progress, wdig);
+            const int st_target = ms_stage_shown_target(st);
+            if (st_target > 0) {
+                compact_worst_count(cnt, sizeof(cnt), st_target, wdig);
                 snprintf(buf, sizeof(buf), "%s%s%s (%s)", gn, gsep, st->display_text, cnt);
-            } else if (st->type == SUBGOAL_STAT && st->required_progress == -1) {
+            } else if (st_target == -1) {
                 snprintf(buf, sizeof(buf), "%s%s%s (%s)", gn, gsep, st->display_text, open);
             } else {
                 snprintf(buf, sizeof(buf), "%s%s%s", gn, gsep, st->display_text);
@@ -4052,16 +4047,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     for (int j = 0; j < goal->stage_count; ++j) {
                         SubGoal *stage = goal->stages[j];
                         char temp_stage_buf[256];
-                        if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
-                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
-                                     stage->required_progress, stage->required_progress);
-                        } else if (stage->type == SUBGOAL_STAT && stage->required_progress == -1) {
-                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d)", stage->display_text,
-                                     stage->current_stat_progress);
-                        } else {
-                            strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
-                            temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
-                        }
+                        char stage_suffix[48];
+                        ms_stage_progress_suffix_widest(stage_suffix, sizeof(stage_suffix), stage);
+                        snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s%s", stage->display_text, stage_suffix);
                         if (strlen(temp_stage_buf) > strlen(longest_criterion_buf)) {
                             strcpy(longest_criterion_buf, temp_stage_buf);
                         }
@@ -4307,17 +4295,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                                 if (goal->current_stage < goal->stage_count) {
                                     SubGoal *active_stage = goal->stages[goal->current_stage];
-                                    if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
-                                        snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
-                                                 active_stage->display_text, active_stage->current_stat_progress,
-                                                 active_stage->required_progress);
-                                    } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress ==
-                                               -1) {
-                                        snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
-                                                 active_stage->display_text, active_stage->current_stat_progress);
-                                    } else {
-                                        snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
-                                    }
+                                    char stage_suffix[48];
+                                    ms_stage_progress_suffix(stage_suffix, sizeof(stage_suffix), active_stage);
+                                    snprintf(progress_buf, sizeof(progress_buf), "%s%s",
+                                             active_stage->display_text, stage_suffix);
                                 }
                                 break;
                             }
@@ -4560,16 +4541,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     for (int j = 0; j < goal->stage_count; ++j) {
                         SubGoal *stage = goal->stages[j];
                         char temp_stage_buf[256];
-                        if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
-                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
-                                     stage->required_progress, stage->required_progress);
-                        } else if (stage->type == SUBGOAL_STAT && stage->required_progress == -1) {
-                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d)", stage->display_text,
-                                     stage->current_stat_progress);
-                        } else {
-                            strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
-                            temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
-                        }
+                        char stage_suffix[48];
+                        ms_stage_progress_suffix_widest(stage_suffix, sizeof(stage_suffix), stage);
+                        snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s%s", stage->display_text, stage_suffix);
                         if (strlen(temp_stage_buf) > strlen(longest_progress_buf)) {
                             strcpy(longest_progress_buf, temp_stage_buf);
                         }
@@ -4833,17 +4807,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             name_buf[sizeof(name_buf) - 1] = '\0';
                             if (goal->current_stage < goal->stage_count) {
                                 SubGoal *active_stage = goal->stages[goal->current_stage];
-                                if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
-                                    snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
-                                             active_stage->display_text, active_stage->current_stat_progress,
-                                             active_stage->required_progress);
-                                } else if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress == -
-                                           1) {
-                                    snprintf(progress_buf, sizeof(progress_buf), "%s (%d)",
-                                             active_stage->display_text, active_stage->current_stat_progress);
-                                } else {
-                                    snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
-                                }
+                                char stage_suffix[48];
+                                ms_stage_progress_suffix(stage_suffix, sizeof(stage_suffix), active_stage);
+                                snprintf(progress_buf, sizeof(progress_buf), "%s%s",
+                                         active_stage->display_text, stage_suffix);
                             }
                             break;
                         }

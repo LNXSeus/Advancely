@@ -326,6 +326,12 @@ struct EditorSubGoal {
     // from its absolute value (see SubGoal::count_from_stage).
     bool count_from_stage = false;
 
+    // When true the stage simply reflects mirror_target: the trigger fields above, the linked goals
+    // and complete_with_next are all kept as they are but neither shown nor written. Only the stage
+    // ID, display text and icon still apply (see SubGoal::mirror_target).
+    bool mirror_enabled = false;
+    EditorCounterLinkedGoal mirror_target;
+
     // Optional free-text explanation shown as a tooltip on the tracker map. Lives in the lang
     // file under the goal's own key plus ".desc", so it translates with everything else.
     // std::string, not a fixed buffer: an undo step snapshots the whole template, and an empty
@@ -718,6 +724,22 @@ static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal
     }
 }
 
+// The same propagation for a stage's single mirror target, which is one linked goal in its own
+// right. A rename that removes it leaves the stage mirroring nothing, so the mirror comes off with
+// it rather than leaving a stage nothing can ever complete.
+static void propagate_rename_in_mirror_target(EditorSubGoal &stage, const char *old_name,
+                                              const char *new_name, const char *parent_root) {
+    if (!stage.mirror_enabled) return;
+    std::vector<EditorCounterLinkedGoal> one{stage.mirror_target};
+    propagate_rename_in_linked_goals(one, old_name, new_name, parent_root);
+    if (one.empty()) {
+        stage.mirror_enabled = false;
+        stage.mirror_target = {};
+    } else {
+        stage.mirror_target = one[0];
+    }
+}
+
 // Helper: when a goal's root_name is renamed, propagate the change to all arrow links, counter linked goals, custom goal linked goals, and stat linked goals
 static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorations,
                                   std::vector<EditorCounterGoal> &counter_goals,
@@ -761,11 +783,12 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
             propagate_rename_in_linked_goals(cg.linked_goals, old_name, new_name, parent_root);
         }
     }
-    // Also update multi-stage goal stage linked goals
+    // Also update multi-stage goal stage linked goals and mirror targets
     if (multi_stage_goals) {
         for (auto &msg: *multi_stage_goals) {
             for (auto &stage: msg.stages) {
                 propagate_rename_in_linked_goals(stage.linked_goals, old_name, new_name, parent_root);
+                propagate_rename_in_mirror_target(stage, old_name, new_name, parent_root);
             }
         }
     }
@@ -846,7 +869,7 @@ static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorat
             }
         }
     }
-    // Also update multi-stage goal stage linked goals
+    // Also update multi-stage goal stage linked goals and mirror targets
     if (multi_stage_goals) {
         for (auto &msg: *multi_stage_goals) {
             for (auto &stage: msg.stages) {
@@ -856,6 +879,13 @@ static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorat
                         strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
                         lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
                     }
+                }
+                if (stage.mirror_enabled &&
+                    strcmp(stage.mirror_target.root_name, parent_root) == 0 &&
+                    strcmp(stage.mirror_target.stage_id, old_stage_id) == 0) {
+                    strncpy(stage.mirror_target.stage_id, new_stage_id,
+                            sizeof(stage.mirror_target.stage_id) - 1);
+                    stage.mirror_target.stage_id[sizeof(stage.mirror_target.stage_id) - 1] = '\0';
                 }
             }
         }
@@ -1009,6 +1039,11 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            a.linked_goal_mode != b.linked_goal_mode ||
            a.complete_with_next != b.complete_with_next ||
            a.count_from_stage != b.count_from_stage ||
+           a.mirror_enabled != b.mirror_enabled ||
+           strcmp(a.mirror_target.root_name, b.mirror_target.root_name) != 0 ||
+           strcmp(a.mirror_target.stage_id, b.mirror_target.stage_id) != 0 ||
+           strcmp(a.mirror_target.parent_root, b.mirror_target.parent_root) != 0 ||
+           a.mirror_target.type != b.mirror_target.type ||
            a.description != b.description ||
            tc_language_text_different(a.language_text, b.language_text) ||
            are_linked_goals_different(a.linked_goals, b.linked_goals);
@@ -1186,6 +1221,15 @@ static void clear_goal_links(EditorTemplate &data, const char *root_name, const 
     for (auto &msg: data.multi_stage_goals) {
         for (auto &st: msg.stages) {
             prune_linked_goals(st.linked_goals, root_name, stage);
+            // A mirror of the removed goal has nothing left to reflect, so the mirror comes off too.
+            if (st.mirror_enabled) {
+                std::vector<EditorCounterLinkedGoal> one{st.mirror_target};
+                prune_linked_goals(one, root_name, stage);
+                if (one.empty()) {
+                    st.mirror_enabled = false;
+                    st.mirror_target = {};
+                }
+            }
         }
     }
 }
@@ -1669,6 +1713,17 @@ static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageG
             snprintf(error_message_buffer, 256, "Error: The 'Final' stage in goal '%s' must be the last in the list.",
                      goal.root_name);
             return false;
+        }
+
+        // Rule 4: A mirror stage has nothing to reflect without a goal, and nothing else would
+        // complete it, so the goal would be stuck there.
+        for (const auto &stage: goal.stages) {
+            if (stage.mirror_enabled && stage.mirror_target.root_name[0] == '\0') {
+                snprintf(error_message_buffer, 256,
+                         "Error: Stage '%s' in goal '%s' mirrors a goal but none is selected.",
+                         stage.stage_id, goal.root_name);
+                return false;
+            }
         }
     }
     return true;
@@ -2268,6 +2323,35 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                 // Only meaningful on a stat stage; a stray flag on another type is dropped on load.
                 new_stage.count_from_stage = (new_stage.type == SUBGOAL_STAT) &&
                                              cJSON_IsTrue(cJSON_GetObjectItem(stage_json, "count_from_stage"));
+
+                // The goal this stage mirrors. The editor keeps the trigger type the stage was saved
+                // with, so unticking the mirror checkbox brings its own settings back untouched.
+                cJSON *mirror_json = cJSON_GetObjectItem(stage_json, "mirror_goal");
+                if (mirror_json) {
+                    cJSON *mr = cJSON_GetObjectItem(mirror_json, "root_name");
+                    if (cJSON_IsString(mr) && mr->valuestring[0] != '\0') {
+                        new_stage.mirror_enabled = true;
+                        strncpy(new_stage.mirror_target.root_name, mr->valuestring,
+                                sizeof(new_stage.mirror_target.root_name) - 1);
+                        new_stage.mirror_target.root_name[sizeof(new_stage.mirror_target.root_name) - 1] = '\0';
+                        cJSON *msid = cJSON_GetObjectItem(mirror_json, "stage_id");
+                        if (cJSON_IsString(msid)) {
+                            strncpy(new_stage.mirror_target.stage_id, msid->valuestring,
+                                    sizeof(new_stage.mirror_target.stage_id) - 1);
+                            new_stage.mirror_target.stage_id[sizeof(new_stage.mirror_target.stage_id) - 1] = '\0';
+                        }
+                        cJSON *mpr = cJSON_GetObjectItem(mirror_json, "parent_root");
+                        if (cJSON_IsString(mpr)) {
+                            strncpy(new_stage.mirror_target.parent_root, mpr->valuestring,
+                                    sizeof(new_stage.mirror_target.parent_root) - 1);
+                            new_stage.mirror_target.parent_root[sizeof(new_stage.mirror_target.parent_root) - 1] = '\0';
+                        }
+                        cJSON *mty = cJSON_GetObjectItem(mirror_json, "type");
+                        new_stage.mirror_target.type = cJSON_IsString(mty)
+                                                           ? linked_goal_type_from_string(mty->valuestring)
+                                                           : LINK_TYPE_ANY;
+                    }
+                }
 
                 new_goal.stages.push_back(new_stage);
             }
@@ -3001,6 +3085,10 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                     break;
                 case SUBGOAL_MANUAL: type_str = "final";
                     break;
+                // Runtime only: a stage that mirrors keeps the trigger type it was saved with,
+                // and the "mirror_goal" object below is what makes it a mirror on load.
+                case SUBGOAL_MIRROR:
+                    break;
             }
             cJSON_AddStringToObject(stage_json, "type", type_str);
 
@@ -3022,6 +3110,23 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 // Stat stages only: count from the value held when the stage was reached.
                 if (stage.type == SUBGOAL_STAT && stage.count_from_stage) {
                     cJSON_AddBoolToObject(stage_json, "count_from_stage", true);
+                }
+                // The goal this stage mirrors. Its presence is what makes the stage a mirror on load;
+                // everything written above stays in the file but is ignored while it is there.
+                if (stage.mirror_enabled && stage.mirror_target.root_name[0] != '\0') {
+                    cJSON *mirror_json = cJSON_CreateObject();
+                    cJSON_AddStringToObject(mirror_json, "root_name", stage.mirror_target.root_name);
+                    if (stage.mirror_target.stage_id[0] != '\0') {
+                        cJSON_AddStringToObject(mirror_json, "stage_id", stage.mirror_target.stage_id);
+                    }
+                    if (stage.mirror_target.parent_root[0] != '\0') {
+                        cJSON_AddStringToObject(mirror_json, "parent_root", stage.mirror_target.parent_root);
+                    }
+                    const char *mirror_type_str = linked_goal_type_to_string(stage.mirror_target.type);
+                    if (mirror_type_str) {
+                        cJSON_AddStringToObject(mirror_json, "type", mirror_type_str);
+                    }
+                    cJSON_AddItemToObject(stage_json, "mirror_goal", mirror_json);
                 }
             }
 
@@ -3638,14 +3743,14 @@ static const char *tc_linked_goal_type_label(LinkedGoalType type, bool uses_achi
     }
 }
 
-// Formats a linked goal for display in a linked-goals list: "N. [Type] root" (plus "[stage]" or
-// "parent > root" disambiguation), with the section type in brackets before the goal ID so
-// identical IDs are clear. The type is derived from the template when the link carries no stamped
-// type (legacy links), so it displays consistently regardless of whether "type" is in the file.
-static void tc_format_linked_goal_display(char *buf, size_t sz, int index,
-                                          const EditorTemplate &tpl,
-                                          const EditorCounterLinkedGoal &lg,
-                                          const char *version_str) {
+// Names a goal a link points at: "[Type] root" (plus "[stage]" or "parent > root" disambiguation),
+// with the section type in brackets before the goal ID so identical IDs are clear. The type is
+// derived from the template when the link carries no stamped type (legacy links), so it displays
+// consistently regardless of whether "type" is in the file.
+static void tc_format_goal_label(char *buf, size_t sz,
+                                 const EditorTemplate &tpl,
+                                 const EditorCounterLinkedGoal &lg,
+                                 const char *version_str) {
     LinkedGoalType type = lg.type != LINK_TYPE_ANY ? lg.type : tc_resolve_linked_goal_section(tpl, lg);
     bool uses_achievements = settings_get_version_from_string(version_str) <= MC_VERSION_1_11_2;
     const char *type_label = tc_linked_goal_type_label(type, uses_achievements);
@@ -3656,12 +3761,22 @@ static void tc_format_linked_goal_display(char *buf, size_t sz, int index,
         prefix[0] = '\0';
     }
     if (lg.stage_id[0] != '\0') {
-        snprintf(buf, sz, "%d. %s%s [%s]", index, prefix, lg.root_name, lg.stage_id);
+        snprintf(buf, sz, "%s%s [%s]", prefix, lg.root_name, lg.stage_id);
     } else if (lg.parent_root[0] != '\0') {
-        snprintf(buf, sz, "%d. %s%s > %s", index, prefix, lg.parent_root, lg.root_name);
+        snprintf(buf, sz, "%s%s > %s", prefix, lg.parent_root, lg.root_name);
     } else {
-        snprintf(buf, sz, "%d. %s%s", index, prefix, lg.root_name);
+        snprintf(buf, sz, "%s%s", prefix, lg.root_name);
     }
+}
+
+// The same label numbered for a linked-goals list: "N. [Type] root".
+static void tc_format_linked_goal_display(char *buf, size_t sz, int index,
+                                          const EditorTemplate &tpl,
+                                          const EditorCounterLinkedGoal &lg,
+                                          const char *version_str) {
+    char label[512];
+    tc_format_goal_label(label, sizeof(label), tpl, lg, version_str);
+    snprintf(buf, sz, "%d. %s", index, label);
 }
 
 // Appends the Visual Layout Editor selection to a linked-goal list, in template order and
@@ -5766,6 +5881,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int goal_selector_header_deco_index = -1; // Index of the text header being edited (multi-select mode)
     static int goal_selector_msg_index = -1; // Index of the multi-stage goal being edited (multi-select mode)
     static int goal_selector_msg_stage_index = -1; // Index of the stage within that multi-stage goal
+    // A stage's mirror target: one goal, picked in single-select mode, written back to the stage
+    // instead of to a linked-goal list. Every section is on offer except the owning goal itself.
+    static int goal_selector_mirror_msg_index = -1;
+    static int goal_selector_mirror_stage_index = -1;
+    // Which section the single-select choice came from, so the mirror stamps a type like a linked
+    // goal does and two goals sharing an ID can't be confused for each other.
+    static LinkedGoalType goal_selector_selected_type = LINK_TYPE_ANY;
     static std::vector<EditorCounterLinkedGoal> goal_selector_multi_selections; // Multi-select state
     static int goal_selector_last_clicked_flat_index = -1; // For shift-click range selection
     static char goal_selector_target_id[256] = ""; // ID of the goal/decoration being edited, shown in popup title
@@ -13120,6 +13242,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      stat_cat.root_name);
                             if (ImGui::Button(select_btn_id)) {
                                 show_goal_selector_popup = true;
+                                goal_selector_mirror_msg_index = -1;
+                                goal_selector_mirror_stage_index = -1;
                                 focus_goal_selector_search = true;
                                 goal_selector_search_buffer[0] = '\0';
                                 goal_selector_max_selection = 0;
@@ -14104,6 +14228,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "Select Goals##SubStat_%s_%zu", stat_cat.root_name, j);
                                     if (ImGui::Button(crit_select_btn_id)) {
                                         show_goal_selector_popup = true;
+                                        goal_selector_mirror_msg_index = -1;
+                                        goal_selector_mirror_stage_index = -1;
                                         focus_goal_selector_search = true;
                                         goal_selector_search_buffer[0] = '\0';
                                         goal_selector_max_selection = 0;
@@ -16270,6 +16396,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SameLine();
                             if (ImGui::Button(select_btn_id)) {
                                 show_goal_selector_popup = true;
+                                goal_selector_mirror_msg_index = -1;
+                                goal_selector_mirror_stage_index = -1;
                                 focus_goal_selector_search = true;
                                 goal_selector_search_buffer[0] = '\0';
                                 goal_selector_max_selection = 0;
@@ -16662,6 +16790,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     case SUBGOAL_CRITERION: stage_type_name = "Criterion";
                                         break;
                                     case SUBGOAL_MANUAL: stage_type_name = "Final";
+                                        break;
+                                    case SUBGOAL_MIRROR: stage_type_name = "Mirror";
                                         break;
                                 }
 
@@ -17653,6 +17783,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         break;
                                     case SUBGOAL_MANUAL: stage_type_name = "Final";
                                         break;
+                                    case SUBGOAL_MIRROR: stage_type_name = "Mirror";
+                                        break;
                                 }
 
                                 if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
@@ -18020,6 +18152,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         break;
                                     case SUBGOAL_MANUAL: stage_type_name = "Final";
                                         break;
+                                    case SUBGOAL_MIRROR: stage_type_name = "Mirror";
+                                        break;
                                 }
 
                                 // Check standard fields
@@ -18041,8 +18175,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
                                 }
 
+                                // A mirror stage hides its own trigger, so it is found by the goal it
+                                // mirrors, and by "mirror" itself since its type still reads as the
+                                // trigger type it keeps.
+                                bool mirror_match = stage.mirror_enabled &&
+                                                    (str_contains_insensitive(stage.mirror_target.root_name,
+                                                                              tc_search_buffer) ||
+                                                     str_contains_insensitive(stage.mirror_target.parent_root,
+                                                                              tc_search_buffer) ||
+                                                     str_contains_insensitive(stage.mirror_target.stage_id,
+                                                                              tc_search_buffer) ||
+                                                     str_contains_insensitive("Mirror", tc_search_buffer));
+
                                 // If nothing matches, skip this stage
-                                if (!standard_match && !type_match && !icon_match) {
+                                if (!standard_match && !type_match && !icon_match && !mirror_match) {
                                     continue;
                                 }
                             }
@@ -18145,134 +18291,217 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
                             }
-                            // --- Version-Aware Type Dropdown ---
-                            const char *current_type_name = "Unknown";
-                            switch (stage.type) {
-                                case SUBGOAL_STAT:
-                                    // Use the clearer "Stat / Achievement" label for older versions
-                                    current_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                            ? "Stat / Achievement"
-                                                            : "Stat";
-                                    break;
-                                case SUBGOAL_ADVANCEMENT: current_type_name = advancements_label_upper;
-                                    break;
-                                case SUBGOAL_UNLOCK: current_type_name = "Unlock";
-                                    break;
-                                case SUBGOAL_CRITERION: current_type_name = "Criterion";
-                                    break;
-                                case SUBGOAL_MANUAL: current_type_name = "Final";
-                                    break;
-                            }
-
-                            if (ImGui::BeginCombo("Type", current_type_name)) {
-                                // Show "Stat / Achievement" for legacy and mid-era versions
-                                if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
-                                        stage.type = SUBGOAL_STAT;
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                    }
-                                }
-
-                                // Show plain "Stat" for modern versions
-                                if (creator_selected_version >= MC_VERSION_1_12) {
-                                    if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
-                                        stage.type = SUBGOAL_STAT;
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                    }
-                                }
-
-                                // "Advancement" type is only available for 1.12+
-                                if (creator_selected_version >= MC_VERSION_1_12) {
-                                    if (ImGui::Selectable(advancements_label_upper,
-                                                          stage.type == SUBGOAL_ADVANCEMENT)) {
-                                        stage.type = SUBGOAL_ADVANCEMENT;
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                    }
-                                }
-
-                                // "Criterion" type is available from mid-era (1.7.2) onwards
-                                if (creator_selected_version >= MC_VERSION_1_7_2) {
-                                    if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
-                                        stage.type = SUBGOAL_CRITERION;
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                    }
-                                }
-
-                                // "Unlock" type is only for 25w14craftmine
-                                if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                    if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
-                                        stage.type = SUBGOAL_UNLOCK;
-                                        ms_goal_data_changed = true;
-                                        save_message_type = MSG_NONE;
-                                    }
-                                }
-
-                                // "Final" type is always available
-                                if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
-                                    stage.type = SUBGOAL_MANUAL;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                                ImGui::EndCombo();
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char type_tooltip_buffer[256];
-                                if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    // not modern
-                                    snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
-                                             "The type of event that will complete this stage.\n"
-                                             "%s count as stats.\n"
-                                             "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
-                                             "and it must be the last stage.\n"
-                                             "Reaching the final stage completes the entire multi-stage goal.",
-                                             advancements_label_plural_upper);
-                                } else {
-                                    // modern
-                                    snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
-                                             "The type of event that will complete this stage.\n"
-                                             "%s can also be recipes.\n"
-                                             "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
-                                             "and it must be the last stage.\n"
-                                             "Reaching the final stage completes the entire multi-stage goal.",
-                                             advancements_label_plural_upper);
-                                }
-                                ImGui::SetTooltip("%s", type_tooltip_buffer);
-                            }
-
-
-                            if (stage.type == SUBGOAL_CRITERION) {
-                                char parent_label[64];
-                                snprintf(parent_label, sizeof(parent_label), "Parent %s", advancements_label_upper);
-                                if (ImGui::InputText(parent_label, stage.parent_advancement,
-                                                     sizeof(stage.parent_advancement))) {
+                            // --- Mirror another goal ---
+                            // A mirror stage is nothing but a view of another goal, so every trigger
+                            // setting below is hidden while it is on and ignored on save. The stage ID,
+                            // display text and icon above still apply, and the mirrored goal's own value
+                            // follows the display text on the tracker and the overlay.
+                            if (stage.type != SUBGOAL_MANUAL || stage.mirror_enabled) {
+                                char mirror_id[128];
+                                snprintf(mirror_id, sizeof(mirror_id), "Mirror another goal##mirror_%s_%zu",
+                                         goal.root_name, j);
+                                if (ImGui::Checkbox(mirror_id, &stage.mirror_enabled)) {
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip_buffer[512];
-                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                        // Mid-era tooltip
-                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                 "The root name of the parent %s this criterion belongs to.\n"
-                                                 "e.g., 'achievement.exploreAllBiomes'",
-                                                 advancements_label_singular_lower);
-                                    } else {
-                                        // Modern tooltip
-                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                 "The root name of the parent %s this criterion belongs to.\n"
-                                                 "e.g., 'minecraft:husbandry/bred_all_animals'",
-                                                 advancements_label_singular_lower);
-                                    }
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "The stage completes exactly when the goal it mirrors does, and shows\n"
+                                             "that goal's value right after this stage's display text.\n"
+                                             "The goal's own name stays on the first line, as always.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
                             }
+                            if (stage.mirror_enabled) {
+                                char mirror_btn_id[128];
+                                snprintf(mirror_btn_id, sizeof(mirror_btn_id), "Select Goal##Mirror_%s_%zu",
+                                         goal.root_name, j);
+                                if (ImGui::Button(mirror_btn_id)) {
+                                    show_goal_selector_popup = true;
+                                    focus_goal_selector_search = true;
+                                    goal_selector_search_buffer[0] = '\0';
+                                    goal_selector_max_selection = 1;
+                                    goal_selector_counter_index = -1;
+                                    goal_selector_custom_goal_index = -1;
+                                    goal_selector_stat_cat_index = -1;
+                                    goal_selector_stat_crit_index = -1;
+                                    goal_selector_header_deco_index = -1;
+                                    goal_selector_deco_index = -1;
+                                    goal_selector_msg_index = -1;
+                                    goal_selector_msg_stage_index = -1;
+                                    goal_selector_last_clicked_flat_index = -1;
+                                    snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s [%s]",
+                                             goal.root_name, stage.stage_id);
+                                    goal_selector_mirror_msg_index =
+                                            (int) (&goal - &current_template_data.multi_stage_goals[0]);
+                                    goal_selector_mirror_stage_index = (int) j;
+                                    // Open on whatever the stage mirrors now, so the popup shows the
+                                    // current choice instead of nothing.
+                                    strncpy(goal_selector_selected_root, stage.mirror_target.root_name,
+                                            sizeof(goal_selector_selected_root) - 1);
+                                    goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
+                                    strncpy(goal_selector_selected_stage, stage.mirror_target.stage_id,
+                                            sizeof(goal_selector_selected_stage) - 1);
+                                    goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
+                                    strncpy(goal_selector_selected_parent, stage.mirror_target.parent_root,
+                                            sizeof(goal_selector_selected_parent) - 1);
+                                    goal_selector_selected_parent[sizeof(goal_selector_selected_parent) - 1] = '\0';
+                                    goal_selector_selected_type = stage.mirror_target.type;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[256];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Pick the goal this stage mirrors.\n"
+                                             "Any goal in the template except this goal's own stages.\n"
+                                             "A mirror counts as a linked goal.\n"
+                                             "Chains of linked goals fail beyond a depth of 32.");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+                                ImGui::SameLine();
+                                if (stage.mirror_target.root_name[0] != '\0') {
+                                    char mirror_label[512];
+                                    tc_format_goal_label(mirror_label, sizeof(mirror_label),
+                                                         current_template_data, stage.mirror_target,
+                                                         creator_version_str);
+                                    ImGui::Text("%s", mirror_label);
+                                } else {
+                                    ImGui::TextDisabled("No goal selected");
+                                }
+                            }
+                            // Hidden for a mirror stage: it has no trigger of its own.
+                            if (!stage.mirror_enabled) {
+                                // --- Version-Aware Type Dropdown ---
+                                const char *current_type_name = "Unknown";
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT:
+                                        // Use the clearer "Stat / Achievement" label for older versions
+                                        current_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                                ? "Stat / Achievement"
+                                                                : "Stat";
+                                        break;
+                                    case SUBGOAL_ADVANCEMENT: current_type_name = advancements_label_upper;
+                                        break;
+                                    case SUBGOAL_UNLOCK: current_type_name = "Unlock";
+                                        break;
+                                    case SUBGOAL_CRITERION: current_type_name = "Criterion";
+                                        break;
+                                    case SUBGOAL_MANUAL: current_type_name = "Final";
+                                        break;
+                                    case SUBGOAL_MIRROR: current_type_name = "Mirror";
+                                        break;
+                                }
 
+                                if (ImGui::BeginCombo("Type", current_type_name)) {
+                                    // Show "Stat / Achievement" for legacy and mid-era versions
+                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
+                                            stage.type = SUBGOAL_STAT;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                    }
+
+                                    // Show plain "Stat" for modern versions
+                                    if (creator_selected_version >= MC_VERSION_1_12) {
+                                        if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
+                                            stage.type = SUBGOAL_STAT;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                    }
+
+                                    // "Advancement" type is only available for 1.12+
+                                    if (creator_selected_version >= MC_VERSION_1_12) {
+                                        if (ImGui::Selectable(advancements_label_upper,
+                                                              stage.type == SUBGOAL_ADVANCEMENT)) {
+                                            stage.type = SUBGOAL_ADVANCEMENT;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                    }
+
+                                    // "Criterion" type is available from mid-era (1.7.2) onwards
+                                    if (creator_selected_version >= MC_VERSION_1_7_2) {
+                                        if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
+                                            stage.type = SUBGOAL_CRITERION;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                    }
+
+                                    // "Unlock" type is only for 25w14craftmine
+                                    if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                        if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
+                                            stage.type = SUBGOAL_UNLOCK;
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                    }
+
+                                    // "Final" type is always available
+                                    if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
+                                        stage.type = SUBGOAL_MANUAL;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char type_tooltip_buffer[256];
+                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        // not modern
+                                        snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                                 "The type of event that will complete this stage.\n"
+                                                 "%s count as stats.\n"
+                                                 "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                                 "and it must be the last stage.\n"
+                                                 "Reaching the final stage completes the entire multi-stage goal.",
+                                                 advancements_label_plural_upper);
+                                    } else {
+                                        // modern
+                                        snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                                 "The type of event that will complete this stage.\n"
+                                                 "%s can also be recipes.\n"
+                                                 "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                                 "and it must be the last stage.\n"
+                                                 "Reaching the final stage completes the entire multi-stage goal.",
+                                                 advancements_label_plural_upper);
+                                    }
+                                    ImGui::SetTooltip("%s", type_tooltip_buffer);
+                                }
+
+
+                                if (stage.type == SUBGOAL_CRITERION) {
+                                    char parent_label[64];
+                                    snprintf(parent_label, sizeof(parent_label), "Parent %s", advancements_label_upper);
+                                    if (ImGui::InputText(parent_label, stage.parent_advancement,
+                                                         sizeof(stage.parent_advancement))) {
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[512];
+                                        if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                            // Mid-era tooltip
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "The root name of the parent %s this criterion belongs to.\n"
+                                                     "e.g., 'achievement.exploreAllBiomes'",
+                                                     advancements_label_singular_lower);
+                                        } else {
+                                            // Modern tooltip
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "The root name of the parent %s this criterion belongs to.\n"
+                                                     "e.g., 'minecraft:husbandry/bred_all_animals'",
+                                                     advancements_label_singular_lower);
+                                        }
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+                                }
+
+                            }
                             // "Final" stages don't need a target or Root Name
-                            if (stage.type != SUBGOAL_MANUAL) {
+                            if (stage.type != SUBGOAL_MANUAL && !stage.mirror_enabled) {
                                 if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
@@ -18556,6 +18785,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
 
+                            }
+
+                            // Completing with the next stage says nothing about how this one is
+                            // triggered, so it applies to a mirror stage as much as any other.
+                            if (stage.type != SUBGOAL_MANUAL) {
                                 // --- Auto-complete this stage when the next stage is completed ---
                                 // Hidden for the stage directly before the 'Final' stage: the final stage is
                                 // never satisfied on its own, so there is nothing to inherit from it.
@@ -18581,7 +18815,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
                                 }
+                            }
 
+                            if (stage.type != SUBGOAL_MANUAL && !stage.mirror_enabled) {
                                 // --- Stage Linked Goals (Auto-Completion) ---
                                 {
                                     ImGui::Text("Auto-Complete Goals: %d", (int) stage.linked_goals.size());
@@ -18591,6 +18827,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "Select Goals##Stage_%s_%zu", goal.root_name, j);
                                     if (ImGui::Button(stage_select_btn_id)) {
                                         show_goal_selector_popup = true;
+                                        goal_selector_mirror_msg_index = -1;
+                                        goal_selector_mirror_stage_index = -1;
                                         focus_goal_selector_search = true;
                                         goal_selector_search_buffer[0] = '\0';
                                         goal_selector_max_selection = 0;
@@ -19892,6 +20130,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SameLine();
                         if (ImGui::Button("Select Goals##Counter")) {
                             show_goal_selector_popup = true;
+                            goal_selector_mirror_msg_index = -1;
+                            goal_selector_mirror_stage_index = -1;
                             focus_goal_selector_search = true;
                             goal_selector_search_buffer[0] = '\0';
                             goal_selector_max_selection = 0;
@@ -20655,6 +20895,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Select Goals##Header_%s", deco.id);
                             if (ImGui::Button(select_header_goals_btn)) {
                                 show_goal_selector_popup = true;
+                                goal_selector_mirror_msg_index = -1;
+                                goal_selector_mirror_stage_index = -1;
                                 focus_goal_selector_search = true;
                                 goal_selector_search_buffer[0] = '\0';
                                 goal_selector_max_selection = 0;
@@ -20805,6 +21047,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     goal_selector_selected_parent[0] = '\0';
                                     show_goal_selector_popup = true;
+                                    goal_selector_mirror_msg_index = -1;
+                                    goal_selector_mirror_stage_index = -1;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip_buffer[256];
@@ -20857,6 +21101,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     goal_selector_selected_parent[0] = '\0';
                                     show_goal_selector_popup = true;
+                                    goal_selector_mirror_msg_index = -1;
+                                    goal_selector_mirror_stage_index = -1;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip_buffer[256];
@@ -26087,6 +26333,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 };
                 auto check_stage = [&](const EditorSubGoal &st, const char *goal_root) {
+                    // A mirror stage ignores its own trigger fields, so the goal it mirrors is the
+                    // only reference worth warning about.
+                    if (st.mirror_enabled) {
+                        if (st.mirror_target.root_name[0] && !will_exist.count(st.mirror_target.root_name)) {
+                            char buf[512];
+                            if (goal_root)
+                                snprintf(buf, sizeof(buf), "%s/%s mirrors -> %s", goal_root, st.stage_id,
+                                         st.mirror_target.root_name);
+                            else
+                                snprintf(buf, sizeof(buf), "%s mirrors -> %s", st.stage_id,
+                                         st.mirror_target.root_name);
+                            out.emplace_back(buf);
+                        }
+                        return;
+                    }
                     if (st.type == SUBGOAL_CRITERION && st.parent_advancement[0] &&
                         !will_exist.count(st.parent_advancement)) {
                         char buf[512];
@@ -26911,13 +27172,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- Left-aligned label ---
         bool is_multi_select = (goal_selector_max_selection != 1);
+        // Picking the one goal a multi-stage stage mirrors: single-select, but written back to the
+        // stage rather than to an arrow endpoint.
+        const bool is_mirror_select = (goal_selector_mirror_msg_index >= 0);
 
         // Identify the goal being edited so it can never be linked to itself. Only relevant for
-        // multi-select (linked goals); single-select arrow endpoints may target any goal.
+        // linked goals and mirrors; single-select arrow endpoints may target any goal.
         const char *owner_root = nullptr;
         const char *owner_parent = nullptr;
         LinkedGoalType owner_type = LINK_TYPE_ANY;
-        if (is_multi_select) {
+        if (is_mirror_select) {
+            // The whole owning goal is off limits, which rules out its other stages too: a stage
+            // mirroring its own goal would be circular, and mirroring a sibling stage pointless.
+            if (goal_selector_mirror_msg_index < (int) current_template_data.multi_stage_goals.size()) {
+                owner_root = current_template_data.multi_stage_goals[goal_selector_mirror_msg_index].root_name;
+                owner_type = LINK_TYPE_MULTI_STAGE;
+            }
+        } else if (is_multi_select) {
             if (goal_selector_counter_index >= 0 &&
                 goal_selector_counter_index < (int) current_template_data.counter_goals.size()) {
                 owner_root = current_template_data.counter_goals[goal_selector_counter_index].root_name;
@@ -26952,6 +27223,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (is_multi_select) {
             ImGui::Text("Select goals to link (Shift+click for range)");
+        } else if (is_mirror_select) {
+            ImGui::Text("Select the goal this stage mirrors");
         } else {
             const char *target_label = (goal_selector_target == GOAL_SELECT_START) ? "Start Goal" : "End Goal";
             ImGui::Text("Selecting: %s", target_label);
@@ -27112,6 +27385,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             // Single-select mode
             if (checked) {
+                goal_selector_selected_type = type;
                 strncpy(goal_selector_selected_root, root_name, sizeof(goal_selector_selected_root) - 1);
                 goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
                 if (stage_id && stage_id[0] != '\0') {
@@ -27127,6 +27401,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     goal_selector_selected_parent[0] = '\0';
                 }
             } else {
+                goal_selector_selected_type = LINK_TYPE_ANY;
                 goal_selector_selected_root[0] = '\0';
                 goal_selector_selected_stage[0] = '\0';
                 goal_selector_selected_parent[0] = '\0';
@@ -27498,6 +27773,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     goal_selector_msg_stage_index = -1;
                     save_message_type = MSG_NONE;
                 }
+            } else if (is_mirror_select) {
+                // Single-select: write the goal a stage mirrors
+                if (goal_selector_mirror_msg_index < (int) current_template_data.multi_stage_goals.size()) {
+                    auto &target_msg = current_template_data.multi_stage_goals[goal_selector_mirror_msg_index];
+                    if (goal_selector_mirror_stage_index >= 0 &&
+                        goal_selector_mirror_stage_index < (int) target_msg.stages.size()) {
+                        auto &target_stage = target_msg.stages[goal_selector_mirror_stage_index];
+                        target_stage.mirror_target = {};
+                        strncpy(target_stage.mirror_target.root_name, goal_selector_selected_root,
+                                sizeof(target_stage.mirror_target.root_name) - 1);
+                        strncpy(target_stage.mirror_target.stage_id, goal_selector_selected_stage,
+                                sizeof(target_stage.mirror_target.stage_id) - 1);
+                        strncpy(target_stage.mirror_target.parent_root, goal_selector_selected_parent,
+                                sizeof(target_stage.mirror_target.parent_root) - 1);
+                        target_stage.mirror_target.type = goal_selector_selected_type;
+                    }
+                }
+                goal_selector_mirror_msg_index = -1;
+                goal_selector_mirror_stage_index = -1;
+                save_message_type = MSG_NONE;
             } else {
                 // Single-select: write to decoration
                 if (goal_selector_deco_index >= 0 &&
@@ -27538,6 +27833,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Cancel button
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            goal_selector_mirror_msg_index = -1;
+            goal_selector_mirror_stage_index = -1;
             show_goal_selector_popup = false;
             ImGui::CloseCurrentPopup();
         }
