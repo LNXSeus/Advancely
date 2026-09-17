@@ -13276,6 +13276,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "when the condition (AND/OR) is met.\n"
                                          "Hold Shift and click to select a range.\n"
                                          "A goal can't be linked to itself.\n"
+                                         "Goals linking back to each other in a loop never complete each other.\n"
                                          "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
@@ -14262,6 +14263,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "when the condition (AND/OR) is met.\n"
                                                  "Hold Shift and click to select a range.\n"
                                                  "A goal can't be linked to itself.\n"
+                                                 "Goals linking back to each other in a loop never complete each other.\n"
                                                  "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
@@ -16421,6 +16423,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "Select goals that, when completed, will auto-complete this custom goal.\n"
                                          "A goal can't be linked to itself.\n"
+                                         "Goals linking back to each other in a loop never complete each other.\n"
                                          "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
@@ -18350,11 +18353,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_selected_type = stage.mirror_target.type;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char tooltip_buffer[256];
+                                    char tooltip_buffer[512];
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                              "Pick the goal this stage mirrors.\n"
                                              "Any goal in the template except this goal's own stages.\n"
                                              "A mirror counts as a linked goal.\n"
+                                             "Goals linking back to each other in a loop never complete each other.\n"
                                              "Chains of linked goals fail beyond a depth of 32.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
@@ -18856,6 +18860,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "when the condition (AND/OR) is met.\n"
                                                  "Hold Shift and click to select a range.\n"
                                                  "A goal can't be linked to itself.\n"
+                                                 "Goals linking back to each other in a loop never complete each other.\n"
                                                  "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
@@ -20158,7 +20163,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "shows only the parent, not its criteria).\n"
                                      "You can select multiple goals of any type.\n"
                                      "Hold Shift and click to select a range.\n"
-                                     "A goal can't be linked to itself.");
+                                     "A goal can't be linked to itself.\n"
+                                     "Goals linking back to each other in a loop never complete each other.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -27417,6 +27423,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         };
         std::vector<FlatGoalEntry> flat_goal_list;
 
+        // A simple (single-value) stat is one row: the category itself, with no sub-stat rows under
+        // it. Both the flat list and the rendering below ask this one lambda, because a shift-click
+        // range indexes into the flat list by the position the rendering assigned, so a row that
+        // exists in one and not the other shifts every entry after it onto the wrong goal.
+        auto stat_shows_sub_rows = [](const EditorTrackableCategory &stat) { return !stat.is_simple_stat; };
+
         // Pre-build flat list (must match the rendering order exactly)
         // Advancements
         for (const auto &adv: current_template_data.advancements) {
@@ -27435,13 +27447,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         for (const auto &stat: current_template_data.stats) {
             bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
             bool any_child = false;
-            for (const auto &sub: stat.criteria)
-                if (matches_search(sub.root_name, sub.display_name, "Sub-Stat")) any_child = true;
+            if (stat_shows_sub_rows(stat)) {
+                for (const auto &sub: stat.criteria)
+                    if (matches_search(sub.root_name, sub.display_name, "Sub-Stat")) any_child = true;
+            }
             if (!parent_match && !any_child) continue;
             if (parent_match) flat_goal_list.push_back({stat.root_name, nullptr, nullptr, LINK_TYPE_STAT});
-            for (const auto &sub: stat.criteria) {
-                if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
-                flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT});
+            if (stat_shows_sub_rows(stat)) {
+                for (const auto &sub: stat.criteria) {
+                    if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
+                    flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT});
+                }
             }
         }
         // Unlocks
@@ -27559,7 +27575,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &stat: current_template_data.stats) {
                 bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
                 bool any_child_match = false;
-                if (!stat.is_simple_stat) {
+                if (stat_shows_sub_rows(stat)) {
                     for (const auto &sub: stat.criteria) {
                         if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
                             any_child_match = true;
@@ -27575,7 +27591,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (const auto &stat: current_template_data.stats) {
                     bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
                     bool any_child_match = false;
-                    if (!stat.is_simple_stat) {
+                    if (stat_shows_sub_rows(stat)) {
                         for (const auto &sub: stat.criteria) {
                             if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
                                 any_child_match = true;
@@ -27589,7 +27605,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         render_goal_checkbox(label, stat.root_name, nullptr, nullptr, LINK_TYPE_STAT, false);
 
                     // Only show sub-stats for complex (multi-stat) categories
-                    if (!stat.is_simple_stat) {
+                    if (stat_shows_sub_rows(stat)) {
                         for (const auto &sub: stat.criteria) {
                             if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
                             char sub_label[384];

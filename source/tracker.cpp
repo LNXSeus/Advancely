@@ -8259,6 +8259,16 @@ static float get_global_safe_x(Tracker *t) {
             check_pos(td->multi_stage_goals[i]->progress_pos, 150.0f);
         }
     }
+    // Counters draw exactly like a multi-stage goal does: one icon, one name, one progress line.
+    // Leaving them out here let a manually placed counter sit under the auto-layout block, because
+    // nothing pushed that block past it.
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        if (td->counter_goals[i]) {
+            check_pos(td->counter_goals[i]->icon_pos, 120.0f);
+            check_pos(td->counter_goals[i]->text_pos, 180.0f);
+            check_pos(td->counter_goals[i]->progress_pos, 150.0f);
+        }
+    }
     for (int i = 0; i < td->decoration_count; i++) {
         if (td->decorations[i]) {
             DecorationElement *deco = td->decorations[i];

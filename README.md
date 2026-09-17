@@ -1240,7 +1240,8 @@ active template), so enabling manual positioning never teleports the element.
       sub-stats, unlocks, custom goals, or multi-stage goal stages. Choose between `AND` mode (all selected goals must
       be completed) or `OR` mode (at least one selected goal must be completed) using the dropdown next to the goal
       list. When the condition is met, the stat is automatically marked as done — in addition to natural progress-based
-      completion and manual checkbox overrides.
+      completion and manual checkbox overrides. A goal can never be linked to itself, and goals linking back to each
+      other in a loop never complete each other.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a stat category to appear in the middle row of the
       overlay instead of the bottom row.
 * **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like
@@ -1281,12 +1282,14 @@ active template), so enabling manual positioning never teleports the element.
       or sub-stat, an unlock, a custom goal, a counter, another multi-stage goal or one of its stages. Goals
       with no value of their own (criteria, unlocks, simple toggles) just show the display text. The goal being
       edited is greyed out in the popup, since a stage can't mirror its own goal. A mirror counts as a linked
-      goal. Chains of linked goals fail beyond a depth of 32.
+      goal. Chains of linked goals fail beyond a depth of 32, and goals linking back to each other in a loop never
+      complete each other.
     * **Auto-Complete via Linked Goals**: Every non-final stage also supports automatic completion through linked goals.
       Use the `Select Goals` button to pick any combination of advancements, criteria, stats, sub-stats, unlocks, custom
       goals, or multi-stage goal stages, and choose `AND` mode (all selected goals must be completed) or `OR` mode (at
       least one) using the dropdown next to the goal list. When the condition is met, the stage advances automatically in
-      addition to its natural trigger. Chains of linked goals fail beyond a depth of 32.
+      addition to its natural trigger. Chains of linked goals fail beyond a depth of 32, and goals linking back to each
+      other in a loop never complete each other.
     * **Auto-Complete if Next Stage is Completed**: Each non-final stage has an `Auto-complete if next stage is completed`
       checkbox. When enabled, the stage is also considered complete once the following stage is complete (on top of its
       own trigger and any linked goals). This chains backward, so a completed later stage pulls every earlier opted-in
@@ -1301,7 +1304,8 @@ active template), so enabling manual positioning never teleports the element.
 * **Counters**: Track how many goals from a selected set are completed. Each counter has a `Root Name`, `Display Name`,
   and `Icon Path`. Use the **Select Goals** button to open a multi-select popup where you can pick any combination of
   advancements, criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages. Hold **Shift** and click
-  to select a range. The goal being edited is greyed out in the popup, since a goal can never be linked to itself. 
+  to select a range. The goal being edited is greyed out in the popup, since a goal can never be linked to itself.
+  Goals linking back to each other in a loop never complete each other, so such a counter can never reach its total.
   The counter displays progress as "(completed / total)" and uses the default, half-done, and done
   background textures based on progress. Only full completion (all linked goals done) contributes to the overall progress
   percentage.
