@@ -420,6 +420,20 @@ struct EditorDecorationElement {
     EditorLanguageTextRef language_text;
 };
 
+// The template's run completion rule (RunCompletionRule) in editor form: the goal list is a vector so
+// an undo snapshot copies it like every other list. `label` is the lang file's "run_completion.label"
+// and so belongs to the language being edited, like display_category.
+struct EditorRunCompletion {
+    bool types[RC_TYPE_COUNT] = {};
+    std::vector<RunCompletionGoalRef> goals;
+    bool use_count = false;
+    int count = 1;
+    bool use_percent = false;
+    float percent = 100.0f;
+    bool require_both = false;
+    char label[128] = {0};
+};
+
 struct EditorTemplate {
     std::vector<EditorTrackableCategory> advancements;
     std::vector<EditorTrackableCategory> stats;
@@ -429,7 +443,102 @@ struct EditorTemplate {
     std::vector<EditorCounterGoal> counter_goals;
     std::vector<EditorDecorationElement> decorations;
     char display_category[MAX_PATH_LENGTH] = {0}; // Per-language override for the settings Display Category prefill
+    EditorRunCompletion run_completion;
 };
+
+// True when the goal an individually required goal points at is (still) in the template.
+static bool tc_run_completion_goal_exists(const EditorTemplate &data, const RunCompletionGoalRef &ref) {
+    switch (ref.kind) {
+        case RC_GOAL_ADVANCEMENT:
+            for (const auto &a: data.advancements) if (strcmp(a.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_STAT:
+            for (const auto &s: data.stats) if (strcmp(s.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_UNLOCK:
+            for (const auto &u: data.unlocks) if (strcmp(u.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_CUSTOM:
+            for (const auto &c: data.custom_goals) if (strcmp(c.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_MULTISTAGE:
+            for (const auto &g: data.multi_stage_goals) if (strcmp(g.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_COUNTER:
+            for (const auto &c: data.counter_goals) if (strcmp(c.root_name, ref.root_name) == 0) return true;
+            return false;
+        default:
+            return false;
+    }
+}
+
+// Drops individually required goals that no longer exist in the template (deleted or renamed).
+// Returns true when something was dropped.
+static bool tc_run_completion_prune(EditorTemplate &data) {
+    auto &goals = data.run_completion.goals;
+    size_t before = goals.size();
+    goals.erase(std::remove_if(goals.begin(), goals.end(),
+                               [&](const RunCompletionGoalRef &ref) {
+                                   return !tc_run_completion_goal_exists(data, ref);
+                               }),
+                goals.end());
+    return goals.size() != before;
+}
+
+static bool are_editor_run_completions_different(const EditorRunCompletion &a, const EditorRunCompletion &b) {
+    for (int i = 0; i < RC_TYPE_COUNT; i++) if (a.types[i] != b.types[i]) return true;
+    if (a.goals.size() != b.goals.size()) return true;
+    for (size_t i = 0; i < a.goals.size(); i++) {
+        if (a.goals[i].kind != b.goals[i].kind || strcmp(a.goals[i].root_name, b.goals[i].root_name) != 0)
+            return true;
+    }
+    return a.use_count != b.use_count || a.count != b.count ||
+           a.use_percent != b.use_percent || a.percent != b.percent ||
+           a.require_both != b.require_both || strcmp(a.label, b.label) != 0;
+}
+
+// Reads the template's "run_completion" section and the language's counter label into the editor.
+static void tc_run_completion_load(const cJSON *root, const cJSON *lang_json, EditorRunCompletion &out) {
+    out = EditorRunCompletion();
+    RunCompletionRule rule;
+    run_completion_parse(root, &rule);
+    for (int i = 0; i < RC_TYPE_COUNT; i++) out.types[i] = rule.types[i];
+    out.goals.assign(rule.goal_refs, rule.goal_refs + rule.goal_ref_count);
+    out.use_count = rule.use_count;
+    out.count = rule.count;
+    out.use_percent = rule.use_percent;
+    out.percent = rule.percent;
+    out.require_both = rule.require_both;
+    run_completion_free(&rule);
+
+    const cJSON *label = lang_json ? cJSON_GetObjectItem(lang_json, "run_completion.label") : nullptr;
+    if (label && cJSON_IsString(label) && label->valuestring) {
+        strncpy(out.label, label->valuestring, sizeof(out.label) - 1);
+        out.label[sizeof(out.label) - 1] = '\0';
+    }
+}
+
+// Writes the editor's rule as the template's "run_completion" section; nothing is written for the
+// default rule (everything required, no targets). Goals that left the template are skipped.
+static void tc_run_completion_serialize(cJSON *root, const EditorTemplate &data) {
+    const EditorRunCompletion &rc = data.run_completion;
+    std::vector<RunCompletionGoalRef> present;
+    for (const auto &ref: rc.goals) if (tc_run_completion_goal_exists(data, ref)) present.push_back(ref);
+
+    RunCompletionRule rule;
+    run_completion_reset(&rule);
+    for (int i = 0; i < RC_TYPE_COUNT; i++) rule.types[i] = rc.types[i];
+    rule.goal_ref_count = (int) present.size();
+    rule.goal_refs = present.empty() ? nullptr : present.data();
+    rule.use_count = rc.use_count;
+    rule.count = rc.count;
+    rule.use_percent = rc.use_percent;
+    rule.percent = rc.percent;
+    rule.require_both = rc.require_both;
+
+    cJSON *json = run_completion_to_json(&rule);
+    if (json) cJSON_AddItemToObject(root, "run_completion", json);
+}
 
 
 // Descriptions are free text, newlines included, so the cap is generous, but it is a cap: the
@@ -1250,6 +1359,7 @@ static bool is_editor_template_empty(const EditorTemplate &t) {
 static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b,
                                            bool ignore_synced_layout = false) {
     if (strcmp(a.display_category, b.display_category) != 0) return true;
+    if (are_editor_run_completions_different(a.run_completion, b.run_completion)) return true;
     if (a.unlocks.size() != b.unlocks.size() ||
         a.custom_goals.size() != b.custom_goals.size() ||
         a.advancements.size() != b.advancements.size() ||
@@ -1374,6 +1484,7 @@ static TcTemplateDiff tc_find_first_template_difference(const EditorTemplate &a,
          [](const EditorDecorationElement &x) { return x.id; });
 
     if (!diff.any && strcmp(a.display_category, b.display_category) != 0) diff.any = true;
+    if (!diff.any && are_editor_run_completions_different(a.run_completion, b.run_completion)) diff.any = true;
     if (!diff.any || diff.root_name[0] == '\0') return diff;
 
     // The goal is known; narrow it down to the criterion, sub-stat or stage that moved, so the
@@ -2802,6 +2913,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     editor_data.counter_goals.clear();
     editor_data.decorations.clear();
     editor_data.display_category[0] = '\0';
+    editor_data.run_completion = EditorRunCompletion();
 
     char version_filename[64]; // Replacing . with _
     strncpy(version_filename, version, sizeof(version_filename) - 1);
@@ -2863,6 +2975,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals,
                                    lang_json);
     parse_editor_counter_goals(cJSON_GetObjectItem(root, "counter_goals"), editor_data.counter_goals, lang_json);
+    tc_run_completion_load(root, lang_json, editor_data.run_completion);
 
     // Decorations come from the layout file when one is present (authoritative); otherwise inline.
     // Decoration display text always comes from the language file.
@@ -3371,6 +3484,7 @@ static cJSON *build_editor_template_json(const EditorTemplate &editor_data, cons
     cJSON_DeleteItemFromObject(root, "multi_stage_goals");
     cJSON_DeleteItemFromObject(root, "counter_goals");
     cJSON_DeleteItemFromObject(root, "decorations");
+    cJSON_DeleteItemFromObject(root, "run_completion");
     serialize_editor_trackable_categories(root, "advancements", editor_data.advancements);
     serialize_editor_stats(root, editor_data.stats);
     serialize_editor_trackable_items(root, "unlocks", editor_data.unlocks, false);
@@ -3378,6 +3492,7 @@ static cJSON *build_editor_template_json(const EditorTemplate &editor_data, cons
     serialize_editor_multi_stage_goals(root, editor_data.multi_stage_goals);
     serialize_editor_counter_goals(root, editor_data.counter_goals);
     serialize_editor_decorations(root, editor_data.decorations);
+    tc_run_completion_serialize(root, editor_data);
 
     // The template editor stores manual layout in a separate _layout file, never inline. Strip any
     // inline positions/decorations from the template before writing so the two never diverge.
@@ -3401,6 +3516,10 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data,
     // 0. Display Category (only written when non-empty so absence falls back to auto-naming)
     if (editor_data.display_category[0] != '\0') {
         cJSON_AddStringToObject(lang_json, "display_category", editor_data.display_category);
+    }
+    // Run completion counter label, per language like the display category; absent = derived name.
+    if (editor_data.run_completion.label[0] != '\0') {
+        cJSON_AddStringToObject(lang_json, "run_completion.label", editor_data.run_completion.label);
     }
 
     tc_for_each_lang_entry(editor_data, [&](const char *display_key, const char *desc_key,
@@ -3517,6 +3636,10 @@ static void write_other_language_files(const char *version, const DiscoveredTemp
         if (display_category) {
             cJSON_AddItemToObject(rebuilt, "display_category", cJSON_Duplicate(display_category, 1));
         }
+        cJSON *completion_label = cJSON_GetObjectItem(existing, "run_completion.label");
+        if (completion_label) {
+            cJSON_AddItemToObject(rebuilt, "run_completion.label", cJSON_Duplicate(completion_label, 1));
+        }
         for (const auto &kv: lang_writes) {
             cJSON_AddStringToObject(rebuilt, kv.first.c_str(), kv.second.c_str());
         }
@@ -3525,6 +3648,7 @@ static void write_other_language_files(const char *version, const DiscoveredTemp
         for (const cJSON *entry = existing->child; entry; entry = entry->next) {
             if (!entry->string) continue;
             if (strcmp(entry->string, "display_category") == 0) continue;
+            if (strcmp(entry->string, "run_completion.label") == 0) continue;
             if (current_keys.count(entry->string) || stale_keys.count(entry->string)) continue;
             cJSON_AddItemToObject(rebuilt, entry->string, cJSON_Duplicate(entry, 1));
         }
@@ -5343,6 +5467,392 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         }
     }
     ImGui::PopID();
+}
+
+// Legacy (<= 1.6.4) hidden helper stats for multi-stage goals are not real goals and stay out of every
+// count, the same rule the tracker and the Compact overlay apply.
+static bool tc_stat_counts_as_goal(const EditorTrackableCategory &s, MC_Version version) {
+    return !(version <= MC_VERSION_1_6_4 && s.is_simple_stat && s.criteria.size() == 1 && s.criteria[0].goal == 0);
+}
+
+// The "Run Completion" editor tab: which goals a run has to finish (whole types and/or individual
+// goals, an empty pick meaning the whole template), the optional count / percentage targets, and the
+// per-language label of the counter the tracker title, info bar and overlay progress text show.
+// `t` supplies the renderer and texture caches for the goal icons in the dropdowns (may be null).
+static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version version, Tracker *t) {
+    EditorRunCompletion &rc = data.run_completion;
+    tc_run_completion_prune(data);
+    const bool modern = (version >= MC_VERSION_1_12);
+    const char *adv_word = modern ? "Advancements" : "Achievements";
+
+    // How many goals of each type the template has, how many of them the rule requires, and which
+    // types the required set spans (for the derived counter label). A goal is required when its
+    // whole type is checked or it is picked individually, so it counts once.
+    int type_total[RC_TYPE_COUNT] = {0};
+    int required_total = 0;
+    int required_mask = 0;
+    int everything_total = 0;
+    auto picked = [&](RunCompletionGoalKind kind, const char *root) {
+        for (const auto &ref: rc.goals)
+            if (ref.kind == kind && strcmp(ref.root_name, root) == 0) return true;
+        return false;
+    };
+    auto tally = [&](RunCompletionType type, RunCompletionGoalKind kind, const char *root) {
+        type_total[type]++;
+        everything_total++;
+        if (rc.types[type] || picked(kind, root)) {
+            required_total++;
+            required_mask |= 1 << type;
+        }
+    };
+    for (const auto &a: data.advancements)
+        tally(a.is_recipe ? RC_TYPE_RECIPES : RC_TYPE_ADVANCEMENTS, RC_GOAL_ADVANCEMENT, a.root_name);
+    for (const auto &s: data.stats)
+        if (tc_stat_counts_as_goal(s, version)) tally(RC_TYPE_STATS, RC_GOAL_STAT, s.root_name);
+    for (const auto &u: data.unlocks) tally(RC_TYPE_UNLOCKS, RC_GOAL_UNLOCK, u.root_name);
+    for (const auto &c: data.custom_goals) tally(RC_TYPE_CUSTOM, RC_GOAL_CUSTOM, c.root_name);
+    for (const auto &g: data.multi_stage_goals) tally(RC_TYPE_MULTISTAGE, RC_GOAL_MULTISTAGE, g.root_name);
+    for (const auto &c: data.counter_goals) tally(RC_TYPE_COUNTERS, RC_GOAL_COUNTER, c.root_name);
+
+    bool any_type = false;
+    for (int i = 0; i < RC_TYPE_COUNT; i++) if (rc.types[i]) any_type = true;
+    const bool everything = !any_type && rc.goals.empty();
+    // The size of the required set; with nothing picked the rule spans the whole template.
+    const int set_size = everything ? everything_total : required_total;
+
+    const char *type_names[RC_TYPE_COUNT] = {
+        adv_word, "Recipes", "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals", "Counters"
+    };
+
+    ImGui::TextWrapped("Decides when a run of this template counts as completed: the IGT freezes and the "
+        "overlay shows its 'RUN COMPLETED' screen. Pick whole goal types and/or individual goals; "
+        "everything picked has to be done. With nothing picked the whole template has to be completed. "
+        "Saved into the template itself, so it travels with it.");
+    ImGui::Spacing();
+    ImGui::SeparatorText("Required Goals");
+
+    // Shift+Click range anchors: one for the type list, one per individual-goal dropdown (row index of
+    // the last plain click; -1 = none yet).
+    static int s_rc_type_anchor = -1;
+    static int s_rc_anchor[RC_TYPE_COUNT];
+    static bool s_rc_anchor_init = false;
+    if (!s_rc_anchor_init) {
+        for (int i = 0; i < RC_TYPE_COUNT; i++) s_rc_anchor[i] = -1;
+        s_rc_anchor_init = true;
+    }
+
+    // --- Whole goal types (multiselect) ---
+    char types_preview[64];
+    if (everything) {
+        snprintf(types_preview, sizeof(types_preview), "Everything");
+    } else {
+        int checked = 0;
+        for (int i = 0; i < RC_TYPE_COUNT; i++) if (rc.types[i] && type_total[i] > 0) checked++;
+        snprintf(types_preview, sizeof(types_preview), "%d selected", checked);
+    }
+    ImGui::SetNextItemWidth(260.0f);
+    if (ImGui::BeginCombo("Goal Types", types_preview)) {
+        if (ImGui::Selectable("Everything (whole template)", everything, ImGuiSelectableFlags_NoAutoClosePopups)) {
+            for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = false;
+            rc.goals.clear();
+            s_rc_type_anchor = -1;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tip[256];
+            snprintf(tip, sizeof(tip),
+                     "The run completes once every goal in the template is done (100%%).\n"
+                     "Clears every type and individual goal picked below.");
+            ImGui::SetTooltip("%s", tip);
+        }
+        ImGui::Separator();
+        for (int i = 0; i < RC_TYPE_COUNT; i++) {
+            if (type_total[i] <= 0) continue;
+            char row[96];
+            snprintf(row, sizeof(row), "All %s (%d)", type_names[i], type_total[i]);
+            if (ImGui::Selectable(row, rc.types[i], ImGuiSelectableFlags_NoAutoClosePopups)) {
+                bool new_state = !rc.types[i];
+                if (ImGui::GetIO().KeyShift && s_rc_type_anchor >= 0 && s_rc_type_anchor != i) {
+                    int lo = s_rc_type_anchor < i ? s_rc_type_anchor : i;
+                    int hi = s_rc_type_anchor < i ? i : s_rc_type_anchor;
+                    for (int k = lo; k <= hi; k++)
+                        if (type_total[k] > 0) rc.types[k] = new_state;
+                } else {
+                    rc.types[i] = new_state;
+                }
+                s_rc_type_anchor = i;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        char tip[512];
+        snprintf(tip, sizeof(tip),
+                 "Whole goal types the run has to finish. Every goal of a checked type is required,\n"
+                 "including goals hidden from the tracker. Only types this template has are listed.\n"
+                 "Combine with the individual goals below; the run needs all of them.\n"
+                 "Shift+Click to range-select.\n"
+                 "Default: Everything");
+        ImGui::SetTooltip("%s", tip);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("All##rc_types"))
+        for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = type_total[i] > 0;
+    ImGui::SameLine();
+    if (ImGui::SmallButton("None##rc_types"))
+        for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = false;
+
+    // --- Individual goals, one dropdown per kind the template has ---
+    auto goal_index = [&](RunCompletionGoalKind kind, const char *root) -> int {
+        for (size_t i = 0; i < rc.goals.size(); i++)
+            if (rc.goals[i].kind == kind && strcmp(rc.goals[i].root_name, root) == 0) return (int) i;
+        return -1;
+    };
+    auto goal_set = [&](RunCompletionGoalKind kind, const char *root, bool on) {
+        int idx = goal_index(kind, root);
+        if (on && idx < 0) {
+            RunCompletionGoalRef ref = {};
+            ref.kind = kind;
+            strncpy(ref.root_name, root, sizeof(ref.root_name) - 1);
+            ref.root_name[sizeof(ref.root_name) - 1] = '\0';
+            rc.goals.push_back(ref);
+        } else if (!on && idx >= 0) {
+            rc.goals.erase(rc.goals.begin() + idx);
+        }
+    };
+
+    // The goal's icon out of the tracker's caches (the same files the tracker draws), or none.
+    auto goal_icon = [&](const char *icon_path, SDL_Texture **tex, AnimatedTexture **anim) {
+        *tex = nullptr;
+        *anim = nullptr;
+        if (!t || !t->renderer || !icon_path || icon_path[0] == '\0') return;
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "%s/%s", get_icons_base_path(), icon_path);
+        if (strstr(full_path, ".gif")) {
+            *anim = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
+                                                    &t->anim_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        } else {
+            *tex = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                          &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        }
+    };
+
+    struct RcRow {
+        const char *root;
+        const char *display;
+        const char *icon;
+    };
+    std::vector<RcRow> rows;
+    auto goal_combo = [&](RunCompletionType type, RunCompletionGoalKind kind, const char *label, const char *tip) {
+        if (rows.empty()) return;
+        int selected = 0;
+        for (const auto &row: rows) if (goal_index(kind, row.root) >= 0) selected++;
+        char preview[48];
+        snprintf(preview, sizeof(preview), "%d selected", selected);
+        char combo_id[96];
+        snprintf(combo_id, sizeof(combo_id), "%s##rc_goals_%d", label, (int) type);
+        // With the whole type checked above every one of these goals is required already, so the
+        // picks here change nothing until the type is unchecked again; they are kept, just greyed out.
+        const bool type_checked = rc.types[type];
+        if (type_checked) ImGui::BeginDisabled();
+        ImGui::SetNextItemWidth(260.0f);
+        if (ImGui::BeginCombo(combo_id, preview)) {
+            ImGuiListClipper clipper;
+            clipper.Begin((int) rows.size(), goal_icon_row_height());
+            while (clipper.Step()) {
+                for (int r = clipper.DisplayStart; r < clipper.DisplayEnd; r++) {
+                    const RcRow &row = rows[r];
+                    bool on = goal_index(kind, row.root) >= 0;
+                    // The display name of the language being edited; the root name only when that
+                    // language has none.
+                    const char *text = row.display[0] != '\0' ? row.display : row.root;
+                    SDL_Texture *tex = nullptr;
+                    AnimatedTexture *anim = nullptr;
+                    goal_icon(row.icon, &tex, &anim);
+                    if (goal_icon_selectable(row.root, text, on, tex, anim)) {
+                        bool new_state = !on;
+                        int &anchor = s_rc_anchor[type];
+                        if (ImGui::GetIO().KeyShift && anchor >= 0 && anchor < (int) rows.size() && anchor != r) {
+                            int lo = anchor < r ? anchor : r;
+                            int hi = anchor < r ? r : anchor;
+                            for (int k = lo; k <= hi; k++) goal_set(kind, rows[k].root, new_state);
+                        } else {
+                            goal_set(kind, row.root, new_state);
+                        }
+                        anchor = r;
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[512];
+            if (type_checked)
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Every %s is already required through 'All %s' in Goal Types,\n"
+                         "so single picks here make no difference. Uncheck the type to pick individually.",
+                         label, label);
+            else
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "%s\nShift+Click to range-select.", tip);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        char all_id[48], none_id[48];
+        snprintf(all_id, sizeof(all_id), "All##rc_goals_%d_all", (int) type);
+        snprintf(none_id, sizeof(none_id), "None##rc_goals_%d_none", (int) type);
+        if (ImGui::SmallButton(all_id)) for (const auto &row: rows) goal_set(kind, row.root, true);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(none_id)) for (const auto &row: rows) goal_set(kind, row.root, false);
+        if (type_checked) ImGui::EndDisabled();
+    };
+
+    rows.clear();
+    for (const auto &a: data.advancements)
+        if (!a.is_recipe) rows.push_back({a.root_name, a.display_name, a.icon_path});
+    goal_combo(RC_TYPE_ADVANCEMENTS, RC_GOAL_ADVANCEMENT, adv_word,
+               modern
+                   ? "Specific advancements the run has to complete. Recipes have their own dropdown."
+                   : "Specific achievements the run has to complete.");
+    rows.clear();
+    for (const auto &a: data.advancements)
+        if (a.is_recipe) rows.push_back({a.root_name, a.display_name, a.icon_path});
+    goal_combo(RC_TYPE_RECIPES, RC_GOAL_ADVANCEMENT, "Recipes", "Specific recipes the run has to unlock.");
+    rows.clear();
+    for (const auto &s: data.stats)
+        if (tc_stat_counts_as_goal(s, version)) rows.push_back({s.root_name, s.display_name, s.icon_path});
+    goal_combo(RC_TYPE_STATS, RC_GOAL_STAT, "Stats",
+               "Specific stats the run has to complete. A multi-stat counts once all of its sub-stats\n"
+               "are done; an open-ended stat (no target) never completes.");
+    rows.clear();
+    for (const auto &u: data.unlocks) rows.push_back({u.root_name, u.display_name, u.icon_path});
+    goal_combo(RC_TYPE_UNLOCKS, RC_GOAL_UNLOCK, "Unlocks", "Specific unlocks the run has to get.");
+    rows.clear();
+    for (const auto &c: data.custom_goals) rows.push_back({c.root_name, c.display_name, c.icon_path});
+    goal_combo(RC_TYPE_CUSTOM, RC_GOAL_CUSTOM, "Custom Goals", "Specific custom goals the run has to complete.");
+    rows.clear();
+    for (const auto &g: data.multi_stage_goals) rows.push_back({g.root_name, g.display_name, g.icon_path});
+    goal_combo(RC_TYPE_MULTISTAGE, RC_GOAL_MULTISTAGE, "Multi-Stage Goals",
+               "Specific multi-stage goals the run has to bring to their final stage.");
+    rows.clear();
+    for (const auto &c: data.counter_goals) rows.push_back({c.root_name, c.display_name, c.icon_path});
+    goal_combo(RC_TYPE_COUNTERS, RC_GOAL_COUNTER, "Counters",
+               "Specific counters the run has to complete (all of their linked goals done).");
+
+    if (everything_total == 0) ImGui::TextDisabled("This template has no goals yet.");
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Targets");
+    ImGui::TextWrapped("Optionally end the run before the required goals are all done (e.g. Half%%).");
+
+    int max_count = set_size > 0 ? set_size : 1;
+    if (rc.count < 1) rc.count = 1;
+    if (rc.count > max_count) rc.count = max_count;
+    ImGui::Checkbox("Complete at goal count", &rc.use_count);
+    if (ImGui::IsItemHovered()) {
+        char tip[512];
+        snprintf(tip, sizeof(tip),
+                 "When enabled, the run completes once this many of the required goals are done\n"
+                 "instead of all of them. The maximum (%d) is the size of the required set above\n"
+                 "(the whole template when nothing is picked).\n"
+                 "Default: Off", max_count);
+        ImGui::SetTooltip("%s", tip);
+    }
+    if (rc.use_count) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputInt("##rc_count", &rc.count)) {
+            if (rc.count < 1) rc.count = 1;
+            if (rc.count > max_count) rc.count = max_count;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tip[128];
+            snprintf(tip, sizeof(tip), "Number of required goals that have to be done (1 to %d).", max_count);
+            ImGui::SetTooltip("%s", tip);
+        }
+    }
+
+    // The overall progress percentage spans the whole template, so it is only a target (and only
+    // shown next to the counter) while the rule requires everything.
+    if (!everything) ImGui::BeginDisabled();
+    ImGui::Checkbox("Complete at progress percentage", &rc.use_percent);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tip[512];
+        if (!everything)
+            snprintf(tip, sizeof(tip),
+                     "Only available with 'Everything': the overall progress percentage covers the whole\n"
+                     "template, which says nothing about the required goals picked above.\n"
+                     "Use the goal count target for a partial completion instead.");
+        else
+            snprintf(tip, sizeof(tip),
+                     "When enabled, the run completes once the overall progress reaches this percentage.\n"
+                     "This is the same overall progress shown in the tracker and overlay, over the whole\n"
+                     "template (every goal type except advancements contributes to it).\n"
+                     "Default: Off");
+        ImGui::SetTooltip("%s", tip);
+    }
+    if (rc.use_percent && everything) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputFloat("##rc_percent", &rc.percent, 0.0f, 0.0f, "%.2f")) {
+            if (rc.percent < 0.0f) rc.percent = 0.0f;
+            if (rc.percent > 100.0f) rc.percent = 100.0f;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tip[128];
+            snprintf(tip, sizeof(tip), "Overall progress percentage required (0.00 to 100.00).");
+            ImGui::SetTooltip("%s", tip);
+        }
+    }
+
+    if (!everything) ImGui::EndDisabled();
+
+    bool both_targets = rc.use_count && rc.use_percent && everything;
+    if (!both_targets) ImGui::BeginDisabled();
+    ImGui::Checkbox("Require both targets (AND)", &rc.require_both);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tip[512];
+        if (!both_targets) {
+            snprintf(tip, sizeof(tip),
+                     "Disabled because only one (or no) target is enabled.\n"
+                     "Enable BOTH the goal count and the progress percentage targets above\n"
+                     "to choose whether both must be met (AND) or just either one (OR).");
+        } else {
+            snprintf(tip, sizeof(tip),
+                     "Checked: the run completes only when BOTH targets are met (AND).\n"
+                     "Unchecked: the run completes as soon as EITHER target is met (OR).\n"
+                     "Default: Off (either target, OR)");
+        }
+        ImGui::SetTooltip("%s", tip);
+    }
+    if (!both_targets) ImGui::EndDisabled();
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Progress Counter");
+    ImGui::TextWrapped("The 'X/Y' counter in the tracker title, the info bar and the overlay progress text "
+        "(Scrolling Belt and Page modes). It counts the required goals picked above and replaces the "
+        "%s counter; the overall progress percentage is left out then, as it covers the whole template. "
+        "With 'Everything' the plain %s counter and the percentage stay.",
+        modern ? "advancement" : "achievement", modern ? "advancement" : "achievement");
+
+    const char *derived = run_completion_derived_label(required_mask, modern);
+    ImGui::SetNextItemWidth(260.0f);
+    ImGui::InputTextWithHint("Counter Label", derived, rc.label, sizeof(rc.label));
+    if (ImGui::IsItemHovered()) {
+        char tip[512];
+        snprintf(tip, sizeof(tip),
+                 "Text shown in front of the counter, e.g. 'Blocks Placed' for 'Blocks Placed: 12/40'.\n"
+                 "Saved into the language file selected above (key 'run_completion.label'), so each\n"
+                 "language can have its own. Leave empty for the automatic name (%s).\n"
+                 "Ignored while 'Everything' is picked.", derived);
+        ImGui::SetTooltip("%s", tip);
+    }
+
+    char shown[256];
+    if (everything) {
+        snprintf(shown, sizeof(shown), "%s: 0/%d", modern ? "Adv" : "Ach", type_total[RC_TYPE_ADVANCEMENTS]);
+    } else {
+        snprintf(shown, sizeof(shown), "%s: 0/%d", rc.label[0] != '\0' ? rc.label : derived, set_size);
+    }
+    ImGui::TextWrapped("Shown as: %s", shown);
 }
 
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
@@ -21254,6 +21764,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::EndTabItem();
                 }
             } // end decorations tab scope
+
+            // ==================== RUN COMPLETION TAB ====================
+            if (ImGui::BeginTabItem("Run Completion")) {
+                ImGui::BeginChild("RunCompletionPane", ImVec2(0, 0), true);
+                tc_render_run_completion_tab(current_template_data, creator_selected_version, t);
+                ImGui::EndChild();
+                ImGui::EndTabItem();
+            }
             ImGui::EndTabBar();
         }
         ImGui::PopID();

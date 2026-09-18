@@ -649,6 +649,52 @@ struct DecorationElement {
     CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals (text headers only)
 };
 
+// --------- RUN COMPLETION (per-template stopping criteria) ---------
+
+// Whole goal types a template can require for the run to count as completed. Stored in the
+// template's "run_completion" section by key (see run_completion_type_key). RC_TYPE_COUNT stays last.
+enum RunCompletionType {
+    RC_TYPE_ADVANCEMENTS = 0, // Advancements (>= 1.12) / Achievements (<= 1.11.2), recipes excluded
+    RC_TYPE_RECIPES, // Recipes (>= 1.12)
+    RC_TYPE_STATS, // Stat categories (simple and multi)
+    RC_TYPE_UNLOCKS,
+    RC_TYPE_CUSTOM, // Custom goals
+    RC_TYPE_MULTISTAGE, // Multi-stage goals
+    RC_TYPE_COUNTERS, // Completion counters
+    RC_TYPE_COUNT
+};
+
+// Which template list an individually required goal lives in.
+enum RunCompletionGoalKind {
+    RC_GOAL_ADVANCEMENT = 0, // Advancement, achievement or recipe
+    RC_GOAL_STAT,
+    RC_GOAL_UNLOCK,
+    RC_GOAL_CUSTOM,
+    RC_GOAL_MULTISTAGE,
+    RC_GOAL_COUNTER,
+    RC_GOAL_KIND_COUNT
+};
+
+struct RunCompletionGoalRef {
+    RunCompletionGoalKind kind;
+    char root_name[192];
+};
+
+// A template's completion rule. The required set is every goal of every checked type plus every
+// individually listed goal; an empty set means "everything in the template". The run completes when
+// the whole set is done, or (count/percent targets) when `count` goals of the set are done and/or the
+// overall progress percentage reaches `percent`, combined with AND or OR via require_both.
+struct RunCompletionRule {
+    bool types[RC_TYPE_COUNT];
+    int goal_ref_count;
+    RunCompletionGoalRef *goal_refs; // Dynamically allocated (tracker side), NULL when empty
+    bool use_count;
+    int count; // Goals of the required set that must be done (1..set size)
+    bool use_percent;
+    float percent; // Overall progress percentage required (0.00..100.00)
+    bool require_both; // Both count and percent targets must be met (AND) instead of either (OR)
+};
+
 // The main container for all data loaded from the template files.
 struct TemplateData {
     int advancement_count; // Amount of advancements defined in the template under "advancements"
@@ -686,6 +732,17 @@ struct TemplateData {
     int completed_criteria_count;
     float overall_progress_percentage;
     // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
+
+    // Run completion rule from the template's "run_completion" section and the goals it requires.
+    // completion_goal_count is 0 when the rule requires everything (the counter then falls back to
+    // the advancement counter above). completion_label is the lang file's "run_completion.label",
+    // empty when it has none; the counter then derives a name from completion_type_mask (bit per
+    // RunCompletionType present in the required set: one type = its name, a mix = "Goals").
+    RunCompletionRule run_completion;
+    int completion_goal_count; // Size of the required goal set (0 = everything)
+    int completion_goals_completed; // Done goals within that set
+    int completion_type_mask;
+    char completion_label[128];
 
     float host_time_since_last_update; // Co-op: host's update timer, mirrored by receivers
 

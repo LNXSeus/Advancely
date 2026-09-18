@@ -57,6 +57,21 @@ void free_discovered_templates(DiscoveredTemplate **templates, int *count);
  */
 uint64_t compute_template_goal_hash(const char *template_file_path);
 
+// --- Run completion rule (the template's "run_completion" section) ---
+// Shared by the tracker (parse) and the template editor (parse + serialize) so the keys never drift.
+const char *run_completion_type_key(RunCompletionType type); // e.g. "advancements", "stats"
+const char *run_completion_goal_kind_key(RunCompletionGoalKind kind); // e.g. "advancement", "stat"
+void run_completion_reset(RunCompletionRule *rule); // Everything required, no count/percent targets
+bool run_completion_is_default(const RunCompletionRule *rule); // Nothing selected and no targets on
+bool run_completion_requires_everything(const RunCompletionRule *rule); // No types and no goals selected
+// Parses template_root["run_completion"] into rule (missing section = default). Allocates goal_refs;
+// release with run_completion_free().
+void run_completion_parse(const cJSON *template_root, RunCompletionRule *rule);
+void run_completion_free(RunCompletionRule *rule);
+// Builds the "run_completion" object for a template file, or NULL when the rule is the default (so
+// templates that never touched the feature keep their file unchanged).
+cJSON *run_completion_to_json(const RunCompletionRule *rule);
+
 #ifdef __cplusplus
 }
 #endif

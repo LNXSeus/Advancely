@@ -1,4 +1,5 @@
 {
+	"run_completion.label":	"Blocks Placed",
 	"stat.mob_heads":	"Mob Heads",
 	"stat.mob_heads.criteria.minecraft:picked_up/minecraft:creeper_head":	"Creeper Head",
 	"stat.mob_heads.criteria.minecraft:picked_up/minecraft:skeleton_skull":	"Skeleton Skull",

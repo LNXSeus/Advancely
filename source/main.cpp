@@ -373,6 +373,9 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
     // dangling pointer and count, so clear them here to make a stray dereference impossible.
     target_td->decorations = nullptr;
     target_td->decoration_count = 0;
+    // Same for the run completion rule's goal list; the overlay only needs the settled counts and label.
+    target_td->run_completion.goal_refs = nullptr;
+    target_td->run_completion.goal_ref_count = 0;
 
     // 3. Read advancements and their criteria.
     for (int i = 0; i < target_td->advancement_count; i++) {
@@ -494,6 +497,9 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
     target->overall_progress_percentage = incoming.overall_progress_percentage;
     target->total_progress_steps = incoming.total_progress_steps;
     target->advancement_goal_count = incoming.advancement_goal_count;
+    target->completion_goal_count = incoming.completion_goal_count;
+    target->completion_goals_completed = incoming.completion_goals_completed;
+    target->completion_type_mask = incoming.completion_type_mask;
     target->play_time_ticks = incoming.play_time_ticks;
     target->frozen_play_time_ticks = incoming.frozen_play_time_ticks;
     target->speedrunigt_ms = incoming.speedrunigt_ms;

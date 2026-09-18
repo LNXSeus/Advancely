@@ -310,19 +310,41 @@ bool str_contains_insensitive(const char *haystack, const char *needle);
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings);
 
 /**
- * @brief Determines whether a run counts as completed, honoring the optional
- * per-template completion thresholds in settings (advancement count and/or
- * overall progress percentage). When neither threshold is enabled the run is
- * only complete at full 100% (advancements done and progress at 100%).
+ * @brief Determines whether a run counts as completed, honoring the template's own run
+ * completion rule (TemplateData::run_completion): the required goal types and goals, plus the
+ * optional count and overall progress percentage targets. With the default rule the run is only
+ * complete at full 100% (advancements done and progress at 100%).
  *
  * This is the single source of truth for run completion; the latched
  * run_completed flag (frozen IGT, overlay "RUN COMPLETED" screen) derives from it.
+ * Relies on the completion counts settled by tracker_calculate_overall_progress().
  *
  * @param td A pointer to the TemplateData with the current progress counts.
- * @param settings A pointer to the AppSettings holding the threshold config (may be NULL).
  * @return true if the run meets the active completion criteria.
  */
-bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *settings);
+bool tracker_run_meets_completion(const TemplateData *td);
+
+/**
+ * @brief The "X/Y" counter the tracker title, info bar and overlay progress text show. This is the
+ * template's run completion set (label from the lang file or derived from the checked types) when
+ * the template has one, otherwise the plain advancement / achievement counter.
+ * @return false when there is nothing to show (no rule and no advancements in the template).
+ */
+bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, const char **label,
+                                  int *done, int *total);
+
+/**
+ * @brief Whether the overall progress percentage belongs next to that counter. It spans the whole
+ * template, so it is hidden while the template's run completion rule requires only a subset.
+ */
+bool tracker_progress_percent_shown(const TemplateData *td);
+
+/**
+ * @brief The counter label used when the language file has no "run_completion.label": the name of
+ * the single type the required set spans (type_mask has one bit set), or "Goals" for a mix.
+ * Shared with the template editor's preview so both agree.
+ */
+const char *run_completion_derived_label(int type_mask, bool modern);
 
 /**
  * @brief Loads an SDL_Texture from a file and sets its scale mode.
@@ -332,6 +354,15 @@ bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *set
  * @return A pointer to the created SDL_Texture, or nullptr on failure.
  */
 SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode);
+
+// Shared goal-row widgets for selection combos (Compact overlay settings, editor Run Completion tab).
+// The frame an animated icon is on right now, or the static texture when the goal has no .gif.
+SDL_Texture *goal_icon_frame_texture(SDL_Texture *tex, const AnimatedTexture *anim);
+// Height of one icon row, so a list clipper can skip rows without measuring them.
+float goal_icon_row_height();
+// A full-width selectable row with the goal's icon on the left and `text` to its right.
+bool goal_icon_selectable(const char *id, const char *text, bool selected,
+                          SDL_Texture *tex, const AnimatedTexture *anim);
 
 /**
     * @brief Gets an SDL_Texture from a path, utilizing a specific cache to avoid redundant loads.

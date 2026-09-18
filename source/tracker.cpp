@@ -4360,32 +4360,177 @@ static bool tracker_update_multi_stage_linked_goals(Tracker *t) {
     return any_changed;
 }
 
-bool tracker_run_meets_completion(const TemplateData *td, const AppSettings *settings) {
+// True when an individually required goal of this kind and root name is part of the rule.
+static bool rc_goal_listed(const RunCompletionRule *rule, RunCompletionGoalKind kind, const char *root_name) {
+    for (int i = 0; i < rule->goal_ref_count; i++) {
+        const RunCompletionGoalRef *ref = &rule->goal_refs[i];
+        if (ref->kind == kind && strcmp(ref->root_name, root_name) == 0) return true;
+    }
+    return false;
+}
+
+// Reads the lang file's "run_completion.label" into completion_label (empty when it has none, in
+// which case the counter derives a name from the types in the required set).
+static void tracker_read_completion_label(TemplateData *td, const cJSON *lang_json) {
+    td->completion_label[0] = '\0';
+    const cJSON *label = lang_json ? cJSON_GetObjectItem(lang_json, "run_completion.label") : nullptr;
+    if (label && cJSON_IsString(label) && label->valuestring) {
+        strncpy(td->completion_label, label->valuestring, sizeof(td->completion_label) - 1);
+        td->completion_label[sizeof(td->completion_label) - 1] = '\0';
+    }
+}
+
+// Counts the goals the template's completion rule requires and how many of them are done, into
+// completion_goal_count / completion_goals_completed, plus completion_type_mask (which types the set
+// spans, for the derived counter label). A goal is in the required set when its whole type is checked
+// or it is listed individually, so a goal picked both ways counts once. With nothing selected the rule
+// means "everything" and the counts stay 0.
+static void tracker_compute_completion_counts(TemplateData *td, MC_Version version) {
+    const RunCompletionRule *rule = &td->run_completion;
+    td->completion_goal_count = 0;
+    td->completion_goals_completed = 0;
+    td->completion_type_mask = 0;
+    if (run_completion_requires_everything(rule)) return;
+
+    int total = 0, done = 0, mask = 0;
+    auto take = [&](RunCompletionType type, bool is_done) {
+        total++;
+        mask |= 1 << type;
+        if (is_done) done++;
+    };
+    for (int i = 0; i < td->advancement_count; i++) {
+        const TrackableCategory *a = td->advancements[i];
+        if (!a) continue;
+        RunCompletionType type = a->is_recipe ? RC_TYPE_RECIPES : RC_TYPE_ADVANCEMENTS;
+        if (rule->types[type] || rc_goal_listed(rule, RC_GOAL_ADVANCEMENT, a->root_name)) take(type, a->done);
+    }
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *s = td->stats[i];
+        if (!s) continue;
+        // Legacy hidden helper stats (<= 1.6.4) are not real goals, same as everywhere else.
+        if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
+            continue;
+        if (rule->types[RC_TYPE_STATS] || rc_goal_listed(rule, RC_GOAL_STAT, s->root_name))
+            take(RC_TYPE_STATS, s->done);
+    }
+    for (int i = 0; i < td->unlock_count; i++) {
+        const TrackableItem *u = td->unlocks[i];
+        if (!u) continue;
+        if (rule->types[RC_TYPE_UNLOCKS] || rc_goal_listed(rule, RC_GOAL_UNLOCK, u->root_name))
+            take(RC_TYPE_UNLOCKS, u->done);
+    }
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        const TrackableItem *c = td->custom_goals[i];
+        if (!c) continue;
+        if (rule->types[RC_TYPE_CUSTOM] || rc_goal_listed(rule, RC_GOAL_CUSTOM, c->root_name))
+            take(RC_TYPE_CUSTOM, c->done);
+    }
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        const MultiStageGoal *g = td->multi_stage_goals[i];
+        if (!g) continue;
+        if (rule->types[RC_TYPE_MULTISTAGE] || rc_goal_listed(rule, RC_GOAL_MULTISTAGE, g->root_name))
+            take(RC_TYPE_MULTISTAGE, g->current_stage >= g->stage_count - 1);
+    }
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        const CounterGoal *c = td->counter_goals[i];
+        if (!c) continue;
+        if (rule->types[RC_TYPE_COUNTERS] || rc_goal_listed(rule, RC_GOAL_COUNTER, c->root_name))
+            take(RC_TYPE_COUNTERS, c->done);
+    }
+    td->completion_goal_count = total;
+    td->completion_goals_completed = done;
+    td->completion_type_mask = mask;
+}
+
+const char *run_completion_derived_label(int type_mask, bool modern) {
+    static const char *type_labels[RC_TYPE_COUNT] = {
+        nullptr, "Recipes", "Stats", "Unlocks", "Custom", "MS-Goals", "Counters"
+    };
+    for (int i = 0; i < RC_TYPE_COUNT; i++) {
+        if (type_mask != (1 << i)) continue;
+        return (i == RC_TYPE_ADVANCEMENTS) ? (modern ? "Adv" : "Ach") : type_labels[i];
+    }
+    return "Goals";
+}
+
+bool tracker_progress_percent_shown(const TemplateData *td) {
+    return td && td->total_progress_steps > 0 && td->completion_goal_count == 0;
+}
+
+bool tracker_run_meets_completion(const TemplateData *td) {
     if (!td) return false;
+    const RunCompletionRule *rule = &td->run_completion;
 
-    const bool adv_on = settings && settings->completion_use_adv_threshold;
-    const bool pct_on = settings && settings->completion_use_percent_threshold;
-
-    // No custom threshold active: require full 100% completion (default behaviour).
-    if (!adv_on && !pct_on) {
-        return td->advancements_completed_count >= td->advancement_count &&
-               td->overall_progress_percentage >= 100.0f;
+    // The rule's own "all of the required set is done" check. With nothing selected that is the
+    // whole template: every advancement done and the progress at 100% (default behaviour).
+    bool set_done;
+    if (run_completion_requires_everything(rule)) {
+        set_done = td->advancements_completed_count >= td->advancement_count &&
+                   td->overall_progress_percentage >= 100.0f;
+    } else {
+        // An empty set (every goal of a checked type was removed from the template) never completes.
+        set_done = td->completion_goal_count > 0 &&
+                   td->completion_goals_completed >= td->completion_goal_count;
     }
 
-    const bool adv_met = td->advancements_completed_count >= settings->completion_adv_threshold;
+    // The percentage target spans the whole template, so it only applies to the "everything" rule;
+    // a required subset is measured by its own count (the editor greys the target out then too).
+    const bool use_percent = rule->use_percent && run_completion_requires_everything(rule);
+
+    // No count / percent target active: the required set has to be done.
+    if (!rule->use_count && !use_percent) return set_done;
+
+    // A count target replaces "all of the set": it asks for `count` goals of it instead. With the
+    // set meaning everything, the count runs over every goal in the template.
+    int set_total, set_completed;
+    if (run_completion_requires_everything(rule)) {
+        set_total = td->advancement_count + td->stat_count + td->unlock_count + td->custom_goal_count +
+                    td->multi_stage_goal_count + td->counter_goal_count;
+        set_completed = td->advancements_completed_count + td->stats_completed_count +
+                        td->unlocks_completed_count;
+        for (int i = 0; i < td->custom_goal_count; i++)
+            if (td->custom_goals[i] && td->custom_goals[i]->done) set_completed++;
+        for (int i = 0; i < td->multi_stage_goal_count; i++) {
+            const MultiStageGoal *g = td->multi_stage_goals[i];
+            if (g && g->current_stage >= g->stage_count - 1) set_completed++;
+        }
+        for (int i = 0; i < td->counter_goal_count; i++)
+            if (td->counter_goals[i] && td->counter_goals[i]->done) set_completed++;
+    } else {
+        set_total = td->completion_goal_count;
+        set_completed = td->completion_goals_completed;
+    }
+    int needed = rule->count < set_total ? rule->count : set_total;
+    const bool count_met = set_completed >= needed;
     // Small epsilon so a target of e.g. 50.00% isn't missed by float rounding.
-    const bool pct_met = td->overall_progress_percentage >= settings->completion_percent_threshold - 0.001f;
+    const bool pct_met = td->overall_progress_percentage >= rule->percent - 0.001f;
 
-    if (settings->completion_threshold_require_both) {
-        // AND: every enabled target must be met.
-        return (!adv_on || adv_met) && (!pct_on || pct_met);
+    if (rule->use_count && use_percent) {
+        return rule->require_both ? (count_met && pct_met) : (count_met || pct_met);
     }
-    // OR: any enabled target being met completes the run.
-    return (adv_on && adv_met) || (pct_on && pct_met);
+    return rule->use_count ? count_met : pct_met;
+}
+
+bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, const char **label,
+                                  int *done, int *total) {
+    if (!td) return false;
+    if (td->completion_goal_count > 0) {
+        *label = td->completion_label[0] != '\0'
+                     ? td->completion_label
+                     : run_completion_derived_label(td->completion_type_mask, version >= MC_VERSION_1_12);
+        *done = td->completion_goals_completed;
+        *total = td->completion_goal_count;
+        return true;
+    }
+    if (td->advancement_goal_count <= 0) return false;
+    *label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+    *done = td->advancements_completed_count;
+    *total = td->advancement_goal_count;
+    return true;
 }
 
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
-    (void) version;
+    (void) settings;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // Every update path ends here, so this is where a mirror stage picks up the numbers of the goal
@@ -4460,9 +4605,11 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
         t->template_data->overall_progress_percentage = 100.0f;
     }
 
+    tracker_compute_completion_counts(t->template_data, version);
+
     // Freeze the IGT the first time the run reaches its completion criteria
-    // (full 100% by default, or the configured advancement/percentage thresholds).
-    bool is_complete = tracker_run_meets_completion(t->template_data, settings);
+    // (full 100% by default, or the template's own run completion rule).
+    bool is_complete = tracker_run_meets_completion(t->template_data);
     if (is_complete && !t->template_data->run_completed) {
         t->template_data->run_completed = true;
         t->template_data->frozen_play_time_ticks = t->template_data->play_time_ticks;
@@ -4840,6 +4987,8 @@ static void tracker_free_template_data(TemplateData *td) {
         free(td->decorations);
     }
 
+    run_completion_free(&td->run_completion);
+
     td->advancements = nullptr;
     td->stats = nullptr;
     td->unlocks = nullptr;
@@ -4856,6 +5005,56 @@ static void tracker_free_template_data(TemplateData *td) {
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
 // START OF NON-STATIC FUNCTIONS ------------------------------------
+
+// The frame an animated icon is on right now, or the static texture when the goal has no .gif.
+// Timed off SDL_GetTicks like the tracker's own GIF selection, so both animate in step.
+SDL_Texture *goal_icon_frame_texture(SDL_Texture *tex, const AnimatedTexture *anim) {
+    if (anim && anim->frame_count > 0) {
+        if (anim->delays && anim->total_duration > 0) {
+            Uint32 elapsed = (Uint32) (SDL_GetTicks() % anim->total_duration);
+            Uint32 sum = 0;
+            for (int i = 0; i < anim->frame_count; i++) {
+                sum += anim->delays[i];
+                if (elapsed < sum) return anim->frames[i];
+            }
+        }
+        return anim->frames[0];
+    }
+    return tex;
+}
+
+// Height of one icon row, so the list clipper can skip rows without measuring them.
+float goal_icon_row_height() {
+    return ImGui::GetTextLineHeight() * 1.5f + ImGui::GetStyle().ItemSpacing.y;
+}
+
+// One goal row inside a goal-selection combo (Compact overlay settings, editor Run Completion tab):
+// the goal's icon on the left, its text to the right.
+// A full-width Selectable is the only layout item, so a click anywhere on the row (icon included)
+// toggles it and the cursor advances normally; the icon and text are painted on top through the draw
+// list, which keeps them out of the layout entirely (cursor rewinding here would extend the popup's
+// bounds and trip ImGui's SetCursorPos error check). `id` only has to be unique within one combo (a
+// root_name is), since each combo is its own popup.
+bool goal_icon_selectable(const char *id, const char *text, bool selected,
+                         SDL_Texture *tex, const AnimatedTexture *anim) {
+    const float ico = ImGui::GetTextLineHeight() * 1.5f;
+    const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+    char sel_id[320];
+    snprintf(sel_id, sizeof(sel_id), "##%s", id);
+    const ImVec2 row_min = ImGui::GetCursorScreenPos();
+    bool clicked = ImGui::Selectable(sel_id, selected, ImGuiSelectableFlags_NoAutoClosePopups,
+                                     ImVec2(0.0f, ico));
+    if (ImGui::IsItemVisible()) {
+        ImDrawList *dl = ImGui::GetWindowDrawList();
+        SDL_Texture *draw_tex = goal_icon_frame_texture(tex, anim);
+        if (draw_tex)
+            dl->AddImage((ImTextureID) draw_tex, row_min, ImVec2(row_min.x + ico, row_min.y + ico));
+        // Goals with no icon keep the same text column, so the names stay lined up.
+        dl->AddText(ImVec2(row_min.x + ico + gap, row_min.y + (ico - ImGui::GetTextLineHeight()) * 0.5f),
+                    ImGui::GetColorU32(ImGuiCol_Text), text);
+    }
+    return clicked;
+}
 
 SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
     if (path == nullptr || path[0] == '\0') {
@@ -13685,14 +13884,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     } else {
         // This is the original info string for when the run is in progress.
         char formatted_update_time[64];
-        const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time),
                                  settings->igt_unit_spacing);
 
         char temp_chunk[256];
-        bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
-        bool show_prog_percent = (t->template_data->total_progress_steps > 0);
+        const char *counter_label = "";
+        int counter_done = 0, counter_total = 0;
+        bool show_adv_counter = tracker_get_progress_counter(t->template_data, version, &counter_label,
+                                                             &counter_done, &counter_total);
+        bool show_prog_percent = tracker_progress_percent_shown(t->template_data);
 
         // For receivers, show co-op sync label instead of world name
         const char *info_world = t->world_name;
@@ -13718,13 +13919,12 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
             snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d  -  Prog: %.2f%%",
-                     info_sep, adv_ach_label, t->template_data->advancements_completed_count,
-                     t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+                     info_sep, counter_label, counter_done, counter_total,
+                     t->template_data->overall_progress_percentage);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_adv_counter) {
             snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d",
-                     info_sep, adv_ach_label, t->template_data->advancements_completed_count,
-                     t->template_data->advancement_goal_count);
+                     info_sep, counter_label, counter_done, counter_total);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_prog_percent) {
             snprintf(temp_chunk, sizeof(temp_chunk), "%sProg: %.2f%%",
@@ -16575,6 +16775,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     // came from, so the editor's unsaved preview carries its descriptions too.
     tracker_build_goal_descriptions(t->template_data, lang_json);
 
+    // The template's run completion rule and the counter label that goes with it. The label comes
+    // from the lang file so it translates; without one it is derived from the checked types.
+    run_completion_parse(template_json, &t->template_data->run_completion);
+    tracker_read_completion_label(t->template_data, lang_json);
+
     // Detect and flag criteria that are shared between multiple advancements
     tracker_detect_shared_icons(t, settings);
 
@@ -17007,14 +17212,15 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time),
                              settings->igt_unit_spacing);
 
-    // Displaying Ach or Adv depending on the version
-    // Get version from string
+    // The counter is the run completion set when the template has one, else Adv/Ach by version.
     MC_Version version = settings_get_version_from_string(settings->version_str);
-    const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
-    char progress_chunk[128] = "";
-    bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
-    bool show_prog_percent = (t->template_data->total_progress_steps > 0);
+    char progress_chunk[256] = "";
+    const char *counter_label = "";
+    int counter_done = 0, counter_total = 0;
+    bool show_adv_counter = tracker_get_progress_counter(t->template_data, version, &counter_label,
+                                                         &counter_done, &counter_total);
+    bool show_prog_percent = tracker_progress_percent_shown(t->template_data);
 
     // OS window title uses 4 spaces around the configured separator.
     const char *title_sep_char = (settings->overlay_progress_separator[0] != '\0')
@@ -17025,12 +17231,11 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     if (show_adv_counter && show_prog_percent) {
         snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d    -    Progress: %.2f%%",
-                 title_sep, adv_ach_label, t->template_data->advancements_completed_count,
-                 t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+                 title_sep, counter_label, counter_done, counter_total,
+                 t->template_data->overall_progress_percentage);
     } else if (show_adv_counter) {
         snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d",
-                 title_sep, adv_ach_label, t->template_data->advancements_completed_count,
-                 t->template_data->advancement_goal_count);
+                 title_sep, counter_label, counter_done, counter_total);
     } else if (show_prog_percent) {
         snprintf(progress_chunk, sizeof(progress_chunk), "%sProgress: %.2f%%",
                  title_sep, t->template_data->overall_progress_percentage);
@@ -17366,8 +17571,37 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
             }
         }
 
-        if (t->template_data->total_progress_steps > 0) {
+        // The template's run completion rule, when it requires a subset: the counter the tracker and
+        // overlay show instead of the advancement counter, and the rule behind it.
+        if (t->template_data->completion_goal_count > 0) {
+            const RunCompletionRule *rule = &t->template_data->run_completion;
+            const char *rc_label = "";
+            int rc_done = 0, rc_total = 0;
+            tracker_get_progress_counter(t->template_data, version, &rc_label, &rc_done, &rc_total);
+            char rule_types[160] = "";
+            for (int i = 0; i < RC_TYPE_COUNT; i++) {
+                if (!rule->types[i]) continue;
+                if (rule_types[0] != '\0') strncat(rule_types, ", ", sizeof(rule_types) - strlen(rule_types) - 1);
+                strncat(rule_types, run_completion_type_key((RunCompletionType) i),
+                        sizeof(rule_types) - strlen(rule_types) - 1);
+            }
+            log_message(LOG_INFO, "[Run Completion] %s: %d / %d completed (types: %s; individual goals: %d)\n",
+                        rc_label, rc_done, rc_total, rule_types[0] != '\0' ? rule_types : "none",
+                        rule->goal_ref_count);
+        }
+        if (t->template_data->run_completion.use_count) {
+            log_message(LOG_INFO, "[Run Completion] Count target: %d\n", t->template_data->run_completion.count);
+        }
+
+        if (tracker_progress_percent_shown(t->template_data)) {
             log_message(LOG_INFO, "[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+            if (t->template_data->run_completion.use_percent) {
+                log_message(LOG_INFO, "[Run Completion] Percentage target: %.2f%% (%s)\n",
+                            t->template_data->run_completion.percent,
+                            t->template_data->run_completion.use_count
+                                ? (t->template_data->run_completion.require_both ? "AND count" : "OR count")
+                                : "alone");
+            }
         }
 
         log_message(LOG_INFO, "============================================================\n");

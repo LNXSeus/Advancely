@@ -106,39 +106,6 @@ static void copy_preset_progress_to_settings(const char *preset_path) {
     cJSON_Delete(preset_root);
 }
 
-// Counts the non-recipe advancements/achievements in the template selected by the
-// given settings (version/category/optional_flag). Used to clamp the completion
-// advancement-count threshold to a valid maximum. Returns 0 if the template file
-// is missing or has no advancements.
-static int count_template_advancement_goals(const AppSettings *s) {
-    if (!s || s->version_str[0] == '\0' || s->category[0] == '\0') return 0;
-
-    char version_filename[64];
-    strncpy(version_filename, s->version_str, sizeof(version_filename) - 1);
-    version_filename[sizeof(version_filename) - 1] = '\0';
-    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
-
-    char template_path[MAX_PATH_LENGTH];
-    snprintf(template_path, sizeof(template_path), "%s/templates/%s/%s/%s_%s%s.json",
-             get_resources_path(), s->version_str, s->category,
-             version_filename, s->category, s->optional_flag);
-
-    cJSON *json = cJSON_from_file(template_path);
-    if (!json) return 0;
-
-    int count = 0;
-    cJSON *advancements = cJSON_GetObjectItem(json, "advancements");
-    if (advancements && cJSON_IsObject(advancements)) {
-        cJSON *adv = nullptr;
-        cJSON_ArrayForEach(adv, advancements) {
-            cJSON *recipe = cJSON_GetObjectItem(adv, "is_recipe");
-            if (!(recipe && cJSON_IsTrue(recipe))) count++;
-        }
-    }
-    cJSON_Delete(json);
-    return count;
-}
-
 // True when the template picked in this window is the one the tracker currently has loaded.
 // A loaded preset (or an edited version/category/flag) points at a different template that is
 // only read on Apply, so until then the tracker's template says nothing about which goals the
@@ -183,55 +150,6 @@ static bool compact_stack_different(const AppSettings *a, const AppSettings *b) 
             return true;
     }
     return false;
-}
-
-// The frame an animated icon is on right now, or the static texture when the goal has no .gif.
-// Timed off SDL_GetTicks like the tracker's own GIF selection, so both animate in step.
-static SDL_Texture *compact_icon_texture(SDL_Texture *tex, const AnimatedTexture *anim) {
-    if (anim && anim->frame_count > 0) {
-        if (anim->delays && anim->total_duration > 0) {
-            Uint32 elapsed = (Uint32) (SDL_GetTicks() % anim->total_duration);
-            Uint32 sum = 0;
-            for (int i = 0; i < anim->frame_count; i++) {
-                sum += anim->delays[i];
-                if (elapsed < sum) return anim->frames[i];
-            }
-        }
-        return anim->frames[0];
-    }
-    return tex;
-}
-
-// Height of one icon row, so the list clipper can skip rows without measuring them.
-static float compact_icon_row_height() {
-    return ImGui::GetTextLineHeight() * 1.5f + ImGui::GetStyle().ItemSpacing.y;
-}
-
-// One goal row inside a Compact selection combo: the goal's icon on the left, its text to the right.
-// A full-width Selectable is the only layout item, so a click anywhere on the row (icon included)
-// toggles it and the cursor advances normally; the icon and text are painted on top through the draw
-// list, which keeps them out of the layout entirely (cursor rewinding here would extend the popup's
-// bounds and trip ImGui's SetCursorPos error check). `id` only has to be unique within one combo (a
-// root_name is), since each combo is its own popup.
-static bool compact_icon_selectable(const char *id, const char *text, bool selected,
-                                    SDL_Texture *tex, const AnimatedTexture *anim) {
-    const float ico = ImGui::GetTextLineHeight() * 1.5f;
-    const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
-    char sel_id[320];
-    snprintf(sel_id, sizeof(sel_id), "##%s", id);
-    const ImVec2 row_min = ImGui::GetCursorScreenPos();
-    bool clicked = ImGui::Selectable(sel_id, selected, ImGuiSelectableFlags_NoAutoClosePopups,
-                                     ImVec2(0.0f, ico));
-    if (ImGui::IsItemVisible()) {
-        ImDrawList *dl = ImGui::GetWindowDrawList();
-        SDL_Texture *draw_tex = compact_icon_texture(tex, anim);
-        if (draw_tex)
-            dl->AddImage((ImTextureID) draw_tex, row_min, ImVec2(row_min.x + ico, row_min.y + ico));
-        // Goals with no icon keep the same text column, so the names stay lined up.
-        dl->AddText(ImVec2(row_min.x + ico + gap, row_min.y + (ico - ImGui::GetTextLineHeight()) * 0.5f),
-                    ImGui::GetColorU32(ImGuiCol_Text), text);
-    }
-    return clicked;
 }
 
 // Points at one of the two Compact goal-selection models (panel cycle or pop-out stack) so the
@@ -431,7 +349,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             char row[224];
             snprintf(row, sizeof(row), "%s (%d/%d)", a->display_name[0] ? a->display_name : a->root_name,
                      a->completed_criteria_count, a->criteria_progress_total);
-            if (compact_icon_selectable(a->root_name, row, s, a->texture, a->anim_texture))
+            if (goal_icon_selectable(a->root_name, row, s, a->texture, a->anim_texture))
                 item_click(kind, i, a->root_name, s);
         } else if (kind == COMPACT_COUNTER_STATS) {
             TrackableCategory *st = ctd->stats[i];
@@ -441,7 +359,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             char row[224];
             if (goal > 0) snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
             else snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
-            if (compact_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
+            if (goal_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
                 item_click(kind, i, st->root_name, s);
         } else if (kind == COMPACT_COUNTER_SUB_STATS) {
             TrackableCategory *st = ctd->stats[i];
@@ -449,12 +367,12 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             char row[224];
             snprintf(row, sizeof(row), "%s (%d/%d)", st->display_name[0] ? st->display_name : st->root_name,
                      st->completed_criteria_count, st->criteria_count);
-            if (compact_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
+            if (goal_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
                 item_click(kind, i, st->root_name, s);
         } else if (kind == COMPACT_COUNTER_CUSTOM) {
             TrackableItem *cg = ctd->custom_goals[i];
             bool s = item_index(kind, cg->root_name) >= 0;
-            if (compact_icon_selectable(cg->root_name, cg->display_name[0] ? cg->display_name : cg->root_name,
+            if (goal_icon_selectable(cg->root_name, cg->display_name[0] ? cg->display_name : cg->root_name,
                                         s, cg->texture, cg->anim_texture))
                 item_click(kind, i, cg->root_name, s);
         } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
@@ -474,7 +392,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                 ms_tex = g->stages[g->current_stage]->texture;
                 ms_anim = g->stages[g->current_stage]->anim_texture;
             }
-            if (compact_icon_selectable(g->root_name, row, s, ms_tex, ms_anim))
+            if (goal_icon_selectable(g->root_name, row, s, ms_tex, ms_anim))
                 item_click(kind, i, g->root_name, s);
         } else if (kind == COMPACT_COUNTER_COUNTERS) {
             CounterGoal *cg = ctd->counter_goals[i];
@@ -482,7 +400,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             char row[224];
             snprintf(row, sizeof(row), "%s (%d/%d)", cg->display_name[0] ? cg->display_name : cg->root_name,
                      cg->completed_count, cg->linked_goal_count);
-            if (compact_icon_selectable(cg->root_name, row, s, cg->texture, cg->anim_texture))
+            if (goal_icon_selectable(cg->root_name, row, s, cg->texture, cg->anim_texture))
                 item_click(kind, i, cg->root_name, s);
         }
     };
@@ -510,7 +428,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             // Rows are a fixed height, so the clipper gets it up front and submits only the ones on
             // screen. A template with hundreds of goals then costs a few visible rows per frame.
             ImGuiListClipper clipper;
-            clipper.Begin((int) rows.size(), compact_icon_row_height());
+            clipper.Begin((int) rows.size(), goal_icon_row_height());
             while (clipper.Step())
                 for (int r = clipper.DisplayStart; r < clipper.DisplayEnd; r++)
                     render_row(kind, rows[r]);
@@ -594,11 +512,6 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->lock_category_display_name != b->lock_category_display_name ||
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
         strcmp(a->layout_flag, b->layout_flag) != 0 ||
-        a->completion_use_adv_threshold != b->completion_use_adv_threshold ||
-        a->completion_adv_threshold != b->completion_adv_threshold ||
-        a->completion_use_percent_threshold != b->completion_use_percent_threshold ||
-        a->completion_percent_threshold != b->completion_percent_threshold ||
-        a->completion_threshold_require_both != b->completion_threshold_require_both ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
         a->using_hermes != b->using_hermes ||
@@ -1566,9 +1479,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // --- Settings Presets (always visible above the tabs) ---
     // Presets are full snapshots of settings.json stored next to it in resources/config/.
-    // preset_loaded_this_frame is set when a preset is loaded so the completion-threshold
-    // state below adopts the loaded values instead of resetting them on the template change.
-    bool preset_loaded_this_frame = false; {
+    {
         // Some settings clash with the synchronised lobby state, so lock the section while active.
         bool preset_lobby_locked = g_coop_ctx &&
                                    (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
@@ -1732,10 +1643,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
                          preset_names[preset_selected]);
                 if (settings_load_from_file(&temp_settings, preset_path)) {
-                    // Force the template list to rescan and the completion thresholds to
-                    // adopt (not reset) the loaded values, so the tabs refresh in place.
+                    // Force the template list to rescan so the tabs refresh in place.
                     last_scanned_version[0] = '\0';
-                    preset_loaded_this_frame = true;
                     // Remember the source so Apply can restore its captured progress.
                     strncpy(pending_preset_progress_path, preset_path, sizeof(pending_preset_progress_path) - 1);
                     pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
@@ -2683,150 +2592,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "Default: Off");
                     ImGui::SetTooltip("%s", lock_display_name_tooltip_buffer);
                 }
-            }
-
-            // --- Run Completion Threshold ---
-            // Optional early-completion criteria (e.g. Half%). These reset to defaults
-            // whenever the selected template changes, and the advancement-count maximum
-            // tracks the currently selected template's goal count.
-            {
-                static char completion_last_template_sig[512] = {0};
-                static int completion_template_goal_count = 0;
-
-                char completion_sig[512];
-                snprintf(completion_sig, sizeof(completion_sig), "%s|%s|%s",
-                         temp_settings.version_str, temp_settings.category, temp_settings.optional_flag);
-
-                if (just_opened || preset_loaded_this_frame) {
-                    // Adopt the current selection on open (or right after a preset load)
-                    // without wiping the thresholds the preset/settings file carried.
-                    strncpy(completion_last_template_sig, completion_sig,
-                            sizeof(completion_last_template_sig) - 1);
-                    completion_last_template_sig[sizeof(completion_last_template_sig) - 1] = '\0';
-                    completion_template_goal_count = count_template_advancement_goals(&temp_settings);
-                } else if (strcmp(completion_sig, completion_last_template_sig) != 0) {
-                    // Template changed: reset thresholds to defaults, refresh the count maximum.
-                    strncpy(completion_last_template_sig, completion_sig,
-                            sizeof(completion_last_template_sig) - 1);
-                    completion_last_template_sig[sizeof(completion_last_template_sig) - 1] = '\0';
-                    completion_template_goal_count = count_template_advancement_goals(&temp_settings);
-                    temp_settings.completion_use_adv_threshold = DEFAULT_COMPLETION_USE_ADV_THRESHOLD;
-                    temp_settings.completion_adv_threshold = DEFAULT_COMPLETION_ADV_THRESHOLD;
-                    temp_settings.completion_use_percent_threshold = DEFAULT_COMPLETION_USE_PERCENT_THRESHOLD;
-                    temp_settings.completion_percent_threshold = DEFAULT_COMPLETION_PERCENT_THRESHOLD;
-                    temp_settings.completion_threshold_require_both = DEFAULT_COMPLETION_THRESHOLD_REQUIRE_BOTH;
-                }
-
-                int max_adv = completion_template_goal_count > 0 ? completion_template_goal_count : 1;
-                // Keep the stored count within valid bounds for the current template.
-                if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
-                if (temp_settings.completion_adv_threshold > max_adv)
-                    temp_settings.completion_adv_threshold = max_adv;
-
-                const char *goal_word = (selected_version <= MC_VERSION_1_6_4) ? "achievements" : "advancements";
-
-                // Niche feature tucked behind a collapsing header (collapsed by default).
-                bool run_completion_open = ImGui::CollapsingHeader("Run Completion (Stopping Criteria)");
-                if (ImGui::IsItemHovered()) {
-                    char run_completion_tooltip_buffer[1024];
-                    snprintf(run_completion_tooltip_buffer, sizeof(run_completion_tooltip_buffer),
-                             "Optionally end the run (and freeze the IGT timer) before full 100%% completion.\n"
-                             "Useful for categories like Half%% where only a fraction of the goals completes the run.\n\n"
-                             "Enable a target %s count and/or a target overall progress percentage.\n"
-                             "When neither is enabled the run only completes at full 100%%.\n\n"
-                             "These settings reset to defaults whenever you change the selected template.",
-                             goal_word);
-                    ImGui::SetTooltip("%s", run_completion_tooltip_buffer);
-                }
-
-                if (run_completion_open) {
-                    // Target advancement/achievement count
-                    char adv_threshold_label[64];
-                    snprintf(adv_threshold_label, sizeof(adv_threshold_label), "Complete at %s count", goal_word);
-                    ImGui::Checkbox(adv_threshold_label, &temp_settings.completion_use_adv_threshold);
-                    if (ImGui::IsItemHovered()) {
-                        char adv_threshold_tooltip_buffer[512];
-                        snprintf(adv_threshold_tooltip_buffer, sizeof(adv_threshold_tooltip_buffer),
-                                 "When enabled, the run completes once this many %s are done.\n"
-                                 "The maximum (%d) is the number of %s in the selected template.\n"
-                                 "Default: Off (resets when the template changes)",
-                                 goal_word, max_adv, goal_word);
-                        ImGui::SetTooltip("%s", adv_threshold_tooltip_buffer);
-                    }
-
-                    // Inline count input, shown only while the checkbox is ticked.
-                    if (temp_settings.completion_use_adv_threshold) {
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(120.0f);
-                        if (ImGui::InputInt("##completion_target_count", &temp_settings.completion_adv_threshold)) {
-                            if (temp_settings.completion_adv_threshold < 1) temp_settings.completion_adv_threshold = 1;
-                            if (temp_settings.completion_adv_threshold > max_adv)
-                                temp_settings.completion_adv_threshold = max_adv;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char target_count_tooltip_buffer[256];
-                            snprintf(target_count_tooltip_buffer, sizeof(target_count_tooltip_buffer),
-                                     "Number of completed %s required (1 to %d).\n"
-                                     "Default: %d", goal_word, max_adv, DEFAULT_COMPLETION_ADV_THRESHOLD);
-                            ImGui::SetTooltip("%s", target_count_tooltip_buffer);
-                        }
-                    }
-
-                    // Target overall progress percentage
-                    ImGui::Checkbox("Complete at progress percentage", &temp_settings.completion_use_percent_threshold);
-                    if (ImGui::IsItemHovered()) {
-                        char pct_threshold_tooltip_buffer[512];
-                        snprintf(pct_threshold_tooltip_buffer, sizeof(pct_threshold_tooltip_buffer),
-                                 "When enabled, the run completes once overall progress reaches this percentage.\n"
-                                 "This is the same overall progress shown in the tracker and overlay\n"
-                                 "(every goal type except advancements contributes to it).\n"
-                                 "Default: Off (resets when the template changes)");
-                        ImGui::SetTooltip("%s", pct_threshold_tooltip_buffer);
-                    }
-
-                    // Inline percentage input, shown only while the checkbox is ticked.
-                    if (temp_settings.completion_use_percent_threshold) {
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(120.0f);
-                        if (ImGui::InputFloat("##completion_target_percentage",
-                                              &temp_settings.completion_percent_threshold, 0.0f, 0.0f, "%.2f")) {
-                            if (temp_settings.completion_percent_threshold < 0.0f)
-                                temp_settings.completion_percent_threshold = 0.0f;
-                            if (temp_settings.completion_percent_threshold > 100.0f)
-                                temp_settings.completion_percent_threshold = 100.0f;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char target_pct_tooltip_buffer[256];
-                            snprintf(target_pct_tooltip_buffer, sizeof(target_pct_tooltip_buffer),
-                                     "Overall progress percentage required (0.00 to 100.00).\n"
-                                     "Default: %.2f", DEFAULT_COMPLETION_PERCENT_THRESHOLD);
-                            ImGui::SetTooltip("%s", target_pct_tooltip_buffer);
-                        }
-                    }
-
-                    // AND/OR logic, only meaningful when both targets are enabled
-                    bool both_targets_enabled = temp_settings.completion_use_adv_threshold &&
-                                                temp_settings.completion_use_percent_threshold;
-                    if (!both_targets_enabled) ImGui::BeginDisabled();
-                    ImGui::Checkbox("Require both targets (AND)", &temp_settings.completion_threshold_require_both);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char require_both_tooltip_buffer[512];
-                        if (!both_targets_enabled) {
-                            snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
-                                     "Disabled because only one (or no) target is enabled.\n"
-                                     "Enable BOTH the %s count and the progress percentage targets above\n"
-                                     "to choose whether both must be met (AND) or just either one (OR).",
-                                     goal_word);
-                        } else {
-                            snprintf(require_both_tooltip_buffer, sizeof(require_both_tooltip_buffer),
-                                     "Checked: the run completes only when BOTH targets are met (AND).\n"
-                                     "Unchecked: the run completes as soon as EITHER target is met (OR).\n"
-                                     "Default: Off (either target, OR)");
-                        }
-                        ImGui::SetTooltip("%s", require_both_tooltip_buffer);
-                    }
-                    if (!both_targets_enabled) ImGui::EndDisabled();
-                } // end run_completion_open
             }
 
             if (show_template_not_found_error) {

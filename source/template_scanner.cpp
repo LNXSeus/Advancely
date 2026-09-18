@@ -652,3 +652,140 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
     cJSON_Delete(json);
     return hash;
 }
+
+// --------- RUN COMPLETION ---------
+
+static const char *RC_TYPE_KEYS[RC_TYPE_COUNT] = {
+    "advancements", "recipes", "stats", "unlocks", "custom", "multi_stage_goals", "counters"
+};
+
+static const char *RC_GOAL_KIND_KEYS[RC_GOAL_KIND_COUNT] = {
+    "advancement", "stat", "unlock", "custom", "multi_stage_goal", "counter"
+};
+
+const char *run_completion_type_key(RunCompletionType type) {
+    if (type < 0 || type >= RC_TYPE_COUNT) return "";
+    return RC_TYPE_KEYS[type];
+}
+
+const char *run_completion_goal_kind_key(RunCompletionGoalKind kind) {
+    if (kind < 0 || kind >= RC_GOAL_KIND_COUNT) return "";
+    return RC_GOAL_KIND_KEYS[kind];
+}
+
+void run_completion_reset(RunCompletionRule *rule) {
+    if (!rule) return;
+    memset(rule, 0, sizeof(*rule));
+    rule->count = 1;
+    rule->percent = 100.0f;
+}
+
+bool run_completion_is_default(const RunCompletionRule *rule) {
+    if (!rule) return true;
+    for (int i = 0; i < RC_TYPE_COUNT; i++) if (rule->types[i]) return false;
+    return rule->goal_ref_count == 0 && !rule->use_count && !rule->use_percent;
+}
+
+bool run_completion_requires_everything(const RunCompletionRule *rule) {
+    if (!rule) return true;
+    for (int i = 0; i < RC_TYPE_COUNT; i++) if (rule->types[i]) return false;
+    return rule->goal_ref_count == 0;
+}
+
+void run_completion_parse(const cJSON *template_root, RunCompletionRule *rule) {
+    if (!rule) return;
+    run_completion_reset(rule);
+    const cJSON *rc = template_root ? cJSON_GetObjectItem(template_root, "run_completion") : nullptr;
+    if (!rc || !cJSON_IsObject(rc)) return;
+
+    const cJSON *types = cJSON_GetObjectItem(rc, "types");
+    if (types && cJSON_IsArray(types)) {
+        const cJSON *entry = nullptr;
+        cJSON_ArrayForEach(entry, types) {
+            if (!cJSON_IsString(entry) || !entry->valuestring) continue;
+            for (int i = 0; i < RC_TYPE_COUNT; i++) {
+                if (strcmp(entry->valuestring, RC_TYPE_KEYS[i]) == 0) rule->types[i] = true;
+            }
+        }
+    }
+
+    const cJSON *goals = cJSON_GetObjectItem(rc, "goals");
+    if (goals && cJSON_IsArray(goals)) {
+        int capacity = cJSON_GetArraySize(goals);
+        if (capacity > 0) {
+            rule->goal_refs = (RunCompletionGoalRef *) calloc((size_t) capacity, sizeof(RunCompletionGoalRef));
+        }
+        const cJSON *entry = nullptr;
+        cJSON_ArrayForEach(entry, goals) {
+            if (!rule->goal_refs || rule->goal_ref_count >= capacity) break;
+            const cJSON *type = cJSON_GetObjectItem(entry, "type");
+            const cJSON *root = cJSON_GetObjectItem(entry, "root_name");
+            if (!type || !cJSON_IsString(type) || !type->valuestring ||
+                !root || !cJSON_IsString(root) || !root->valuestring || root->valuestring[0] == '\0')
+                continue;
+            int kind = -1;
+            for (int i = 0; i < RC_GOAL_KIND_COUNT; i++) {
+                if (strcmp(type->valuestring, RC_GOAL_KIND_KEYS[i]) == 0) kind = i;
+            }
+            if (kind < 0) continue;
+            RunCompletionGoalRef *ref = &rule->goal_refs[rule->goal_ref_count++];
+            ref->kind = (RunCompletionGoalKind) kind;
+            strncpy(ref->root_name, root->valuestring, sizeof(ref->root_name) - 1);
+            ref->root_name[sizeof(ref->root_name) - 1] = '\0';
+        }
+        if (rule->goal_ref_count == 0 && rule->goal_refs) {
+            free(rule->goal_refs);
+            rule->goal_refs = nullptr;
+        }
+    }
+
+    const cJSON *use_count = cJSON_GetObjectItem(rc, "use_count");
+    if (use_count && cJSON_IsBool(use_count)) rule->use_count = cJSON_IsTrue(use_count);
+    const cJSON *count = cJSON_GetObjectItem(rc, "count");
+    if (count && cJSON_IsNumber(count)) rule->count = count->valueint < 1 ? 1 : count->valueint;
+    const cJSON *use_percent = cJSON_GetObjectItem(rc, "use_percent");
+    if (use_percent && cJSON_IsBool(use_percent)) rule->use_percent = cJSON_IsTrue(use_percent);
+    const cJSON *percent = cJSON_GetObjectItem(rc, "percent");
+    if (percent && cJSON_IsNumber(percent)) {
+        float v = (float) percent->valuedouble;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 100.0f) v = 100.0f;
+        rule->percent = v;
+    }
+    const cJSON *both = cJSON_GetObjectItem(rc, "require_both");
+    if (both && cJSON_IsBool(both)) rule->require_both = cJSON_IsTrue(both);
+}
+
+void run_completion_free(RunCompletionRule *rule) {
+    if (!rule) return;
+    free(rule->goal_refs);
+    run_completion_reset(rule);
+}
+
+cJSON *run_completion_to_json(const RunCompletionRule *rule) {
+    if (!rule || run_completion_is_default(rule)) return nullptr;
+    cJSON *rc = cJSON_CreateObject();
+
+    cJSON *types = cJSON_CreateArray();
+    for (int i = 0; i < RC_TYPE_COUNT; i++) {
+        if (rule->types[i]) cJSON_AddItemToArray(types, cJSON_CreateString(RC_TYPE_KEYS[i]));
+    }
+    cJSON_AddItemToObject(rc, "types", types);
+
+    cJSON *goals = cJSON_CreateArray();
+    for (int i = 0; i < rule->goal_ref_count; i++) {
+        const RunCompletionGoalRef *ref = &rule->goal_refs[i];
+        cJSON *entry = cJSON_CreateObject();
+        cJSON_AddStringToObject(entry, "type", run_completion_goal_kind_key(ref->kind));
+        cJSON_AddStringToObject(entry, "root_name", ref->root_name);
+        cJSON_AddItemToArray(goals, entry);
+    }
+    cJSON_AddItemToObject(rc, "goals", goals);
+
+    cJSON_AddBoolToObject(rc, "use_count", rule->use_count);
+    cJSON_AddNumberToObject(rc, "count", rule->count);
+    cJSON_AddBoolToObject(rc, "use_percent", rule->use_percent);
+    cJSON_AddNumberToObject(rc, "percent", rule->percent);
+    cJSON_AddBoolToObject(rc, "require_both", rule->require_both);
+    return rc;
+}

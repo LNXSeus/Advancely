@@ -3507,19 +3507,23 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             // Show progress sections if they have something
             if (settings->overlay_show_progress) {
-                bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
-                bool show_prog_percent = (t->template_data->total_progress_steps > 0);
-                const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+                // The counter is the template's run completion set (with its own label, e.g.
+                // "Blocks Placed: 12/40") when the template defines one, else Adv/Ach by version.
+                const char *counter_label = "";
+                int counter_done = 0, counter_total = 0;
+                bool show_adv_counter = tracker_get_progress_counter(t->template_data, version, &counter_label,
+                                                                     &counter_done, &counter_total);
+                // Hidden for a required subset: the whole-template percentage says nothing about it.
+                bool show_prog_percent = tracker_progress_percent_shown(t->template_data);
 
                 if (show_adv_counter && show_prog_percent) {
                     snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
-                             adv_ach_label, t->template_data->advancements_completed_count,
-                             t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+                             counter_label, counter_done, counter_total,
+                             t->template_data->overall_progress_percentage);
                     add_component(temp_chunk);
                 } else if (show_adv_counter) {
                     snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d",
-                             adv_ach_label, t->template_data->advancements_completed_count,
-                             t->template_data->advancement_goal_count);
+                             counter_label, counter_done, counter_total);
                     add_component(temp_chunk);
                 } else if (show_prog_percent) {
                     snprintf(temp_chunk, sizeof(temp_chunk), "Prog: %.2f%%",
