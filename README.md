@@ -719,6 +719,7 @@ You can also filter by the status indicators shown as colored tags in the templa
 keywords (the term must match exactly):
 
 * `recipe`/`rcp`: recipe advancements.
+* `complex`/`cmplx`: complex advancements, recipes, or achievements (1.7.2 to 1.11.2), meaning ones that have criteria.
 * `hidden`: goals flagged as Hidden.
 * `row1`/`r1`: criteria and sub-stats, which sit on the 1st overlay row. The sub-stats of a multi-stat tagged `noR1`
   are excluded, since that flag keeps them off the 1st row entirely, as are the single sub-stats of simple stats.
@@ -731,12 +732,13 @@ keywords (the term must match exactly):
 * `nor1`/`no-r1`/`norow1`: multi-stats whose sub-stats are kept out of the 1st overlay row.
 * `pos`/`position`/`manual`: goals with custom manual-layout coordinates.
 
-Unlike the row keywords, which show a matching goal on its own, `multi` and `nor1` expand each matching category in the
-tracker with all of its sub-stats, since both keywords are about the sub-stats themselves.
+Unlike the row keywords, which show a matching goal on its own, `complex`, `multi` and `nor1` expand each matching goal
+in the tracker with all of its criteria or sub-stats, since these keywords are about the sub-items themselves.
 
 These keywords work in both the tracker search and the template editor's search, and are listed in the tooltip of each
 search box. In the editor, that tooltip lists only the keywords that apply to the goal type currently selected in the
-scope dropdown, so `multi` and `nor1` only show up under the `Stats` scope.
+scope dropdown, so `complex` only shows up under the `Advancements` scope and `multi` and `nor1` only under the `Stats`
+scope.
 
 ### Section Completion Counters
 
@@ -1162,7 +1164,8 @@ list has a `Show Display Names` checkbox to toggle between display names and roo
   order.
 * **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, unlocks, custom
   goals, multi-stage goals, and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
-  detail pane: `rcp` (recipe, advancements only), `H` (hidden from the overlay and automatic tracker layout),
+  detail pane: `rcp` (recipe, advancements only), `cmplx` (has criteria, advancements only), `H` (hidden from the
+  overlay and automatic tracker layout),
   `R2`/`R3` (forced to the 2nd/3rd overlay row), `multi` (multi-stat category, stats only), `noR1` (sub-stats kept out
   of the 1st overlay row, multi-stats only), and `pos` (has custom manual-layout coordinates). The tags appear in the
   same order as the matching checkboxes in the detail pane. Hover the tags for a tooltip describing the active ones.

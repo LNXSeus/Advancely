@@ -726,19 +726,27 @@ static void draw_editor_row_status_tags(const EditorRowTag *tags, int count) {
 // Builds and draws the status tags for a goal-list row from its individual flags.
 // Pass in_2nd_row / in_3rd_row / is_recipe as false for goal types that don't support them.
 // is_multi_stat / substats_hidden_in_row1 only apply to stat categories; leave them false elsewhere.
+// is_complex only applies to advancements/achievements/recipes that have criteria.
 static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3rd_row,
                                       bool is_recipe, bool manual_pos_set,
                                       bool is_multi_stat = false,
-                                      bool substats_hidden_in_row1 = false) {
-    EditorRowTag tags[7];
+                                      bool substats_hidden_in_row1 = false,
+                                      bool is_complex = false) {
+    EditorRowTag tags[8];
     int n = 0;
     // Tag order mirrors the order of the checkboxes in the detail pane of every goal type:
     // Is Recipe, Hidden, Row 2 / Row 3, Multi-Stat Category, Hide Sub-Stats from Row 1, then the
-    // manual-layout coordinates further down the pane.
+    // manual-layout coordinates further down the pane. The complex tag has no checkbox and sits
+    // next to the recipe tag since both describe what kind of goal this is.
     if (is_recipe)
         tags[n++] = {
             "rcp", IM_COL32(130, 220, 130, 255),
             "Recipe (counts toward progress percentage, not advancements)"
+        };
+    if (is_complex)
+        tags[n++] = {
+            "cmplx", IM_COL32(255, 140, 205, 255),
+            "Complex (has criteria)"
         };
     if (is_hidden)
         tags[n++] = {
@@ -769,14 +777,17 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
 // manual position). The term must exactly equal a recognized keyword for the matching flag to
 // count, so it does not pollute ordinary name/root searches. effective_row is the overlay row the
 // goal actually lands on (1, 2 or 3), so "r2"/"r3" reveal goals that sit there by default, not just
-// the ones forced there; pass 0 to disable row matching. Pass false for flags a goal type does not
+// the ones forced there; pass 0 to disable row matching. is_complex only applies to
+// advancements/achievements/recipes with criteria. Pass false for flags a goal type does not
 // support.
 static bool indicator_matches_search(const char *search, bool is_hidden, int effective_row,
                                      bool is_recipe, bool manual_pos_set,
                                      bool is_multi_stat = false,
-                                     bool substats_hidden_in_row1 = false) {
+                                     bool substats_hidden_in_row1 = false,
+                                     bool is_complex = false) {
     if (!search || search[0] == '\0') return false;
     if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
+    if (is_complex && (strcasecmp(search, "complex") == 0 || strcasecmp(search, "cmplx") == 0)) return true;
     if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
     if (effective_row == 2 && (strcasecmp(search, "row2") == 0 || strcasecmp(search, "r2") == 0)) return true;
     if (effective_row == 3 && (strcasecmp(search, "row3") == 0 || strcasecmp(search, "r3") == 0)) return true;
@@ -800,6 +811,12 @@ static bool subitem_indicator_matches_search(const EditorTrackableItem &c, const
                                              bool on_row1 = true) {
     return indicator_matches_search(search, c.is_hidden, on_row1 ? 1 : 0, false,
                                     c.icon_pos.is_set || c.text_pos.is_set || c.progress_pos.is_set);
+}
+
+// Complex advancement/achievement/recipe: one with criteria. Achievements only gained criteria in
+// 1.7.2, so the "complex"/"cmplx" keyword and tag stay off for older versions.
+static bool adv_is_complex(const EditorTrackableCategory &advancement, MC_Version version) {
+    return version >= MC_VERSION_1_7_2 && !advancement.criteria.empty();
 }
 
 // Helper: propagate a rename through a vector of EditorCounterLinkedGoal
@@ -7249,10 +7266,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // exposes a different subset (e.g. only advancements have recipes; only criteria/sub-stats
             // sit on Row 1). Build the keyword list to match the scope currently being searched.
             bool ind_hidden = false, ind_row1 = false, ind_row23 = false, ind_recipe = false, ind_pos = false;
-            bool ind_multi = false, ind_subh = false;
+            bool ind_multi = false, ind_subh = false, ind_complex = false;
             switch (current_search_scope) {
                 case SCOPE_ADVANCEMENTS:
                     ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = true;
+                    ind_complex = creator_selected_version >= MC_VERSION_1_7_2;
                     break;
                 case SCOPE_STATS:
                     ind_hidden = ind_row1 = ind_row23 = ind_pos = true;
@@ -7272,7 +7290,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     break;
             }
             bool any_indicator = ind_hidden || ind_row1 || ind_row23 || ind_recipe || ind_pos
-                                 || ind_multi || ind_subh;
+                                 || ind_multi || ind_subh || ind_complex;
 
             char tooltip_buffer[1024];
             int p = snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -7283,6 +7301,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ind_recipe)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  recipe / rcp  - recipe advancements");
+                if (ind_complex)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  complex / cmplx - %s with criteria", advancements_label_plural_lower);
                 if (ind_hidden)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  hidden        - goals flagged as Hidden");
@@ -9921,7 +9942,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                          advancement.is_recipe,
                                                                          advancement.icon_pos.is_set || advancement.
                                                                          text_pos.is_set ||
-                                                                         advancement.progress_pos.is_set);
+                                                                         advancement.progress_pos.is_set,
+                                                                         false, false,
+                                                                         adv_is_complex(advancement, creator_selected_version));
 
                             if (parent_match) {
                                 advancements_to_render.push_back(&advancement);
@@ -10771,7 +10794,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             advancement.is_hidden, advancement.in_2nd_row, advancement.in_3rd_row,
                             advancement.is_recipe,
                             advancement.icon_pos.is_set || advancement.text_pos.is_set ||
-                            advancement.progress_pos.is_set);
+                            advancement.progress_pos.is_set,
+                            false, false, adv_is_complex(advancement, creator_selected_version));
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
