@@ -13840,8 +13840,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                      : "|";
     char info_window_title[256];
     snprintf(info_window_title, sizeof(info_window_title),
-             "Info %s ESC: Settings %s SPACE: Lock %s Pan: RMB/MMB Drag %s Zoom: Wheel %s Click: LMB %s Move Win: LMB Drag",
-             title_sep_char, title_sep_char, title_sep_char, title_sep_char, title_sep_char, title_sep_char);
+             "Info %s ESC: Settings %s Pan: RMB/MMB Drag %s Zoom/Scroll: Wheel %s Click: LMB %s Move Win: LMB Drag",
+             title_sep_char, title_sep_char, title_sep_char, title_sep_char, title_sep_char);
     ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
     // Add padding (WindowPadding * 2 + extra for safety/frame borders)
     float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
