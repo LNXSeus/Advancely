@@ -2584,8 +2584,12 @@ static uint64_t compute_file_hash(const char *path) {
 }
 
 // Helper for counting based on Hash instead of Path
+// One entry per (criterion icon, parent icon) pair: summing the counts of every entry with the same
+// icon hash gives how often the icon is used at all, a single entry how often it sits under a parent
+// with that exact icon (where the shared icon would look identical).
 typedef struct {
     uint64_t hash;
+    uint64_t parent_hash;
     int count;
 } IconHashCounter;
 
@@ -2624,6 +2628,12 @@ static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capac
         // If the parent category is hidden, children should not contribute to shared count (not visible)
         if (categories[i]->is_hidden) continue;
 
+        // The parent's icon hash tells whether the shared icon would differ between the sharers
+        if (categories[i]->icon_hash == 0 && categories[i]->icon_path[0] != '\0') {
+            categories[i]->icon_hash = get_image_hash_optimized(t, categories[i]->icon_path);
+        }
+        const uint64_t parent_hash = categories[i]->icon_hash;
+
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
 
@@ -2638,7 +2648,7 @@ static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capac
 
             bool found = false;
             for (int k = 0; k < current_unique_count; k++) {
-                if ((*counts)[k].hash == crit->icon_hash) {
+                if ((*counts)[k].hash == crit->icon_hash && (*counts)[k].parent_hash == parent_hash) {
                     (*counts)[k].count++;
                     found = true;
                     break;
@@ -2647,6 +2657,7 @@ static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capac
 
             if (!found && current_unique_count < capacity) {
                 (*counts)[current_unique_count].hash = crit->icon_hash;
+                (*counts)[current_unique_count].parent_hash = parent_hash;
                 (*counts)[current_unique_count].count = 1;
                 current_unique_count++;
             }
@@ -2669,16 +2680,23 @@ static void flag_shared_icons_by_hash(IconHashCounter *counts, int unique_count,
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
             crit->is_shared = false;
+            crit->is_shared_same_parent = false;
 
             if (crit->is_hidden || crit->icon_path[0] == '\0' || crit->icon_hash == 0) continue;
 
+            int total_uses = 0;
+            int same_parent_uses = 0;
             for (int k = 0; k < unique_count; k++) {
                 // Compare RAM integers instead of reading files
-                if (counts[k].hash == crit->icon_hash && counts[k].count > 1) {
-                    crit->is_shared = true;
-                    break;
-                }
+                if (counts[k].hash != crit->icon_hash) continue;
+                total_uses += counts[k].count;
+                if (counts[k].parent_hash == categories[i]->icon_hash) same_parent_uses = counts[k].count;
             }
+            crit->is_shared = total_uses > 1;
+            // Another criterion with the same icon under a parent with the same icon (the same goal or
+            // a look-alike one): the shared icon would be identical on both, so it is only drawn when
+            // the user opts to keep it.
+            crit->is_shared_same_parent = same_parent_uses > 1;
         }
     }
 }
@@ -9632,11 +9650,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 // --- End Icon Scaling and Centering Logic (Child Icon) ---
                             }
 
-                            // Shared-icon badge: when this criterion's icon content is identical to a
+                            // Shared icon: when this criterion's icon content is identical to a
                             // criterion of another goal (crit->is_shared, hash-detected), its parent's
                             // icon is drawn in the corner of the sub-item box so the two stay tellable
                             // apart. Mirrors the overlay's shared icon. Capped by the box it sits in.
-                            if (crit->is_shared && settings->tracker_shared_icon_size > 0.0f) {
+                            // Skipped when the shared icon would be identical on another sharer, unless kept.
+                            if (crit->is_shared && settings->tracker_shared_icon_size > 0.0f &&
+                                (!crit->is_shared_same_parent || settings->tracker_shared_icon_keep_redundant)) {
                                 SDL_Texture *shared_texture_to_draw = nullptr;
                                 if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
                                     if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {

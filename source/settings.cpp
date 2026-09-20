@@ -571,6 +571,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
         a->compact_row1_icon_size != b->compact_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+        a->overlay_shared_icon_keep_redundant != b->overlay_shared_icon_keep_redundant ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
         a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
@@ -600,6 +601,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->adv_icon_offset_x != b->adv_icon_offset_x ||
         a->adv_icon_offset_y != b->adv_icon_offset_y ||
         a->tracker_shared_icon_size != b->tracker_shared_icon_size ||
+        a->tracker_shared_icon_keep_redundant != b->tracker_shared_icon_keep_redundant ||
 
         // LOD Settings
         a->lod_text_sub_threshold != b->lod_text_sub_threshold ||
@@ -851,6 +853,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row1_spacing != b->overlay_row1_spacing ||
             a->compact_row1_icon_size != b->compact_row1_icon_size ||
             a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+            a->overlay_shared_icon_keep_redundant != b->overlay_shared_icon_keep_redundant ||
             a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
             a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
             a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
@@ -3334,6 +3337,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
+            ImGui::Checkbox("Keep Redundant Shared Icons", &temp_settings.tracker_shared_icon_keep_redundant);
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
+                         "it is the same goal), the parent icon looks identical on both and tells nothing\n"
+                         "apart, so it is dropped. Check this to draw it anyway.\n"
+                         "Default: %s", DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
 
             ImGui::EndTabItem();
         } // End of Tracker Visuals Tab
@@ -4747,6 +4761,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE);
                         ImGui::SetTooltip("%s", compact_stack_shared_tooltip_buffer);
                     }
+
+                    // Same toggle as under Row 1 Shared Icon Size in Belt/Page; covers the strip and the stack.
+                    ImGui::Checkbox("Keep Redundant Shared Icons##Compact",
+                                    &temp_settings.overlay_shared_icon_keep_redundant);
+                    if (ImGui::IsItemHovered()) {
+                        char compact_keep_shared_tooltip_buffer[512];
+                        snprintf(compact_keep_shared_tooltip_buffer, sizeof(compact_keep_shared_tooltip_buffer),
+                                 "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
+                                 "it is the same goal), the parent icon looks identical on both and tells nothing\n"
+                                 "apart, so it is dropped from the icon strip and the pop-out stack.\n"
+                                 "Check this to draw it anyway. Applies to every overlay mode.\n"
+                                 "Default: %s", DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
+                        ImGui::SetTooltip("%s", compact_keep_shared_tooltip_buffer);
+                    }
                 }
 
                 // The scroll speed, per-row custom speeds and auto-freeze toggles only affect the
@@ -4997,6 +5025,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Set to 0 to disable the shared icon overlay entirely.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    // One toggle for every overlay shared icon; Compact mode shows it under its stack setting.
+                    ImGui::Checkbox("Keep Redundant Shared Icons", &temp_settings.overlay_shared_icon_keep_redundant);
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
+                                 "it is the same goal), the parent icon looks identical on both and tells nothing\n"
+                                 "apart, so it is dropped. Check this to draw it anyway.\n"
+                                 "Applies to every overlay mode.\n"
+                                 "Default: %s", DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 

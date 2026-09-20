@@ -290,6 +290,10 @@ struct TrackableItem {
 
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
+    // Set with is_shared when another criterion has this icon under a parent with the identical icon
+    // (the same goal or a look-alike one), so the shared icon would look the same on both and tells
+    // nothing apart. The tracker and the overlay each have a setting that decides whether it still shows.
+    bool is_shared_same_parent;
     bool is_manually_completed; // Allow manually overriding sub-stats (NOT FOR ACHIEVEMENTS/ADVANCEMENTS)
     bool is_hidden; // If true, this item is hidden unless "Remove Completed Goals" is off
     bool in_2nd_row; // Forces custom goals (or potentially stats) to the 2nd overlay row
@@ -343,6 +347,7 @@ struct TrackableCategory {
     char icon_path[256];
     SDL_Texture *texture; // Main icon texture for category/advancement
     AnimatedTexture *anim_texture; // To support .gif files
+    uint64_t icon_hash; // Cache for the image hash (shared icon detection compares parent icons by it)
 
     // Recipe flag for modern version advancements
     bool is_recipe;

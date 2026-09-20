@@ -1038,6 +1038,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
     settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
     settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
+    settings->overlay_shared_icon_keep_redundant = DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT;
     settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
     settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
@@ -1114,6 +1115,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
     settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
     settings->tracker_shared_icon_size = DEFAULT_TRACKER_SHARED_ICON_SIZE;
+    settings->tracker_shared_icon_keep_redundant = DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT;
 
     // UI Theme Colors
     settings->ui_text_color = DEFAULT_UI_TEXT_COLOR;
@@ -1894,6 +1896,15 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         if (settings->tracker_shared_icon_size > TRACKER_SUB_ICON_BOX_SIZE)
             settings->tracker_shared_icon_size = TRACKER_SUB_ICON_BOX_SIZE;
 
+        const cJSON *tracker_shared_keep_json = cJSON_GetObjectItem(visual_settings,
+                                                                    "tracker_shared_icon_keep_redundant");
+        if (tracker_shared_keep_json && cJSON_IsBool(tracker_shared_keep_json))
+            settings->tracker_shared_icon_keep_redundant = cJSON_IsTrue(tracker_shared_keep_json);
+        else {
+            settings->tracker_shared_icon_keep_redundant = DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT;
+            defaults_were_used = true;
+        }
+
         // Clamp to valid bounds so the icon box always stays inside the 96x96 background.
         if (settings->adv_icon_size < ADV_ICON_MIN_SIZE) settings->adv_icon_size = ADV_ICON_MIN_SIZE;
         if (settings->adv_icon_size > ADV_ICON_BG_SIZE) settings->adv_icon_size = ADV_ICON_BG_SIZE;
@@ -2419,6 +2430,15 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *shared_keep_json = cJSON_GetObjectItem(visual_settings,
+                                                                 "overlay_shared_icon_keep_redundant");
+        if (shared_keep_json && cJSON_IsBool(shared_keep_json))
+            settings->overlay_shared_icon_keep_redundant = cJSON_IsTrue(shared_keep_json);
+        else {
+            settings->overlay_shared_icon_keep_redundant = DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT;
+            defaults_were_used = true;
+        }
+
         const cJSON *row2_custom_enabled = cJSON_GetObjectItem(visual_settings, "overlay_row2_custom_spacing_enabled");
         if (row2_custom_enabled && cJSON_IsBool(row2_custom_enabled))
             settings->overlay_row2_custom_spacing_enabled = cJSON_IsTrue(row2_custom_enabled);
@@ -2734,6 +2754,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
         settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
         settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
+        settings->overlay_shared_icon_keep_redundant = DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT;
         settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
@@ -2789,6 +2810,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->adv_icon_offset_x = DEFAULT_ADV_ICON_OFFSET_X;
         settings->adv_icon_offset_y = DEFAULT_ADV_ICON_OFFSET_Y;
         settings->tracker_shared_icon_size = DEFAULT_TRACKER_SHARED_ICON_SIZE;
+        settings->tracker_shared_icon_keep_redundant = DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT;
 
         strncpy(settings->compact_panel_path, DEFAULT_COMPACT_PANEL_PATH, sizeof(settings->compact_panel_path) - 1);
         settings->compact_panel_path[sizeof(settings->compact_panel_path) - 1] = '\0';
@@ -3560,6 +3582,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "tracker_shared_icon_size",
                               cJSON_CreateNumber(settings->tracker_shared_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_shared_icon_keep_redundant");
+        cJSON_AddItemToObject(visuals_obj, "tracker_shared_icon_keep_redundant",
+                              cJSON_CreateBool(settings->tracker_shared_icon_keep_redundant));
 
         // --- Save Compact mode panel ---
         cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_path");
@@ -3733,6 +3758,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size",
                               cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_shared_icon_keep_redundant");
+        cJSON_AddItemToObject(visuals_obj, "overlay_shared_icon_keep_redundant",
+                              cJSON_CreateBool(settings->overlay_shared_icon_keep_redundant));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing_enabled");
         cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled",

@@ -1715,7 +1715,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 snprintf(ptext, sizeof(ptext), "%s (%d/%d)", aname, shown, a->criteria_progress_total);
                 consider(crit_kind, crit_kind, a->root_name, key, 0, c->done, true,
                          a->icon_path, ptext, c->icon_path,
-                         compact_display_name(c->display_name, c->root_name), c->is_shared, adv_face);
+                         compact_display_name(c->display_name, c->root_name),
+                         c->is_shared && (!c->is_shared_same_parent || settings->overlay_shared_icon_keep_redundant),
+                         adv_face);
             }
         }
         // Stats: simple stats pop as a graded single line; multi-stat sub-stats pop as 2-line groups.
@@ -1807,7 +1809,10 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
                              compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, sub->progress),
                              compact_pop_done(settings, COMPACT_COUNTER_SUB_STATS, sub->done), true,
-                             s->icon_path, ptext, sub->icon_path, itext, sub->is_shared, sub_face);
+                             s->icon_path, ptext, sub->icon_path, itext,
+                             sub->is_shared && (!sub->is_shared_same_parent ||
+                                                settings->overlay_shared_icon_keep_redundant),
+                             sub_face);
                 }
             }
         }
@@ -2532,7 +2537,7 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
 // Draws one row-1 icon (with the shared-parent overlay when applicable) into `dest`, matching the
 // belt/page Row 1 look. Used by the Compact icon strip. A missing texture draws a magenta placeholder.
 static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRect *dest,
-                                   float shared_icon_size, Uint8 alpha = 255) {
+                                   float shared_icon_size, bool keep_redundant_shared, Uint8 alpha = 255) {
     TrackableItem *item = it.first;
     TrackableCategory *parent = it.second;
 
@@ -2553,7 +2558,9 @@ static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRe
         render_texture_with_alpha(o->renderer, tex, anim_tex, dest, alpha);
     }
 
-    if (item->is_shared && parent && shared_icon_size > 0.0f) {
+    // Skipped when the shared icon would be identical on another sharer, unless kept.
+    if (item->is_shared && parent && shared_icon_size > 0.0f &&
+        (!item->is_shared_same_parent || keep_redundant_shared)) {
         SDL_Texture *parent_tex = nullptr;
         AnimatedTexture *parent_anim_tex = nullptr;
         if (strstr(parent->icon_path, ".gif")) {
@@ -2773,7 +2780,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
                                                icon_y, icon_y + icon_size,
                                                settings->compact_row1_clear_animation);
             compact_draw_row1_icon(o, icon_items[tile.idx], &dest, settings->compact_icon_shared_size,
-                                   tile_alpha_mod(tile.alpha));
+                                   settings->overlay_shared_icon_keep_redundant, tile_alpha_mod(tile.alpha));
             if (clipped) SDL_SetRenderClipRect(o->renderer, nullptr);
         }
     }
@@ -3692,7 +3699,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
 
                 // --- Render Shared Parent Icon Overlay ---
-                if (item_to_render->is_shared && parent) {
+                // Skipped when the shared icon would be identical on another sharer, unless kept.
+                if (item_to_render->is_shared && parent &&
+                    (!item_to_render->is_shared_same_parent || settings->overlay_shared_icon_keep_redundant)) {
                     SDL_Texture *parent_tex = nullptr;
                     AnimatedTexture *parent_anim_tex = nullptr;
                     if (strstr(parent->icon_path, ".gif")) {

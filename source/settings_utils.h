@@ -131,6 +131,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_ROW1_ICON_SIZE_MIN 8.0f
 #define COMPACT_ROW1_ICON_SIZE_MAX 96.0f
 #define DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE 32.0f // Default shared icon size in pixels for row 1
+#define DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT false // Keep the shared icon when it looks the same on another sharer
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED false
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING 192.0f // 96px icon + more (took spacing from 1.16 AA template)
 #define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED false
@@ -281,6 +282,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 // Shared-parent icon overlaid on a criterion/sub-stat icon in the tracker.
 #define DEFAULT_TRACKER_SHARED_ICON_SIZE 20.0f
+#define DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT false // Keep the shared icon when it looks the same on another sharer
 #define TRACKER_SHARED_ICON_SIZE_MIN 0.0f // Upper bound is the sub-item icon box (TRACKER_SUB_ICON_BOX_SIZE)
 #define TRACKER_SUB_ICON_BOX_SIZE 32.0f // Edge length of the criteria/sub-stat icon box in the tracker
 
@@ -852,6 +854,7 @@ struct AppSettings {
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
     float compact_row1_icon_size; // Icon size for the compact-mode row-1 icon strip.
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1
+    bool overlay_shared_icon_keep_redundant; // Draw the overlay shared icon (Row 1 and compact strip/stack) even when identical on another sharer
     bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
     float overlay_row2_custom_spacing; // The custom spacing value for row 2
     bool overlay_row3_custom_spacing_enabled; // If true, use custom spacing for row 3
@@ -924,6 +927,7 @@ struct AppSettings {
     float adv_icon_offset_x; // Icon box left offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
     float adv_icon_offset_y; // Icon box top offset in 96x96 background space (0..ADV_ICON_BG_SIZE - adv_icon_size)
     float tracker_shared_icon_size; // Shared-parent icon size on a tracker criterion/sub-stat icon (0 hides it)
+    bool tracker_shared_icon_keep_redundant; // Draw the shared-parent icon even when identical on another sharer
 
     // --- UI Theme Colors (collapsible section) ---
     ColorRGBA ui_text_color; // Text color for the UI elements.
