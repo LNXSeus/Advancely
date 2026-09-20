@@ -3329,9 +3329,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "with a criterion/sub-stat of another goal. It tells overlapping icons apart.\n"
                          "Drawn in the corner of the %.0fx%.0f sub-item icon box, so it can never exceed it.\n"
                          "Set it to 0 to hide it.\n"
-                         "Range: %.0f - %.0f px. Default: %.0f px.",
-                         TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SHARED_ICON_SIZE_MIN,
-                         TRACKER_SUB_ICON_BOX_SIZE, DEFAULT_TRACKER_SHARED_ICON_SIZE);
+                         "Default: %.0f px.",
+                         TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SUB_ICON_BOX_SIZE, DEFAULT_TRACKER_SHARED_ICON_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -3372,7 +3371,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for UI windows.\n"
                          "Affects Settings, Template Editor, and Notes windows.\n"
-                         "Default: %.1f pt. Max: 64.0 pt.\n\n"
+                         "Default: %.1f pt.\n\n"
                          "IMPORTANT: Requires restarting Advancely to apply.",
                          DEFAULT_UI_FONT_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -6288,7 +6287,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     char face_size_tooltip[1024];
                                     snprintf(face_size_tooltip, sizeof(face_size_tooltip),
                                              "Logical pixel size of the contributor face on main goals (advancements,\n"
-                                             "simple stats, counter custom goals). Range 16-48 px.\n"
+                                             "simple stats, counter custom goals).\n"
                                              "Sub-stat and checkbox faces use a fixed size that matches the checkbox.\n"
                                              "Default: %.0f px", DEFAULT_COOP_FACE_SIZE);
                                     ImGui::SetTooltip("%s", face_size_tooltip);

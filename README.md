@@ -662,7 +662,7 @@ You can manipulate the view using several intuitive controls:
   you move the mouse onto it.
 * **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
 * **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
-  For an exact level, use the `Zoom` slider in the `View` menu, which spans the same 0.1x to 10x range. Drag it for a
+  For an exact level, use the `Zoom` slider in the `View` menu, which spans the same range as the wheel. Drag it for a
   rough value, or `Ctrl+Click` (`Cmd+Click` on macOS) to type one with up to three decimal places. The wheel keeps the
   point under your cursor in place, the slider keeps the center of the window in place.
 * **Scroll Lists**: When hovering over a goal with many sub-items, the `Mouse Wheel` will scroll the list contents
