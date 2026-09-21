@@ -14601,7 +14601,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                      "Zoom level of the tracker map, between %.1fx and %.0fx.\n"
                      "Drag for a rough value, or Ctrl + click (Cmd on macOS) to type an exact one.\n"
                      "The mouse wheel over the map does the same thing around the cursor,\n"
-                     "unless 'Lock Camera' is on.",
+                     "unless 'Lock Camera' is on.\n"
+                     "The default pixel font is only pixel-sharp when zoom times font size is a whole\n"
+                     "multiple of 16, so type exactly 1x, 2x or 3x here with the default 16 pt font.",
                      TRACKER_ZOOM_MIN, TRACKER_ZOOM_MAX);
             ImGui::SetTooltip("%s", zoom_tooltip_buffer);
         }

@@ -3153,6 +3153,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for main goal names, the notes window,\n"
                          "and manual layout text header decorations.\n"
+                         "The default pixel font is drawn on a 16 pt grid, so it renders pixel-sharp\n"
+                         "when font size times map zoom is a whole multiple of 16 (e.g. 16 pt at 1x, 2x,\n"
+                         "3x or 32 pt at 1x). Every other combination blurs its edges.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_FONT_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -3169,6 +3172,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for sub-items like criteria,\n"
                          "sub-stats, and multi-stage goal stages.\n"
+                         "With the default pixel font, sub-item text is only pixel-sharp when\n"
+                         "this size times map zoom is a whole multiple of 16, so the default\n"
+                         "trades a little sharpness for smaller sub-items.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_SUB_FONT_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -3184,6 +3190,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for the top info bar and bottom control bar.\n"
+                         "The bars ignore map zoom, so with the default pixel font any whole\n"
+                         "multiple of 16 pt is pixel-sharp.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_UI_FONT_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
