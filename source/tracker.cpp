@@ -2200,6 +2200,58 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 }
 
 /**
+ * @brief Applies the manual stat overrides from settings.json without a stats file.
+ * Every era's stat loader returns before touching the overrides when the player has no stats
+ * file (no world open), so after a template reload the freshly parsed stats would stay unticked
+ * even though the override is still on disk. Progress is left as it is; only the manual
+ * completion flags, done flags and the completion counts are recomputed.
+ */
+static void tracker_apply_stat_overrides_without_file(Tracker *t, cJSON *settings_json, const char *uuid) {
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", uuid);
+
+    t->template_data->stats_completed_count = 0;
+    t->template_data->stats_completed_criteria_count = 0;
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (!stat_cat) continue;
+        stat_cat->completed_criteria_count = 0;
+
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+            if (!sub_stat) continue;
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
+
+            cJSON *sub_override;
+            if (stat_cat->criteria_count == 1) {
+                sub_override = parent_override;
+            } else {
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
+            }
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
+
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+            if (sub_stat->done) stat_cat->completed_criteria_count++;
+        }
+
+        bool all_children_done = (stat_cat->criteria_count > 0 &&
+                                  stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        stat_cat->done = all_children_done || parent_forced_true;
+
+        if (stat_cat->done) t->template_data->stats_completed_count++;
+        t->template_data->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
+}
+
+/**
  * @brief Parses linked goals and mode from a JSON object into C arrays.
  * Used for stat auto-completion. Allocates linked_goals array with calloc.
  */
@@ -6491,6 +6543,12 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         // Needs version for playtime as 1.17 renames minecraft:play_one_minute into minecraft:play_time
         tracker_update_stats_modern(t, player_stats_json, settings_json, version, self_uuid);
         tracker_update_unlock_progress(t, player_unlocks_json); // Just returns if unlocks don't exist
+    }
+
+    // No stats file (no world open): the loaders above bailed before reading the manual overrides,
+    // so re-apply them here or a template reload (e.g. Apply Settings) drops every ticked stat.
+    if (!player_stats_json) {
+        tracker_apply_stat_overrides_without_file(t, settings_json, self_uuid);
     }
 
     // Re-apply the Hermes floor over whatever the (possibly not-yet-rewritten) stats file just set.
