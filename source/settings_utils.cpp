@@ -18,6 +18,7 @@
 #include "main.h"
 #include "format_utils.h"
 #include "coop_net.h" // g_coop_ctx for ghost-player prune exemption
+#include "template_scanner.h" // run_completion_requires_everything for the template-driven Compact default
 
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
@@ -639,6 +640,24 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
                         settings->overlay_show_hidden_goals);
 }
 
+bool settings_default_compact_progress_text(AppSettings *settings, const TemplateData *td) {
+    if (!settings || !td || settings->compact_cycle_customized) return false;
+    if (settings->compact_cycle_item_count > 0 || settings->compact_cycle_run_percent) return false;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+        if (i != COMPACT_COUNTER_ADVANCEMENTS && settings->compact_cycle_type[i]) return false;
+    bool adv_only = settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] && !settings->compact_cycle_run_counter;
+    bool counter_only = !settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] &&
+                        settings->compact_cycle_run_counter;
+    if (!adv_only && !counter_only) return false;
+
+    bool custom_labelled = !run_completion_requires_everything(&td->run_completion) &&
+                           td->completion_label[0] != '\0';
+    if (custom_labelled == counter_only) return false;
+    settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = !custom_labelled;
+    settings->compact_cycle_run_counter = custom_labelled;
+    return true;
+}
+
 bool compact_type_has_progress(OverlayCompactCounterType kind) {
     return kind == COMPACT_COUNTER_STATS || kind == COMPACT_COUNTER_SUB_STATS ||
            kind == COMPACT_COUNTER_CUSTOM || kind == COMPACT_COUNTER_MULTISTAGE ||
@@ -989,6 +1008,13 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
     settings->compact_cycle_item_count = 0;
     settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+    settings->compact_cycle_run_counter = DEFAULT_COMPACT_CYCLE_RUN_COUNTER;
+    settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
+    settings->compact_chain_entries = DEFAULT_COMPACT_CHAIN_ENTRIES;
+    strncpy(settings->compact_chain_separator, DEFAULT_COMPACT_CHAIN_SEPARATOR,
+            sizeof(settings->compact_chain_separator) - 1);
+    settings->compact_chain_separator[sizeof(settings->compact_chain_separator) - 1] = '\0';
+    settings->compact_cycle_customized = DEFAULT_COMPACT_CYCLE_CUSTOMIZED;
     settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
     settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
     settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
@@ -2094,6 +2120,46 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *compact_run_counter = cJSON_GetObjectItem(visual_settings, "compact_cycle_run_counter");
+        if (compact_run_counter && cJSON_IsBool(compact_run_counter)) {
+            settings->compact_cycle_run_counter = cJSON_IsTrue(compact_run_counter);
+        } else {
+            settings->compact_cycle_run_counter = DEFAULT_COMPACT_CYCLE_RUN_COUNTER;
+            defaults_were_used = true;
+        }
+        const cJSON *compact_run_percent = cJSON_GetObjectItem(visual_settings, "compact_cycle_run_percent");
+        if (compact_run_percent && cJSON_IsBool(compact_run_percent)) {
+            settings->compact_cycle_run_percent = cJSON_IsTrue(compact_run_percent);
+        } else {
+            settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
+            defaults_were_used = true;
+        }
+        const cJSON *compact_chain = cJSON_GetObjectItem(visual_settings, "compact_chain_entries");
+        if (compact_chain && cJSON_IsBool(compact_chain)) {
+            settings->compact_chain_entries = cJSON_IsTrue(compact_chain);
+        } else {
+            settings->compact_chain_entries = DEFAULT_COMPACT_CHAIN_ENTRIES;
+            defaults_were_used = true;
+        }
+        const cJSON *compact_chain_sep = cJSON_GetObjectItem(visual_settings, "compact_chain_separator");
+        if (compact_chain_sep && cJSON_IsString(compact_chain_sep) && compact_chain_sep->valuestring[0] != '\0') {
+            strncpy(settings->compact_chain_separator, compact_chain_sep->valuestring,
+                    sizeof(settings->compact_chain_separator) - 1);
+            settings->compact_chain_separator[sizeof(settings->compact_chain_separator) - 1] = '\0';
+        } else {
+            strncpy(settings->compact_chain_separator, DEFAULT_COMPACT_CHAIN_SEPARATOR,
+                    sizeof(settings->compact_chain_separator) - 1);
+            settings->compact_chain_separator[sizeof(settings->compact_chain_separator) - 1] = '\0';
+            defaults_were_used = true;
+        }
+        const cJSON *compact_customized = cJSON_GetObjectItem(visual_settings, "compact_cycle_customized");
+        if (compact_customized && cJSON_IsBool(compact_customized)) {
+            settings->compact_cycle_customized = cJSON_IsTrue(compact_customized);
+        } else {
+            settings->compact_cycle_customized = DEFAULT_COMPACT_CYCLE_CUSTOMIZED;
+            defaults_were_used = true;
+        }
+
         // Row-1 icon strip above the panel.
         const cJSON *compact_show_icons = cJSON_GetObjectItem(visual_settings, "compact_show_row1_icons");
         if (compact_show_icons && cJSON_IsBool(compact_show_icons))
@@ -2838,6 +2904,13 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_cycle_item_count = 0;
         settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
+        settings->compact_cycle_run_counter = DEFAULT_COMPACT_CYCLE_RUN_COUNTER;
+        settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
+        settings->compact_chain_entries = DEFAULT_COMPACT_CHAIN_ENTRIES;
+        strncpy(settings->compact_chain_separator, DEFAULT_COMPACT_CHAIN_SEPARATOR,
+                sizeof(settings->compact_chain_separator) - 1);
+        settings->compact_chain_separator[sizeof(settings->compact_chain_separator) - 1] = '\0';
+        settings->compact_cycle_customized = DEFAULT_COMPACT_CYCLE_CUSTOMIZED;
         settings->compact_show_row1_icons = DEFAULT_COMPACT_SHOW_ROW1_ICONS;
         settings->compact_icon_cycle_interval = DEFAULT_COMPACT_ICON_CYCLE_INTERVAL;
         settings->compact_icon_row_gap = DEFAULT_COMPACT_ICON_ROW_GAP;
@@ -3653,6 +3726,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_interval");
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_interval",
                               cJSON_CreateNumber(settings->compact_cycle_interval));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_run_counter");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_run_counter",
+                              cJSON_CreateBool(settings->compact_cycle_run_counter));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_run_percent");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_run_percent",
+                              cJSON_CreateBool(settings->compact_cycle_run_percent));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_chain_entries");
+        cJSON_AddItemToObject(visuals_obj, "compact_chain_entries",
+                              cJSON_CreateBool(settings->compact_chain_entries));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_chain_separator");
+        cJSON_AddItemToObject(visuals_obj, "compact_chain_separator",
+                              cJSON_CreateString(settings->compact_chain_separator));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_customized");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_customized",
+                              cJSON_CreateBool(settings->compact_cycle_customized));
 
         cJSON_DeleteItemFromObject(visuals_obj, "compact_show_row1_icons");
         cJSON_AddItemToObject(visuals_obj, "compact_show_row1_icons",

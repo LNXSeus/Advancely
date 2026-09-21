@@ -121,9 +121,16 @@ static bool settings_template_is_loaded(const AppSettings *s, const Tracker *t) 
     return strcmp(template_path, t->advancement_template_path) == 0;
 }
 
-// True if the two Compact-cycle selections differ (which whole-section type counts are enabled and
-// which individual goals are selected, in order). Used by both settings-diff functions below.
+// True if the two Compact-cycle selections differ (which progress text and whole-section type counts
+// are enabled, which individual goals are selected, in order, and how the entries are chained). Used
+// by both settings-diff functions below.
 static bool compact_cycle_different(const AppSettings *a, const AppSettings *b) {
+    if (a->compact_cycle_run_counter != b->compact_cycle_run_counter ||
+        a->compact_cycle_run_percent != b->compact_cycle_run_percent ||
+        a->compact_cycle_customized != b->compact_cycle_customized ||
+        a->compact_chain_entries != b->compact_chain_entries ||
+        strcmp(a->compact_chain_separator, b->compact_chain_separator) != 0)
+        return true;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
         if (a->compact_cycle_type[i] != b->compact_cycle_type[i]) return true;
     }
@@ -167,10 +174,13 @@ struct CompactSelTarget {
 // `is_cycle` picks cycle-vs-stack wording (and the cycle's "at least one must stay selected" note).
 // Presence/label rules match compact_compute_type_counters and the tracker's section separators, so
 // `cc` has to come from it with the caller's own hidden rule: real totals for the cycle, hidden-aware
-// (`show_hidden`) for the stack, which only lists what can really pop.
+// (`show_hidden`) for the stack, which only lists what can really pop. The cycle's types list also
+// leads with the progress text the other modes show in their top bar (the run-completion counter
+// and the overall percentage), toggled through `run_counter` / `run_percent` (nullptr for the stack).
 static void compact_selection_ui(const char *suffix, const TemplateData *ctd, const CompactCounter *cc,
-                                 bool modern, const char *types_label, CompactSelTarget tgt,
-                                 int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden) {
+                                 bool modern, MC_Version version, const char *types_label, CompactSelTarget tgt,
+                                 int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden,
+                                 bool *run_counter, bool *run_percent) {
     // A goal hidden in the template is normally not listed here; the "Show Hidden Goals" overlay
     // option surfaces it so it can be selected. hidden_now() folds that in (true = treat as hidden).
     auto hidden_now = [&](bool h) { return h && !show_hidden; };
@@ -185,13 +195,35 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         return i == COMPACT_COUNTER_ADVANCEMENTS || i == COMPACT_COUNTER_RECIPES ||
                i == COMPACT_COUNTER_UNLOCKS;
     };
+    // The progress text rows (cycle only): present under the same rules as the Belt/Page top bar.
+    const char *counter_label = "";
+    int counter_done = 0, counter_total = 0;
+    bool counter_shown = run_counter && tracker_get_progress_counter(ctd, version, &counter_label,
+                                                                     &counter_done, &counter_total);
+    bool percent_shown = run_percent && tracker_progress_percent_shown(ctd);
     int sel_type_count = 0;
+    if (counter_shown && *run_counter) sel_type_count++;
+    if (percent_shown && *run_percent) sel_type_count++;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
         if (tgt.type[i] && type_shown(i)) sel_type_count++;
     char types_preview[48];
     snprintf(types_preview, sizeof(types_preview), "%d selected", sel_type_count);
     if (ImGui::BeginCombo(types_label, types_preview)) {
         bool any_present = false;
+        if (counter_shown) {
+            any_present = true;
+            char row[96];
+            snprintf(row, sizeof(row), "Progress Text: %s (%d/%d)", counter_label, counter_done, counter_total);
+            if (ImGui::Selectable(row, *run_counter, ImGuiSelectableFlags_NoAutoClosePopups))
+                *run_counter = !*run_counter;
+        }
+        if (percent_shown) {
+            any_present = true;
+            char row[64];
+            snprintf(row, sizeof(row), "Progress Text: Prog (%.2f%%)", ctd->overall_progress_percentage);
+            if (ImGui::Selectable(row, *run_percent, ImGuiSelectableFlags_NoAutoClosePopups))
+                *run_percent = !*run_percent;
+        }
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
             if (!type_shown(i)) continue;
             any_present = true;
@@ -218,11 +250,17 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         char tip[800];
         if (is_cycle)
             snprintf(tip, sizeof(tip),
-                     "Each checked goal type adds one big \"label over count\" entry to the panel's\n"
-                     "cycle. Only types present in this template are listed. The totals are the real\n"
-                     "counts, including goals hidden from the overlay. Shift+Click to range-select.\n"
+                     "Each checked entry adds one big \"label over count\" entry to the panel's cycle.\n"
+                     "The Progress Text rows are the counter and percentage the Belt and Page top bar\n"
+                     "shows: the counter follows the template's Run Completion rule (or Advancements /\n"
+                     "Achievements), the percentage is the whole template's progress and is left out\n"
+                     "while a required subset is tracked. Only goal types present in this template are\n"
+                     "listed. The totals are the real counts, including goals hidden from the overlay.\n"
+                     "Shift+Click to range-select goal types.\n"
                      "At least one entry across these and the individual-goal dropdowns must stay selected.\n"
-                     "Default: Advancements / Achievements only.");
+                     "Default: the Progress Text counter when the template has its own Run Completion\n"
+                     "rule with a lang-file label, otherwise Advancements / Achievements only (until\n"
+                     "you edit the selection here).");
         else
             snprintf(tip, sizeof(tip),
                      "Whole-goal types that pop into the stack when they complete. Only kinds without their\n"
@@ -240,13 +278,19 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
     char type_all_id[32], type_none_id[32];
     snprintf(type_all_id, sizeof(type_all_id), "All##%stypeall", suffix);
     snprintf(type_none_id, sizeof(type_none_id), "None##%stypenone", suffix);
-    if (ImGui::SmallButton(type_all_id))
+    if (ImGui::SmallButton(type_all_id)) {
+        if (counter_shown) *run_counter = true;
+        if (percent_shown) *run_percent = true;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
             if (type_shown(i)) tgt.type[i] = true;
+    }
     ImGui::SameLine();
-    if (ImGui::SmallButton(type_none_id))
+    if (ImGui::SmallButton(type_none_id)) {
+        if (counter_shown) *run_counter = false;
+        if (percent_shown) *run_percent = false;
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
             if (type_shown(i)) tgt.type[i] = false;
+    }
 
     // --- Individual goals, one combo per applicable category ---
     auto item_index = [&](OverlayCompactCounterType kind, const char *root) -> int {
@@ -4376,6 +4420,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // cleanup never registers as an unsaved change.
                         settings_prune_compact_cycle_items(&temp_settings, ctd);
                         settings_prune_compact_cycle_items(&saved_settings, ctd);
+                        // Same template-driven default the tracker applied on load (progress text
+                        // counter for a custom, labelled run completion rule), so the dropdown shows
+                        // what the overlay uses. Both copies, so it never registers as unsaved.
+                        settings_default_compact_progress_text(&temp_settings, ctd);
+                        settings_default_compact_progress_text(&saved_settings, ctd);
 
                         MC_Version cver = settings_get_version_from_string(temp_settings.version_str);
                         bool modern = (cver >= MC_VERSION_1_12);
@@ -4401,19 +4450,40 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.compact_cycle_items,
                             &temp_settings.compact_cycle_item_count
                         };
-                        compact_selection_ui("cycle", ctd, cc, modern, "Main Goal Types", cycle_tgt,
+                        // Any edit to the selection marks it customized, which stops the
+                        // template-driven default from touching it again.
+                        bool cycle_types_before[COMPACT_COUNTER_TYPE_COUNT];
+                        memcpy(cycle_types_before, temp_settings.compact_cycle_type, sizeof(cycle_types_before));
+                        bool run_counter_before = temp_settings.compact_cycle_run_counter;
+                        bool run_percent_before = temp_settings.compact_cycle_run_percent;
+                        int cycle_items_before = temp_settings.compact_cycle_item_count;
+                        compact_selection_ui("cycle", ctd, cc, modern, cver, "Main Goal Types", cycle_tgt,
                                              &s_type_anchor, s_item_anchor, true,
-                                             temp_settings.overlay_show_hidden_goals);
+                                             temp_settings.overlay_show_hidden_goals,
+                                             &temp_settings.compact_cycle_run_counter,
+                                             &temp_settings.compact_cycle_run_percent);
+                        if (memcmp(cycle_types_before, temp_settings.compact_cycle_type, sizeof(cycle_types_before)) != 0 ||
+                            run_counter_before != temp_settings.compact_cycle_run_counter ||
+                            run_percent_before != temp_settings.compact_cycle_run_percent ||
+                            cycle_items_before != temp_settings.compact_cycle_item_count)
+                            temp_settings.compact_cycle_customized = true;
 
-                        // Never allow an empty cycle across ALL these dropdowns. If no goal type is
-                        // selected AND no individual goal is selected, keep the first present type on so
-                        // the cycle always shows something (and the dropdown shows a check). If an
-                        // individual goal IS selected, the goal types may be emptied entirely (to show
-                        // only that goal). The item list was already pruned to present goals above, so
-                        // compact_cycle_item_count reflects only real selections. Applied to the saved
+                        // Never allow an empty cycle across ALL these dropdowns. If no progress text or
+                        // goal type is selected AND no individual goal is selected, keep the first present
+                        // type on so the cycle always shows something (and the dropdown shows a check).
+                        // If an individual goal IS selected, the goal types may be emptied entirely (to
+                        // show only that goal). The item list was already pruned to present goals above,
+                        // so compact_cycle_item_count reflects only real selections. Applied to the saved
                         // baseline too so this correction never registers as an "unsaved change".
+                        const char *rc_label = "";
+                        int rc_done = 0, rc_total = 0;
+                        bool rc_shown = tracker_get_progress_counter(ctd, cver, &rc_label, &rc_done, &rc_total);
+                        bool rp_shown = tracker_progress_percent_shown(ctd);
                         auto ensure_something_selected = [&](AppSettings *s) {
                             if (s->compact_cycle_item_count > 0) return;
+                            if ((rc_shown && s->compact_cycle_run_counter) ||
+                                (rp_shown && s->compact_cycle_run_percent))
+                                return;
                             bool any = false;
                             int first = -1;
                             for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
@@ -4430,22 +4500,53 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ensure_something_selected(&saved_settings);
                     }
 
-                    if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
-                                         COMPACT_CYCLE_INTERVAL_MIN, COMPACT_CYCLE_INTERVAL_MAX, "%.1f s")) {
-                        if (temp_settings.compact_cycle_interval < COMPACT_CYCLE_INTERVAL_MIN)
-                            temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MIN;
-                        if (temp_settings.compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
-                            temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
-                    }
+                    ImGui::Checkbox("Chain All Entries", &temp_settings.compact_chain_entries);
                     if (ImGui::IsItemHovered()) {
-                        char compact_cycle_tooltip_buffer[512];
-                        snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
-                                 "How long each selected entry stays on the panel before the\n"
-                                 "cycle advances to the next one. With a single entry selected the\n"
-                                 "panel is static. Press %s while the overlay window is focused\n"
-                                 "to jump to the next goal, which also flips the Row 1 icons.\n"
-                                 "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
-                        ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
+                        char compact_chain_tooltip_buffer[640];
+                        snprintf(compact_chain_tooltip_buffer, sizeof(compact_chain_tooltip_buffer),
+                                 "Shows every selected entry on the panel at once instead of cycling\n"
+                                 "through them: the labels are chained on the top line and the counts on\n"
+                                 "the bottom line (e.g. \"Adv: - Prog:\" over \"12/80 - 45.32%%\"), joined by\n"
+                                 "the separator below. The panel is sized to the widest values every\n"
+                                 "entry can reach, so it still never resizes during a run, but it gets\n"
+                                 "wider with every entry you add. At most %d entries are chained (the\n"
+                                 "first %d in cycle order: progress text, goal types, then individual goals).\n"
+                                 "Default: %s", COMPACT_CHAIN_MAX_ENTRIES, COMPACT_CHAIN_MAX_ENTRIES,
+                                 DEFAULT_COMPACT_CHAIN_ENTRIES ? "On" : "Off");
+                        ImGui::SetTooltip("%s", compact_chain_tooltip_buffer);
+                    }
+                    if (temp_settings.compact_chain_entries) {
+                        ImGui::SetNextItemWidth(80.0f);
+                        ImGui::InputText("Chain Separator", temp_settings.compact_chain_separator,
+                                         sizeof(temp_settings.compact_chain_separator));
+                        if (ImGui::IsItemHovered()) {
+                            char compact_chain_sep_tooltip_buffer[512];
+                            snprintf(compact_chain_sep_tooltip_buffer, sizeof(compact_chain_sep_tooltip_buffer),
+                                     "The character(s) drawn between the chained entries on both panel\n"
+                                     "lines, with a space on either side. Up to %zu characters.\n"
+                                     "Default: \"%s\"",
+                                     sizeof(temp_settings.compact_chain_separator) - 1,
+                                     DEFAULT_COMPACT_CHAIN_SEPARATOR);
+                            ImGui::SetTooltip("%s", compact_chain_sep_tooltip_buffer);
+                        }
+                    } else {
+                        if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
+                                             COMPACT_CYCLE_INTERVAL_MIN, COMPACT_CYCLE_INTERVAL_MAX, "%.1f s")) {
+                            if (temp_settings.compact_cycle_interval < COMPACT_CYCLE_INTERVAL_MIN)
+                                temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MIN;
+                            if (temp_settings.compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
+                                temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char compact_cycle_tooltip_buffer[512];
+                            snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
+                                     "How long each selected entry stays on the panel before the\n"
+                                     "cycle advances to the next one. With a single entry selected the\n"
+                                     "panel is static. Press %s while the overlay window is focused\n"
+                                     "to jump to the next goal, which also flips the Row 1 icons.\n"
+                                     "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
+                            ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
+                        }
                     }
 
                     ImGui::Separator();
@@ -4528,9 +4629,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.compact_stack_items,
                             &temp_settings.compact_stack_item_count
                         };
-                        compact_selection_ui("stack", sctd, scc, smodern, "Stack Goal Types", stack_tgt,
+                        compact_selection_ui("stack", sctd, scc, smodern, sver, "Stack Goal Types", stack_tgt,
                                              &s_stack_type_anchor, s_stack_item_anchor, false,
-                                             temp_settings.overlay_show_hidden_goals);
+                                             temp_settings.overlay_show_hidden_goals, nullptr, nullptr);
 
                         // Per-type pop trigger. Only the counting types can pop mid-progress, so the
                         // rest (advancements, recipes, unlocks, criteria) are left out: they have

@@ -1053,11 +1053,14 @@ static void draw_nine_slice(SDL_Renderer *r, SDL_Texture *tex, const SDL_FRect *
 // count. Goals with a completion state get a plain-ASCII marker (same as the pop-out stack): "[x] "
 // manually checked off, "[a] " auto-completed (a linked goal or the target/game), "[o] " not done.
 // Manually-checkable goals (simple stats, multi-stats, open-ended custom) show all three; auto-only
-// goals (targeted custom goals, counters) show "[a] " when done and nothing otherwise.
+// goals (targeted custom goals, counters) show "[a] " when done and nothing otherwise. The overall
+// progress percentage is its own form: "Prog:" over "45.32%" (no count at all).
 struct CompactEntry {
     char label[200];
     int completed;
     int total; // valid only when !no_target
+    bool percent; // overall progress percentage entry: shows percent_value as "45.32%"
+    float percent_value;
     bool no_target; // open-ended goal: show the count with no denominator
     bool checkbox; // manually-checkable goal: shows [x] manual / [a] auto-done / [o] not done
     bool auto_mark; // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
@@ -1080,7 +1083,9 @@ static const char *compact_display_name(const char *display, const char *root) {
     return (display && display[0] != '\0') ? display : root;
 }
 
-// Build the ordered list of Compact cycle entries from the user's selection: first each selected
+// Build the ordered list of Compact cycle entries from the user's selection: first the progress text
+// the other modes show in their top bar (the run-completion counter, e.g. "Adv: 12/80", and the
+// overall percentage "Prog: 45.32%"), then each selected
 // whole-section type count that is present in the template (fixed enum order), then each selected
 // individual goal, walked in TEMPLATE order per category and in the same category order the settings
 // dropdowns present them (complex advancements, complex recipes, simple stats, multi-stats, custom
@@ -1096,11 +1101,46 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
     compact_compute_type_counters(td, version, cc, true); // panel counts show the real totals
 
     int n = 0;
+    // The progress text: the same counter and percentage the Belt/Page top bar shows, with the same
+    // presence rules (the counter is the template's run completion set or Adv/Ach by version; the
+    // percentage is hidden while a required subset is tracked).
+    if (td && settings->compact_cycle_run_counter && n < max_entries) {
+        const char *counter_label = "";
+        int counter_done = 0, counter_total = 0;
+        if (tracker_get_progress_counter(td, version, &counter_label, &counter_done, &counter_total)) {
+            snprintf(out[n].label, sizeof(out[n].label), "%s", counter_label);
+            out[n].completed = counter_done;
+            out[n].total = counter_total;
+            out[n].percent = false;
+            out[n].percent_value = 0.0f;
+            out[n].no_target = false;
+            out[n].checkbox = false;
+            out[n].auto_mark = false;
+            out[n].manual = false;
+            out[n].done = false;
+            n++;
+        }
+    }
+    if (td && settings->compact_cycle_run_percent && tracker_progress_percent_shown(td) && n < max_entries) {
+        snprintf(out[n].label, sizeof(out[n].label), "Prog");
+        out[n].completed = 0;
+        out[n].total = 0;
+        out[n].percent = true;
+        out[n].percent_value = td->overall_progress_percentage;
+        out[n].no_target = false;
+        out[n].checkbox = false;
+        out[n].auto_mark = false;
+        out[n].manual = false;
+        out[n].done = false;
+        n++;
+    }
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT && n < max_entries; i++) {
         if (!settings->compact_cycle_type[i] || cc[i].total <= 0) continue;
         snprintf(out[n].label, sizeof(out[n].label), "%s", cc[i].label);
         out[n].completed = cc[i].completed;
         out[n].total = cc[i].total;
+        out[n].percent = false;
+        out[n].percent_value = 0.0f;
         out[n].no_target = false;
         out[n].checkbox = false;
         out[n].auto_mark = false;
@@ -1126,6 +1166,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                          compact_display_name(a->display_name, a->root_name));
                 out[n].completed = a->completed_criteria_count;
                 out[n].total = a->criteria_progress_total;
+                out[n].percent = false;
+                out[n].percent_value = 0.0f;
                 out[n].no_target = false;
                 out[n].checkbox = false;
                 out[n].auto_mark = false;
@@ -1145,6 +1187,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             if (!compact_item_selected(settings, COMPACT_COUNTER_STATS, s->root_name)) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
             out[n].completed = s->criteria[0]->progress;
+            out[n].percent = false;
+            out[n].percent_value = 0.0f;
             out[n].checkbox = true; // simple stats can be completed manually
             out[n].auto_mark = false;
             out[n].manual = s->is_manually_completed;
@@ -1166,6 +1210,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
             out[n].completed = s->completed_criteria_count;
             out[n].total = s->criteria_count;
+            out[n].percent = false;
+            out[n].percent_value = 0.0f;
             out[n].no_target = false;
             out[n].checkbox = true; // multi-stats can be completed manually
             out[n].auto_mark = false;
@@ -1181,6 +1227,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             if (!compact_item_selected(settings, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
             out[n].completed = c->progress;
+            out[n].percent = false;
+            out[n].percent_value = 0.0f;
             if (c->goal > 0) {
                 // Targeted custom goals are counter-driven, not manually checkable: [a] only when done.
                 out[n].total = c->goal;
@@ -1207,6 +1255,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
             out[n].completed = c->completed_count;
             out[n].total = c->linked_goal_count;
+            out[n].percent = false;
+            out[n].percent_value = 0.0f;
             out[n].no_target = false;
             out[n].checkbox = false;
             out[n].auto_mark = true; // counters aren't manually checkable: [a] only when done
@@ -1221,6 +1271,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 snprintf(out[0].label, sizeof(out[0].label), "%s", cc[i].label);
                 out[0].completed = cc[i].completed;
                 out[0].total = cc[i].total;
+                out[0].percent = false;
+                out[0].percent_value = 0.0f;
                 out[0].no_target = false;
                 out[0].checkbox = false;
                 out[0].auto_mark = false;
@@ -1235,6 +1287,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                      (version >= MC_VERSION_1_12) ? "Advancements" : "Achievements");
             out[0].completed = 0;
             out[0].total = 0;
+            out[0].percent = false;
+            out[0].percent_value = 0.0f;
             out[0].no_target = false;
             out[0].checkbox = false;
             out[0].auto_mark = false;
@@ -1278,8 +1332,13 @@ static void compact_worst_count(char *buf, size_t buf_sz, int total, char wdigit
 // the running count for open-ended ones. Completion markers (ASCII only, so they render in any font):
 // manually-checkable goals show "[x] " manual / "[a] " auto-done / "[o] " not done; auto-only goals
 // show "[a] " when done and nothing otherwise. The marker is part of the line, which is centered as a
-// whole: centering the count alone and hanging the marker off its left reads far worse.
+// whole: centering the count alone and hanging the marker off its left reads far worse. The
+// percentage entry is formatted exactly like the Belt/Page top bar ("45.32%").
 static void compact_format_count(char *buf, size_t buf_sz, const AppSettings *s, const CompactEntry *e) {
+    if (e->percent) {
+        snprintf(buf, buf_sz, "%.2f%%", e->percent_value);
+        return;
+    }
     const char *box = "";
     if (s->compact_show_completion_markers) {
         if (e->checkbox)
@@ -1296,10 +1355,15 @@ static void compact_format_count(char *buf, size_t buf_sz, const AppSettings *s,
 // Worst-case count string for panel sizing. Targeted goals: widest digit repeated over the total.
 // Open-ended goals: the widest digit repeated for the running count's current digit length (so the
 // panel only grows if the value gains a digit). A checkbox prefix is reserved for checkbox entries;
-// "[x]"/"[o]" are the same length so a manual-toggle never resizes the panel.
+// "[x]"/"[o]" are the same length so a manual-toggle never resizes the panel. The percentage
+// reserves "100.00%" in the widest digit, so it never resizes on the way to a complete run.
 static void compact_worst_count_entry(char *buf, size_t buf_sz, const AppSettings *s, const CompactEntry *e,
                                       char wdigit) {
     char body[48];
+    if (e->percent) {
+        snprintf(buf, buf_sz, "%c%c%c.%c%c%%", wdigit, wdigit, wdigit, wdigit, wdigit);
+        return;
+    }
     if (e->no_target) {
         int v = e->completed < 0 ? -e->completed : e->completed;
         int digits = 1;
@@ -2581,7 +2645,9 @@ static void compact_draw_row1_icon(Overlay *o, const Row1Item &it, const SDL_FRe
 // goals) on a wall-clock timer. The 9-slice panel is sized to the worst-case width across ALL
 // selected entries so the background stays fixed for the whole run. Completed/progressing goals then
 // slide out from under the panel and stack below it (compact_render_stack), and the promo line fills
-// the stack's first slot while it is quiet (compact_render_promo_line). Once the run is complete the
+// the stack's first slot while it is quiet (compact_render_promo_line). With "Chain All Entries" on
+// there is no cycle: every entry is drawn at once, labels chained on the top line and counts on the
+// bottom line, joined by the chain separator. Once the run is complete the
 // panel freezes on "RUN COMPLETED!" over the final in-game time.
 static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettings *settings) {
     SDL_Color text_color = {
@@ -2597,38 +2663,81 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // the other modes use for their completion screen.
     bool run_complete = td && td->run_completed;
 
-    char label_buf[224];
-    char count_buf[64];
+    std::string label_str; // the panel's top line
+    std::string count_str; // the panel's bottom line
     float content_w = 0.0f; // widest line the panel must fit, sizes the panel
+
+    // The selected cycle entries (built below, when the run is not complete): the two progress text
+    // entries, the type counts and the individual goals.
+    // static: this is ~223 KB (label is char[200] x ~1036 slots); keep it off the per-frame stack.
+    // Safe because overlay_render_compact only runs on the overlay's single render thread, and
+    // compact_build_cycle fully rewrites the [0, entry_count) range it returns each call.
+    static CompactEntry entries[2 + COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
 
     if (run_complete) {
         // The run is over: the panel stops cycling and freezes on the completion screen. The final
         // time comes from the frozen tick count and honors the same IGT options as the other modes.
-        snprintf(label_buf, sizeof(label_buf), "RUN COMPLETED!");
+        char count_buf[64];
+        label_str = "RUN COMPLETED!";
         long long compact_ticks = settings->igt_freeze_on_completion
                                       ? td->frozen_play_time_ticks
                                       : td->play_time_ticks;
         format_igt(compact_ticks, td->speedrunigt_ms, count_buf, sizeof(count_buf),
                    settings->igt_unit_spacing, settings->igt_always_show_ms);
+        count_str = count_buf;
         int lwm = 0, cwm = 0;
-        TTF_MeasureString(label_font, label_buf, 0, 0, &lwm, nullptr);
-        TTF_MeasureString(count_font, count_buf, 0, 0, &cwm, nullptr);
+        TTF_MeasureString(label_font, label_str.c_str(), 0, 0, &lwm, nullptr);
+        TTF_MeasureString(count_font, count_str.c_str(), 0, 0, &cwm, nullptr);
+        content_w = fmaxf((float) lwm, (float) cwm);
+    } else if (settings->compact_chain_entries) {
+        // Every entry at once: labels chained on the top line, counts on the bottom line, each joined
+        // by the chain separator (padded with spaces like the top bar's segment separator). The
+        // bottom line is sized by the chain of worst-case counts, so the panel keeps a fixed width
+        // for the whole run just like the cycle does. The chain is capped at COMPACT_CHAIN_MAX_ENTRIES
+        // (the first entries in cycle order win) so the panel can't grow absurdly wide.
+        int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
+        if (entry_count > COMPACT_CHAIN_MAX_ENTRIES) entry_count = COMPACT_CHAIN_MAX_ENTRIES;
+
+        char chain_sep[16];
+        snprintf(chain_sep, sizeof(chain_sep), " %s ",
+                 settings->compact_chain_separator[0] != '\0' ? settings->compact_chain_separator : "-");
+        char wdig = compact_widest_digit(count_font);
+        std::string worst_str;
+        for (int i = 0; i < entry_count; i++) {
+            if (i > 0) {
+                label_str += chain_sep;
+                count_str += chain_sep;
+                worst_str += chain_sep;
+            }
+            char lbl[224];
+            compact_ms_label(lbl, sizeof(lbl), entries[i].label);
+            label_str += lbl;
+            char cnt[64];
+            compact_format_count(cnt, sizeof(cnt), settings, &entries[i]);
+            count_str += cnt;
+            char wc[64];
+            compact_worst_count_entry(wc, sizeof(wc), settings, &entries[i], wdig);
+            worst_str += wc;
+        }
+        int lwm = 0, cwm = 0;
+        TTF_MeasureString(label_font, label_str.c_str(), 0, 0, &lwm, nullptr);
+        TTF_MeasureString(count_font, worst_str.c_str(), 0, 0, &cwm, nullptr);
         content_w = fmaxf((float) lwm, (float) cwm);
     } else {
         // Build the selected cycle, then pick the entry showing this frame. The shared page_index is
         // advanced by the cycle-interval timer (overlay_update) and by SPACE (overlay_events), exactly
         // like Page mode; static when there's only one entry.
-        // static: this is ~223 KB (label is char[200] x ~1034 slots); keep it off the per-frame stack.
-        // Safe because overlay_render_compact only runs on the overlay's single render thread, and
-        // compact_build_cycle fully rewrites the [0, entry_count) range it returns each call.
-        static CompactEntry entries[COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
         int entry_count = compact_build_cycle(t, settings, entries, (int) (sizeof(entries) / sizeof(entries[0])));
 
         int cur_idx = (entry_count > 0) ? (((o->page_index % entry_count) + entry_count) % entry_count) : 0;
         CompactEntry *cur = &entries[cur_idx];
 
+        char label_buf[224];
+        char count_buf[64];
         compact_ms_label(label_buf, sizeof(label_buf), cur->label);
         compact_format_count(count_buf, sizeof(count_buf), settings, cur);
+        label_str = label_buf;
+        count_str = count_buf;
 
         // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
         // possible count each can display (widest digit repeated over the total, never the live count).
@@ -2649,8 +2758,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         }
     }
 
-    SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_buf, text_color);
-    SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_buf, text_color);
+    SDL_Texture *label_tex = get_text_texture_from_cache(o, label_font, label_str.c_str(), text_color);
+    SDL_Texture *count_tex = get_text_texture_from_cache(o, count_font, count_str.c_str(), text_color);
 
     float lw = 0.0f, lh = 0.0f, cw = 0.0f, ch = 0.0f;
     if (label_tex) SDL_GetTextureSize(label_tex, &lw, &lh);

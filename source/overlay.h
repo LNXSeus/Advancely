@@ -29,7 +29,7 @@ struct OverlayDisplayItem {
 
 // A cache entry for rendered text to avoid re-creating textures every frame
 typedef struct {
-    char text[256]; // The text string that was rendered
+    char text[2048]; // The text string that was rendered (Compact chains every panel entry into one line)
     SDL_Color color; // The color it was rendered with
     TTF_Font *font; // The font it was rendered with (top bar and rows can differ)
     SDL_Texture *texture;

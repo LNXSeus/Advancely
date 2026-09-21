@@ -16824,6 +16824,12 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     run_completion_parse(template_json, &t->template_data->run_completion);
     tracker_read_completion_label(t->template_data, lang_json);
 
+    // An untouched Compact panel follows the template: its stock entry becomes the progress text
+    // counter when the template has a custom, labelled run completion rule. Persisted right away,
+    // since the overlay process reads its settings from the file.
+    if (settings_default_compact_progress_text(settings, t->template_data))
+        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+
     // Detect and flag criteria that are shared between multiple advancements
     tracker_detect_shared_icons(t, settings);
 

@@ -167,6 +167,12 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_CYCLE_INTERVAL 3.0f // Seconds each selected entry shows before the cycle advances
 #define COMPACT_CYCLE_INTERVAL_MIN 0.5f
 #define COMPACT_CYCLE_INTERVAL_MAX 60.0f
+#define DEFAULT_COMPACT_CYCLE_RUN_COUNTER false // Run-completion counter ("Adv: 12/80") in the panel cycle
+#define DEFAULT_COMPACT_CYCLE_RUN_PERCENT false // Overall progress percentage ("Prog: 45.32%") in the panel cycle
+#define DEFAULT_COMPACT_CHAIN_ENTRIES false // Show every cycle entry side by side instead of cycling
+#define DEFAULT_COMPACT_CHAIN_SEPARATOR "-" // Drawn between chained entries on both panel lines
+#define COMPACT_CHAIN_MAX_ENTRIES 32 // Chained entries beyond this are dropped so the panel stays a sane width
+#define DEFAULT_COMPACT_CYCLE_CUSTOMIZED false // Flips on once the user edits the Panel Content selection
 
 // Compact row-1 icon strip (first-row icons shown above the panel, paged like Page mode).
 #define DEFAULT_COMPACT_SHOW_ROW1_ICONS false // Off by default so existing compact layouts are unchanged
@@ -795,6 +801,12 @@ struct AppSettings {
     CompactCycleItem compact_cycle_items[MAX_COMPACT_CYCLE_ITEMS]; // Individual goals selected into the cycle by name.
     int compact_cycle_item_count; // Number of valid entries in compact_cycle_items.
     float compact_cycle_interval; // Seconds each selected entry shows before the cycle advances.
+    bool compact_cycle_run_counter; // Adds the run-completion counter (the "Adv: 12/80" progress text) to the cycle.
+    bool compact_cycle_run_percent; // Adds the overall progress percentage ("Prog: 45.32%") to the cycle.
+    bool compact_chain_entries; // Show all cycle entries at once, chained on both panel lines, instead of cycling.
+    char compact_chain_separator[9]; // Separator between chained entries. Default "-". Up to 8 characters.
+    bool compact_cycle_customized; // Set once the user edits the Panel Content selection; until then the
+    // selection is the stock default, which settings_default_compact_progress_text keeps template-driven.
 
     // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged
     // to fit the panel width and flipped on their own interval. Aligned with compact_panel_align.
@@ -1033,6 +1045,15 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
 
 // Same as settings_prune_compact_cycle_items, for the independent pop-out-stack item selection.
 void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td);
+
+// Keeps the stock Panel Content selection template-driven: while the user has never edited it
+// (compact_cycle_customized off) and it still has the stock shape (only the Advancements type or
+// only the progress counter, no other entries), a template with its own run completion rule AND a
+// lang "run_completion.label" gets the progress text counter as the default entry instead of the
+// Advancements count, and a template without one goes back to Advancements. Returns true when the
+// selection was changed (the caller persists it). Shared by the tracker (on template load) and the
+// settings window (so the dropdown shows the same default the overlay uses).
+bool settings_default_compact_progress_text(AppSettings *settings, const TemplateData *td);
 
 /**
  * @brief Returns the owner UUID assigned to an advancement, or NULL if unassigned.
