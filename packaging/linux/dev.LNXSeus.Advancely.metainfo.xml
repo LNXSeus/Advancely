@@ -15,6 +15,26 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.7.2" date="2026-09-22">
+      <description>
+        <p>Goal descriptions, a Run Completion Criteria tab, more control over the compact overlay panel text, and an important overlay width fix.</p>
+        <ul>
+          <li>Overlay width fix: changing the overlay width in the settings now actually applies. The width field also shows the real default (1440px) instead of a placeholder, and applying a width change no longer reloads the template twice.</li>
+          <li>Goal descriptions: advancements, stats, unlocks, custom goals, counters, multi-stage goals and their individual stages can carry a description that appears when hovering the goal on the tracker map (outside the visual layout editor). Descriptions hold up to 1024 characters, with a countdown that appears near the limit, and they come along when goals are imported.</li>
+          <li>Run Completion Criteria moved into its own tab in the template editor and now controls both when a template counts as complete and what the progress text shows, which suits categories like half% or all_blocks. The 1.16 all_blocks template uses it, and the debug print reflects it.</li>
+          <li>Stat stages: a stage can now start counting from 0 the moment it begins (the new count_from_stage key), stages can mirror an already existing goal (custom goals and counters included), and Hermes remembers snapshot stat stages per goal and per template, so returning to the same world keeps them. Co-op follows the new stat stage setting.</li>
+          <li>Compact overlay panel text: the chained and cycling panel text can show far more at once, including the overall progress percentage again, with up to 32 chained entries. Entries now appear in the order you selected them in, so a chain reads exactly how you built it.</li>
+          <li>The selection rectangle on the main tracker map can be turned off, with its own hotkey.</li>
+          <li>Criteria that share a display are grouped as one on the tracker.</li>
+          <li>New setting (off by default) to hide the shared icon on sub-goals that share a base icon, separately for the tracker and the overlay.</li>
+          <li>New "complex" / "cmplx" search tag in the template editor and the tracker search, for advancements, achievements and recipes that have sub-goals.</li>
+          <li>Overlay: a frozen row that has an item cleared now plays the clear animation instead of shifting instantly.</li>
+          <li>Fixes: language file key propagation after importing a language and renaming a goal, range selection in the linked goal popups, manual custom goals pushing automatically arranged goals aside in the manual layout, and applying settings no longer resetting stat checkboxes while no world is tracked.</li>
+          <li>Tooltips and documentation: how to get the tracker text perfectly sharp, a note that goals cannot be linked to themselves even indirectly, "Zoom/Scroll" instead of "SPACE: Lock" in the info window, and settings tooltips no longer quote fixed ranges.</li>
+          <li>Minecraft 27.1 is available as a version, and the 1.0, 1.16.1 and craftmine test templates plus the 1.16.1 all_blocks template were updated.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.7.1" date="2026-09-11">
       <description>
         <p>Undo/redo in the template editor, a selection rectangle with auto-pan in the visual layout editor, bulk grid positioning, and overlay and tracker fixes.</p>
