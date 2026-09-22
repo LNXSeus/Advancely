@@ -703,6 +703,7 @@ enum OverlayCompactCounterType {
 typedef struct {
     OverlayCompactCounterType kind;
     char root_name[192];
+    int order; // Panel-cycle selection sequence (1-based, 0 = not ordered yet). Unused by the stack.
 } CompactCycleItem;
 
 #define MAX_COMPACT_CYCLE_ITEMS 1024 // High enough to be effectively unlimited for any real template
@@ -807,6 +808,14 @@ struct AppSettings {
     char compact_chain_separator[9]; // Separator between chained entries. Default "-". Up to 8 characters.
     bool compact_cycle_customized; // Set once the user edits the Panel Content selection; until then the
     // selection is the stock default, which settings_default_compact_progress_text keeps template-driven.
+
+    // Selection order for the panel cycle: every selected entry (progress text rows, whole-section
+    // type counts and individual goals) carries a 1-based sequence number, and the panel shows them
+    // in that order whether it cycles or chains. 0 means "selected but not ordered yet" (an older
+    // settings.json), which settings_compact_cycle_order_normalize fills in.
+    int compact_cycle_type_order[COMPACT_COUNTER_TYPE_COUNT]; // Parallel to compact_cycle_type.
+    int compact_cycle_run_counter_order;
+    int compact_cycle_run_percent_order;
 
     // Row-1 icon strip above the panel: the first-row icons (advancement criteria + sub-stats), paged
     // to fit the panel width and flipped on their own interval. Aligned with compact_panel_align.
@@ -1045,6 +1054,13 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
 
 // Same as settings_prune_compact_cycle_items, for the independent pop-out-stack item selection.
 void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td);
+
+// Brings the panel cycle's selection order into a clean state: every selected entry ends up with a
+// unique 1-based order, entries that already had one keep their relative order, newly selected ones
+// (order 0, including everything in a settings.json written before ordering existed) are appended in
+// the legacy display order, and deselected entries lose theirs. Idempotent, so the settings window
+// can call it every frame to turn "what the user clicked first" into the panel's order.
+void settings_compact_cycle_order_normalize(AppSettings *settings);
 
 // Keeps the stock Panel Content selection template-driven: while the user has never edited it
 // (compact_cycle_customized off) and it still has the stock shape (only the Advancements type or

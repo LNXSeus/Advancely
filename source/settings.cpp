@@ -131,12 +131,18 @@ static bool compact_cycle_different(const AppSettings *a, const AppSettings *b) 
         a->compact_chain_entries != b->compact_chain_entries ||
         strcmp(a->compact_chain_separator, b->compact_chain_separator) != 0)
         return true;
+    if (a->compact_cycle_run_counter_order != b->compact_cycle_run_counter_order ||
+        a->compact_cycle_run_percent_order != b->compact_cycle_run_percent_order)
+        return true;
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
-        if (a->compact_cycle_type[i] != b->compact_cycle_type[i]) return true;
+        if (a->compact_cycle_type[i] != b->compact_cycle_type[i] ||
+            a->compact_cycle_type_order[i] != b->compact_cycle_type_order[i])
+            return true;
     }
     if (a->compact_cycle_item_count != b->compact_cycle_item_count) return true;
     for (int i = 0; i < a->compact_cycle_item_count; i++) {
         if (a->compact_cycle_items[i].kind != b->compact_cycle_items[i].kind ||
+            a->compact_cycle_items[i].order != b->compact_cycle_items[i].order ||
             strcmp(a->compact_cycle_items[i].root_name, b->compact_cycle_items[i].root_name) != 0)
             return true;
     }
@@ -250,17 +256,16 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         char tip[800];
         if (is_cycle)
             snprintf(tip, sizeof(tip),
-                     "Each checked entry adds one big \"label over count\" entry to the panel's cycle.\n"
-                     "The Progress Text rows are the counter and percentage the Belt and Page top bar\n"
-                     "shows: the counter follows the template's Run Completion rule (or Advancements /\n"
-                     "Achievements), the percentage is the whole template's progress and is left out\n"
-                     "while a required subset is tracked. Only goal types present in this template are\n"
-                     "listed. The totals are the real counts, including goals hidden from the overlay.\n"
-                     "Shift+Click to range-select goal types.\n"
-                     "At least one entry across these and the individual-goal dropdowns must stay selected.\n"
-                     "Default: the Progress Text counter when the template has its own Run Completion\n"
-                     "rule with a lang-file label, otherwise Advancements / Achievements only (until\n"
-                     "you edit the selection here).");
+                     "Each checked entry adds one big \"label over count\" entry to the panel.\n"
+                     "The Progress Text rows are the counter and percentage from the Belt and Page\n"
+                     "top bar. Only types present in this template are listed, with their real\n"
+                     "totals (goals hidden from the overlay included).\n"
+                     "Shift+Click to range-select.\n"
+                     "The panel shows the entries in the order you selected them in, across all of\n"
+                     "these dropdowns; click one off and on again to move it to the end.\n"
+                     "At least one entry must stay selected.\n"
+                     "Default: the Progress Text counter when the template has its own labelled Run\n"
+                     "Completion rule, otherwise Advancements / Achievements.");
         else
             snprintf(tip, sizeof(tip),
                      "Whole-goal types that pop into the stack when they complete. Only kinds without their\n"
@@ -309,6 +314,9 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             ci->kind = kind;
             strncpy(ci->root_name, root, sizeof(ci->root_name) - 1);
             ci->root_name[sizeof(ci->root_name) - 1] = '\0';
+            // Unordered until the cycle's normalize pass puts it at the end (the slot may still
+            // hold the order of an item that was deselected earlier). The stack ignores it.
+            ci->order = 0;
         }
     };
     auto item_set = [&](OverlayCompactCounterType kind, const char *root, bool on) {
@@ -484,6 +492,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                 snprintf(item_combo_tooltip_buffer, sizeof(item_combo_tooltip_buffer),
                          "%s\n"
                          "Shift+Click to range-select.\n"
+                         "The panel shows the entries in the order you selected them in; click one off\n"
+                         "and on again to move it to the end.\n"
                          "At least one entry across all these dropdowns must stay selected;\n"
                          "up to %d individual goals can be added in total.", tip, MAX_COMPACT_CYCLE_ITEMS);
             else
@@ -4506,6 +4516,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         };
                         ensure_something_selected(&temp_settings);
                         ensure_something_selected(&saved_settings);
+
+                        // Turn the clicks above into the panel's order: anything just selected lands
+                        // at the end of the cycle, anything just deselected gives up its place. The
+                        // saved baseline is normalized too, so filling in orders for a selection that
+                        // predates this never shows up as an unsaved change on its own.
+                        settings_compact_cycle_order_normalize(&temp_settings);
+                        settings_compact_cycle_order_normalize(&saved_settings);
                     }
 
                     ImGui::Checkbox("Chain All Entries", &temp_settings.compact_chain_entries);
@@ -4517,8 +4534,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "the bottom line (e.g. \"Adv: - Prog:\" over \"12/80 - 45.32%%\"), joined by\n"
                                  "the separator below. The panel is sized to the widest values every\n"
                                  "entry can reach, so it still never resizes during a run, but it gets\n"
-                                 "wider with every entry you add. At most %d entries are chained (the\n"
-                                 "first %d in cycle order: progress text, goal types, then individual goals).\n"
+                                 "wider with every entry you add. The entries are chained left to right in\n"
+                                 "the order you selected them in. At most %d entries are chained (the first\n"
+                                 "%d of that order).\n"
                                  "Default: %s", COMPACT_CHAIN_MAX_ENTRIES, COMPACT_CHAIN_MAX_ENTRIES,
                                  DEFAULT_COMPACT_CHAIN_ENTRIES ? "On" : "Off");
                         ImGui::SetTooltip("%s", compact_chain_tooltip_buffer);

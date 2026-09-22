@@ -7,6 +7,8 @@
 // Created by Linus on 27.06.2025.
 //
 
+#include <algorithm>
+#include <climits>
 #include <cstdio>
 #include <cstring>
 
@@ -638,6 +640,39 @@ void settings_prune_compact_cycle_items(AppSettings *settings, const TemplateDat
     if (!settings) return;
     prune_compact_items(td, settings->compact_cycle_items, &settings->compact_cycle_item_count,
                         settings->overlay_show_hidden_goals);
+    settings_compact_cycle_order_normalize(settings); // Close the gaps the dropped items left.
+}
+
+void settings_compact_cycle_order_normalize(AppSettings *settings) {
+    if (!settings) return;
+
+    // A deselected entry never keeps an order, so re-selecting it later puts it at the end.
+    if (!settings->compact_cycle_run_counter) settings->compact_cycle_run_counter_order = 0;
+    if (!settings->compact_cycle_run_percent) settings->compact_cycle_run_percent_order = 0;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+        if (!settings->compact_cycle_type[i]) settings->compact_cycle_type_order[i] = 0;
+
+    // Every selected entry, gathered in the legacy display order (progress text, then the type
+    // counts in enum order, then the individual goals): that is where the ones without an order
+    // yet belong, which keeps a settings.json written before ordering existed looking the same.
+    int *slots[2 + COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
+    int slot_count = 0;
+    if (settings->compact_cycle_run_counter) slots[slot_count++] = &settings->compact_cycle_run_counter_order;
+    if (settings->compact_cycle_run_percent) slots[slot_count++] = &settings->compact_cycle_run_percent_order;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++)
+        if (settings->compact_cycle_type[i]) slots[slot_count++] = &settings->compact_cycle_type_order[i];
+    for (int i = 0; i < settings->compact_cycle_item_count && i < MAX_COMPACT_CYCLE_ITEMS; i++)
+        slots[slot_count++] = &settings->compact_cycle_items[i].order;
+
+    // Ordered entries first, by the order they were selected in; the unordered ones keep their
+    // legacy positions behind them. Stable, so equal keys never shuffle between frames.
+    std::stable_sort(slots, slots + slot_count, [](const int *a, const int *b) {
+        int ka = (*a > 0) ? *a : INT_MAX;
+        int kb = (*b > 0) ? *b : INT_MAX;
+        return ka < kb;
+    });
+
+    for (int i = 0; i < slot_count; i++) *slots[i] = i + 1;
 }
 
 bool settings_default_compact_progress_text(AppSettings *settings, const TemplateData *td) {
@@ -655,6 +690,7 @@ bool settings_default_compact_progress_text(AppSettings *settings, const Templat
     if (custom_labelled == counter_only) return false;
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = !custom_labelled;
     settings->compact_cycle_run_counter = custom_labelled;
+    settings_compact_cycle_order_normalize(settings);
     return true;
 }
 
@@ -1004,9 +1040,14 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
     settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
     settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP;
-    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+    for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+        settings->compact_cycle_type[i] = false;
+        settings->compact_cycle_type_order[i] = 0;
+    }
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true; // Advancements-only by default
     settings->compact_cycle_item_count = 0;
+    settings->compact_cycle_run_counter_order = 0;
+    settings->compact_cycle_run_percent_order = 0;
     settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
     settings->compact_cycle_run_counter = DEFAULT_COMPACT_CYCLE_RUN_COUNTER;
     settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
@@ -2075,14 +2116,29 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         }
 
         const cJSON *compact_types = cJSON_GetObjectItem(visual_settings, "compact_cycle_types");
-        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+        // Selection order, one entry per compact_cycle_types entry and in the same positions. A
+        // settings.json written before the panel followed selection order has none, and the
+        // normalize call at the end of the load numbers everything in the legacy display order.
+        const cJSON *compact_type_orders = cJSON_GetObjectItem(visual_settings, "compact_cycle_type_orders");
+        bool have_type_orders = compact_type_orders && cJSON_IsArray(compact_type_orders);
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            settings->compact_cycle_type[i] = false;
+            settings->compact_cycle_type_order[i] = 0;
+        }
         if (compact_types && cJSON_IsArray(compact_types)) {
+            int type_pos = 0;
             const cJSON *type_entry = nullptr;
             cJSON_ArrayForEach(type_entry, compact_types) {
                 if (cJSON_IsNumber(type_entry) && type_entry->valueint >= 0
                     && type_entry->valueint < COMPACT_COUNTER_TYPE_COUNT) {
                     settings->compact_cycle_type[type_entry->valueint] = true;
+                    const cJSON *type_order = have_type_orders
+                                                  ? cJSON_GetArrayItem(compact_type_orders, type_pos)
+                                                  : nullptr;
+                    if (type_order && cJSON_IsNumber(type_order) && type_order->valueint > 0)
+                        settings->compact_cycle_type_order[type_entry->valueint] = type_order->valueint;
                 }
+                type_pos++;
             }
         } else {
             settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
@@ -2104,6 +2160,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 ci->kind = (OverlayCompactCounterType) kind->valueint;
                 strncpy(ci->root_name, root->valuestring, sizeof(ci->root_name) - 1);
                 ci->root_name[sizeof(ci->root_name) - 1] = '\0';
+                const cJSON *item_order = cJSON_GetObjectItem(item_entry, "order");
+                ci->order = (cJSON_IsNumber(item_order) && item_order->valueint > 0) ? item_order->valueint : 0;
                 settings->compact_cycle_item_count++;
             }
         }
@@ -2134,6 +2192,15 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
             defaults_were_used = true;
         }
+        const cJSON *rc_order = cJSON_GetObjectItem(visual_settings, "compact_cycle_run_counter_order");
+        settings->compact_cycle_run_counter_order =
+                (cJSON_IsNumber(rc_order) && rc_order->valueint > 0) ? rc_order->valueint : 0;
+        const cJSON *rp_order = cJSON_GetObjectItem(visual_settings, "compact_cycle_run_percent_order");
+        settings->compact_cycle_run_percent_order =
+                (cJSON_IsNumber(rp_order) && rp_order->valueint > 0) ? rp_order->valueint : 0;
+        // The whole cycle selection is loaded by now, so give anything that came in without an
+        // order its legacy place and leave the numbering gap-free.
+        settings_compact_cycle_order_normalize(settings);
         const cJSON *compact_chain = cJSON_GetObjectItem(visual_settings, "compact_chain_entries");
         if (compact_chain && cJSON_IsBool(compact_chain)) {
             settings->compact_chain_entries = cJSON_IsTrue(compact_chain);
@@ -2288,6 +2355,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
                 ci->kind = (OverlayCompactCounterType) kind->valueint;
                 strncpy(ci->root_name, root->valuestring, sizeof(ci->root_name) - 1);
                 ci->root_name[sizeof(ci->root_name) - 1] = '\0';
+                ci->order = 0; // The stack has no order of its own; it pops as goals complete.
                 settings->compact_stack_item_count++;
             }
         }
@@ -2900,9 +2968,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_count_font_size = DEFAULT_COMPACT_COUNT_FONT_SIZE;
         settings->compact_stack_font_size = DEFAULT_COMPACT_STACK_FONT_SIZE;
         settings->compact_panel_line_gap = DEFAULT_COMPACT_PANEL_LINE_GAP;
-        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) settings->compact_cycle_type[i] = false;
+        for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
+            settings->compact_cycle_type[i] = false;
+            settings->compact_cycle_type_order[i] = 0;
+        }
         settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = true;
         settings->compact_cycle_item_count = 0;
+        settings->compact_cycle_run_counter_order = 0;
+        settings->compact_cycle_run_percent_order = 0;
         settings->compact_cycle_interval = DEFAULT_COMPACT_CYCLE_INTERVAL;
         settings->compact_cycle_run_counter = DEFAULT_COMPACT_CYCLE_RUN_COUNTER;
         settings->compact_cycle_run_percent = DEFAULT_COMPACT_CYCLE_RUN_PERCENT;
@@ -3705,12 +3778,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(visuals_obj, "compact_panel_line_gap",
                               cJSON_CreateNumber(settings->compact_panel_line_gap));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_types");
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_type_orders");
         cJSON *compact_types_array = cJSON_CreateArray();
+        cJSON *compact_type_orders_array = cJSON_CreateArray();
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
-            if (settings->compact_cycle_type[i])
+            if (settings->compact_cycle_type[i]) {
                 cJSON_AddItemToArray(compact_types_array, cJSON_CreateNumber(i));
+                cJSON_AddItemToArray(compact_type_orders_array,
+                                     cJSON_CreateNumber(settings->compact_cycle_type_order[i]));
+            }
         }
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_types", compact_types_array);
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_type_orders", compact_type_orders_array);
 
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_items");
         cJSON *compact_items_array = cJSON_CreateArray();
@@ -3719,6 +3798,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
             cJSON *item_obj = cJSON_CreateObject();
             cJSON_AddItemToObject(item_obj, "kind", cJSON_CreateNumber(ci->kind));
             cJSON_AddItemToObject(item_obj, "root", cJSON_CreateString(ci->root_name));
+            cJSON_AddItemToObject(item_obj, "order", cJSON_CreateNumber(ci->order));
             cJSON_AddItemToArray(compact_items_array, item_obj);
         }
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_items", compact_items_array);
@@ -3732,6 +3812,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_run_percent");
         cJSON_AddItemToObject(visuals_obj, "compact_cycle_run_percent",
                               cJSON_CreateBool(settings->compact_cycle_run_percent));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_run_counter_order");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_run_counter_order",
+                              cJSON_CreateNumber(settings->compact_cycle_run_counter_order));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_cycle_run_percent_order");
+        cJSON_AddItemToObject(visuals_obj, "compact_cycle_run_percent_order",
+                              cJSON_CreateNumber(settings->compact_cycle_run_percent_order));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_chain_entries");
         cJSON_AddItemToObject(visuals_obj, "compact_chain_entries",
                               cJSON_CreateBool(settings->compact_chain_entries));

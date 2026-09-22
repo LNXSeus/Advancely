@@ -21,6 +21,7 @@
 #include <string>
 #include <vector> // Required for collecting items to render
 #include <algorithm> // Required for std::reverse
+#include <climits> // INT_MAX: unordered Compact cycle entries sort last
 #include <unordered_map> // Compact pop-out stack: previous-state snapshot for the diff engine
 
 #define SOCIAL_CYCLE_SECONDS 15.0f
@@ -1066,15 +1067,17 @@ struct CompactEntry {
     bool auto_mark; // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
     bool manual; // is_manually_completed (drives [x])
     bool done; // completed by any means (drives [a])
+    int order; // the entry's place in the user's selection order (0 = unordered, sorts last)
 };
 
-// True if the user selected the individual goal (kind + root_name) into the Compact cycle.
-static bool compact_item_selected(const AppSettings *settings, OverlayCompactCounterType kind, const char *root) {
+// The selection order of the individual goal (kind + root_name) in the Compact cycle, 0 when it is
+// selected but has no order yet, and -1 when it is not selected at all.
+static int compact_item_order(const AppSettings *settings, OverlayCompactCounterType kind, const char *root) {
     for (int i = 0; i < settings->compact_cycle_item_count; i++)
         if (settings->compact_cycle_items[i].kind == kind &&
             strcmp(settings->compact_cycle_items[i].root_name, root) == 0)
-            return true;
-    return false;
+            return settings->compact_cycle_items[i].order;
+    return -1;
 }
 
 // Display label for a goal, falling back to its root_name/ID when the display name is empty
@@ -1083,16 +1086,15 @@ static const char *compact_display_name(const char *display, const char *root) {
     return (display && display[0] != '\0') ? display : root;
 }
 
-// Build the ordered list of Compact cycle entries from the user's selection: first the progress text
+// Build the ordered list of Compact cycle entries from the user's selection: the progress text rows
 // the other modes show in their top bar (the run-completion counter, e.g. "Adv: 12/80", and the
-// overall percentage "Prog: 45.32%"), then each selected
-// whole-section type count that is present in the template (fixed enum order), then each selected
-// individual goal, walked in TEMPLATE order per category and in the same category order the settings
-// dropdowns present them (complex advancements, complex recipes, simple stats, multi-stats, custom
-// goals, counters) so the cycle order stays consistent with the dropdowns regardless of the order
-// they were checked. Version rules
-// for the type counts come from the shared compact_compute_type_counters. Falls back to a single
-// entry (first present type, else an empty Advancements/Achievements 0/0). Returns >= 1.
+// overall percentage "Prog: 45.32%"), each selected whole-section type count that is present in the
+// template, and each selected individual goal. Entries are collected in the legacy display order
+// (progress text, type counts in enum order, then individual goals walked in TEMPLATE order per
+// category) and then sorted by the order the user selected them in, which is what the panel shows
+// whether it cycles or chains. An entry with no order yet keeps its legacy place at the end.
+// Version rules for the type counts come from the shared compact_compute_type_counters. Falls back
+// to a single entry (first present type, else an empty Advancements/Achievements 0/0). Returns >= 1.
 static int compact_build_cycle(const Tracker *t, const AppSettings *settings, CompactEntry *out, int max_entries) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
@@ -1118,6 +1120,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].auto_mark = false;
             out[n].manual = false;
             out[n].done = false;
+            out[n].order = settings->compact_cycle_run_counter_order;
             n++;
         }
     }
@@ -1132,6 +1135,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         out[n].auto_mark = false;
         out[n].manual = false;
         out[n].done = false;
+        out[n].order = settings->compact_cycle_run_percent_order;
         n++;
     }
     for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT && n < max_entries; i++) {
@@ -1146,6 +1150,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         out[n].auto_mark = false;
         out[n].manual = false;
         out[n].done = false;
+        out[n].order = settings->compact_cycle_type_order[i];
         n++;
     }
     if (td) {
@@ -1161,7 +1166,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 if (!a || a->is_recipe != want_recipe || a->criteria_count <= 0 ||
                     goal_is_hidden(a->is_hidden, settings))
                     continue;
-                if (!compact_item_selected(settings, kind, a->root_name)) continue;
+                int item_order = compact_item_order(settings, kind, a->root_name);
+                if (item_order < 0) continue;
                 snprintf(out[n].label, sizeof(out[n].label), "%s",
                          compact_display_name(a->display_name, a->root_name));
                 out[n].completed = a->completed_criteria_count;
@@ -1173,6 +1179,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].auto_mark = false;
                 out[n].manual = false;
                 out[n].done = false;
+                out[n].order = item_order;
                 n++;
             }
         }
@@ -1184,7 +1191,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             if (s->criteria_count < 1 || !s->criteria[0]) continue;
             int goal = s->criteria[0]->goal;
             if (goal <= 0 && goal != -1) continue;
-            if (!compact_item_selected(settings, COMPACT_COUNTER_STATS, s->root_name)) continue;
+            int item_order = compact_item_order(settings, COMPACT_COUNTER_STATS, s->root_name);
+            if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
             out[n].completed = s->criteria[0]->progress;
             out[n].percent = false;
@@ -1200,13 +1208,15 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].total = 0;
                 out[n].no_target = true;
             }
+            out[n].order = item_order;
             n++;
         }
         // Multi-stats (complex stat categories) -> their sub-stat progress.
         for (int i = 0; i < td->stat_count && n < max_entries; i++) {
             TrackableCategory *s = td->stats[i];
             if (!s || s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings)) continue;
-            if (!compact_item_selected(settings, COMPACT_COUNTER_SUB_STATS, s->root_name)) continue;
+            int item_order = compact_item_order(settings, COMPACT_COUNTER_SUB_STATS, s->root_name);
+            if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
             out[n].completed = s->completed_criteria_count;
             out[n].total = s->criteria_count;
@@ -1217,6 +1227,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].auto_mark = false;
             out[n].manual = s->is_manually_completed;
             out[n].done = s->done;
+            out[n].order = item_order;
             n++;
         }
         // Custom goals -> a real target (goal > 0) shows progress / goal; an open-ended custom goal
@@ -1224,7 +1235,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         for (int i = 0; i < td->custom_goal_count && n < max_entries; i++) {
             TrackableItem *c = td->custom_goals[i];
             if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
-            if (!compact_item_selected(settings, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
+            int item_order = compact_item_order(settings, COMPACT_COUNTER_CUSTOM, c->root_name);
+            if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
             out[n].completed = c->progress;
             out[n].percent = false;
@@ -1245,13 +1257,15 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].manual = c->is_manually_completed;
                 out[n].done = c->done;
             }
+            out[n].order = item_order;
             n++;
         }
         // Completion counters -> completed/linked goals.
         for (int i = 0; i < td->counter_goal_count && n < max_entries; i++) {
             CounterGoal *c = td->counter_goals[i];
             if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
-            if (!compact_item_selected(settings, COMPACT_COUNTER_COUNTERS, c->root_name)) continue;
+            int item_order = compact_item_order(settings, COMPACT_COUNTER_COUNTERS, c->root_name);
+            if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
             out[n].completed = c->completed_count;
             out[n].total = c->linked_goal_count;
@@ -1262,9 +1276,17 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].auto_mark = true; // counters aren't manually checkable: [a] only when done
             out[n].manual = false;
             out[n].done = c->done;
+            out[n].order = item_order;
             n++;
         }
     }
+    // Into the order the user picked them in. Stable, so entries that share an order (nothing has
+    // been reordered yet, or a settings.json older than this) keep the legacy order above.
+    std::stable_sort(out, out + n, [](const CompactEntry &a, const CompactEntry &b) {
+        int ka = (a.order > 0) ? a.order : INT_MAX;
+        int kb = (b.order > 0) ? b.order : INT_MAX;
+        return ka < kb;
+    });
     if (n == 0) {
         for (int i = 0; i < COMPACT_COUNTER_TYPE_COUNT; i++) {
             if (cc[i].total > 0) {
@@ -1278,6 +1300,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[0].auto_mark = false;
                 out[0].manual = false;
                 out[0].done = false;
+                out[0].order = 0;
                 n = 1;
                 break;
             }
@@ -1294,6 +1317,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[0].auto_mark = false;
             out[0].manual = false;
             out[0].done = false;
+            out[0].order = 0;
             n = 1;
         }
     }
