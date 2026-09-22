@@ -2794,6 +2794,9 @@ int main(int argc, char *argv[]) {
         // template froze the tracker for seconds and, on a timeout, raced the single-overlay guard.
         bool overlay_restart_pending = false;
         Uint64 overlay_restart_deadline = 0;
+        // The width the user just applied, captured before the settings reload can overwrite
+        // app_settings.overlay_window with the (stale) on-disk copy the tracker never writes.
+        int overlay_applied_width = 0;
 
         // Track previous coop state for detecting disconnects
         CoopNetState prev_coop_state = COOP_NET_IDLE;
@@ -2977,7 +2980,14 @@ int main(int argc, char *argv[]) {
                     // settings dialog (we never push width into the overlay process),
                     // so rewrite just the width subkey using the tracker's authoritative
                     // value before the new overlay process starts.
-                    settings_save_overlay_width_only(app_settings.overlay_window.w);
+                    // app_settings already holds this width, so the write is ours alone and the
+                    // dmon watcher would only cost a redundant full reinit.
+                    if (overlay_applied_width > 0) {
+                        app_settings.overlay_window.w = overlay_applied_width;
+                        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+                        settings_save_overlay_width_only(overlay_applied_width);
+                        overlay_applied_width = 0;
+                    }
 
                     if (app_settings.enable_overlay) {
                         log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
@@ -3129,6 +3139,11 @@ int main(int argc, char *argv[]) {
             if (SDL_SetAtomicInt(&g_apply_button_clicked, 0) == 1) {
                 log_message(LOG_INFO, "[MAIN] 'Apply Settings' clicked. Re-initializing overlay process.\n");
 
+                // settings_save() deliberately never writes overlay_window (the overlay process owns
+                // it), so the settings reload further down puts the on-disk width back over the one
+                // just applied. Capture it here and write it out right before the overlay starts.
+                overlay_applied_width = app_settings.overlay_window.w;
+
                 // First, check if an overlay process is currently running.
                 bool overlay_is_running = false;
 #ifdef _WIN32
@@ -3204,6 +3219,11 @@ int main(int argc, char *argv[]) {
                     // Never spawn one next to an overlay that is already running detached.
                     if (app_settings.enable_overlay && !external_overlay) {
                         log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
+                        if (overlay_applied_width > 0) {
+                            SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+                            settings_save_overlay_width_only(overlay_applied_width);
+                            overlay_applied_width = 0;
+                        }
                         spawn_overlay_process(tracker);
                     }
                 }

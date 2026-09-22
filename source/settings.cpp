@@ -5067,7 +5067,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                     // Slider for overlay width
                     static int overlay_width;
-                    overlay_width = temp_settings.overlay_window.w;
+                    // A width of DEFAULT_WINDOW_SIZE is the "never set" sentinel that init_sdl
+                    // resolves to OVERLAY_DEFAULT_WIDTH, so show that resolved value here.
+                    overlay_width = (temp_settings.overlay_window.w == DEFAULT_WINDOW_SIZE)
+                                        ? OVERLAY_DEFAULT_WIDTH
+                                        : temp_settings.overlay_window.w;
                     if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
                         // Strict clamping for width
                         if (overlay_width < 200) overlay_width = 200;
