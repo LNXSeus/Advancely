@@ -230,7 +230,8 @@
 					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:smithing_table",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"13",
 					"icon":	"items/vex_armor_trim_smithing_template_1.20.2.png",

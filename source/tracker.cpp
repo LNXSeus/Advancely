@@ -2251,6 +2251,12 @@ static void tracker_apply_stat_overrides_without_file(Tracker *t, cJSON *setting
     }
 }
 
+// Template "hide_progress" of a goal or stage: leaves its "(0/1)" out when the target is exactly 1.
+// On unless the template sets it to false.
+static bool parse_hide_progress(cJSON *json_obj) {
+    return !cJSON_IsFalse(cJSON_GetObjectItem(json_obj, "hide_progress"));
+}
+
 /**
  * @brief Parses linked goals and mode from a JSON object into C arrays.
  * Used for stat auto-completion. Allocates linked_goals array with calloc.
@@ -2492,6 +2498,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         if (is_stat_category) {
                             cJSON *target = cJSON_GetObjectItem(crit_item, "target");
                             if (cJSON_IsNumber(target)) new_crit->goal = target->valueint;
+                            new_crit->hide_progress = parse_hide_progress(crit_item);
                         }
                         char crit_lang_key[256];
                         snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key,
@@ -2610,6 +2617,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                     cJSON *target = cJSON_GetObjectItem(cat_json, "target");
                     if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
+                    the_criterion->hide_progress = parse_hide_progress(cat_json);
 
                     new_cat->criteria[0] = the_criterion;
                 }
@@ -2914,6 +2922,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsNumber(target)) {
                 new_item->goal = target->valueint;
             }
+            new_item->hide_progress = parse_hide_progress(item_json);
 
             // Parse linked goals for manual custom goals (goal <= 0)
             if (parse_linked && new_item->goal <= 0) {
@@ -3076,6 +3085,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     new_stage->root_name[sizeof(new_stage->root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target_val)) new_stage->required_progress = target_val->valueint; // This is a number
+                new_stage->hide_progress = parse_hide_progress(stage_item_json);
 
                 // Look up stage display name from lang file
                 char stage_lang_key[256];
@@ -3875,6 +3885,8 @@ static void resolve_goal_numbers_by_root(const TemplateData *td, const CounterLi
                 // A lone sub-stat is the category's own value (that is how the tracker draws it);
                 // a category holding several counts how many of them are done.
                 if (stat->criteria_count == 1 && stat->criteria[0]) {
+                    // A hidden "(0/1)" stays hidden on a stage mirroring it too.
+                    if (item_progress_hidden(stat->criteria[0])) return;
                     *out_progress = stat->criteria[0]->progress;
                     *out_target = (stat->criteria[0]->goal > 0) ? stat->criteria[0]->goal : -1;
                 } else if (stat->criteria_count > 1) {
@@ -3887,6 +3899,7 @@ static void resolve_goal_numbers_by_root(const TemplateData *td, const CounterLi
                 TrackableItem *sub = stat->criteria[k];
                 if (!sub || strcmp(sub->root_name, root_name) != 0) continue;
                 if (has_parent && strcmp(stat->root_name, parent_root) != 0) continue;
+                if (item_progress_hidden(sub)) return;
                 *out_progress = sub->progress;
                 *out_target = (sub->goal > 0) ? sub->goal : -1;
                 return;
@@ -3904,7 +3917,7 @@ static void resolve_goal_numbers_by_root(const TemplateData *td, const CounterLi
             TrackableItem *cg = td->custom_goals[j];
             if (!cg || strcmp(cg->root_name, root_name) != 0) continue;
             // A plain on/off goal has no count; a targeted or open-ended one does.
-            if (cg->goal > 0) {
+            if (cg->goal > 0 && !item_progress_hidden(cg)) {
                 *out_progress = cg->progress;
                 *out_target = cg->goal;
             } else if (cg->goal == -1) {
@@ -8907,7 +8920,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (is_simple_stat_category && cat->criteria_count == 1) {
                 // Simple stat progress text calculation
                 TrackableItem *crit = cat->criteria[0];
-                if (crit->goal > 0) {
+                if (crit->goal > 0 && !item_progress_hidden(crit)) {
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", crit->progress,
                              crit->goal);
                 } else if (crit->goal == -1) {
@@ -8958,7 +8971,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         char crit_progress_text_width[32] = "";
                         if (is_stat_section) {
                             // Only calculate progress width for sub-stats
-                            if (crit->goal > 0) {
+                            if (crit->goal > 0 && !item_progress_hidden(crit)) {
                                 snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d / %d)",
                                          crit->progress,
                                          crit->goal);
@@ -9130,7 +9143,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     has_progress_text = true; // Multi-stat always has counter
                 } else if (cat->criteria_count == 1) {
                     TrackableItem *crit = cat->criteria[0];
-                    if (crit->goal > 0 || crit->goal == -1) has_progress_text = true;
+                    if ((crit->goal > 0 && !item_progress_hidden(crit)) || crit->goal == -1) has_progress_text = true;
                 }
             } else {
                 if (cat->criteria_count > 0) has_progress_text = true;
@@ -10250,7 +10263,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             char crit_progress_text[32] = "";
                             if (is_stat_section && (render_crit_progress || capture_crit_layout)) {
-                                if (crit->goal > 0) {
+                                if (crit->goal > 0 && !item_progress_hidden(crit)) {
                                     snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)",
                                              crit->progress, crit->goal);
                                 } else if (crit->goal == -1) {
@@ -10774,7 +10787,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         // Construct progress text to determine if it exists, without calculating size yet
         char progress_text[32] = "";
         bool has_progress_text = false;
-        if (item->goal > 0) {
+        if (item->goal > 0 && !item_progress_hidden(item)) {
             snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
             has_progress_text = true;
         }
@@ -11177,7 +11190,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                              settings->tracker_font_size, t->tracker_font->LegacySize);
 
                 char progress_text_width_calc[32] = "";
-                if (item->goal > 0) {
+                if (item->goal > 0 && !item_progress_hidden(item)) {
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", item->progress,
                              item->goal);
                 } else if (item->goal == -1) {
@@ -11241,7 +11254,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // Construct progress text string to determine if it exists
         char progress_text[32] = "";
         bool has_progress_text = false;
-        if (item->goal > 0) {
+        if (item->goal > 0 && !item_progress_hidden(item)) {
             snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
             has_progress_text = true;
         } else if (item->goal == -1) {

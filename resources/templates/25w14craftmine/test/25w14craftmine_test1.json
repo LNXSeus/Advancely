@@ -83,15 +83,18 @@
 			"criteria":	{
 				"minecraft:used/minecraft:sentry_armor_trim_smithing_template":	{
 					"icon":	"items/sentry_armor_trim_smithing_template_25w14craftmine.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:used/minecraft:vex_armor_trim_smithing_template":	{
 					"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:used/minecraft:wild_armor_trim_smithing_template":	{
 					"icon":	"items/wild_armor_trim_smithing_template_25w14craftmine.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}
 			}
 		},
@@ -100,11 +103,13 @@
 			"criteria":	{
 				"minecraft:used/minecraft:sentry_armor_trim_smithing_template":	{
 					"icon":	"items/sentry_armor_trim_smithing_template_25w14craftmine.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:used/minecraft:vex_armor_trim_smithing_template":	{
 					"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}
 			}
 		},

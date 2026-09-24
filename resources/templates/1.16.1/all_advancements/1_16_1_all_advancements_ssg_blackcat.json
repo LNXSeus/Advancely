@@ -962,6 +962,7 @@
 					"icon":	"items/Potion_of_Fire_Resistance_JE2_BE2.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:picked_up/minecraft:splash_potion",
 							"parent_root":	"stat:barters"
@@ -971,6 +972,7 @@
 					"icon":	"items/Splash_Potion_of_Fire_Resistance_JE2_BE2.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:picked_up/minecraft:potion",
 							"parent_root":	"stat:barters"
@@ -990,7 +992,8 @@
 			"icon":	"blocks/placeholder.png",
 			"hidden":	true,
 			"root_name":	"minecraft:picked_up/minecraft:trident",
-			"target":	1
+			"target":	1,
+			"hide_progress":	true
 		},
 		"stat:drowned_killed":	{
 			"icon":	"monsters/Drowned_mob.png",
@@ -1025,7 +1028,8 @@
 					"stage_id":	"1",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"advancement",

@@ -1724,6 +1724,7 @@
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -1732,6 +1733,7 @@
 				"warden_setup":	{
 					"icon":	"blocks/Sculk_Shrieker_JE2_BE3_unoptimized.gif",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:deep_dark",
 							"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1741,6 +1743,7 @@
 				"villager_transport":	{
 					"icon":	"items/emerald_1.20.2.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/trade_at_world_height",
 							"type":	"advancement"
@@ -1748,11 +1751,13 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -1760,11 +1765,13 @@
 				},
 				"minecraft:used/minecraft:conduit":	{
 					"icon":	"blocks/Conduit_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"hero_of_the_village":	{
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/hero_of_the_village",
 							"type":	"advancement"
@@ -1773,6 +1780,7 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_25w14craftmine.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -1935,6 +1943,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:picked_up/minecraft:heavy_core",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/overoverkill"
 				}, {
@@ -1973,6 +1982,7 @@
 					"icon":	"items/trident_1.13.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/very_very_frightening",
 							"type":	"advancement"
@@ -1996,6 +2006,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:fermented_spider_eye",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",
@@ -2008,6 +2019,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:suspicious_stew",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
 				}]
@@ -2042,6 +2054,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:spyglass",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/spyglass_at_parrot",
 					"type":	"advancement"
@@ -2147,6 +2160,7 @@
 				"minecraft:crafted/minecraft:conduit":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:used/minecraft:conduit",
 							"parent_root":	"hdwgh_summaryyyy",
@@ -2221,6 +2235,7 @@
 				"minecraft:picked_up/minecraft:wither_rose":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -2275,6 +2290,7 @@
 				"minecraft:crafted/minecraft:lightning_rod":	{
 					"icon":	"blocks/Lightning_Rod_(U)_JE3.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/lightning_rod_with_villager_no_fire",
 							"type":	"advancement"
@@ -2344,12 +2360,14 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -2405,7 +2423,8 @@
 					"icon":	"items/tadpole_bucket_1.20.2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:tadpole_bucket",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				}, {
 					"stage_id":	"4",
 					"icon":	"items/tadpole_bucket_1.20.2.png",
@@ -2441,6 +2460,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -2488,6 +2508,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:heavy_core",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
@@ -2495,6 +2516,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:mace",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"5",
@@ -2546,6 +2568,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -2553,6 +2576,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"7",

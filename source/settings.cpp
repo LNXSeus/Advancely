@@ -409,7 +409,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             bool s = item_index(kind, st->root_name) >= 0;
             const char *nm = st->display_name[0] ? st->display_name : st->root_name;
             char row[224];
-            if (goal > 0) snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
+            if (item_progress_hidden(st->criteria[0])) snprintf(row, sizeof(row), "%s", nm);
+            else if (goal > 0) snprintf(row, sizeof(row), "%s (%d/%d)", nm, st->criteria[0]->progress, goal);
             else snprintf(row, sizeof(row), "%s (%d)", nm, st->criteria[0]->progress);
             if (goal_icon_selectable(st->root_name, row, s, st->texture, st->anim_texture))
                 item_click(kind, i, st->root_name, s);

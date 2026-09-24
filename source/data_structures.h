@@ -284,6 +284,9 @@ struct TrackableItem {
     bool done; // For advancements/unlocks: Is it completed?
     int progress; // For stats: The current value, e.g., 5.
     int goal; // For stats: The target value, e.g., 40.
+    // Template "hide_progress": with a target of exactly 1 the "(0/1)" is left out everywhere the
+    // goal shows. On unless the template says otherwise. Read it through item_progress_hidden().
+    bool hide_progress;
 
     // For legacy stat snapshotting
     int initial_progress;
@@ -337,6 +340,11 @@ struct TrackableItem {
     float cached_prog_w;
     float cached_prog_font;
 };
+
+// True when a goal's "(0/1)" is left out: its target is exactly 1 and the template hides it.
+inline bool item_progress_hidden(const TrackableItem *item) {
+    return item && item->goal == 1 && item->hide_progress;
+}
 
 
 // A struct to hold a category of trackable items (e.g., all Advancements).
@@ -455,6 +463,7 @@ struct SubGoal {
     char parent_advancement[192]; // Used for "criterion" stage of multi-stage goal
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
+    bool hide_progress; // Stat stages: same as TrackableItem::hide_progress, applied in ms_stage_shown_target()
     int current_stat_progress; // Current value of stat within multi-stage goal
 
     // Stat stages only: count from the value the stat held when this stage was reached, instead of
@@ -512,7 +521,11 @@ inline int ms_stage_shown_progress(const SubGoal *stage) {
 inline int ms_stage_shown_target(const SubGoal *stage) {
     if (!stage) return 0;
     if (stage->type == SUBGOAL_MIRROR) return stage->mirror_required;
-    if (stage->type == SUBGOAL_STAT) return stage->required_progress;
+    if (stage->type == SUBGOAL_STAT) {
+        // A stage whose target is exactly 1 can leave its "(0/1)" out, as if it had no number.
+        if (stage->required_progress == 1 && stage->hide_progress) return 0;
+        return stage->required_progress;
+    }
     return 0;
 }
 

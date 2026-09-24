@@ -1501,7 +1501,8 @@
 					"icon":	"items/pale_oak_boat_1.21.2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:pale_oak_boat",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"damage",
 					"icon":	"items/heart_pottery_sherd_25w14craftmine.png",
@@ -1513,7 +1514,8 @@
 					"icon":	"animals/pig.png",
 					"type":	"stat",
 					"root_name":	"minecraft:custom/minecraft:mob_kills",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"complete_1hp",
 					"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
@@ -1542,7 +1544,8 @@
 					"icon":	"blocks/Crafting_Table_JE4_BE3.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:crafting_table",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"smelter",
 					"icon":	"blocks/Furnace_(S)_JE4.png",
@@ -1832,7 +1835,8 @@
 					"icon":	"blocks/Lodestone_JE1_BE1.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:lodestone",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"traded",
 					"icon":	"items/villager_spawn_egg_25w14craftmine.png",
@@ -1844,25 +1848,29 @@
 					"icon":	"items/bucket_25w14craftmine.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:bucket",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"lava",
 					"icon":	"items/lava_bucket_25w14craftmine.png",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:lava_bucket",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"e_chest_1",
 					"icon":	"blocks/Ender_Chest.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:ender_chest",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"place_e_chest_1",
 					"icon":	"blocks/Ender_Chest.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:ender_chest",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"death",
 					"icon":	"items/grave_advancement_25w14craftmine.png",
@@ -2014,7 +2022,8 @@
 					"icon":	"animals/pig.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:pig",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"hoglin",
 					"icon":	"monsters/hoglin.png",
@@ -2051,7 +2060,8 @@
 					"icon":	"animals/pig.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:pig",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"zoglin",
 					"icon":	"monsters/zoglin.png",
@@ -2074,7 +2084,8 @@
 					"icon":	"monsters/zombie.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:zombie",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"ziglin",
 					"icon":	"monsters/zombified_piglin.png",
@@ -2111,7 +2122,8 @@
 					"icon":	"monsters/spider.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:spider",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"spider",
 					"icon":	"monsters/spider.png",
@@ -2231,7 +2243,8 @@
 					"icon":	"blocks/Lodestone_JE1_BE1.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:lodestone",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"trade",
 					"icon":	"items/villager_spawn_egg_25w14craftmine.png",
@@ -2288,7 +2301,8 @@
 					"icon":	"blocks/End_Stone_JE3_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:mined/minecraft:end_stone",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"endermite",
 					"icon":	"monsters/endermite.png",
@@ -2301,7 +2315,8 @@
 					"icon":	"monsters/endermite.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:endermite",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"shulker",
 					"icon":	"monsters/shulker.png",
@@ -2522,7 +2537,8 @@
 					"icon":	"monsters/pillager.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:pillager",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"raid_adv",
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
@@ -2544,7 +2560,8 @@
 					"icon":	"monsters/skeleton.png",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:skeleton",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"skeleton_boss_adv",
 					"icon":	"items/skeleton_spawn_egg_25w14craftmine.png",
@@ -2566,7 +2583,8 @@
 					"icon":	"blocks/Bone_Block_(UD)_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:mined/minecraft:bone_block",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"ghast_crit",
 					"icon":	"monsters/ghast.png",

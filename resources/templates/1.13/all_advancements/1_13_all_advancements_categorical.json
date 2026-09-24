@@ -866,6 +866,7 @@
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -873,11 +874,13 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -885,11 +888,13 @@
 				},
 				"minecraft:used/minecraft:conduit":	{
 					"icon":	"blocks/Conduit_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"hdwgh":	{
 					"icon":	"items/bucket_1.13.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -993,7 +998,8 @@
 				"minecraft:picked_up/minecraft:trident":	{
 					"icon":	"items/trident_1.13.png",
 					"hidden":	true,
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"minecraft:picked_up/minecraft:nautilus_shell":	{
 					"icon":	"items/nautilus_shell_1.13.png",
@@ -1012,7 +1018,8 @@
 			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:fermented_spider_eye",
-			"target":	1
+			"target":	1,
+			"hide_progress":	false
 		},
 		"leads":	{
 			"icon":	"items/lead_1.11.png",
@@ -1020,6 +1027,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:lead",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects",
 					"type":	"advancement"
@@ -1125,7 +1133,8 @@
 				},
 				"minecraft:crafted/minecraft:conduit":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				}
 			}
 		}
@@ -1169,13 +1178,15 @@
 					"icon":	"monsters/Wither_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				}, {
 					"stage_id":	"4",
 					"icon":	"monsters/Wither_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.craft.minecraft.beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"5",
@@ -1183,6 +1194,7 @@
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -1210,6 +1222,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1239,6 +1252,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1246,6 +1260,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",

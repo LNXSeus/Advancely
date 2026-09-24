@@ -247,6 +247,8 @@ struct EditorTrackableItem {
     char display_name[192];
     char icon_path[256];
     int goal;
+    // Only meaningful with a target of exactly 1: leaves the "(0/1)" out everywhere the goal shows.
+    bool hide_progress = true;
     bool is_hidden;
     bool in_2nd_row;
     bool in_3rd_row; // Forces unlocks from Row 2 to Row 3
@@ -312,6 +314,7 @@ struct EditorSubGoal {
     char parent_advancement[192];
     char root_name[192];
     int required_progress;
+    bool hide_progress = true; // Stat stages with a target of exactly 1: leave the "(0/1)" out
     char icon_path[256]; // Icon path for each stage
     int sort_order = 0;
 
@@ -1110,6 +1113,7 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            strcmp(a.display_name, b.display_name) != 0 ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.goal != b.goal ||
+           a.hide_progress != b.hide_progress ||
            a.is_hidden != b.is_hidden ||
            a.in_2nd_row != b.in_2nd_row ||
            a.in_3rd_row != b.in_3rd_row ||
@@ -1161,6 +1165,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            strcmp(a.parent_advancement, b.parent_advancement) != 0 ||
            strcmp(a.root_name, b.root_name) != 0 ||
            a.required_progress != b.required_progress ||
+           a.hide_progress != b.hide_progress ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.linked_goal_mode != b.linked_goal_mode ||
            a.complete_with_next != b.complete_with_next ||
@@ -2066,6 +2071,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
             new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
         }
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
+        new_item.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(item_json, "hide_progress"));
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_item.in_2nd_row = cJSON_IsTrue(in_2nd_row);
         if (cJSON_IsBool(in_3rd_row)) new_item.in_3rd_row = cJSON_IsTrue(in_3rd_row);
@@ -2283,6 +2289,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 }
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
                 if (cJSON_IsNumber(crit_target)) new_crit.goal = crit_target->valueint;
+                new_crit.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(criterion_json, "hide_progress"));
 
                 // Stat criteria language file
                 char crit_lang_key[512];
@@ -2323,6 +2330,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             }
 
             if (cJSON_IsNumber(target)) new_crit.goal = target->valueint;
+            new_crit.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(category_json, "hide_progress"));
 
             // For simple stats, the criterion's display name is the same as the category's
             new_cat.criteria.push_back(new_crit);
@@ -2410,6 +2418,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target)) new_stage.required_progress = target->valueint;
+                new_stage.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(stage_json, "hide_progress"));
 
                 // Per-stage icon file if used
                 cJSON *stage_icon = cJSON_GetObjectItem(stage_json, "icon");
@@ -3053,6 +3062,7 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
             // Only add target if it's not 0 (default for unlocks)
             cJSON_AddNumberToObject(item_json, "target", item.goal);
         }
+        if (item.goal == 1) cJSON_AddBoolToObject(item_json, "hide_progress", item.hide_progress);
         if (item.is_hidden) {
             cJSON_AddBoolToObject(item_json, "hidden", item.is_hidden);
         }
@@ -3139,6 +3149,7 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
             if (crit.goal != 0) {
                 cJSON_AddNumberToObject(cat_json, "target", crit.goal);
             }
+            if (crit.goal == 1) cJSON_AddBoolToObject(cat_json, "hide_progress", crit.hide_progress);
         } else {
             // Complex (multi-stat)
             if (cat.hide_substats_in_row1) {
@@ -3154,6 +3165,7 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
                 if (crit.goal != 0) {
                     cJSON_AddNumberToObject(crit_json, "target", crit.goal);
                 }
+                if (crit.goal == 1) cJSON_AddBoolToObject(crit_json, "hide_progress", crit.hide_progress);
                 // Serialize sub-stat linked goals
                 serialize_linked_goals(crit_json, crit.linked_goals, crit.linked_goal_mode);
                 save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
@@ -3228,6 +3240,8 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
             cJSON_AddStringToObject(stage_json, "root_name", stage.root_name);
             if (stage.type != SUBGOAL_MANUAL) {
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
+                if (stage.type == SUBGOAL_STAT && stage.required_progress == 1)
+                    cJSON_AddBoolToObject(stage_json, "hide_progress", stage.hide_progress);
                 // Serialize stage linked goals (non-final stages only)
                 serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
                 // Auto-complete this stage when the next stage is completed.
@@ -13958,6 +13972,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                 ImGui::SetTooltip("%s", target_tooltip_buffer);
                             }
+                            if (simple_crit.goal == 1) {
+                                if (ImGui::Checkbox("Hide Progress", &simple_crit.hide_progress)) {
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char hide_progress_tooltip_buffer[256];
+                                    snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
+                                             "Leaves the progress value (0/1) out everywhere this stat is shown:\n"
+                                             "the tracker, the overlay and the compact overlay.");
+                                    ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
+                                }
+                            }
                         } else {
                             ImGui::Text("Sub-Stats");
 
@@ -14655,6 +14681,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              ">0 = Progress-based counter (completes when value reached).\n"
                                              "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                     ImGui::SetTooltip("%s", target_tooltip_buffer);
+                                }
+                                if (crit.goal == 1) {
+                                    if (ImGui::Checkbox("Hide Progress", &crit.hide_progress)) {
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char hide_progress_tooltip_buffer[256];
+                                        snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
+                                                 "Leaves the progress value (0/1) out everywhere this sub-stat is shown:\n"
+                                                 "the tracker, the overlay and the compact overlay.");
+                                        ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
+                                    }
                                 } {
                                     bool is_sub_selected = s_sub_selection.find((int) j) != s_sub_selection.end();
                                     if (ImGui::Checkbox("##sub_bulk_sel", &is_sub_selected)) {
@@ -16909,6 +16947,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "-1 = Infinite counter. Supports linked goals.\n"
                                      ">0 = Progress-based counter that completes at this value.");
                             ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
+                        }
+                        if (goal.goal == 1) {
+                            if (ImGui::Checkbox("Hide Progress##CustomGoal", &goal.hide_progress)) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char hide_progress_tooltip_buffer[256];
+                                snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
+                                         "Leaves the progress value (0/1) out everywhere this custom goal is shown:\n"
+                                         "the tracker, the overlay and the compact overlay.");
+                                ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
+                            }
                         }
                         ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
 
@@ -19321,6 +19371,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Something else must complete it: a linked auto-complete goal, or the\n"
                                                  "'Auto-complete if next stage is completed' checkbox on this stage.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+                                    if (stage.required_progress == 1) {
+                                        if (ImGui::Checkbox("Hide Progress", &stage.hide_progress)) {
+                                            ms_goal_data_changed = true;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        if (ImGui::IsItemHovered()) {
+                                            char hide_progress_tooltip_buffer[256];
+                                            snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
+                                                     "Leaves the progress value (0/1) out everywhere this stage is shown:\n"
+                                                     "the tracker, the overlay, the compact overlay and any stage mirroring it.");
+                                            ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
+                                        }
                                     }
 
                                     // Count the stat from the value it held when the stage was reached.

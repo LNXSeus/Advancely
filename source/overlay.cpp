@@ -1063,6 +1063,7 @@ struct CompactEntry {
     bool percent; // overall progress percentage entry: shows percent_value as "45.32%"
     float percent_value;
     bool no_target; // open-ended goal: show the count with no denominator
+    bool no_count; // target-1 goal hiding its "(0/1)": shows only its completion marker
     bool checkbox; // manually-checkable goal: shows [x] manual / [a] auto-done / [o] not done
     bool auto_mark; // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
     bool manual; // is_manually_completed (drives [x])
@@ -1107,6 +1108,9 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
 
     CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
     compact_compute_type_counters(td, version, cc, true); // panel counts show the real totals
+
+    // Only the two goal kinds with a target of their own ever set this, so clear it for the rest.
+    for (int i = 0; i < max_entries; i++) out[i].no_count = false;
 
     int n = 0;
     // The progress text: the same counter and percentage the Belt/Page top bar shows, with the same
@@ -1207,6 +1211,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].auto_mark = false;
             out[n].manual = s->is_manually_completed;
             out[n].done = s->done;
+            out[n].no_count = item_progress_hidden(s->criteria[0]);
             if (goal > 0) {
                 out[n].total = goal;
                 out[n].no_target = false;
@@ -1247,6 +1252,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].completed = c->progress;
             out[n].percent = false;
             out[n].percent_value = 0.0f;
+            out[n].no_count = item_progress_hidden(c);
             if (c->goal > 0) {
                 // Targeted custom goals are counter-driven, not manually checkable: [a] only when done.
                 out[n].total = c->goal;
@@ -1376,7 +1382,10 @@ static void compact_format_count(char *buf, size_t buf_sz, const AppSettings *s,
         else if (e->auto_mark && e->done)
             box = "[a] ";
     }
-    if (e->no_target)
+    if (e->no_count) {
+        // Just the marker, without the space that would separate it from a count.
+        snprintf(buf, buf_sz, "%.3s", box);
+    } else if (e->no_target)
         snprintf(buf, buf_sz, "%s%d", box, e->completed);
     else
         snprintf(buf, buf_sz, "%s%d/%d", box, e->completed, e->total);
@@ -1392,6 +1401,11 @@ static void compact_worst_count_entry(char *buf, size_t buf_sz, const AppSetting
     char body[48];
     if (e->percent) {
         snprintf(buf, buf_sz, "%c%c%c.%c%c%%", wdigit, wdigit, wdigit, wdigit, wdigit);
+        return;
+    }
+    if (e->no_count) {
+        bool marked = s->compact_show_completion_markers && (e->checkbox || e->auto_mark);
+        snprintf(buf, buf_sz, "%s", marked ? "[x]" : "");
         return;
     }
     if (e->no_target) {
@@ -1828,7 +1842,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // checked off, [a] auto-completed (a linked goal or the target reached), [o] not done.
                 const char *box = compact_done_box(settings, s->is_manually_completed, s->done);
                 char sbody[240];
-                if (goal > 0) snprintf(sbody, sizeof(sbody), "%s (%d/%d)", sname, prog, goal);
+                if (item_progress_hidden(s->criteria[0])) snprintf(sbody, sizeof(sbody), "%s", sname);
+                else if (goal > 0) snprintf(sbody, sizeof(sbody), "%s (%d/%d)", sname, prog, goal);
                 else snprintf(sbody, sizeof(sbody), "%s (%d)", sname, prog);
                 compact_marked_line(itext, sizeof(itext), box, right_align, sbody);
                 snprintf(key, sizeof(key), "stat|%s", s->root_name);
@@ -1874,7 +1889,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     const char *subname = sub->display_name;
                     const char *subsep = name_value_sep(subname);
                     char subbody[240];
-                    if (sub->goal > 0)
+                    if (item_progress_hidden(sub))
+                        snprintf(subbody, sizeof(subbody), "%s", subname);
+                    else if (sub->goal > 0)
                         snprintf(subbody, sizeof(subbody), "%s%s(%d/%d)", subname, subsep, sub->progress, sub->goal);
                     else
                         snprintf(subbody, sizeof(subbody), "%s%s(%d)", subname, subsep, sub->progress);
@@ -1931,7 +1948,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 // [a] (auto) when done, nothing otherwise.
                 const char *box = compact_auto_box(settings, c->done);
                 char cbody[240];
-                snprintf(cbody, sizeof(cbody), "%s (%d/%d)", cname, c->progress, c->goal);
+                if (item_progress_hidden(c)) snprintf(cbody, sizeof(cbody), "%s", cname);
+                else snprintf(cbody, sizeof(cbody), "%s (%d/%d)", cname, c->progress, c->goal);
                 compact_marked_line(itext, sizeof(itext), box, right_align, cbody);
             } else {
                 // Open-ended custom goals show the box: [x] manual, [a] auto (linked goal), [o] not done.
@@ -2215,7 +2233,9 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             int goal = s->criteria[0]->goal;
             if (goal <= 0 && goal != -1) continue;
             if (!compact_stack_allows(settings, COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name)) continue;
-            if (goal > 0) {
+            if (item_progress_hidden(s->criteria[0])) {
+                snprintf(buf, sizeof(buf), "[x] %s", sn);
+            } else if (goal > 0) {
                 compact_worst_count(cnt, sizeof(cnt), goal, wdig);
                 snprintf(buf, sizeof(buf), "[x] %s (%s)", sn, cnt);
             } else {
@@ -2232,7 +2252,9 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
                 TrackableItem *sub = s->criteria[j];
                 if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
                 const char *subn = sub->display_name;
-                if (sub->goal > 0) {
+                if (item_progress_hidden(sub)) {
+                    snprintf(buf, sizeof(buf), "[x] %s", subn);
+                } else if (sub->goal > 0) {
                     compact_worst_count(cnt, sizeof(cnt), sub->goal, wdig);
                     snprintf(buf, sizeof(buf), "[x] %s%s(%s)", subn, name_value_sep(subn), cnt);
                 } else {
@@ -2253,7 +2275,9 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
         if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
         const char *cn = compact_display_name(c->display_name, c->root_name);
-        if (c->goal > 0) {
+        if (item_progress_hidden(c)) {
+            snprintf(buf, sizeof(buf), "[x] %s", cn); // reserve the done-marker width
+        } else if (c->goal > 0) {
             compact_worst_count(cnt, sizeof(cnt), c->goal, wdig);
             snprintf(buf, sizeof(buf), "[x] %s (%s)", cn, cnt); // reserve the done-marker width
         } else {
@@ -4162,7 +4186,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         for (int j = 0; j < stat->criteria_count; ++j) {
                             TrackableItem *crit = stat->criteria[j];
                             char temp_sub_stat_buf[256] = {0};
-                            if (crit->goal > 0) {
+                            if (item_progress_hidden(crit)) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s", j + 1, crit->display_name);
+                            } else if (crit->goal > 0) {
                                 snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(%d / %d)", j + 1,
                                          crit->display_name, name_value_sep(crit->display_name), crit->goal, crit->goal);
                             } else if (crit->goal == -1) {
@@ -4176,7 +4202,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                     } else if (stat->criteria_count == 1) {
                         TrackableItem *crit = stat->criteria[0];
-                        if (crit->goal > 0) {
+                        if (crit->goal > 0 && !item_progress_hidden(crit)) {
                             snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)", crit->goal,
                                      crit->goal);
                         } else if (crit->goal == -1) {
@@ -4188,7 +4214,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                     name_buf[sizeof(name_buf) - 1] = '\0';
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-                    if (goal->goal > 0) {
+                    if (goal->goal > 0 && !item_progress_hidden(goal)) {
                         snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)", goal->goal,
                                  goal->goal);
                     } else if (goal->goal == -1) {
@@ -4388,7 +4414,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                         int list_index_to_show = (current_ticks / cycle_duration_ms) % num_incomplete;
                                         int original_crit_index = incomplete_indices[list_index_to_show];
                                         TrackableItem *crit = stat->criteria[original_crit_index];
-                                        if (crit->goal > 0) {
+                                        if (item_progress_hidden(crit)) {
+                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s", original_crit_index + 1, crit->display_name);
+                                        } else if (crit->goal > 0) {
                                             snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d / %d)",
                                                      original_crit_index + 1, crit->display_name,
                                                      name_value_sep(crit->display_name), crit->progress,
@@ -4404,7 +4432,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     name_buf[sizeof(name_buf) - 1] = '\0';
                                     if (stat->criteria_count == 1) {
                                         TrackableItem *crit = stat->criteria[0];
-                                        if (crit->goal > 0)
+                                        if (crit->goal > 0 && !item_progress_hidden(crit))
                                             snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                                      crit->progress, crit->goal);
                                         else if (crit->goal == -1)
@@ -4428,7 +4456,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 icon_path = goal->icon_path;
                                 strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                                 name_buf[sizeof(name_buf) - 1] = '\0';
-                                if (goal->goal > 0)
+                                if (goal->goal > 0 && !item_progress_hidden(goal))
                                     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                              goal->progress, goal->goal);
                                 else if (goal->goal == -1)
@@ -4656,7 +4684,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         for (int j = 0; j < stat->criteria_count; ++j) {
                             TrackableItem *crit = stat->criteria[j];
                             char temp_sub_stat_buf[256] = {0};
-                            if (crit->goal > 0) {
+                            if (item_progress_hidden(crit)) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s", j + 1, crit->display_name);
+                            } else if (crit->goal > 0) {
                                 snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(%d / %d)", j + 1,
                                          crit->display_name, name_value_sep(crit->display_name), crit->goal,
                                          crit->goal); // Use max progress for width
@@ -4671,7 +4701,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     } else if (stat->criteria_count == 1) {
                         // Simple stat
                         TrackableItem *crit = stat->criteria[0];
-                        if (crit->goal > 0) {
+                        if (crit->goal > 0 && !item_progress_hidden(crit)) {
                             snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", crit->goal,
                                      crit->goal); // Use max progress
                         } else if (crit->goal == -1) {
@@ -4686,7 +4716,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                     name_buf[sizeof(name_buf) - 1] = '\0';
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-                    if (goal->goal > 0) {
+                    if (goal->goal > 0 && !item_progress_hidden(goal)) {
                         snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", goal->goal,
                                  goal->goal);
                     } else if (goal->goal == -1) {
@@ -4898,7 +4928,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     int original_crit_index = incomplete_indices[list_index_to_show];
                                     TrackableItem *crit = stat->criteria[original_crit_index];
 
-                                    if (crit->goal > 0) {
+                                    if (item_progress_hidden(crit)) {
+                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s", original_crit_index + 1, crit->display_name);
+                                    } else if (crit->goal > 0) {
                                         snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d / %d)",
                                                  original_crit_index + 1, crit->display_name,
                                                  name_value_sep(crit->display_name), crit->progress,
@@ -4917,7 +4949,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 name_buf[sizeof(name_buf) - 1] = '\0';
                                 if (stat->criteria_count == 1) {
                                     TrackableItem *crit = stat->criteria[0];
-                                    if (crit->goal > 0) {
+                                    if (crit->goal > 0 && !item_progress_hidden(crit)) {
                                         snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                                  crit->progress, crit->goal);
                                     } else if (crit->goal == -1) {
@@ -4941,7 +4973,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             icon_path = goal->icon_path;
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
-                            if (goal->goal > 0) {
+                            if (goal->goal > 0 && !item_progress_hidden(goal)) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", goal->progress, goal->goal);
                             } else if (goal->goal == -1) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d)", goal->progress);

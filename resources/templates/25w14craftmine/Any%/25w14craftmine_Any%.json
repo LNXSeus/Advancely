@@ -45,7 +45,8 @@
 					"stage_id":	"3",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:blaze",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"4",
 					"type":	"advancement",
@@ -55,7 +56,8 @@
 					"stage_id":	"5",
 					"type":	"stat",
 					"root_name":	"minecraft:killed/minecraft:ender_dragon",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"6",
 					"type":	"advancement",

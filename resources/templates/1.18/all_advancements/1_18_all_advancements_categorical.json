@@ -1326,6 +1326,7 @@
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -1333,11 +1334,13 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -1345,11 +1348,13 @@
 				},
 				"minecraft:used/minecraft:conduit":	{
 					"icon":	"blocks/Conduit_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"hero_of_the_village":	{
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/hero_of_the_village",
 							"type":	"advancement"
@@ -1358,6 +1363,7 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_25w14craftmine.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -1500,7 +1506,8 @@
 				"minecraft:picked_up/minecraft:trident":	{
 					"icon":	"items/trident_1.13.png",
 					"hidden":	true,
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				},
 				"minecraft:picked_up/minecraft:nautilus_shell":	{
 					"icon":	"items/nautilus_shell_25w14craftmine.png",
@@ -1520,6 +1527,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:fermented_spider_eye",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",
@@ -1532,6 +1540,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:suspicious_stew",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
 				}]
@@ -1542,6 +1551,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:lead",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:husbandry/bred_all_animals"
 				}, {
@@ -1568,6 +1578,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:spyglass",
 			"target":	1,
+			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/spyglass_at_dragon",
 					"type":	"advancement"
@@ -1673,6 +1684,7 @@
 				"minecraft:crafted/minecraft:conduit":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:used/minecraft:conduit",
 							"parent_root":	"hdwgh_summaryyyy",
@@ -1726,6 +1738,7 @@
 				"minecraft:picked_up/minecraft:wither_rose":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
+					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -1769,7 +1782,8 @@
 					"stage_id":	"2",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:enchanted_golden_apple",
-					"target":	1
+					"target":	1,
+					"hide_progress":	false
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -1789,6 +1803,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1839,6 +1854,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1875,6 +1891,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1882,6 +1899,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
@@ -1933,6 +1951,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -1940,6 +1959,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"7",

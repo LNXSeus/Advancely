@@ -633,19 +633,22 @@
 					"icon":	"items/nether_star_1.0.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"4",
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"stat.craftItem.minecraft.beacon",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"5",
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"6",
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",

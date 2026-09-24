@@ -955,7 +955,8 @@
 		"stat_cat:break_wooden_shovel":	{
 			"icon":	"items/wooden_shovel_3d_shareware_v1.34.png",
 			"root_name":	"minecraft:broken/minecraft:wooden_shovel",
-			"target":	1
+			"target":	1,
+			"hide_progress":	true
 		}
 	},
 	"unlocks":	[],

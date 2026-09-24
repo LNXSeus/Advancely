@@ -880,13 +880,15 @@
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"5",
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"6",
 					"icon":	"blocks/Beacon_JE6_BE2.png",
@@ -915,13 +917,15 @@
 					"icon":	"blocks/Conduit_JE1_BE1.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:conduit",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"3",
 					"icon":	"blocks/Conduit_unoptimized.gif",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:conduit",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"4",
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
@@ -947,7 +951,8 @@
 					"stage_id":	"1",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"advancement",
@@ -970,7 +975,8 @@
 					"stage_id":	"2",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:enchanted_golden_apple",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				}, {
 					"stage_id":	"final",
 					"type":	"final",

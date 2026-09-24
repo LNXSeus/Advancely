@@ -1239,6 +1239,9 @@ active template), so enabling manual positioning never teleports the element.
   of its own, and ticking the name's `Hide` checkbox does the same, so hiding a name never hides its progress text. The
   progress text then sits at the name's default spot by the icon, even if the name itself was moved. The criteria and
   sub-stat list under an advancement or stat stays where it is.
+* **Hide Progress**: When a stat, sub-stat, custom goal or stat stage has a `Target Value` of exactly `1`, a
+  `Hide Progress` checkbox (on by default) appears below it. It leaves the `(0/1)` out everywhere the goal shows: the
+  tracker, the overlay, the compact overlay and any multi-stage stage mirroring it.
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
