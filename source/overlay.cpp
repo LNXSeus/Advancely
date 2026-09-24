@@ -1086,6 +1086,12 @@ static const char *compact_display_name(const char *display, const char *root) {
     return (display && display[0] != '\0') ? display : root;
 }
 
+// The gap between a name and the value printed after it. An empty name leaves no gap, so the value
+// takes the name's place instead of starting with a stray space.
+static const char *name_value_sep(const char *name) {
+    return (name && name[0] != '\0') ? " " : "";
+}
+
 // Build the ordered list of Compact cycle entries from the user's selection: the progress text rows
 // the other modes show in their top bar (the run-completion counter, e.g. "Adv: 12/80", and the
 // overall percentage "Prog: 45.32%"), each selected whole-section type count that is present in the
@@ -1864,12 +1870,14 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                     // sub-stat counts up, so it shows its value and pops on every increment (goal > 0
                     // shows value / target, an open-ended one just the value).
                     const char *subbox = compact_done_box(settings, sub->is_manually_completed, sub->done);
-                    const char *subname = compact_display_name(sub->display_name, sub->root_name);
+                    // An unnamed sub-stat shows only its value, which then sits where the name would be.
+                    const char *subname = sub->display_name;
+                    const char *subsep = name_value_sep(subname);
                     char subbody[240];
                     if (sub->goal > 0)
-                        snprintf(subbody, sizeof(subbody), "%s (%d/%d)", subname, sub->progress, sub->goal);
+                        snprintf(subbody, sizeof(subbody), "%s%s(%d/%d)", subname, subsep, sub->progress, sub->goal);
                     else
-                        snprintf(subbody, sizeof(subbody), "%s (%d)", subname, sub->progress);
+                        snprintf(subbody, sizeof(subbody), "%s%s(%d)", subname, subsep, sub->progress);
                     compact_marked_line(itext, sizeof(itext), subbox, right_align, subbody);
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
                     // Parent count frozen at this sub-stat's completion moment (incremental in a batch).
@@ -2223,12 +2231,12 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             for (int j = 0; j < s->criteria_count; j++) {
                 TrackableItem *sub = s->criteria[j];
                 if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
-                const char *subn = compact_display_name(sub->display_name, sub->root_name);
+                const char *subn = sub->display_name;
                 if (sub->goal > 0) {
                     compact_worst_count(cnt, sizeof(cnt), sub->goal, wdig);
-                    snprintf(buf, sizeof(buf), "[x] %s (%s)", subn, cnt);
+                    snprintf(buf, sizeof(buf), "[x] %s%s(%s)", subn, name_value_sep(subn), cnt);
                 } else {
-                    snprintf(buf, sizeof(buf), "[x] %s (%s)", subn, open);
+                    snprintf(buf, sizeof(buf), "[x] %s%s(%s)", subn, name_value_sep(subn), open);
                 }
                 measure(buf);
             }
@@ -4146,19 +4154,20 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                     if (!stat->is_single_stat_category) {
                         // Complex stat (even if one sub-stat)
-                        snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
-                                 stat->completed_criteria_count, stat->criteria_count);
+                        snprintf(name_buf, sizeof(name_buf), "%s%s(%d / %d)", stat->display_name,
+                                 name_value_sep(stat->display_name), stat->completed_criteria_count,
+                                 stat->criteria_count);
                         TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
 
                         for (int j = 0; j < stat->criteria_count; ++j) {
                             TrackableItem *crit = stat->criteria[j];
                             char temp_sub_stat_buf[256] = {0};
                             if (crit->goal > 0) {
-                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)", j + 1,
-                                         crit->display_name, crit->goal, crit->goal);
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(%d / %d)", j + 1,
+                                         crit->display_name, name_value_sep(crit->display_name), crit->goal, crit->goal);
                             } else if (crit->goal == -1) {
-                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (999)", j + 1,
-                                         crit->display_name);
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(999)", j + 1,
+                                         crit->display_name, name_value_sep(crit->display_name));
                             }
                             if (strlen(temp_sub_stat_buf) > strlen(longest_criterion_buf)) {
                                 // Reuse longest_criterion_buf
@@ -4360,8 +4369,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 if (!stat->is_single_stat_category) {
                                     // If complex stat it cycles (even if just one sub-stat)
                                     // Multi-stat / Complex Stat Logic
-                                    snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
-                                             stat->completed_criteria_count, stat->criteria_count);
+                                    snprintf(name_buf, sizeof(name_buf), "%s%s(%d / %d)", stat->display_name,
+                                             name_value_sep(stat->display_name), stat->completed_criteria_count,
+                                             stat->criteria_count);
                                     // Cycle logic for multi-stat
                                     std::vector<int> incomplete_indices;
                                     for (int j = 0; j < stat->criteria_count; ++j) {
@@ -4379,12 +4389,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                         int original_crit_index = incomplete_indices[list_index_to_show];
                                         TrackableItem *crit = stat->criteria[original_crit_index];
                                         if (crit->goal > 0) {
-                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
-                                                     original_crit_index + 1, crit->display_name, crit->progress,
+                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d / %d)",
+                                                     original_crit_index + 1, crit->display_name,
+                                                     name_value_sep(crit->display_name), crit->progress,
                                                      crit->goal);
                                         } else if (crit->goal == -1) {
-                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
-                                                     original_crit_index + 1, crit->display_name, crit->progress);
+                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d)",
+                                                     original_crit_index + 1, crit->display_name,
+                                                     name_value_sep(crit->display_name), crit->progress);
                                         }
                                     }
                                 } else {
@@ -4491,6 +4503,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, tile_alpha);
 
+                        // An empty name takes no line, so the progress line moves up into its place.
+                        float name_h = 0.0f;
                         SDL_Texture *name_texture = get_text_texture_from_cache(o, o->font, name_buf, text_color);
                         if (name_texture) {
                             float w, h;
@@ -4498,19 +4512,20 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             float text_x = current_x + snap_px((cell_width_row2 - w) / 2.0f);
                             SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                             render_text_with_alpha(o->renderer, name_texture, &dest_rect, tile_alpha);
+                            name_h = h;
+                        }
 
-                            if (progress_buf[0] != '\0') {
-                                SDL_Texture *progress_texture =
-                                        get_text_texture_from_cache(o, o->font, progress_buf, text_color);
-                                if (progress_texture) {
-                                    float pw, ph;
-                                    SDL_GetTextureSize(progress_texture, &pw, &ph);
-                                    float p_text_x = current_x + snap_px((cell_width_row2 - pw) / 2.0f);
-                                    SDL_FRect p_dest_rect = {
-                                        p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph
-                                    };
-                                    render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
-                                }
+                        if (progress_buf[0] != '\0' && (name_texture || name_buf[0] == '\0')) {
+                            SDL_Texture *progress_texture =
+                                    get_text_texture_from_cache(o, o->font, progress_buf, text_color);
+                            if (progress_texture) {
+                                float pw, ph;
+                                SDL_GetTextureSize(progress_texture, &pw, &ph);
+                                float p_text_x = current_x + snap_px((cell_width_row2 - pw) / 2.0f);
+                                SDL_FRect p_dest_rect = {
+                                    p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + name_h, pw, ph
+                                };
+                                render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
                             }
                         }
 
@@ -4633,19 +4648,21 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     if (!stat->is_single_stat_category) {
                         // Complex Stat
                         // Find longest sub-stat line (e.g., "1. Name (X / Y)")
-                        snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
-                                 stat->completed_criteria_count, stat->criteria_count);
+                        snprintf(name_buf, sizeof(name_buf), "%s%s(%d / %d)", stat->display_name,
+                                 name_value_sep(stat->display_name), stat->completed_criteria_count,
+                                 stat->criteria_count);
                         TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
 
                         for (int j = 0; j < stat->criteria_count; ++j) {
                             TrackableItem *crit = stat->criteria[j];
                             char temp_sub_stat_buf[256] = {0};
                             if (crit->goal > 0) {
-                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)", j + 1,
-                                         crit->display_name, crit->goal, crit->goal); // Use max progress for width
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(%d / %d)", j + 1,
+                                         crit->display_name, name_value_sep(crit->display_name), crit->goal,
+                                         crit->goal); // Use max progress for width
                             } else if (crit->goal == -1) {
-                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (999)", j + 1,
-                                         crit->display_name); // Assume 3 digits for width
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s%s(999)", j + 1,
+                                         crit->display_name, name_value_sep(crit->display_name)); // Assume 3 digits for width
                             }
                             if (strlen(temp_sub_stat_buf) > strlen(longest_progress_buf)) {
                                 strcpy(longest_progress_buf, temp_sub_stat_buf);
@@ -4859,8 +4876,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             if (!stat->is_single_stat_category) {
                                 // If it's a complex stat (even if just one sub-stat)
                                 // Multi-stat / Complex stat logic
-                                snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
-                                         stat->completed_criteria_count, stat->criteria_count);
+                                snprintf(name_buf, sizeof(name_buf), "%s%s(%d / %d)", stat->display_name,
+                                         name_value_sep(stat->display_name), stat->completed_criteria_count,
+                                         stat->criteria_count);
 
                                 std::vector<int> incomplete_indices;
                                 for (int j = 0; j < stat->criteria_count; ++j) {
@@ -4881,12 +4899,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     TrackableItem *crit = stat->criteria[original_crit_index];
 
                                     if (crit->goal > 0) {
-                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
-                                                 original_crit_index + 1, crit->display_name, crit->progress,
+                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d / %d)",
+                                                 original_crit_index + 1, crit->display_name,
+                                                 name_value_sep(crit->display_name), crit->progress,
                                                  crit->goal);
                                     } else if (crit->goal == -1) {
-                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
-                                                 original_crit_index + 1, crit->display_name, crit->progress);
+                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s%s(%d)",
+                                                 original_crit_index + 1, crit->display_name,
+                                                 name_value_sep(crit->display_name), crit->progress);
                                     }
                                 } else {
                                     progress_buf[0] = '\0';
@@ -5004,6 +5024,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
 
                     // Text rendering uses cell_width_row3 for centering
+                    // An empty name takes no line, so the progress line moves up into its place.
+                    float name_h = 0.0f;
                     SDL_Texture *name_texture = get_text_texture_from_cache(o, o->font, name_buf, text_color);
                     // Use name_buf calculated earlier
                     if (name_texture) {
@@ -5013,19 +5035,22 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         // Center using cell_width_row3
                         SDL_FRect dest_rect = {text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
                         render_text_with_alpha(o->renderer, name_texture, &dest_rect, tile_alpha);
+                        name_h = h;
+                    }
 
-                        if (progress_buf[0] != '\0') {
-                            // Use progress_buf which holds current text
-                            SDL_Texture *progress_texture = get_text_texture_from_cache(
-                                o, o->font, progress_buf, text_color);
-                            if (progress_texture) {
-                                float pw, ph;
-                                SDL_GetTextureSize(progress_texture, &pw, &ph);
-                                float p_text_x = current_x + snap_px((cell_width_row3 - pw) / 2.0f);
-                                // Center using cell_width_row3
-                                SDL_FRect p_dest_rect = {p_text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
-                                render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
-                            }
+                    if (progress_buf[0] != '\0' && (name_texture || name_buf[0] == '\0')) {
+                        // Use progress_buf which holds current text
+                        SDL_Texture *progress_texture = get_text_texture_from_cache(
+                            o, o->font, progress_buf, text_color);
+                        if (progress_texture) {
+                            float pw, ph;
+                            SDL_GetTextureSize(progress_texture, &pw, &ph);
+                            float p_text_x = current_x + snap_px((cell_width_row3 - pw) / 2.0f);
+                            // Center using cell_width_row3
+                            SDL_FRect p_dest_rect = {
+                                p_text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + name_h, pw, ph
+                            };
+                            render_text_with_alpha(o->renderer, progress_texture, &p_dest_rect, tile_alpha);
                         }
                     }
 

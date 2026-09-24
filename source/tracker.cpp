@@ -7985,6 +7985,24 @@ static inline bool tracker_layout_capture_active(const Tracker *t) {
     return t->temp_creator_window_open;
 }
 
+// A goal name that is empty, or hidden in the manual layout, takes no line (or spot), so the progress
+// text flowing after it moves into its place.
+static inline bool tracker_name_takes_line(const char *display_name, bool hidden_in_layout) {
+    return display_name[0] != '\0' && !hidden_in_layout;
+}
+
+static inline float tracker_name_line_advance(bool name_takes_line, float text_h, float zoom) {
+    return name_takes_line ? (text_h + 4.0f) * zoom : 0.0f;
+}
+
+// A name that takes no line has no drag handle, so a progress text flowing from it hangs straight off
+// the icon, or off nothing when the name has coordinates of its own.
+static ManualPos *tracker_progress_hierarchy_parent(const AppSettings *settings, bool name_takes_line,
+                                                    ManualPos &icon_pos, ManualPos &text_pos) {
+    if (name_takes_line) return &text_pos;
+    return (settings->use_manual_layout && text_pos.is_set) ? nullptr : &icon_pos;
+}
+
 // Draws a contrasting crosshair (black outline + white inner) at the given screen position.
 static void draw_anchor_crosshair(ImDrawList *draw_list, ImVec2 pos, float size) {
     ImU32 outline_color = IM_COL32(0, 0, 0, 200);
@@ -9120,6 +9138,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
             // Base icon + Main text + Padding
+            bool cat_name_empty = cat->display_name[0] == '\0';
             float item_height = 96.0f + main_text_line_height + 4.0f;
             if (has_snapshot_text) item_height += sub_text_line_height + 4.0f;
             if (has_progress_text) item_height += sub_text_line_height + 4.0f;
@@ -9499,7 +9518,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Main Name
                 ImVec2 main_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y);
                 ImVec2 main_text_screen_size = ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level);
-                bool draw_main_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_text_in_layout;
+                bool draw_main_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_text_in_layout &&
+                                      !cat_name_empty;
                 if (!draw_main_text && tracker_layout_capture_active(t))
                     record_auto_layout_rect(t, cat->text_pos, main_text_pos, main_text_screen_size);
                 if (draw_main_text) {
@@ -9522,13 +9542,18 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                          main_text_pos.y + main_text_screen_size.y),
                                                   is_stat_section ? 's' : 'a', cat->root_name);
                 }
+                // The text lines move up into an empty name's place, but current_text_y keeps the
+                // unshifted flow so the criteria list below stays where it always was.
+                bool cat_name_takes_line = tracker_name_takes_line(cat->display_name, hide_text_in_layout);
+                float name_line_shift = (text_size.y + 4.0f) * t->zoom_level -
+                                        tracker_name_line_advance(cat_name_takes_line, text_size.y, t->zoom_level);
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
                 // Snapshot Text
                 if (has_snapshot_text && !hide_text_in_layout) {
                     if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                         ImVec2 snap_text_pos = ImVec2(text_x_center - (snapshot_text_size.x * t->zoom_level) * 0.5f,
-                                                      current_text_y);
+                                                      current_text_y - name_line_shift);
                         if (text_reveal_ok(snap_text_pos,
                                            ImVec2(snap_text_pos.x + snapshot_text_size.x * t->zoom_level,
                                                   snap_text_pos.y + snapshot_text_size.y * t->zoom_level),
@@ -9542,10 +9567,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Progress Text
                 if (has_progress_text) {
                     float prog_x_center = text_x_center;
-                    float prog_y = current_text_y;
+                    float prog_y = current_text_y - name_line_shift;
+                    float prog_flow_shift = name_line_shift;
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && cat->progress_pos.is_set) {
+                        prog_flow_shift = 0.0f;
                         ImVec2 prog_anchor_off = get_anchor_offset(cat->progress_pos.anchor, progress_text_size.x,
                                                                    progress_text_size.y);
                         prog_x_center = ((cat->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x
@@ -9577,9 +9604,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                      cat->root_name);
                             handle_visual_layout_dragging(t, drag_id, prog_text_pos, prog_screen_size,
                                                           cat->progress_pos, cat_type, cat->display_name, "Progress",
-                                                          cat->root_name, nullptr, nullptr, &cat->text_pos);
+                                                          cat->root_name, nullptr, nullptr,
+                                                          tracker_progress_hierarchy_parent(
+                                                              settings, cat_name_takes_line, cat->icon_pos,
+                                                              cat->text_pos));
                         }
-                        current_text_y = prog_y + progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+                        current_text_y = prog_y + prog_flow_shift + progress_text_size.y * t->zoom_level +
+                                         4.0f * t->zoom_level;
                     }
                 }
 
@@ -9630,11 +9661,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 settings->use_manual_layout &&
                                 ((crit->text_pos.is_hidden_in_layout && crit_layout_hiding_active) ||
                                  (!crit->text_pos.is_set && parent_fully_hidden_in_layout));
+                        // A hidden name does not take its progress with it: the progress moves into
+                        // the name's spot instead, just like when the name is empty.
                         bool hide_crit_progress_in_layout =
                                 settings->use_manual_layout &&
                                 ((crit->progress_pos.is_hidden_in_layout && crit_layout_hiding_active) ||
-                                 (!crit->progress_pos.is_set && (parent_fully_hidden_in_layout ||
-                                                                 hide_crit_text_in_layout)));
+                                 (!crit->progress_pos.is_set && parent_fully_hidden_in_layout));
+                        bool crit_name_takes_spot = tracker_name_takes_line(crit->display_name,
+                                                                            hide_crit_text_in_layout);
 
                         float item_screen_y = 0.0f;
                         if (!is_manually_placed) {
@@ -10079,12 +10113,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Render Child Text and Progress
                         // LOD: Check if zoom level is sufficient for sub-text
-                        // An independently positioned progress text keeps rendering even when the
-                        // text it would otherwise follow is hidden.
                         bool render_crit_text = !hide_crit_text_in_layout;
-                        bool render_crit_progress = !hide_crit_progress_in_layout &&
-                                                    (render_crit_text ||
-                                                     (settings->use_manual_layout && crit->progress_pos.is_set));
+                        bool render_crit_progress = !hide_crit_progress_in_layout;
                         bool capture_crit_layout = tracker_layout_capture_active(t);
                         if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD &&
                             (render_crit_text || render_crit_progress || capture_crit_layout)) {
@@ -10168,7 +10198,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 current_element_x_screen = child_text_pos.x;
                             }
 
-                            if (!render_crit_text && capture_crit_layout) {
+                            if (!crit_name_takes_spot && capture_crit_layout) {
                                 record_auto_layout_rect(t, crit->text_pos, child_text_pos,
                                                         ImVec2(child_text_size.x * t->zoom_level,
                                                                child_text_size.y * t->zoom_level));
@@ -10186,30 +10216,30 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                         draw_list->AddImage((void *) crit_text_face_tex, face_min, face_max);
                                 }
 
-                                if (text_reveal_ok(child_text_pos,
-                                                   ImVec2(child_text_pos.x + child_text_size.x * t->zoom_level,
-                                                          child_text_pos.y + child_text_size.y * t->zoom_level),
-                                                   reveal_anchor(settings, crit->text_pos, ANCHOR_TOP_LEFT),
-                                                   io.DisplaySize, settings, t))
-                                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
-                                                       current_child_text_color, crit->display_name);
+                                // An empty name draws nothing and has no drag handle; the progress after
+                                // it takes its spot.
+                                if (crit_name_takes_spot) {
+                                    if (text_reveal_ok(child_text_pos,
+                                                       ImVec2(child_text_pos.x + child_text_size.x * t->zoom_level,
+                                                              child_text_pos.y + child_text_size.y * t->zoom_level),
+                                                       reveal_anchor(settings, crit->text_pos, ANCHOR_TOP_LEFT),
+                                                       io.DisplaySize, settings, t))
+                                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
+                                                           current_child_text_color, crit->display_name);
 
-                                // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
-                                snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name,
-                                         crit->root_name);
-                                handle_visual_layout_dragging(t, drag_id, crit_combined_min_screen,
-                                                              ImVec2(crit_combined_w * t->zoom_level,
-                                                                     child_text_size.y * t->zoom_level),
-                                                              crit->text_pos, crit_type, crit->display_name,
-                                                              "Text", crit->root_name,
-                                                              cat->display_name, cat->root_name, &crit->icon_pos);
+                                    // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
+                                    snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name,
+                                             crit->root_name);
+                                    handle_visual_layout_dragging(t, drag_id, crit_combined_min_screen,
+                                                                  ImVec2(crit_combined_w * t->zoom_level,
+                                                                         child_text_size.y * t->zoom_level),
+                                                                  crit->text_pos, crit_type, crit->display_name,
+                                                                  "Text", crit->root_name,
+                                                                  cat->display_name, cat->root_name, &crit->icon_pos);
 
-                                current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
-                            } else if (capture_crit_layout) {
-                                // Keep the flow cursor moving so a hidden text still yields the spot
-                                // the progress text after it would occupy.
-                                current_element_x_screen = child_text_pos.x + (child_text_size.x * t->zoom_level) +
-                                                           (4.0f * t->zoom_level);
+                                    current_element_x_screen += (child_text_size.x * t->zoom_level) +
+                                            (4.0f * t->zoom_level);
+                                }
                             }
 
                             char crit_progress_text[32] = "";
@@ -10262,7 +10292,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                       crit->display_name,
                                                                       "Progress", crit->root_name,
                                                                       cat->display_name, cat->root_name,
-                                                                      &crit->text_pos);
+                                                                      tracker_progress_hierarchy_parent(
+                                                                          settings, crit_name_takes_spot,
+                                                                          crit->icon_pos, crit->text_pos));
                                     }
                                 }
                             }
@@ -10746,7 +10778,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
         // Calculate height using Math: Icon bg (96) + main text height + padding (4) + [progress text height + padding (4)]
-        float item_height = 96.0f + main_text_line_height + 4.0f;
+        bool item_name_empty = item->display_name[0] == '\0';
+        float item_height = 96.0f + (item_name_empty ? 0.0f : main_text_line_height) + 4.0f;
         if (has_progress_text) {
             item_height += sub_text_line_height + 4.0f;
         }
@@ -10807,10 +10840,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         if (is_visible_on_screen) {
             // --- Calculate Text Sizes for Centering (only measure if the text will be drawn) ---
             bool show_item_text = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_item_text_in_layout;
-            bool show_item_progress = show_item_text && has_progress_text && !hide_item_progress_in_layout &&
-                                      (t->zoom_level > LOD_TEXT_SUB_THRESHOLD);
+            // The progress keeps showing when the name is hidden: it moves up into the name's place.
+            bool show_item_progress = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && has_progress_text &&
+                                      !hide_item_progress_in_layout && (t->zoom_level > LOD_TEXT_SUB_THRESHOLD);
             ImVec2 text_size = ImVec2(0, 0);
-            if (show_item_text) {
+            if (show_item_text && !item_name_empty) {
                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
                 text_size = ImGui::CalcTextSize(item->display_name);
                 RESET_FONT_SCALE();
@@ -10924,8 +10958,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
-            bool draw_unlock_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout;
-            if (draw_unlock_text || tracker_layout_capture_active(t)) {
+            bool unlock_text_lod = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD;
+            bool draw_unlock_text = unlock_text_lod && !hide_item_text_in_layout;
+            bool unlock_name_takes_line = tracker_name_takes_line(item->display_name, hide_item_text_in_layout);
+            if (unlock_text_lod || tracker_layout_capture_active(t)) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done)
@@ -10947,8 +10983,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 ImVec2 unlock_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 ImVec2 unlock_text_screen_size = ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level);
 
-                if (!draw_unlock_text) {
-                    record_auto_layout_rect(t, item->text_pos, unlock_text_pos, unlock_text_screen_size);
+                if (!draw_unlock_text || item_name_empty) {
+                    if (tracker_layout_capture_active(t))
+                        record_auto_layout_rect(t, item->text_pos, unlock_text_pos, unlock_text_screen_size);
                 } else {
                     if (text_reveal_ok(unlock_text_pos,
                                        ImVec2(unlock_text_pos.x + text_size.x * t->zoom_level,
@@ -10967,10 +11004,12 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                                   ImVec2(unlock_text_pos.x + unlock_text_screen_size.x,
                                                          unlock_text_pos.y + unlock_text_screen_size.y),
                                                   'u', item->root_name);
+                }
 
+                if (unlock_text_lod) {
                     // Draw Progress Text below main name (if applicable, centered)
                     if (has_progress_text && !hide_item_progress_in_layout) {
-                        text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+                        text_y_pos += tracker_name_line_advance(unlock_name_takes_line, text_size.y, t->zoom_level);
 
                         // LOD: Hide progress text if zoomed out
                         if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
@@ -11201,7 +11240,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
         // Calculate height using Math: Icon bg (96) + main text height + padding (4) + [progress text height + padding (4)]
-        float item_height = 96.0f + main_text_line_height + 4.0f;
+        bool item_name_empty = item->display_name[0] == '\0';
+        float item_height = 96.0f + (item_name_empty ? 0.0f : main_text_line_height) + 4.0f;
         if (has_progress_text) {
             item_height += sub_text_line_height + 4.0f;
         }
@@ -11262,10 +11302,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         if (is_visible_on_screen) {
             // --- Calculate Text Sizes for Centering (only measure if the text will be drawn) ---
             bool show_item_text = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_item_text_in_layout;
-            bool show_item_progress = show_item_text && has_progress_text && !hide_item_progress_in_layout &&
-                                      (t->zoom_level > LOD_TEXT_SUB_THRESHOLD);
+            // The progress keeps showing when the name is hidden: it moves up into the name's place.
+            bool show_item_progress = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && has_progress_text &&
+                                      !hide_item_progress_in_layout && (t->zoom_level > LOD_TEXT_SUB_THRESHOLD);
             ImVec2 text_size = ImVec2(0, 0);
-            if (show_item_text) {
+            if (show_item_text && !item_name_empty) {
                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
                 text_size = ImGui::CalcTextSize(item->display_name);
                 RESET_FONT_SCALE();
@@ -11433,9 +11474,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
-            bool draw_cg_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout;
+            bool cg_text_lod = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD;
+            bool draw_cg_text = cg_text_lod && !hide_item_text_in_layout;
+            bool cg_name_takes_line = tracker_name_takes_line(item->display_name, hide_item_text_in_layout);
             bool capture_cg_layout = tracker_layout_capture_active(t);
-            if (draw_cg_text || capture_cg_layout) {
+            if (cg_text_lod || capture_cg_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = tracker_is_faded_by_mode(settings, item->done)
@@ -11457,8 +11500,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 ImVec2 cg_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 ImVec2 cg_text_screen_size = ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level);
 
-                if (!draw_cg_text) {
-                    record_auto_layout_rect(t, item->text_pos, cg_text_pos, cg_text_screen_size);
+                if (!draw_cg_text || item_name_empty) {
+                    if (capture_cg_layout)
+                        record_auto_layout_rect(t, item->text_pos, cg_text_pos, cg_text_screen_size);
                 } else {
                     if (text_reveal_ok(cg_text_pos,
                                        ImVec2(cg_text_pos.x + text_size.x * t->zoom_level,
@@ -11482,7 +11526,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text) {
                     float prog_x_center = text_x_center;
-                    float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+                    float prog_y = text_y_pos + tracker_name_line_advance(cg_name_takes_line, text_size.y,
+                                                                          t->zoom_level);
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && item->progress_pos.is_set) {
@@ -11498,7 +11543,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     ImVec2 cg_prog_screen_size = ImVec2(progress_text_size.x * t->zoom_level,
                                                         progress_text_size.y * t->zoom_level);
                     // LOD: Hide progress text if zoomed out
-                    bool draw_cg_progress = draw_cg_text && !hide_item_progress_in_layout &&
+                    bool draw_cg_progress = cg_text_lod && !hide_item_progress_in_layout &&
                                             t->zoom_level > LOD_TEXT_SUB_THRESHOLD;
 
                     if (!draw_cg_progress) {
@@ -11518,7 +11563,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         snprintf(prog_drag_id, sizeof(prog_drag_id), "drag_cg_prog_%s", item->root_name);
                         handle_visual_layout_dragging(t, prog_drag_id, cg_prog_pos, cg_prog_screen_size,
                                                       item->progress_pos, "Custom Goal", item->display_name, "Progress",
-                                                      item->root_name, nullptr, nullptr, &item->text_pos);
+                                                      item->root_name, nullptr, nullptr,
+                                                      tracker_progress_hierarchy_parent(
+                                                          settings, cg_name_takes_line, item->icon_pos,
+                                                          item->text_pos));
                         // --------------------------------------------
                     }
                 }
@@ -11828,7 +11876,9 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         snprintf(progress_text, sizeof(progress_text), "(%d / %d)",
                  goal->completed_count, goal->linked_goal_count);
 
-        float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+        bool goal_name_empty = goal->display_name[0] == '\0';
+        float item_height = 96.0f + (goal_name_empty ? 0.0f : main_text_line_height) + 4.0f +
+                            sub_text_line_height + 4.0f;
 
         // Skip auto-layout items that are fully hidden in manual layout
         bool goal_layout_hiding_active = tracker_layout_hiding_active(settings, goal->done);
@@ -11875,10 +11925,11 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
 
         if (is_visible_on_screen) {
             bool show_goal_text = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_goal_text_in_layout;
-            bool show_goal_progress = show_goal_text && !hide_goal_progress_in_layout &&
+            // The progress keeps showing when the name is hidden: it moves up into the name's place.
+            bool show_goal_progress = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_goal_progress_in_layout &&
                                       (t->zoom_level > LOD_TEXT_SUB_THRESHOLD);
             ImVec2 text_size = ImVec2(0, 0);
-            if (show_goal_text) {
+            if (show_goal_text && !goal_name_empty) {
                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
                 text_size = ImGui::CalcTextSize(goal->display_name);
                 RESET_FONT_SCALE();
@@ -11990,9 +12041,11 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             }
 
             // Render Text
-            bool draw_counter_text = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_goal_text_in_layout;
+            bool counter_text_lod = t->zoom_level > LOD_TEXT_MAIN_THRESHOLD;
+            bool draw_counter_text = counter_text_lod && !hide_goal_text_in_layout;
+            bool counter_name_takes_line = tracker_name_takes_line(goal->display_name, hide_goal_text_in_layout);
             bool capture_counter_layout = tracker_layout_capture_active(t);
-            if (draw_counter_text || capture_counter_layout) {
+            if (counter_text_lod || capture_counter_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = tracker_is_faded_by_mode(settings, goal->done)
@@ -12013,8 +12066,9 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 ImVec2 counter_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
                 ImVec2 counter_text_screen_size = ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level);
 
-                if (!draw_counter_text) {
-                    record_auto_layout_rect(t, goal->text_pos, counter_text_pos, counter_text_screen_size);
+                if (!draw_counter_text || goal_name_empty) {
+                    if (capture_counter_layout)
+                        record_auto_layout_rect(t, goal->text_pos, counter_text_pos, counter_text_screen_size);
                 } else {
                     if (text_reveal_ok(counter_text_pos,
                                        ImVec2(counter_text_pos.x + text_size.x * t->zoom_level,
@@ -12038,7 +12092,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 // Draw Progress Text
                 {
                     float prog_x_center = text_x_center;
-                    float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+                    float prog_y = text_y_pos + tracker_name_line_advance(counter_name_takes_line, text_size.y,
+                                                                          t->zoom_level);
 
                     if (settings->use_manual_layout && goal->progress_pos.is_set) {
                         ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, progress_text_size.x,
@@ -12053,7 +12108,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                                      prog_y);
                     ImVec2 counter_prog_screen_size = ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level);
-                    bool draw_counter_progress = draw_counter_text && !hide_goal_progress_in_layout &&
+                    bool draw_counter_progress = counter_text_lod && !hide_goal_progress_in_layout &&
                                                  t->zoom_level > LOD_TEXT_SUB_THRESHOLD;
 
                     if (!draw_counter_progress) {
@@ -12072,7 +12127,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                         snprintf(drag_id, sizeof(drag_id), "drag_counter_prog_%s", goal->root_name);
                         handle_visual_layout_dragging(t, drag_id, counter_prog_pos, counter_prog_screen_size,
                                                       goal->progress_pos, "Counter", goal->display_name, "Progress",
-                                                      goal->root_name, nullptr, nullptr, &goal->text_pos);
+                                                      goal->root_name, nullptr, nullptr,
+                                                      tracker_progress_hierarchy_parent(
+                                                          settings, counter_name_takes_line, goal->icon_pos,
+                                                          goal->text_pos));
                     }
                 }
             }
@@ -12307,7 +12365,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         // --- Item Height and Layout (OPTIMIZED) ---
         // Calculate height using Math: Icon bg (96) + main name height + padding (4) + stage text height + padding (4)
         // Multi-Stage goals always have both lines of text
-        float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+        bool goal_name_empty = goal->display_name[0] == '\0';
+        float item_height = 96.0f + (goal_name_empty ? 0.0f : main_text_line_height) + 4.0f +
+                            sub_text_line_height + 4.0f;
 
         // Skip auto-layout items that are fully hidden in manual layout
         bool goal_layout_hiding_active = tracker_layout_hiding_active(settings, is_done_render);
@@ -12369,7 +12429,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             bool show_goal_text = (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) && !hide_goal_text_in_layout;
             bool show_goal_stage = (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) && !hide_goal_progress_in_layout;
             ImVec2 text_size = ImVec2(0, 0);
-            if (show_goal_text || show_goal_stage) {
+            if ((show_goal_text || show_goal_stage) && !goal_name_empty) {
                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
                 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
                 RESET_FONT_SCALE();
@@ -12530,9 +12590,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // LOD: Hide main name if zoomed out too far
             ImVec2 ms_text_pos = ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos);
             ImVec2 ms_text_screen_size = ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level);
-            if (t->zoom_level <= LOD_TEXT_MAIN_THRESHOLD && tracker_layout_capture_active(t))
+            bool ms_name_takes_line = tracker_name_takes_line(goal->display_name, hide_goal_text_in_layout);
+            if ((t->zoom_level <= LOD_TEXT_MAIN_THRESHOLD || !ms_name_takes_line) && tracker_layout_capture_active(t))
                 record_auto_layout_rect(t, goal->text_pos, ms_text_pos, ms_text_screen_size);
-            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && ms_name_takes_line) {
                 if (!hide_goal_text_in_layout &&
                     text_reveal_ok(ms_text_pos,
                                    ImVec2(ms_text_pos.x + text_size.x * t->zoom_level,
@@ -12556,7 +12617,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
 
             // Draw Current Stage Text (uses sub_font_size)
-            float stage_text_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+            float stage_text_y = text_y_pos + tracker_name_line_advance(ms_name_takes_line, text_size.y,
+                                                                        t->zoom_level);
             float stage_text_x_center = text_x_center;
 
             // Apply manual progress_pos if set
@@ -12590,7 +12652,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_prog_%s", goal->root_name);
                 handle_visual_layout_dragging(t, drag_id, ms_stage_pos, ms_stage_screen_size,
                                               goal->progress_pos, "Multi-Stage Goal", goal->display_name, "Progress",
-                                              goal->root_name, nullptr, nullptr, &goal->text_pos);
+                                              goal->root_name, nullptr, nullptr,
+                                              tracker_progress_hierarchy_parent(
+                                                  settings, ms_name_takes_line, goal->icon_pos, goal->text_pos));
                 if (!hide_goal_progress_in_layout) {
                     tracker_show_multi_stage_description(t, ms_stage_pos,
                                                          ImVec2(ms_stage_pos.x + ms_stage_screen_size.x,

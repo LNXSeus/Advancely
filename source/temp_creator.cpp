@@ -11129,9 +11129,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
+                            char display_name_tooltip_buffer[512];
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name that appears on the tracker/overlay.");
+                                     "The user-facing name that appears on the tracker/overlay.\n\n"
+                                     "Left empty, the progress text below the name moves up into the name's place,\n"
+                                     "on both the tracker and the overlay. The criteria list stays where it is.\n"
+                                     "Manual layout: this only happens while that progress text has no position of its own.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("AdvDesc", advancement.description,
@@ -13622,9 +13626,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
+                            char display_name_tooltip_buffer[512];
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name for this single stat or stat category.");
+                                     "The user-facing name for this single stat or stat category.\n\n"
+                                     "Left empty, the progress text below the name moves up into the name's place,\n"
+                                     "on both the tracker and the overlay. The sub-stat list stays where it is.\n"
+                                     "Manual layout: this only happens while that progress text has no position of its own.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("StatDesc", stat_cat.description, "stat")) {
@@ -14596,9 +14604,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char display_name_tooltip_buffer[128];
+                                    char display_name_tooltip_buffer[512];
                                     snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                             "The user-facing name for this sub-stat.");
+                                             "The user-facing name for this sub-stat.\n\n"
+                                             "Left empty, the progress value next to the name moves over into the name's place,\n"
+                                             "on both the tracker and the overlay.\n"
+                                             "Manual layout: this only happens while that progress value has no position of its own.\n"
+                                             "Hiding the name in the manual layout moves it over the same way.");
                                     ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                                 }
                                 if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
@@ -15891,9 +15903,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
+                            char display_name_tooltip_buffer[512];
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name for this unlock.");
+                                     "The user-facing name for this unlock.\n\n"
+                                     "Left empty, the progress text below the name moves up into the name's place.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("UnlockDesc", unlock.description, "unlock")) {
@@ -16829,11 +16843,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[256];
+                            char display_name_tooltip_buffer[640];
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
                                      "The user-facing name for this custom goal.\n"
                                      "If target value isn't 0 you'll find this name at the bottom\n"
-                                     "of the settings window to configure hotkeys.");
+                                     "of the settings window to configure hotkeys.\n\n"
+                                     "Left empty, the progress text below the name moves up into the name's place,\n"
+                                     "on both the tracker and the overlay.\n"
+                                     "Manual layout: this only happens while that progress text has no position of its own.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("CustomGoalDesc", goal.description, "custom goal")) {
@@ -18168,9 +18186,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
+                            char display_name_tooltip_buffer[512];
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name for this multi-stage goal.");
+                                     "The user-facing name for this multi-stage goal.\n\n"
+                                     "Left empty, the current stage text below the name moves up into the name's place,\n"
+                                     "on both the tracker and the overlay.\n"
+                                     "Manual layout: this only happens while that stage text has no position of its own.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("MSGoalDesc", goal.description, "multi-stage goal")) {
@@ -20597,9 +20619,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
+                            char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "The user-facing name for this counter.");
+                                     "The user-facing name for this counter.\n\n"
+                                     "Left empty, the progress text below the name moves up into the name's place,\n"
+                                     "on both the tracker and the overlay.\n"
+                                     "Manual layout: this only happens while that progress text has no position of its own.\n"
+                                     "Hiding the name in the manual layout moves it up the same way.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         if (draw_editor_description_box("CounterDesc", counter.description, "counter")) {
