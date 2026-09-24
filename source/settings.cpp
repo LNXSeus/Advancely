@@ -2682,13 +2682,39 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetTooltip("%s", open_templates_folder_tooltip_buffer);
             }
 
-            // Place Template Creator Button in same line
-            ImGui::SameLine();
-
             bool coop_session_active = g_coop_ctx &&
                                        (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
                                         coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
                                         coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
+
+            // Import Template: asks for the zip, then opens the Template Editor on its import screen, so it is
+            // disabled whenever the Template Editor button is.
+            ImGui::SameLine();
+            if (coop_session_active) ImGui::BeginDisabled();
+            if (ImGui::Button("Import Template")) {
+                // The editor only opens once a zip is chosen; cancelling the dialog leaves everything as it was.
+                const char *zip_path = temp_creator_pick_import_zip();
+                if (zip_path) {
+                    temp_creator_request_import(zip_path);
+                    *p_temp_creator_open = true;
+                }
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char import_template_tooltip_buffer[512];
+                if (coop_session_active) {
+                    snprintf(import_template_tooltip_buffer, sizeof(import_template_tooltip_buffer),
+                             "Template editing is disabled during a Co-op session");
+                } else {
+                    snprintf(import_template_tooltip_buffer, sizeof(import_template_tooltip_buffer),
+                             "Imports a template from a .zip file and opens the Template Editor to finish the import.");
+                }
+                ImGui::SetTooltip("%s", import_template_tooltip_buffer);
+            }
+            if (coop_session_active) ImGui::EndDisabled();
+
+            // Place Template Creator Button in same line
+            ImGui::SameLine();
+
             if (coop_session_active) ImGui::BeginDisabled();
             if (ImGui::Button("Open Template Editor")) {
                 *p_temp_creator_open = true; // Open the template creator window

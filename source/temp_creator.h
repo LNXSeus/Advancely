@@ -30,6 +30,19 @@ struct Tracker;
  */
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t);
 
+/**
+ * @brief Shows the "Import Template From Zip" file dialog used by every template import.
+ *
+ * @return The chosen .zip path (valid until the next dialog), or nullptr when the dialog was cancelled.
+ */
+const char *temp_creator_pick_import_zip(void);
+
+/**
+ * @brief Makes the Template Editor continue the "Import Template" action with an already chosen zip on its next
+ * frame, exactly as if that zip was picked from its Template menu. The caller opens the editor window itself.
+ */
+void temp_creator_request_import(const char *zip_path);
+
 #ifdef __cplusplus
 }
 #endif

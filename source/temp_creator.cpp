@@ -5888,6 +5888,28 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
 
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
+const char *temp_creator_pick_import_zip(void) {
+#ifdef __APPLE__
+    const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
+    int filter_count = 2;
+#else
+    const char *filter_patterns[1] = {"*.zip"};
+    int filter_count = 1;
+#endif
+    return tinyfd_openFileDialog("Import Template From Zip", "", filter_count, filter_patterns,
+                                 "Template ZIP Archive", 0);
+}
+
+// Zip chosen through temp_creator_request_import(), taken by the next temp_creator_render_gui() frame.
+// Empty when nothing is pending.
+static char s_pending_import_path[MAX_PATH_LENGTH] = "";
+
+void temp_creator_request_import(const char *zip_path) {
+    if (!zip_path) return;
+    strncpy(s_pending_import_path, zip_path, sizeof(s_pending_import_path) - 1);
+    s_pending_import_path[sizeof(s_pending_import_path) - 1] = '\0';
+}
+
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void) t;
 
@@ -7736,6 +7758,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     bool request_import = false;
     bool request_export = false;
 
+    // An import started from the settings window's "Import Template" button, whose zip is already chosen. It
+    // obeys the same rule as the menu item below; when that item is disabled the request is dropped and the
+    // reason is shown instead.
+    char pending_import_path[MAX_PATH_LENGTH] = "";
+    if (s_pending_import_path[0] != '\0') {
+        strncpy(pending_import_path, s_pending_import_path, sizeof(pending_import_path) - 1);
+        pending_import_path[sizeof(pending_import_path) - 1] = '\0';
+        s_pending_import_path[0] = '\0';
+        if (template_switching_disabled) {
+            pending_import_path[0] = '\0';
+            snprintf(status_message, sizeof(status_message), "%s",
+                     visual_editing_active
+                         ? "Cannot import a template while Visual Editing is active. Stop Visual Editing first."
+                         : "Cannot import a template while the template has unsaved changes. "
+                         "Save or revert your changes first.");
+            save_message_type = MSG_ERROR;
+        }
+    }
+
     if (ImGui::Button("Template...")) {
         ImGui::OpenPopup("TemplateActionsMenu");
     }
@@ -8023,61 +8064,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::OpenPopup("Delete Template?");
     }
 
-    if (request_import) {
-#ifdef __APPLE__
-        const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
-        int filter_count = 2;
-#else
-        const char *filter_patterns[1] = {"*.zip"};
-        int filter_count = 1;
-#endif
-        const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", filter_count, filter_patterns,
-                                                      "Template ZIP Archive", 0);
-        if (open_path) {
-            char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
-            bool from_metadata = false;
-            if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message),
-                                  &from_metadata)) {
-                // Success: Pre-fill the confirmation view
-                strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
-                import_zip_path[sizeof(import_zip_path) - 1] = '\0';
+    // The menu item asks for the zip here; the settings window's button already asked for it.
+    const char *import_open_path = nullptr;
+    if (request_import) import_open_path = temp_creator_pick_import_zip();
+    else if (pending_import_path[0] != '\0') import_open_path = pending_import_path;
+    if (import_open_path) {
+        char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
+        bool from_metadata = false;
+        if (get_info_from_zip(import_open_path, version, category, flag, status_message, sizeof(status_message),
+                              &from_metadata)) {
+            // Success: Pre-fill the confirmation view
+            strncpy(import_zip_path, import_open_path, sizeof(import_zip_path) - 1);
+            import_zip_path[sizeof(import_zip_path) - 1] = '\0';
 
-                strncpy(import_category, category, sizeof(import_category) - 1);
-                import_category[sizeof(import_category) - 1] = '\0';
+            strncpy(import_category, category, sizeof(import_category) - 1);
+            import_category[sizeof(import_category) - 1] = '\0';
 
-                strncpy(import_flag, flag, sizeof(import_flag) - 1);
-                import_flag[sizeof(import_flag) - 1] = '\0';
+            strncpy(import_flag, flag, sizeof(import_flag) - 1);
+            import_flag[sizeof(import_flag) - 1] = '\0';
 
-                // Remember the zip's declared identity to show alongside the (editable) fields.
-                strncpy(import_orig_version, version, sizeof(import_orig_version) - 1);
-                import_orig_version[sizeof(import_orig_version) - 1] = '\0';
-                strncpy(import_orig_category, category, sizeof(import_orig_category) - 1);
-                import_orig_category[sizeof(import_orig_category) - 1] = '\0';
-                strncpy(import_orig_flag, flag, sizeof(import_orig_flag) - 1);
-                import_orig_flag[sizeof(import_orig_flag) - 1] = '\0';
-                import_orig_from_metadata = from_metadata;
+            // Remember the zip's declared identity to show alongside the (editable) fields.
+            strncpy(import_orig_version, version, sizeof(import_orig_version) - 1);
+            import_orig_version[sizeof(import_orig_version) - 1] = '\0';
+            strncpy(import_orig_category, category, sizeof(import_orig_category) - 1);
+            import_orig_category[sizeof(import_orig_category) - 1] = '\0';
+            strncpy(import_orig_flag, flag, sizeof(import_orig_flag) - 1);
+            import_orig_flag[sizeof(import_orig_flag) - 1] = '\0';
+            import_orig_from_metadata = from_metadata;
 
-                // Pre-select the version dropdown to match the version recorded in the zip.
-                // Fall back to the creator's current version if no match is found.
-                import_version_idx = creator_version_idx;
-                for (int v = 0; v < VERSION_STRINGS_COUNT; ++v) {
-                    if (strcmp(VERSION_STRINGS[v], version) == 0) {
-                        import_version_idx = v;
-                        break;
-                    }
+            // Pre-select the version dropdown to match the version recorded in the zip.
+            // Fall back to the creator's current version if no match is found.
+            import_version_idx = creator_version_idx;
+            for (int v = 0; v < VERSION_STRINGS_COUNT; ++v) {
+                if (strcmp(VERSION_STRINGS[v], version) == 0) {
+                    import_version_idx = v;
+                    break;
                 }
-
-                show_import_confirmation_view = true;
-                import_zip_has_icons = zip_contains_icons(open_path);
-                import_icons_checkbox = import_zip_has_icons; // default ON if icons present
-                show_create_new_view = false;
-                show_copy_view = false;
-                show_rename_view = false;
-                editing_template = false;
-            } else {
-                // On failure, get_info_from_zip already set the status_message
-                ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
             }
+
+            show_import_confirmation_view = true;
+            import_zip_has_icons = zip_contains_icons(import_open_path);
+            import_icons_checkbox = import_zip_has_icons; // default ON if icons present
+            show_create_new_view = false;
+            show_copy_view = false;
+            show_rename_view = false;
+            editing_template = false;
+        } else {
+            // On failure, get_info_from_zip already set the status_message
+            ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
         }
     }
 

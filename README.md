@@ -1116,7 +1116,9 @@ dropdown to keep the button row tidy:
   `Category Name` **and** `Optional Flag` all match an existing template, the **`Replace Existing Template?`**
   confirmation appears. Choosing **`Replace`** permanently deletes the existing template and **all** of its associated
   files (language, layout, `notes` and global-stats `snapshot`) before the import overwrites it, and reloads the tracker
-  if it was using that template.
+  if it was using that template. The `Import Template` button in the settings (`ESC`), next to `Open Template Folder`,
+  starts this import right away and opens the Template Editor once a `.zip` is chosen (cancelling the file dialog opens
+  nothing). Like `Open Template Editor`, it is disabled during a Co-op session.
 * **Export Template**: Packages the selected template and all its language **and layout files** into a single `.zip`
   file, perfect for
   sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz). Clicking the button opens a
