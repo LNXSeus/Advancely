@@ -1233,6 +1233,11 @@ checkbox is the only thing that hides it, so it stays visible even when the pare
 position without its own coordinates belongs to the parent and inherits the parent's hidden state. Ticking a position
 for the first time starts it at the spot the element currently occupies on the tracker (when you are editing the
 active template), so enabling manual positioning never teleports the element.
+* **Empty Display Names**: Leaving a `Display Name` empty frees its spot: the progress text below it (for a sub-stat,
+  the value next to it) moves into the name's place on the tracker and the overlay, and the empty name has no drag
+  handle in the `Visual Layout Editor`. In the manual layout this only happens while the progress text has no position
+  of its own, and ticking the name's `Hide` checkbox does the same, so hiding a name never hides its progress text. The
+  criteria and sub-stat list under an advancement or stat stays where it is.
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
