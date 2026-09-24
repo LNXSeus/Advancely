@@ -2,132 +2,154 @@
 	"advancements":	{
 		"minecraft:story/iron_tools":	{
 			"icon":	"items/iron_pickaxe_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/lava_bucket":	{
 			"icon":	"items/bucket_lava_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/kill_dragon":	{
 			"icon":	"blocks/Dragon_Head.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/obtain_armor":	{
 			"icon":	"items/iron_chestplate_1.9.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/shiny_gear":	{
 			"icon":	"items/diamond_chestplate_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enchant_item":	{
 			"icon":	"blocks/Enchanting_Table_JE1_BE1_OLD.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/sleep_in_bed":	{
 			"icon":	"blocks/White_Bed_(N)_JE1_1.12.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/sniper_duel":	{
 			"icon":	"items/arrow_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/upgrade_tools":	{
 			"icon":	"items/stone_pickaxe_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/summon_iron_golem":	{
 			"icon":	"blocks/Carved_Pumpkin_(E)_JE1_BE1_OLD.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/deflect_arrow":	{
 			"icon":	"items/Shield_JE1_OLD.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/trade":	{
 			"icon":	"items/emerald_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:husbandry/plant_seed":	{
 			"icon":	"items/wheat_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:adventure/totem_of_undying":	{
 			"icon":	"items/totem_1.11.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:story/cure_zombie_villager":	{
 			"icon":	"items/apple_golden_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/return_to_sender":	{
 			"icon":	"items/fire_charge_1.13.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/uneasy_alliance":	{
 			"icon":	"items/ghast_tear_1.0.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/fast_travel":	{
 			"icon":	"items/map_empty_1.11.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/levitate":	{
 			"icon":	"items/shulker_shell_1.11.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/dragon_egg":	{
 			"icon":	"blocks/Dragon_Egg_JE5.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/respawn_dragon":	{
 			"icon":	"items/end_crystal_1.11.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
 		},
 		"minecraft:end/dragon_breath":	{
 			"icon":	"items/dragon_breath_1.11.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 			}
@@ -138,112 +160,148 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"plains":	{
-					"icon":	"ovBiomes/plains.png"
+					"icon":	"ovBiomes/plains.png",
+					"hidden":	true
 				},
 				"forest":	{
-					"icon":	"ovBiomes/forest.png"
+					"icon":	"ovBiomes/forest.png",
+					"hidden":	true
 				},
 				"forest_hills":	{
-					"icon":	"ovBiomes/forest_hills.png"
+					"icon":	"ovBiomes/forest_hills.png",
+					"hidden":	true
 				},
 				"birch_forest":	{
-					"icon":	"ovBiomes/birch_forest.png"
+					"icon":	"ovBiomes/birch_forest.png",
+					"hidden":	true
 				},
 				"birch_forest_hills":	{
-					"icon":	"ovBiomes/birch_forest_hills.png"
+					"icon":	"ovBiomes/birch_forest_hills.png",
+					"hidden":	true
 				},
 				"river":	{
-					"icon":	"ovBiomes/river.png"
+					"icon":	"ovBiomes/river.png",
+					"hidden":	true
 				},
 				"roofed_forest":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/roofed_forest.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/roofed_forest.png",
+					"hidden":	true
 				},
 				"ocean":	{
-					"icon":	"ovBiomes/ocean.png"
+					"icon":	"ovBiomes/ocean.png",
+					"hidden":	true
 				},
 				"deep_ocean":	{
-					"icon":	"ovBiomes/deep_ocean.png"
+					"icon":	"ovBiomes/deep_ocean.png",
+					"hidden":	true
 				},
 				"beaches":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/beach.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/beach.png",
+					"hidden":	true
 				},
 				"stone_beach":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/stone_beach.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/stone_beach.png",
+					"hidden":	true
 				},
 				"swampland":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/swampland.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/swampland.png",
+					"hidden":	true
 				},
 				"mushroom_island":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomisland.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomisland.png",
+					"hidden":	true
 				},
 				"mushroom_island_shore":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomislandshore.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomislandshore.png",
+					"hidden":	true
 				},
 				"ice_flats":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/ice_plains.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/ice_plains.png",
+					"hidden":	true
 				},
 				"ice_mountains":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/ice_mountains.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/ice_mountains.png",
+					"hidden":	true
 				},
 				"cold_beach":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_beach.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_beach.png",
+					"hidden":	true
 				},
 				"frozen_river":	{
-					"icon":	"ovBiomes/frozen_river.png"
+					"icon":	"ovBiomes/frozen_river.png",
+					"hidden":	true
 				},
 				"taiga":	{
-					"icon":	"ovBiomes/taiga.png"
+					"icon":	"ovBiomes/taiga.png",
+					"hidden":	true
 				},
 				"taiga_hills":	{
-					"icon":	"ovBiomes/taiga_hills.png"
+					"icon":	"ovBiomes/taiga_hills.png",
+					"hidden":	true
 				},
 				"redwood_taiga":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga.png",
+					"hidden":	true
 				},
 				"redwood_taiga_hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png",
+					"hidden":	true
 				},
 				"taiga_cold":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga.png",
+					"hidden":	true
 				},
 				"taiga_cold_hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png",
+					"hidden":	true
 				},
 				"jungle":	{
-					"icon":	"ovBiomes/jungle.png"
+					"icon":	"ovBiomes/jungle.png",
+					"hidden":	true
 				},
 				"jungle_edge":	{
-					"icon":	"ovBiomes/jungle_edge.png"
+					"icon":	"ovBiomes/jungle_edge.png",
+					"hidden":	true
 				},
 				"jungle_hills":	{
-					"icon":	"ovBiomes/jungle_hills.png"
+					"icon":	"ovBiomes/jungle_hills.png",
+					"hidden":	true
 				},
 				"extreme_hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills.png",
+					"hidden":	true
 				},
 				"extreme_hills_with_trees":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills+.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills+.png",
+					"hidden":	true
 				},
 				"savanna":	{
-					"icon":	"ovBiomes/savanna.png"
+					"icon":	"ovBiomes/savanna.png",
+					"hidden":	true
 				},
 				"savanna_rock":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png",
+					"hidden":	true
 				},
 				"desert":	{
-					"icon":	"ovBiomes/desert.png"
+					"icon":	"ovBiomes/desert.png",
+					"hidden":	true
 				},
 				"desert_hills":	{
-					"icon":	"ovBiomes/desert_hills.png"
+					"icon":	"ovBiomes/desert_hills.png",
+					"hidden":	true
 				},
 				"mesa":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa.png",
+					"hidden":	true
 				},
 				"mesa_rock":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png",
+					"hidden":	true
 				},
 				"mesa_clear_rock":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau.png"
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau.png",
+					"hidden":	true
 				}
 			}
 		},
@@ -253,70 +311,92 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"blaze":	{
-					"icon":	"monsters/blaze_1.12.png"
+					"icon":	"monsters/blaze_1.12.png",
+					"hidden":	true
 				},
 				"enderman":	{
-					"icon":	"monsters/enderman.png"
+					"icon":	"monsters/enderman.png",
+					"hidden":	true
 				},
 				"shulker":	{
-					"icon":	"monsters/shulker.png"
+					"icon":	"monsters/shulker.png",
+					"hidden":	true
 				},
 				"zombie":	{
-					"icon":	"monsters/zombie.png"
+					"icon":	"monsters/zombie.png",
+					"hidden":	true
 				},
 				"skeleton":	{
-					"icon":	"monsters/skeleton_1.12.png"
+					"icon":	"monsters/skeleton_1.12.png",
+					"hidden":	true
 				},
 				"creeper":	{
-					"icon":	"monsters/creeper.png"
+					"icon":	"monsters/creeper.png",
+					"hidden":	true
 				},
 				"spider":	{
-					"icon":	"monsters/spider_1.12.png"
+					"icon":	"monsters/spider_1.12.png",
+					"hidden":	true
 				},
 				"witch":	{
-					"icon":	"monsters/witch_1.12.png"
+					"icon":	"monsters/witch_1.12.png",
+					"hidden":	true
 				},
 				"vindicator":	{
-					"icon":	"monsters/vindicator_1.12.png"
+					"icon":	"monsters/vindicator_1.12.png",
+					"hidden":	true
 				},
 				"evoker":	{
-					"icon":	"monsters/evoker_1.12.png"
+					"icon":	"monsters/evoker_1.12.png",
+					"hidden":	true
 				},
 				"slime":	{
-					"icon":	"monsters/slime.png"
+					"icon":	"monsters/slime.png",
+					"hidden":	true
 				},
 				"polar_bear":	{
-					"icon":	"animals/polar_bear.png"
+					"icon":	"animals/polar_bear.png",
+					"hidden":	true
 				},
 				"stray":	{
-					"icon":	"monsters/stray_1.12.png"
+					"icon":	"monsters/stray_1.12.png",
+					"hidden":	true
 				},
 				"zombie_villager":	{
-					"icon":	"monsters/zombie_villager_1.12.png"
+					"icon":	"monsters/zombie_villager_1.12.png",
+					"hidden":	true
 				},
 				"silverfish":	{
-					"icon":	"monsters/silverfish.png"
+					"icon":	"monsters/silverfish.png",
+					"hidden":	true
 				},
 				"husk":	{
-					"icon":	"monsters/husk.png"
+					"icon":	"monsters/husk.png",
+					"hidden":	true
 				},
 				"cave_spider":	{
-					"icon":	"monsters/cave_spider_1.12.png"
+					"icon":	"monsters/cave_spider_1.12.png",
+					"hidden":	true
 				},
 				"wither_skeleton":	{
-					"icon":	"monsters/wither_skeleton_1.12.png"
+					"icon":	"monsters/wither_skeleton_1.12.png",
+					"hidden":	true
 				},
 				"zombie_pigman":	{
-					"icon":	"monsters/zombie_pigman.png"
+					"icon":	"monsters/zombie_pigman.png",
+					"hidden":	true
 				},
 				"magma_cube":	{
-					"icon":	"monsters/magma_cube.png"
+					"icon":	"monsters/magma_cube.png",
+					"hidden":	true
 				},
 				"ghast":	{
-					"icon":	"monsters/ghast_1.12.png"
+					"icon":	"monsters/ghast_1.12.png",
+					"hidden":	true
 				},
 				"guardian":	{
-					"icon":	"monsters/guardian.png"
+					"icon":	"monsters/guardian.png",
+					"hidden":	true
 				}
 			}
 		},
@@ -326,109 +406,144 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"rotten_flesh":	{
-					"icon":	"items/rotten_flesh_1.0.png"
+					"icon":	"items/rotten_flesh_1.0.png",
+					"hidden":	true
 				},
 				"spider_eye":	{
-					"icon":	"items/spider_eye_1.0.png"
+					"icon":	"items/spider_eye_1.0.png",
+					"hidden":	true
 				},
 				"chorus_fruit":	{
-					"icon":	"items/chorus_fruit_1.11.png"
+					"icon":	"items/chorus_fruit_1.11.png",
+					"hidden":	true
 				},
 				"beef":	{
-					"icon":	"items/beef_raw_1.0.png"
+					"icon":	"items/beef_raw_1.0.png",
+					"hidden":	true
 				},
 				"cooked_beef":	{
-					"icon":	"items/beef_cooked_1.11.png"
+					"icon":	"items/beef_cooked_1.11.png",
+					"hidden":	true
 				},
 				"mutton":	{
-					"icon":	"items/mutton_raw_1.11.png"
+					"icon":	"items/mutton_raw_1.11.png",
+					"hidden":	true
 				},
 				"cooked_mutton":	{
-					"icon":	"items/mutton_cooked_1.11.png"
+					"icon":	"items/mutton_cooked_1.11.png",
+					"hidden":	true
 				},
 				"porkchop":	{
-					"icon":	"items/porkchop_raw_1.9.png"
+					"icon":	"items/porkchop_raw_1.9.png",
+					"hidden":	true
 				},
 				"cooked_porkchop":	{
-					"icon":	"items/porkchop_cooked_1.0.png"
+					"icon":	"items/porkchop_cooked_1.0.png",
+					"hidden":	true
 				},
 				"chicken":	{
-					"icon":	"items/chicken_raw_1.0.png"
+					"icon":	"items/chicken_raw_1.0.png",
+					"hidden":	true
 				},
 				"cooked_chicken":	{
-					"icon":	"items/chicken_cooked_1.0.png"
+					"icon":	"items/chicken_cooked_1.0.png",
+					"hidden":	true
 				},
 				"golden_apple":	{
-					"icon":	"items/golden_apple_1.13.png"
+					"icon":	"items/golden_apple_1.13.png",
+					"hidden":	true
 				},
 				"golden_carrot":	{
-					"icon":	"items/golden_carrot_1.13.png"
+					"icon":	"items/golden_carrot_1.13.png",
+					"hidden":	true
 				},
 				"apple":	{
-					"icon":	"items/apple_1.0.png"
+					"icon":	"items/apple_1.0.png",
+					"hidden":	true
 				},
 				"pumpkin_pie":	{
-					"icon":	"items/pumpkin_pie_1.0.png"
+					"icon":	"items/pumpkin_pie_1.0.png",
+					"hidden":	true
 				},
 				"bread":	{
-					"icon":	"items/bread_1.0.png"
+					"icon":	"items/bread_1.0.png",
+					"hidden":	true
 				},
 				"carrot":	{
-					"icon":	"items/carrot_1.0.png"
+					"icon":	"items/carrot_1.0.png",
+					"hidden":	true
 				},
 				"beetroot":	{
-					"icon":	"items/beetroot_1.11.png"
+					"icon":	"items/beetroot_1.11.png",
+					"hidden":	true
 				},
 				"beetroot_soup":	{
-					"icon":	"items/beetroot_soup_1.11.png"
+					"icon":	"items/beetroot_soup_1.11.png",
+					"hidden":	true
 				},
 				"potato":	{
-					"icon":	"items/potato_1.0.png"
+					"icon":	"items/potato_1.0.png",
+					"hidden":	true
 				},
 				"baked_potato":	{
-					"icon":	"items/potato_baked_1.9.png"
+					"icon":	"items/potato_baked_1.9.png",
+					"hidden":	true
 				},
 				"poisonous_potato":	{
-					"icon":	"items/poisonous_potato_1.13.png"
+					"icon":	"items/poisonous_potato_1.13.png",
+					"hidden":	true
 				},
 				"mushroom_stew":	{
-					"icon":	"items/mushroom_stew_1.0.png"
+					"icon":	"items/mushroom_stew_1.0.png",
+					"hidden":	true
 				},
 				"rabbit":	{
-					"icon":	"items/rabbit_raw_1.11.png"
+					"icon":	"items/rabbit_raw_1.11.png",
+					"hidden":	true
 				},
 				"cooked_rabbit":	{
-					"icon":	"items/rabbit_cooked_1.11.png"
+					"icon":	"items/rabbit_cooked_1.11.png",
+					"hidden":	true
 				},
 				"rabbit_stew":	{
-					"icon":	"items/rabbit_stew_1.11.png"
+					"icon":	"items/rabbit_stew_1.11.png",
+					"hidden":	true
 				},
 				"melon":	{
-					"icon":	"items/melon_1.0.png"
+					"icon":	"items/melon_1.0.png",
+					"hidden":	true
 				},
 				"cookie":	{
-					"icon":	"items/cookie_1.0.png"
+					"icon":	"items/cookie_1.0.png",
+					"hidden":	true
 				},
 				"raw_cod":	{
-					"icon":	"items/fish_cod_raw_1.11.png"
+					"icon":	"items/fish_cod_raw_1.11.png",
+					"hidden":	true
 				},
 				"cooked_cod":	{
-					"icon":	"items/fish_cod_cooked_1.7.2.png"
+					"icon":	"items/fish_cod_cooked_1.7.2.png",
+					"hidden":	true
 				},
 				"raw_salmon":	{
-					"icon":	"items/fish_salmon_raw_1.11.png"
+					"icon":	"items/fish_salmon_raw_1.11.png",
+					"hidden":	true
 				},
 				"cooked_salmon":	{
-					"icon":	"items/fish_salmon_cooked_1.11.png"
+					"icon":	"items/fish_salmon_cooked_1.11.png",
+					"hidden":	true
 				},
 				"clownfish":	{
-					"icon":	"items/fish_clownfish_raw_1.11.png"
+					"icon":	"items/fish_clownfish_raw_1.11.png",
+					"hidden":	true
 				},
 				"pufferfish":	{
-					"icon":	"items/fish_pufferfish_raw_1.11.png"
+					"icon":	"items/fish_pufferfish_raw_1.11.png",
+					"hidden":	true
 				},
 				"enchanted_golden_apple":	{
-					"icon":	"items/Enchanted_Golden_Apple_JE1_BE1_unoptimized.gif"
+					"icon":	"items/Enchanted_Golden_Apple_JE1_BE1_unoptimized.gif",
+					"hidden":	true
 				}
 			}
 		},
@@ -438,34 +553,44 @@
 			"groups_enabled":	false,
 			"criteria":	{
 				"bred_cow":	{
-					"icon":	"animals/cow_1.12.png"
+					"icon":	"animals/cow_1.12.png",
+					"hidden":	true
 				},
 				"bred_sheep":	{
-					"icon":	"animals/sheep_1.12.png"
+					"icon":	"animals/sheep_1.12.png",
+					"hidden":	true
 				},
 				"bred_pig":	{
-					"icon":	"animals/pig_1.12.png"
+					"icon":	"animals/pig_1.12.png",
+					"hidden":	true
 				},
 				"bred_chicken":	{
-					"icon":	"animals/chicken_1.12.png"
+					"icon":	"animals/chicken_1.12.png",
+					"hidden":	true
 				},
 				"bred_horse":	{
-					"icon":	"animals/horse_1.12.png"
+					"icon":	"animals/horse_1.12.png",
+					"hidden":	true
 				},
 				"bred_mooshroom":	{
-					"icon":	"animals/mooshroom_1.12.png"
+					"icon":	"animals/mooshroom_1.12.png",
+					"hidden":	true
 				},
 				"bred_rabbit":	{
-					"icon":	"animals/rabbit_1.12.png"
+					"icon":	"animals/rabbit_1.12.png",
+					"hidden":	true
 				},
 				"bred_wolf":	{
-					"icon":	"animals/wolf.png"
+					"icon":	"animals/wolf.png",
+					"hidden":	true
 				},
 				"bred_ocelot":	{
-					"icon":	"animals/ocelot_1.12.png"
+					"icon":	"animals/ocelot_1.12.png",
+					"hidden":	true
 				},
 				"bred_llama":	{
-					"icon":	"animals/llama_1.12.png"
+					"icon":	"animals/llama_1.12.png",
+					"hidden":	true
 				}
 			}
 		},
@@ -676,6 +801,7 @@
 	"stats":	{
 		"hdwgh_summary":	{
 			"icon":	"items/bucket_1.13.png",
+			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.mineBlock.end_stone":	{
 					"icon":	"monsters/wither.png",
@@ -713,6 +839,7 @@
 		},
 		"dedication_summary":	{
 			"icon":	"items/diamond_hoe_1.9.png",
+			"hidden":	true,
 			"root_name":	"stat.useItem.minecraft.diamond_hoe",
 			"target":	1561,
 			"linked_goals":	[{
@@ -726,6 +853,7 @@
 		},
 		"gold_blocks_summary":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
+			"hidden":	true,
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
@@ -734,11 +862,13 @@
 		},
 		"early_game_items":	{
 			"icon":	"blocks/Chest_(S)_JE2.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.pickup.minecraft.obsidian":	{
 					"icon":	"blocks/Obsidian_JE3_BE2.png",
+					"hidden":	true,
 					"target":	-1,
 					"linked_goals":	[{
 							"root_name":	"stat.pickup.minecraft.obsidian",
@@ -748,6 +878,7 @@
 				},
 				"stat.pickup.minecraft.lapis_lazuli":	{
 					"icon":	"items/lapis_lazuli_1.13.png",
+					"hidden":	true,
 					"target":	-1,
 					"linked_goals":	[{
 							"root_name":	"stat.pickup.minecraft.lapis_lazuli",
@@ -757,6 +888,7 @@
 				},
 				"stat.pickup.minecraft.redstone":	{
 					"icon":	"items/redstone_1.13.png",
+					"hidden":	true,
 					"target":	6,
 					"linked_goals":	[{
 							"root_name":	"minecraft:husbandry/break_diamond_hoe",
@@ -770,7 +902,6 @@
 		},
 		"gold_blocks_copy":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
-			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
@@ -781,6 +912,7 @@
 		},
 		"fishing":	{
 			"icon":	"items/fish_cod_raw_1.11.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.fish",
 			"target":	-1,
@@ -812,7 +944,6 @@
 		},
 		"serious_dedication":	{
 			"icon":	"items/diamond_hoe_1.9.png",
-			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.useItem.minecraft.diamond_hoe",
 			"target":	1561,
@@ -823,6 +954,7 @@
 		},
 		"tears":	{
 			"icon":	"items/ghast_tear_1.0.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.ghast_tear",
 			"target":	4,
@@ -834,11 +966,13 @@
 		},
 		"fortress":	{
 			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.pickup.minecraft.skull":	{
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
+					"hidden":	true,
 					"target":	3,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/summon_wither",
@@ -847,6 +981,7 @@
 				},
 				"stat.pickup.minecraft.blaze_rod":	{
 					"icon":	"items/blaze_rod_1.0.png",
+					"hidden":	true,
 					"target":	3,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
@@ -860,6 +995,7 @@
 				},
 				"stat.pickup.minecraft.nether_wart":	{
 					"icon":	"items/nether_wart_1.0.png",
+					"hidden":	true,
 					"target":	2,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
@@ -875,6 +1011,7 @@
 			"criteria":	{
 				"stat.craft.minecraft.end_crystal":	{
 					"icon":	"blocks/placeholder.png",
+					"hidden":	true,
 					"target":	4,
 					"linked_goals":	[{
 							"root_name":	"minecraft:end/respawn_dragon",
@@ -883,6 +1020,7 @@
 				},
 				"stat.pickup.minecraft.obsidian":	{
 					"icon":	"blocks/placeholder.png",
+					"hidden":	true,
 					"target":	24,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/fast_travel",
@@ -894,6 +1032,7 @@
 				},
 				"stat.pickup.minecraft.lapis_lazuli":	{
 					"icon":	"blocks/placeholder.png",
+					"hidden":	true,
 					"target":	24,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
@@ -973,6 +1112,7 @@
 	"counter_goals":	[{
 			"root_name":	"any%",
 			"icon":	"blocks/Dragon_Head.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:story/iron_tools",
 					"type":	"advancement"
@@ -1038,6 +1178,7 @@
 		}, {
 			"root_name":	"overworld",
 			"icon":	"blocks/Grass_Block_JE6_BE5_OLD.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"plains",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1169,6 +1310,7 @@
 		}, {
 			"root_name":	"village",
 			"icon":	"items/emerald_1.0.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"bread",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
@@ -1207,6 +1349,7 @@
 		}, {
 			"root_name":	"mansion",
 			"icon":	"items/totem_1.11.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"roofed_forest",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1226,6 +1369,7 @@
 		}, {
 			"root_name":	"wet",
 			"icon":	"items/water_bucket_1.13.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"deep_ocean",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1277,6 +1421,7 @@
 		}, {
 			"root_name":	"tundra",
 			"icon":	"items/snowball_1.0.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"ice_mountains",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1328,6 +1473,7 @@
 		}, {
 			"root_name":	"taiga_jungle",
 			"icon":	"blocks/Podzol_JE1_BE1.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"taiga_cold_hills",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1384,6 +1530,7 @@
 		}, {
 			"root_name":	"dry",
 			"icon":	"blocks/Sand_JE3_BE2.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"savanna_rock",
 					"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1436,6 +1583,7 @@
 		}, {
 			"root_name":	"stationary",
 			"icon":	"items/fishing_rod_1.13.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"cooked_cod",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
@@ -1470,6 +1618,7 @@
 		}, {
 			"root_name":	"nether",
 			"icon":	"blocks/Netherrack_JE2_BE1.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/return_to_sender",
 					"type":	"advancement"
@@ -1517,6 +1666,7 @@
 		}, {
 			"root_name":	"endgame",
 			"icon":	"items/end_crystal_1.11.png",
+			"in_2nd_row":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:end/levitate",
 					"type":	"advancement"
@@ -1550,5 +1700,14 @@
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]
-		}]
+		}],
+	"run_completion":	{
+		"types":	["advancements"],
+		"goals":	[],
+		"use_count":	false,
+		"count":	1,
+		"use_percent":	false,
+		"percent":	100,
+		"require_both":	false
+	}
 }

@@ -1,5 +1,6 @@
 {
 	"display_category":	"全部进度",
+	"run_completion.label":	"进度",
 	"advancement.minecraft.story.iron_tools":	"这不是铁镐么",
 	"advancement.minecraft.story.lava_bucket":	"热腾腾的",
 	"advancement.minecraft.end.kill_dragon":	"解放末地",
@@ -165,7 +166,7 @@
 	"stat.hdwgh_summary.criteria.hdwgh":	"为什么会变成这样呢？",
 	"stat.dedication_summary":	"终极奉献",
 	"stat.gold_blocks_summary":	"金块",
-	"stat.early_game_items":	"物品",
+	"stat.early_game_items":	"前期",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.obsidian":	"黑曜石",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.lapis_lazuli":	"青金石",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.redstone":	"红石",

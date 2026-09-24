@@ -1,5 +1,6 @@
 {
 	"display_category":	"All Advancements",
+	"run_completion.label":	"Advancements",
 	"advancement.minecraft.story.upgrade_tools":	"Upgrade",
 	"advancement.minecraft.story.iron_tools":	"Iron Pick",
 	"advancement.minecraft.story.lava_bucket":	"Lava",
@@ -205,7 +206,7 @@
 	"stat.hdwgh_summary.criteria.hotv":	"HOTV",
 	"stat.hdwgh_summary.criteria.hdwgh":	"HDWGH",
 	"stat.gold_blocks_summary":	"Gold Blocks",
-	"stat.early_game_items":	"Items",
+	"stat.early_game_items":	"Early Game",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:obsidian":	"Obsidian",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	"Lapis",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:redstone_dust":	"Redstone",

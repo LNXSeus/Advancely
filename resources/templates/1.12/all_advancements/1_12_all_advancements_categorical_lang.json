@@ -1,5 +1,6 @@
 {
 	"display_category":	"All Advancements",
+	"run_completion.label":	"Advancements",
 	"advancement.minecraft.story.iron_tools":	"Iron Pick",
 	"advancement.minecraft.story.lava_bucket":	"Lava",
 	"advancement.minecraft.end.kill_dragon":	"Free End",
@@ -165,7 +166,7 @@
 	"stat.hdwgh_summary.criteria.hdwgh":	"HDWGH",
 	"stat.dedication_summary":	"Dedication",
 	"stat.gold_blocks_summary":	"Gold Blocks",
-	"stat.early_game_items":	"Items",
+	"stat.early_game_items":	"Early Game",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.obsidian":	"Obsidian",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.lapis_lazuli":	"Lapis",
 	"stat.early_game_items.criteria.stat.pickup.minecraft.redstone":	"Redstone",

@@ -1,5 +1,6 @@
 {
 	"display_category":	"Alle Fortschritte",
+	"run_completion.label":	"Fortschritte",
 	"advancement.minecraft.story.upgrade_tools":	"Techn. Fortschritt",
 	"advancement.minecraft.story.iron_tools":	"Eisen im Blut",
 	"advancement.minecraft.story.lava_bucket":	"Moegen's heiss",
@@ -344,7 +345,7 @@
 	"stat.hdwgh_summary.criteria.hero_of_the_village":	"Dorfheld",
 	"stat.hdwgh_summary.criteria.hdwgh":	"HDWGH",
 	"stat.gold_blocks_summary":	"Goldbloecke",
-	"stat.early_items":	"Gegenstaende",
+	"stat.early_items":	"Fruehes Spiel",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:ender_pearl":	"Perlen",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:obsidian":	"Obsidian",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	"Lapis",
@@ -482,6 +483,7 @@
 	"multi_stage_goal.ward_full.stage.new_stage_3":	"Erhalten",
 	"multi_stage_goal.ward_full.stage.final":	"Angewandt",
 	"multi_stage_goal.silence_full.display_name":	"Stille",
+	"multi_stage_goal.silence_full.stage.new_stage_1":	"Truhen",
 	"multi_stage_goal.silence_full.stage.new_stage_2":	"Erhalte",
 	"multi_stage_goal.silence_full.stage.new_stage_3":	"Erhalten",
 	"multi_stage_goal.silence_full.stage.final":	"Angewandt",

@@ -1,5 +1,6 @@
 {
 	"display_category":	"全部进度",
+	"run_completion.label":	"进度",
 	"advancement.minecraft.story.upgrade_tools":	"获得升级",
 	"advancement.minecraft.story.iron_tools":	"这不是铁镐么",
 	"advancement.minecraft.story.lava_bucket":	"热腾腾的",
@@ -344,7 +345,7 @@
 	"stat.hdwgh_summary.criteria.hero_of_the_village":	"村庄英雄",
 	"stat.hdwgh_summary.criteria.hdwgh":	"为什么会变成这样呢？",
 	"stat.gold_blocks_summary":	"金块",
-	"stat.early_items":	"物品",
+	"stat.early_items":	"前期",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:ender_pearl":	"末影珍珠",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:obsidian":	"黑曜石",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	"青金石",
@@ -482,6 +483,7 @@
 	"multi_stage_goal.ward_full.stage.new_stage_3":	"已获取",
 	"multi_stage_goal.ward_full.stage.final":	"已应用",
 	"multi_stage_goal.silence_full.display_name":	"沉默",
+	"multi_stage_goal.silence_full.stage.new_stage_1":	"箱子",
 	"multi_stage_goal.silence_full.stage.new_stage_2":	"获取中",
 	"multi_stage_goal.silence_full.stage.new_stage_3":	"已获取",
 	"multi_stage_goal.silence_full.stage.final":	"已应用",

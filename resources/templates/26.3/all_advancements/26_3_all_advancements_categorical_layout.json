@@ -3027,7 +3027,7 @@
 	"stat.ocean_items":	{
 		"icon_pos":	{
 			"x":	1700,
-			"y":	309
+			"y":	315
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:sniffer_egg":	{
@@ -3038,7 +3038,7 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	469
+			"y":	475
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:pufferfish":	{
@@ -3049,7 +3049,7 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	505
+			"y":	511
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:trident":	{
@@ -3060,7 +3060,7 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	541
+			"y":	547
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:nautilus_shell":	{
@@ -3071,7 +3071,7 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	577
+			"y":	583
 		}
 	},
 	"stat.fermented":	{

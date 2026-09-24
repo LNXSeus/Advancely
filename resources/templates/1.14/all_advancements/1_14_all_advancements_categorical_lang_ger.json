@@ -1,5 +1,6 @@
 {
 	"display_category":	"Alle Fortschritte",
+	"run_completion.label":	"Fortschritte",
 	"advancement.minecraft.story.upgrade_tools":	"Techn. Fortschritt",
 	"advancement.minecraft.story.iron_tools":	"Eisen im Blut",
 	"advancement.minecraft.story.lava_bucket":	"Moegen's heiss",
@@ -205,7 +206,7 @@
 	"stat.hdwgh_summary.criteria.hotv":	"HOTV",
 	"stat.hdwgh_summary.criteria.hdwgh":	"HDWGH",
 	"stat.gold_blocks_summary":	"Goldbloecke",
-	"stat.early_game_items":	"Gegenstaende",
+	"stat.early_game_items":	"Fruehes Spiel",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:obsidian":	"Obsidian",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	"Lapis",
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:redstone_dust":	"Redstone",

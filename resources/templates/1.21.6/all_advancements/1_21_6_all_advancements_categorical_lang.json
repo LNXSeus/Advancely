@@ -1,5 +1,6 @@
 {
 	"display_category":	"All Advancements",
+	"run_completion.label":	"Advancements",
 	"advancement.minecraft.story.iron_tools":	"Iron Pick",
 	"advancement.minecraft.story.lava_bucket":	"Lava",
 	"advancement.minecraft.nether.loot_bastion":	"War Pigs",
@@ -334,7 +335,7 @@
 	"stat.hdwgh_summary.criteria.hero_of_the_village":	"HOTV",
 	"stat.hdwgh_summary.criteria.hdwgh":	"HDWGH",
 	"stat.gold_blocks_summary":	"Gold Blocks",
-	"stat.early_items":	"Items",
+	"stat.early_items":	"Early Game",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:ender_pearl":	"Pearls",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:obsidian":	"Obsidian",
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	"Lapis",
@@ -471,6 +472,7 @@
 	"multi_stage_goal.ward_full.stage.new_stage_3":	"Obtained",
 	"multi_stage_goal.ward_full.stage.final":	"Applied",
 	"multi_stage_goal.silence_full.display_name":	"Silence",
+	"multi_stage_goal.silence_full.stage.new_stage_1":	"Chests",
 	"multi_stage_goal.silence_full.stage.new_stage_2":	"Obtain",
 	"multi_stage_goal.silence_full.stage.new_stage_3":	"Obtained",
 	"multi_stage_goal.silence_full.stage.final":	"Applied",

@@ -1,0 +1,658 @@
+{
+	"advancement.minecraft.story.root":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.husbandry.root":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.adventure.root":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.adventure.kill_a_mob":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.adventure.trade":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	190
+		}
+	},
+	"advancement.minecraft.husbandry.tactical_fishing":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	190
+		}
+	},
+	"advancement.minecraft.husbandry.fishy_business":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	190
+		}
+	},
+	"advancement.minecraft.husbandry.plant_seed":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	320
+		}
+	},
+	"advancement.minecraft.husbandry.breed_an_animal":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	320
+		}
+	},
+	"advancement.minecraft.husbandry.tame_an_animal":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	320
+		}
+	},
+	"advancement.minecraft.story.enter_the_nether":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	500
+		}
+	},
+	"advancement.minecraft.nether.root":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	500
+		}
+	},
+	"advancement.minecraft.nether.find_bastion":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	660
+		}
+	},
+	"advancement.minecraft.nether.distract_piglin":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	660
+		}
+	},
+	"advancement.minecraft.nether.loot_bastion":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	660
+		}
+	},
+	"advancement.minecraft.nether.obtain_crying_obsidian":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	660
+		}
+	},
+	"advancement.minecraft.story.form_obsidian":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	660
+		}
+	},
+	"advancement.minecraft.story.mine_stone":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	790
+		}
+	},
+	"advancement.minecraft.story.upgrade_tools":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	790
+		}
+	},
+	"advancement.minecraft.story.smelt_iron":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	790
+		}
+	},
+	"advancement.minecraft.story.iron_tools":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	790
+		}
+	},
+	"advancement.minecraft.story.lava_bucket":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	790
+		}
+	},
+	"advancement.minecraft.story.obtain_armor":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.nether.charge_respawn_anchor":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.nether.obtain_ancient_debris":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.nether.use_lodestone":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.husbandry.obtain_netherite_hoe":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.nether.find_fortress":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	1080
+		}
+	},
+	"advancement.minecraft.nether.obtain_blaze_rod":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	1080
+		}
+	},
+	"advancement.minecraft.nether.brew_potion":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	1080
+		}
+	},
+	"advancement.minecraft.nether.get_wither_skull":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	1080
+		}
+	},
+	"advancement.minecraft.nether.return_to_sender":	{
+		"icon_pos":	{
+			"x":	30,
+			"y":	1240
+		}
+	},
+	"advancement.minecraft.nether.ride_strider":	{
+		"icon_pos":	{
+			"x":	150,
+			"y":	1240
+		}
+	},
+	"advancement.minecraft.nether.fast_travel":	{
+		"icon_pos":	{
+			"x":	270,
+			"y":	1240
+		}
+	},
+	"advancement.minecraft.nether.explore_nether":	{
+		"icon_pos":	{
+			"x":	390,
+			"y":	1240
+		}
+	},
+	"advancement.minecraft.nether.explore_nether.criteria.minecraft:nether_wastes":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	1190
+		}
+	},
+	"advancement.minecraft.nether.explore_nether.criteria.minecraft:basalt_deltas":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	1226
+		}
+	},
+	"advancement.minecraft.nether.explore_nether.criteria.minecraft:soul_sand_valley":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	1262
+		}
+	},
+	"advancement.minecraft.nether.explore_nether.criteria.minecraft:crimson_forest":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	1298
+		}
+	},
+	"advancement.minecraft.nether.explore_nether.criteria.minecraft:warped_forest":	{
+		"icon_pos":	{
+			"x":	510,
+			"y":	1334
+		}
+	},
+	"advancement.minecraft.adventure.shoot_arrow":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.story.deflect_arrow":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.adventure.ol_betsy":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	30
+		}
+	},
+	"advancement.minecraft.adventure.sniper_duel":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	160
+		}
+	},
+	"advancement.minecraft.adventure.bullseye":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	160
+		}
+	},
+	"advancement.minecraft.adventure.sleep_in_bed":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	160
+		}
+	},
+	"advancement.minecraft.story.mine_diamond":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	320
+		}
+	},
+	"advancement.minecraft.story.shiny_gear":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	320
+		}
+	},
+	"advancement.minecraft.adventure.voluntary_exile":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	450
+		}
+	},
+	"advancement.minecraft.adventure.whos_the_pillager_now":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	450
+		}
+	},
+	"advancement.minecraft.story.enchant_item":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	580
+		}
+	},
+	"advancement.minecraft.husbandry.silk_touch_nest":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	580
+		}
+	},
+	"advancement.minecraft.story.follow_ender_eye":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	760
+		}
+	},
+	"advancement.minecraft.story.enter_the_end":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.end.root":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.end.dragon_breath":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	920
+		}
+	},
+	"advancement.minecraft.end.kill_dragon":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	1050
+		}
+	},
+	"advancement.minecraft.end.dragon_egg":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	1050
+		}
+	},
+	"advancement.minecraft.end.enter_end_gateway":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1050
+		}
+	},
+	"advancement.minecraft.end.find_end_city":	{
+		"icon_pos":	{
+			"x":	660,
+			"y":	1180
+		}
+	},
+	"advancement.minecraft.end.elytra":	{
+		"icon_pos":	{
+			"x":	780,
+			"y":	1180
+		}
+	},
+	"advancement.minecraft.end.levitate":	{
+		"icon_pos":	{
+			"x":	900,
+			"y":	1180
+		}
+	},
+	"advancement.minecraft.story.cure_zombie_villager":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.uneasy_alliance":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.all_effects":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.all_potions":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.create_full_beacon":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.create_beacon":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.summon_wither":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.end.respawn_dragon":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.husbandry.safely_harvest_honey":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.two_birds_one_arrow":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.arbalistic":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.honey_block_slide":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.hero_of_the_village":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.throw_trident":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.summon_iron_golem":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.totem_of_undying":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.kill_all_mobs":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.adventuring_time":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.very_very_frightening":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.husbandry.balanced_diet":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.husbandry.bred_all_animals":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.husbandry.complete_catalogue":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.nether.netherite_armor":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		}
+	},
+	"decorations":	[{
+			"id":	"line_1",
+			"type":	"line",
+			"thickness":	5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1020,
+				"y":	0
+			},
+			"pos":	{
+				"x":	0,
+				"y":	0
+			}
+		}, {
+			"id":	"line_1_copy2",
+			"type":	"line",
+			"thickness":	5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1020,
+				"y":	1400
+			},
+			"pos":	{
+				"x":	0,
+				"y":	1400
+			}
+		}, {
+			"id":	"line_1_copy",
+			"type":	"line",
+			"thickness":	2,
+			"opacity":	1,
+			"pos2":	{
+				"x":	630,
+				"y":	1400
+			},
+			"pos":	{
+				"x":	630,
+				"y":	0
+			}
+		}, {
+			"id":	"line_1_copy_copy2",
+			"type":	"line",
+			"thickness":	5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	0,
+				"y":	1400
+			},
+			"pos":	{
+				"x":	0,
+				"y":	0
+			}
+		}, {
+			"id":	"line_1_copy_copy",
+			"type":	"line",
+			"thickness":	5,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1020,
+				"y":	1400
+			},
+			"pos":	{
+				"x":	1020,
+				"y":	0
+			}
+		}, {
+			"id":	"line_2",
+			"type":	"line",
+			"thickness":	2,
+			"opacity":	1,
+			"pos2":	{
+				"x":	630,
+				"y":	470
+			},
+			"pos":	{
+				"x":	0,
+				"y":	470
+			}
+		}, {
+			"id":	"line_3",
+			"type":	"line",
+			"thickness":	2,
+			"opacity":	1,
+			"pos2":	{
+				"x":	1020,
+				"y":	730
+			},
+			"pos":	{
+				"x":	630,
+				"y":	730
+			}
+		}, {
+			"id":	"credits",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1019,
+				"y":	1412,
+				"anchor":	2
+			}
+		}]
+}

@@ -2170,7 +2170,7 @@
 		},
 		"progress_pos":	{
 			"x":	90,
-			"y":	909
+			"y":	907
 		}
 	},
 	"stat.gold_blocks_summary":	{
@@ -3079,10 +3079,6 @@
 					"type":	"stat"
 				}, {
 					"root_name":	"minecraft:picked_up/minecraft:pufferfish",
-					"parent_root":	"underwater_items",
-					"type":	"stat"
-				}, {
-					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"parent_root":	"underwater_items",
 					"type":	"stat"
 				}, {
