@@ -61,6 +61,12 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     // Set position after creation to handle multi-monitor setups better
     SDL_SetWindowPosition(t->window, x, y);
 
+    // Entering fullscreen only after the windowed position is set places it on the monitor the
+    // window was last on, and leaving it later restores the saved windowed size.
+    if (settings->tracker_fullscreen) {
+        SDL_SetWindowFullscreen(t->window, true);
+    }
+
     // Print the value being set at initialization
     log_message(LOG_INFO, "[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
                 settings->tracker_always_on_top ? "true" : "false");

@@ -1159,6 +1159,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
     settings->tracker_window = default_window;
+    settings->tracker_fullscreen = false;
     settings->overlay_window = default_window;
 
     // Default colors
@@ -1855,6 +1856,13 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         if (load_window_rect(visual_settings, "overlay_window", &settings->overlay_window, &default_window))
             defaults_were_used = true;
+        const cJSON *tracker_fullscreen_json = cJSON_GetObjectItem(visual_settings, "tracker_fullscreen");
+        if (cJSON_IsBool(tracker_fullscreen_json)) {
+            settings->tracker_fullscreen = cJSON_IsTrue(tracker_fullscreen_json);
+        } else {
+            settings->tracker_fullscreen = false;
+            defaults_were_used = true;
+        }
         if (load_color(visual_settings, "tracker_bg_color", &settings->tracker_bg_color, &DEFAULT_TRACKER_BG_COLOR))
             defaults_were_used = true;
         if (load_color(visual_settings, "overlay_bg_color", &settings->overlay_bg_color, &DEFAULT_OVERLAY_BG_COLOR))
@@ -3682,6 +3690,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     cJSON *visuals_obj = get_or_create_object(root, "visuals");
     if (context == SAVE_CONTEXT_ALL || context == SAVE_CONTEXT_TRACKER_GEOM) {
         save_window_rect(visuals_obj, "tracker_window", &settings->tracker_window);
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_fullscreen");
+        cJSON_AddItemToObject(visuals_obj, "tracker_fullscreen", cJSON_CreateBool(settings->tracker_fullscreen));
     }
     // overlay_window is owned by the overlay process. Only write it with an
     // explicit SAVE_CONTEXT_OVERLAY_GEOM call (from the overlay itself). Under

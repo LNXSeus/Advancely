@@ -8185,6 +8185,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 // Preserve runtime state that is managed outside the settings UI
                 temp_settings.use_manual_layout = app_settings->use_manual_layout;
+                temp_settings.tracker_fullscreen = app_settings->tracker_fullscreen;
 
                 // Preserve the goal hiding mode — it's now driven by the tracker's
                 // dropdown, not the settings UI. Without this, Apply Settings reverts
@@ -8329,6 +8330,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Preserve current window geometry before resetting other settings
         WindowRect current_tracker_window = temp_settings.tracker_window;
         WindowRect current_overlay_window = temp_settings.overlay_window;
+        bool current_tracker_fullscreen = temp_settings.tracker_fullscreen;
 
         // Preserve the goal hiding mode — it's driven by the tracker's dropdown,
         // not the settings UI, so Reset To Defaults must not touch it.
@@ -8341,6 +8343,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Restore the preserved window geometry
         temp_settings.tracker_window = current_tracker_window;
         temp_settings.overlay_window = current_overlay_window;
+        temp_settings.tracker_fullscreen = current_tracker_fullscreen;
 
         // Restore the preserved goal hiding mode
         temp_settings.goal_hiding_mode = current_hiding_mode;
@@ -8365,6 +8368,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
         temp_settings.use_manual_layout = app_settings->use_manual_layout;
+        temp_settings.tracker_fullscreen = app_settings->tracker_fullscreen;
         temp_settings.goal_hiding_mode = app_settings->goal_hiding_mode;
         temp_settings.invert_hiding_mode = app_settings->invert_hiding_mode;
         temp_settings.coop_player_count = app_settings->coop_player_count;

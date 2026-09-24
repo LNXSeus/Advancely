@@ -491,6 +491,13 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Opens or closes the notes window, exactly like the \"Notes\" checkbox in the control bar.\n" \
       "Whether the window shows per-world or per-template notes stays whatever it was set to\n" \
       "inside the window itself.") \
+    X(APP_HOTKEY_TOGGLE_FULLSCREEN, "toggle_fullscreen", "F11", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL | APP_HOTKEY_CTX_EDITOR | APP_HOTKEY_CTX_SETTINGS, \
+      APP_HOTKEY_GROUP_TRACKER, \
+      "Toggle Fullscreen", \
+      "Switches the tracker window between fullscreen and windowed.\n" \
+      "Whether it was fullscreen is remembered and restored on the next start.\n" \
+      "On macOS, Ctrl+Cmd+F and the green window button do the same and are not configurable.") \
     X(APP_HOTKEY_LOCK_CAMERA, "lock_camera", "C", HOTKEY_MOD_SHIFT, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
       "Lock Camera (Zoom & Pan)", \
@@ -929,6 +936,7 @@ struct AppSettings {
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.
+    bool tracker_fullscreen; // If true, the main tracker window starts in fullscreen.
     WindowRect overlay_window; // The saved position and size of the overlay window.
 
     // --- Colors ---

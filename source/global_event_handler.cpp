@@ -249,6 +249,10 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             // Ctrl + F or Cmd + F for search box focus
             // Global hotkey for focusing the search box (Ctrl+F or Cmd+F)
             bool is_ctrl_or_cmd = (mod_state & SDL_KMOD_CTRL) || (mod_state & SDL_KMOD_GUI);
+#ifdef __APPLE__
+            // Ctrl+Cmd+F is the macOS fullscreen shortcut, not a search.
+            if ((mod_state & SDL_KMOD_CTRL) && (mod_state & SDL_KMOD_GUI)) is_ctrl_or_cmd = false;
+#endif
 
             if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F && !ImGui::IsPopupOpen(
                     nullptr, ImGuiPopupFlags_AnyPopup) && t) {
@@ -343,6 +347,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 }
                 if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_REVERT, key, app_mods)) {
                     t->settings_revert_pressed = true;
+                }
+                // The new state is persisted by the ENTER/LEAVE_FULLSCREEN window events, which
+                // also catch the macOS green button and its Ctrl+Cmd+F menu shortcut.
+                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_FULLSCREEN, key, app_mods)) {
+                    bool is_fullscreen = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_FULLSCREEN) != 0;
+                    SDL_SetWindowFullscreen(t->window, !is_fullscreen);
                 }
             }
 
@@ -453,9 +463,22 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         // wiping Hermes in-memory state.
         else if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST) {
             if (t && event.window.windowID == SDL_GetWindowID(t->window)) {
-                if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
+                // The rect keeps the windowed geometry while fullscreen, so leaving fullscreen
+                // after a restart still has a sensible size and position to return to.
+                if ((event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) &&
+                    !(SDL_GetWindowFlags(t->window) & SDL_WINDOW_FULLSCREEN)) {
                     SDL_GetWindowPosition(t->window, &app_settings->tracker_window.x, &app_settings->tracker_window.y);
                     SDL_GetWindowSize(t->window, &app_settings->tracker_window.w, &app_settings->tracker_window.h);
+                }
+                // Unlike moves, a fullscreen switch is rare enough to save right away.
+                if (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN ||
+                    event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) {
+                    bool now_fullscreen = (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN);
+                    if (app_settings->tracker_fullscreen != now_fullscreen) {
+                        app_settings->tracker_fullscreen = now_fullscreen;
+                        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+                        settings_save(app_settings, nullptr, SAVE_CONTEXT_TRACKER_GEOM);
+                    }
                 }
                 tracker_events(t, &event, is_running, settings_opened); // still pass other window events
             } else if (o && event.window.windowID == SDL_GetWindowID(o->window)) {
