@@ -1237,7 +1237,8 @@ active template), so enabling manual positioning never teleports the element.
   the value next to it) moves into the name's place on the tracker and the overlay, and the empty name has no drag
   handle in the `Visual Layout Editor`. In the manual layout this only happens while the progress text has no position
   of its own, and ticking the name's `Hide` checkbox does the same, so hiding a name never hides its progress text. The
-  criteria and sub-stat list under an advancement or stat stays where it is.
+  progress text then sits at the name's default spot by the icon, even if the name itself was moved. The criteria and
+  sub-stat list under an advancement or stat stays where it is.
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and

@@ -11135,7 +11135,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Left empty, the progress text below the name moves up into the name's place,\n"
                                      "on both the tracker and the overlay. The criteria list stays where it is.\n"
                                      "Manual layout: this only happens while that progress text has no position of its own.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("AdvDesc", advancement.description,
@@ -13632,7 +13633,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Left empty, the progress text below the name moves up into the name's place,\n"
                                      "on both the tracker and the overlay. The sub-stat list stays where it is.\n"
                                      "Manual layout: this only happens while that progress text has no position of its own.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("StatDesc", stat_cat.description, "stat")) {
@@ -14610,7 +14612,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "Left empty, the progress value next to the name moves over into the name's place,\n"
                                              "on both the tracker and the overlay.\n"
                                              "Manual layout: this only happens while that progress value has no position of its own.\n"
-                                             "Hiding the name in the manual layout moves it over the same way.");
+                                             "Hiding the name in the manual layout does the same, placing it right next to the icon\n"
+                                             "even if the name itself was moved.");
                                     ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                                 }
                                 if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
@@ -15907,7 +15910,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
                                      "The user-facing name for this unlock.\n\n"
                                      "Left empty, the progress text below the name moves up into the name's place.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("UnlockDesc", unlock.description, "unlock")) {
@@ -16851,7 +16855,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Left empty, the progress text below the name moves up into the name's place,\n"
                                      "on both the tracker and the overlay.\n"
                                      "Manual layout: this only happens while that progress text has no position of its own.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("CustomGoalDesc", goal.description, "custom goal")) {
@@ -18192,7 +18197,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Left empty, the current stage text below the name moves up into the name's place,\n"
                                      "on both the tracker and the overlay.\n"
                                      "Manual layout: this only happens while that stage text has no position of its own.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
                         if (draw_editor_description_box("MSGoalDesc", goal.description, "multi-stage goal")) {
@@ -20625,7 +20631,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Left empty, the progress text below the name moves up into the name's place,\n"
                                      "on both the tracker and the overlay.\n"
                                      "Manual layout: this only happens while that progress text has no position of its own.\n"
-                                     "Hiding the name in the manual layout moves it up the same way.");
+                                     "Hiding the name in the manual layout does the same, placing it at the name's default spot\n"
+                                     "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         if (draw_editor_description_box("CounterDesc", counter.description, "counter")) {
