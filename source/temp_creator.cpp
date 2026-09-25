@@ -199,6 +199,14 @@ using EditorLanguageTextRef = std::shared_ptr<const std::vector<EditorLanguageTe
 // the active one.
 using TcLangFileWrites = std::map<std::string, std::vector<std::pair<std::string, std::string> > >;
 
+static void tc_prefix_optional_flag(char *flag, size_t size) {
+    if (flag[0] == '\0' || flag[0] == '_') return;
+    size_t len = strlen(flag);
+    if (len + 2 > size) return;
+    memmove(flag + 1, flag, len + 1);
+    flag[0] = '_';
+}
+
 // Sets one language's text on a goal, replacing what that language said before. Null means the
 // language has no such key; a pointer to an empty string means it has the key and it is blank.
 // Copy-on-write: an entry shared with an undo snapshot is cloned rather than edited in place.
@@ -7607,10 +7615,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Faded version of the regular text colour (not the separate "disabled" grey), so the flag
             // reads as the same text, just dimmed.
             ImVec4 flag_col = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            ImVec4 underscore_col = flag_col;
             flag_col.w *= 0.55f;
-            float category_width = ImGui::CalcTextSize(tpl.category).x;
-            row_draw_list->AddText(ImVec2(row_screen_pos.x + category_width, row_screen_pos.y),
-                                   ImGui::GetColorU32(flag_col), tpl.optional_flag);
+            underscore_col.w *= 0.25f;
+            float flag_x = row_screen_pos.x + ImGui::CalcTextSize(tpl.category).x;
+            const char *flag_text = tpl.optional_flag;
+            if (flag_text[0] == '_') {
+                row_draw_list->AddText(ImVec2(flag_x, row_screen_pos.y), ImGui::GetColorU32(underscore_col),
+                                       flag_text, flag_text + 1);
+                flag_x += ImGui::CalcTextSize(flag_text, flag_text + 1).x;
+                flag_text++;
+            }
+            row_draw_list->AddText(ImVec2(flag_x, row_screen_pos.y), ImGui::GetColorU32(flag_col), flag_text);
         }
 
         if (clicked) {
@@ -8082,7 +8098,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             copy_counter++; // Increment and try the next number
         }
         // Apply the new unique flag to the copy view's buffer
-        strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
+        strncpy(copy_template_flag, new_flag[0] == '_' ? new_flag + 1 : new_flag, sizeof(copy_template_flag) - 1);
         copy_template_flag[sizeof(copy_template_flag) - 1] = '\0';
     }
 
@@ -8097,7 +8113,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         strncpy(rename_template_category, selected.category, sizeof(rename_template_category) - 1);
         rename_template_category[sizeof(rename_template_category) - 1] = '\0';
-        strncpy(rename_template_flag, selected.optional_flag, sizeof(rename_template_flag) - 1);
+        strncpy(rename_template_flag, selected.optional_flag[0] == '_' ? selected.optional_flag + 1
+                                                                       : selected.optional_flag,
+                sizeof(rename_template_flag) - 1);
         rename_template_flag[sizeof(rename_template_flag) - 1] = '\0';
         rename_template_version_idx = creator_version_idx;
     }
@@ -8122,7 +8140,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(import_category, category, sizeof(import_category) - 1);
             import_category[sizeof(import_category) - 1] = '\0';
 
-            strncpy(import_flag, flag, sizeof(import_flag) - 1);
+            strncpy(import_flag, flag[0] == '_' ? flag + 1 : flag, sizeof(import_flag) - 1);
             import_flag[sizeof(import_flag) - 1] = '\0';
 
             // Remember the zip's declared identity to show alongside the (editable) fields.
@@ -22008,9 +22026,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
-                     "A variant for the category (e.g., '_optimized', '_modded').\n"
-                     "The optional flag immediately follows the category name\n"
-                     "so it best practice to start with an underscore.\n"
+                     "A variant for the category (e.g., 'optimized', 'modded').\n"
+                     "It follows the category name with an underscore in between,\n"
+                     "which is added automatically, so you don't need to type it.\n"
                      "Cannot contain spaces or special characters besides the %% sign.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
@@ -22018,6 +22036,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Also allow enter key ONLY WHEN the window is focused
         if (ImGui::Button("Create Template") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
                                                      ImGuiFocusedFlags_RootAndChildWindows))) {
+            tc_prefix_optional_flag(new_template_flag, sizeof(new_template_flag));
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
                 bool name_collision = false;
@@ -22083,10 +22102,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::InputText("New Optional Flag", copy_template_flag, sizeof(copy_template_flag));
         if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., '_optimized').\n"
-                     "The optional flag immediately follows the category name\n"
-                     "so it best practice to start with an underscore.\n"
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., 'optimized').\n"
+                     "It follows the category name with an underscore in between,\n"
+                     "which is added automatically, so you don't need to type it.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
@@ -22094,6 +22113,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Allowing enter key to confirm copy WHEN the window is focused
         if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
                                                   ImGuiFocusedFlags_RootAndChildWindows))) {
+            tc_prefix_optional_flag(copy_template_flag, sizeof(copy_template_flag));
             if (selected_template_index != -1 && copy_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
@@ -22172,10 +22192,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::InputText("New Optional Flag", rename_template_flag, sizeof(rename_template_flag));
         if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the category (e.g., '_optimized').\n"
-                     "The optional flag immediately follows the category name\n"
-                     "so it best practice to start with an underscore.\n"
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the category (e.g., 'optimized').\n"
+                     "It follows the category name with an underscore in between,\n"
+                     "which is added automatically, so you don't need to type it.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
@@ -22188,6 +22208,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const char *dest_version = VERSION_STRINGS[rename_template_version_idx];
                 char error_msg[256] = "";
                 bool name_collision = false;
+                const char *prefilled_flag = selected.optional_flag[0] == '_' ? selected.optional_flag + 1
+                                                                               : selected.optional_flag;
+                if (strcmp(rename_template_flag, prefilled_flag) == 0) {
+                    strncpy(rename_template_flag, selected.optional_flag, sizeof(rename_template_flag) - 1);
+                    rename_template_flag[sizeof(rename_template_flag) - 1] = '\0';
+                } else {
+                    tc_prefix_optional_flag(rename_template_flag, sizeof(rename_template_flag));
+                }
 
                 // Capture whether this is the in-use template BEFORE the files move.
                 bool was_current = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -22270,7 +22298,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(exported_as_buffer, sizeof(exported_as_buffer),
                      "Exported as:   Version: %s   |   Category: %s   |   Flag: %s",
                      import_orig_version, import_orig_category,
-                     import_orig_flag[0] != '\0' ? import_orig_flag : "(none)");
+                     import_orig_flag[0] == '\0' ? "(none)"
+                     : import_orig_flag[0] == '_' ? import_orig_flag + 1 : import_orig_flag);
         } else {
             snprintf(exported_as_buffer, sizeof(exported_as_buffer),
                      "Exported as:   unknown (zip has no metadata; fields guessed from filename)");
@@ -22312,10 +22341,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::InputText("Optional Flag", import_flag, sizeof(import_flag));
         if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., '_optimized').\n"
-                     "The optional flag immediately follows the category name\n"
-                     "so it best practice to start with an underscore.\n"
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., 'optimized').\n"
+                     "It follows the category name with an underscore in between,\n"
+                     "which is added automatically, so you don't need to type it.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
@@ -22351,6 +22380,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Spacing();
 
         if (ImGui::Button("Confirm Import") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused())) {
+            const char *prefilled_flag = import_orig_flag[0] == '_' ? import_orig_flag + 1 : import_orig_flag;
+            if (strcmp(import_flag, prefilled_flag) == 0) {
+                strncpy(import_flag, import_orig_flag, sizeof(import_flag) - 1);
+                import_flag[sizeof(import_flag) - 1] = '\0';
+            } else {
+                tc_prefix_optional_flag(import_flag, sizeof(import_flag));
+            }
             if (import_version_idx != -1) {
                 const char *version_str = VERSION_STRINGS[import_version_idx];
                 MC_Version version_enum = settings_get_version_from_string(version_str);

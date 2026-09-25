@@ -2445,7 +2445,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         if (flag[0] == '\0') {
                             display = "None";
                         } else {
-                            display = flag;
+                            display = flag[0] == '_' ? flag + 1 : flag;
                         }
                         if (flag[0] != '\0' && discovered_templates[i].has_layout) {
                             display += " (has layout)";
@@ -2496,7 +2496,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "The optional flag is used to differentiate between different alterations of the same template.\n\n"
                              "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
                              "Enable the 'Manual Layout' checkbox to use them.\n"
-                             "Default: %s", DEFAULT_OPTIONAL_FLAG);
+                             "Default: %s", DEFAULT_OPTIONAL_FLAG + 1);
                 }
                 ImGui::SetTooltip("%s", flag_tooltip_buffer);
             }
