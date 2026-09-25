@@ -3714,6 +3714,34 @@ static void write_other_language_files(const char *version, const DiscoveredTemp
     }
 }
 
+// The "decoration.<id>" keys of the text headers in every layout file except skip_layout_flag. All layouts
+// share the language files, so a save made with one layout loaded must not drop another layout's headers.
+static std::set<std::string> tc_collect_other_layout_header_keys(const char *version,
+                                                                 const DiscoveredTemplate &template_info,
+                                                                 const std::string &skip_layout_flag) {
+    std::set<std::string> keys;
+    for (const auto &flag: template_info.available_layout_flags) {
+        if (flag == skip_layout_flag) continue;
+        char layout_path[MAX_PATH_LENGTH];
+        build_editor_template_paths(version, template_info, std::string(), flag, nullptr, nullptr, layout_path);
+        cJSON *layout_json = cJSON_from_file(layout_path);
+        if (!layout_json) continue;
+        cJSON *decorations = cJSON_GetObjectItem(layout_json, "decorations");
+        if (cJSON_IsArray(decorations)) {
+            cJSON *deco = nullptr;
+            cJSON_ArrayForEach(deco, decorations) {
+                cJSON *type = cJSON_GetObjectItem(deco, "type");
+                cJSON *id = cJSON_GetObjectItem(deco, "id");
+                if (!cJSON_IsString(type) || strcmp(type->valuestring, "text_header") != 0) continue;
+                if (!cJSON_IsString(id) || id->valuestring[0] == '\0') continue;
+                keys.insert(std::string("decoration.") + id->valuestring);
+            }
+        }
+        cJSON_Delete(layout_json);
+    }
+    return keys;
+}
+
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag, const std::string &layout_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer,
@@ -3779,6 +3807,20 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     TcLangFileWrites other_language_writes;
     cJSON *lang_json = build_editor_lang_json(editor_data, &other_language_writes);
 
+    std::set<std::string> other_layout_header_keys =
+            tc_collect_other_layout_header_keys(version, template_info, layout_flag);
+    if (!other_layout_header_keys.empty()) {
+        cJSON *lang_on_disk = cJSON_from_file(lang_path);
+        if (lang_on_disk) {
+            for (const auto &key: other_layout_header_keys) {
+                if (cJSON_GetObjectItemCaseSensitive(lang_json, key.c_str())) continue;
+                cJSON *text = cJSON_GetObjectItemCaseSensitive(lang_on_disk, key.c_str());
+                if (cJSON_IsString(text)) cJSON_AddStringToObject(lang_json, key.c_str(), text->valuestring);
+            }
+            cJSON_Delete(lang_on_disk);
+        }
+    }
+
     FILE *lang_file = fopen(lang_path, "w");
     if (lang_file) {
         char *lang_str = cJSON_Print(lang_json);
@@ -3801,7 +3843,7 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     std::set<std::string> current_keys = tc_collect_lang_keys(editor_data);
     std::set<std::string> stale_keys;
     for (const auto &key: lang_keys_on_disk) {
-        if (!current_keys.count(key)) stale_keys.insert(key);
+        if (!current_keys.count(key) && !other_layout_header_keys.count(key)) stale_keys.insert(key);
     }
     write_other_language_files(version, template_info, lang_flag, other_language_writes, current_keys,
                                stale_keys);
@@ -8815,10 +8857,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
         if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
+            char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Import a layout file (.json) for the selected template '%s%s'\n"
-                     "under a new layout flag.",
+                     "under a new layout flag.\n\n"
+                     "Text headers get their display text from this template's language files.\n"
+                     "A header whose ID another layout already uses shows that layout's text.",
                      selected.category, selected.optional_flag);
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
@@ -21534,10 +21578,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char id_tooltip_buffer[256];
-                            snprintf(id_tooltip_buffer, sizeof(id_tooltip_buffer),
-                                     "Unique identifier for this decoration element.\n"
-                                     "Used internally and in the language file.");
+                            char id_tooltip_buffer[512];
+                            if (deco.type == DECORATION_TEXT_HEADER) {
+                                snprintf(id_tooltip_buffer, sizeof(id_tooltip_buffer),
+                                         "Unique identifier for this decoration element.\n"
+                                         "Used internally and in the language file.\n\n"
+                                         "All layouts of this template share the language files.\n"
+                                         "A text header with the same ID in another layout shares this\n"
+                                         "display text, so editing it here changes it there too.\n"
+                                         "Use an ID no other layout uses to give this layout its own text.");
+                            } else {
+                                snprintf(id_tooltip_buffer, sizeof(id_tooltip_buffer),
+                                         "Unique identifier for this decoration element.\n"
+                                         "Used internally.");
+                            }
                             ImGui::SetTooltip("%s", id_tooltip_buffer);
                         }
 
@@ -21548,10 +21602,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char display_text_tooltip_buffer[256];
+                                char display_text_tooltip_buffer[512];
                                 snprintf(display_text_tooltip_buffer, sizeof(display_text_tooltip_buffer),
                                          "The text to display on the tracker map.\n"
-                                         "Uses the Tracker Font and Tracker Font Size.");
+                                         "Uses the Tracker Font and Tracker Font Size.\n\n"
+                                         "Stored in the language file under this header's ID. Every layout\n"
+                                         "of this template shares that entry, so a text header with the\n"
+                                         "same ID in another layout shows this text as well.");
                                 ImGui::SetTooltip("%s", display_text_tooltip_buffer);
                             }
 

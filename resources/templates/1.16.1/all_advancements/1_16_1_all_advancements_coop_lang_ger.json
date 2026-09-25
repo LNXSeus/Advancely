@@ -229,5 +229,6 @@
 	"advancement.minecraft.story.shiny_gear":	"Diamantruestung",
 	"advancement.minecraft.story.smelt_iron":	"Metallurgie",
 	"advancement.minecraft.story.upgrade_tools":	"Techn. Fortschritt",
-	"decoration.credits":	"Template von magnissima"
+	"decoration.credits_magnissima":	"Template von magnissima",
+	"decoration.credits_kittymmeow":	"Template von kittymmeow"
 }

@@ -265,5 +265,6 @@
 	"multi_stage_goal.ms_goal:bees.stage.2":	"Harvest Honey",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"Get 'Sticky'",
 	"multi_stage_goal.ms_goal:bees.stage.final":	"Bees Done!",
-	"decoration.credits":	"Template by Zesskyo"
+	"decoration.credits_zesskyo":	"Template by Zesskyo",
+	"decoration.credits_kittymmeow":	"Template by kittymmeow"
 }

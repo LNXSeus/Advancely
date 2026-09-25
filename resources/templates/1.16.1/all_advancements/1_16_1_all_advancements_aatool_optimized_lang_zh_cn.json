@@ -265,5 +265,6 @@
 	"multi_stage_goal.ms_goal:bees.stage.2":	"采集蜂蜜",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"获取'胶着状态'",
 	"multi_stage_goal.ms_goal:bees.stage.final":	"蜜蜂完成！",
-	"decoration.credits":	"模板由 Zesskyo 制作"
+	"decoration.credits_zesskyo":	"模板由 Zesskyo 制作",
+	"decoration.credits_kittymmeow":	"模板由 kittymmeow 制作"
 }

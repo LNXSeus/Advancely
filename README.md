@@ -1147,6 +1147,13 @@ This mirrors the language system exactly, so the same `(has layout)` marker, set
 management buttons apply. A template can carry several layouts, and a custom layout you build on an official template
 survives that template's automatic updates.
 
+Text headers are the one part of a layout whose content lives in the language files: a header's display text is stored
+there as `decoration.<id>`, and all layouts of a template share the same language files. The header texts of **every**
+layout are kept in the language files, so saving while one layout is loaded never removes another layout's header
+text. This also means that text headers with the **same ID** in different layouts share **one** display text: editing
+it in one layout changes it in all of them. To give a layout its own text (for example its own credits), give that
+header an ID no other layout uses.
+
 * **Create Layout**: Creates a new, blank layout file (no positions or decorations). Build it up afterward with the
   **Visual Layout Editor**.
 * **Copy Layout**: Duplicates an existing layout file to a new flag. Copying the `Default` when the template has no
@@ -1346,7 +1353,9 @@ right. Each row is tagged with its type (`txt`, `line`, `arw`) so you can tell t
 
 * **Text Headers**: Display custom text on the tracker map using the main tracker font and font size. Useful for
   labeling different sections or areas of your layout. Each text header has a position that can be set numerically
-  or dragged in the Visual Layout Editor.
+  or dragged in the Visual Layout Editor. Its display text is stored in the language files under its ID, which all
+  layouts of the template share, so a header with the same ID in another layout shows the same text (see
+  [Layout File Management](#layout-file-management)).
 * **Lines**: Draw a line between two endpoints on the map. Lines use the tracker's text color and have configurable
   **Thickness** and **Opacity** sliders. Each endpoint can be dragged independently in the Visual Layout Editor, or
   you can drag the line's midpoint marker to move the entire line at once.
@@ -2108,25 +2117,26 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                                                                                            | Optional Flag(s)         | Languages            |
-|--------------------|----------------------------------------------------------------------------------------------------------------|--------------------------|----------------------|
-| `any%`             | 25w14craftmine                                                                                                 |                          | Default              |
-| `AMI`              | 25w14craftmine                                                                                                 |                          | Default              |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                                                                    |                          | Default, ger         |
-| `all_achievements` | 1.6.4                                                                                                          | `_ssg_keimaseed`         | Default, ger         |
-| `all_achievements` | 1.11                                                                                                           |                          | Default              |
-| `all_advancements` | 1.12, 1.16.1                                                                                                   | `_glitched_categorical`  | Default, ger, zh_cn  |
-| `all_advancements` | 1.16.1                                                                                                         | `_half%_categorical`     | Default, ger, zh_cn  |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                                                                                     |                          | Default              |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                      |                          | Default, ger, zh_cn  |
-| `all_advancements` | 1.12, 1.13, 1.14, 1.15, 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3 | `_categorical`           | Default, ger, zh_cn  |
-| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.2                                                                        | `_aatool_optimized`      | Default, ger, zh_cn  |
-| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                          | `_optimized`             | Default, ger, zh_cn  |
-| `all_advancements` | 1.16.1                                                                                                         | `_ssg_blackcat`, `_coop` | Default, ger, zh_cn  |
-| `all_blocks`       | 1.16.1                                                                                                         |                          | Default              |
-| `miku%`            | 1.21                                                                                                           |                          | Default              |
-| `all_trims`        | 1.21                                                                                                           |                          | Default              |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                                                     | `1`                      | Default              |
+| Category           | Template Version(s)                                                                                            | Optional Flag(s)             | Language(s)         | Layout(s)  |
+|--------------------|----------------------------------------------------------------------------------------------------------------|------------------------------|---------------------|------------|
+| `any%`             | 25w14craftmine                                                                                                 |                              | Default             |            |   
+| `AMI`              | 25w14craftmine                                                                                                 |                              | Default             |            |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                                                                    |                              | Default, ger        |            |
+| `all_achievements` | 1.6.4                                                                                                          | `_ssg_keimaseed`             | Default, ger        |            |
+| `all_achievements` | 1.11                                                                                                           |                              | Default             |            |
+| `all_advancements` | 1.12, 1.16.1                                                                                                   | `_glitched_categorical`      | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `_half%_categorical`         | Default, ger, zh_cn |            |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                                                                                     |                              | Default             |            |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                      |                              | Default, ger, zh_cn |            |
+| `all_advancements` | 1.12, 1.13, 1.14, 1.15, 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3 | `_categorical`               | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.2                                                                        | `_aatool_optimized`          | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `_aatool_optimized`, `_coop` | Default, ger, zh_cn | `vertical` |
+| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                          | `_optimized`                 | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `_ssg_blackcat`, `_coop`     | Default, ger, zh_cn |            |
+| `all_blocks`       | 1.16.1                                                                                                         |                              | Default             |            |
+| `miku%`            | 1.21                                                                                                           |                              | Default             |            |
+| `all_trims`        | 1.21                                                                                                           |                              | Default             |            |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                                                     | `1`                          | Default             |            |
 
 If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the `View` menu in the bottom right of the tracker.
 
@@ -2328,7 +2338,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
   on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 * **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
-* **[ScrambledMC](https://www.twitch.tv/scrambledmc)**: Made the fantastic `_categorical` `all_advancements` templates.
+* **[ScrambledMC](https://www.twitch.tv/scrambledmc)**: Made the fantastic `_categorical` `all_advancements` templates, half% and glitched.
 * **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates. Helped testing coop on Windows.
 * **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` and `_ssg_keimaseed` templates.
 * **Jaykeycakey** (`jaykeycakey_` on Discord): Windows coop tester.

@@ -229,5 +229,6 @@
 	"advancement.minecraft.story.shiny_gear":	"钻石护体",
 	"advancement.minecraft.story.smelt_iron":	"来硬的",
 	"advancement.minecraft.story.upgrade_tools":	"获得升级",
-	"decoration.credits":	"模板由 magnissima 制作"
+	"decoration.credits_magnissima":	"模板由 magnissima 制作",
+	"decoration.credits_kittymmeow":	"模板由 kittymmeow 制作"
 }
