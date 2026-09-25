@@ -8860,7 +8860,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Import a layout file (.json) for the selected template '%s%s'\n"
-                     "under a new layout flag.\n\n"
+                     "under a new layout flag.\n"
+                     "Any entries matching this template's root names will be kept,\n"
+                     "goals without an entry will fall back to the automatic grid.\n\n"
                      "Text headers get their display text from this template's language files.\n"
                      "A header whose ID another layout already uses shows that layout's text.",
                      selected.category, selected.optional_flag);

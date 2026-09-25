@@ -2417,7 +2417,7 @@
 			"id":	"line_1",
 			"type":	"line",
 			"thickness":	5,
-			"opacity":	1,
+			"opacity":	0.800000011920929,
 			"pos2":	{
 				"x":	840,
 				"y":	628
@@ -2456,7 +2456,7 @@
 			"id":	"line_4",
 			"type":	"line",
 			"thickness":	2,
-			"opacity":	0.800000011920929,
+			"opacity":	0.699999988079071,
 			"pos2":	{
 				"x":	625,
 				"y":	1149
