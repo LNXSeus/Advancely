@@ -1084,12 +1084,14 @@ dropdown to keep the button row tidy:
   (`category: all_advancements`, `flag: _x`) and (`category: all_advancements_x`, `flag:` *empty*) are **two different
   templates** that happily coexist even though their names read the same. In the **Existing Templates** list the
   `Optional Flag` is shown in a dimmed colour, and its leading underscore even fainter, so you can always tell which
-  is which. You don't need to type that underscore: when you create, copy, rename, or import a template, an
-  `Optional Flag` entered without one gets it added automatically (`custom` becomes `_custom`), so the file names
-  come out exactly as before. For the same reason the `Copy Template`, `Rename Template` and `Import Template` fields
-  are pre-filled without it, and the settings `Optional Flag` dropdown lists the flags without it too. Renaming or
-  importing a template without touching its pre-filled flag always keeps the flag exactly as it was. A template is
-  only treated as already existing when its `Category Name` **and** `Optional Flag` both match. In that case, instead
+  is which. You don't need to type that underscore: when you create, copy, rename, or import a template, the
+  `Add underscore` checkbox under the `Optional Flag` field (ticked by default) puts it in for you (`custom` becomes
+  `_custom`), so the file names come out exactly as before. Untick it to attach the flag directly to the category
+  name instead (`test` + `1` becomes `test1`); hovering the checkbox shows the resulting file name. For the same
+  reason the `Copy Template`, `Rename Template` and `Import Template` fields are pre-filled without the underscore,
+  with the checkbox set to match the source template, and the settings `Optional Flag` dropdown lists the flags
+  without it too. A template is only treated as already existing when its `Category Name` **and** `Optional Flag`
+  both match. In that case, instead
   of a hard error, a **`Replace Existing Template?`** confirmation appears, warning you that continuing permanently
   deletes the existing
   template and **all** of its associated files (language, layout, `notes` and global-stats `snapshot`). Choose
@@ -1115,8 +1117,9 @@ dropdown to keep the button row tidy:
   back to filename parsing). An `Exported as` line shows the zip's original identity so you can spot any accidental
   edits to the pre-fill before importing; for older zips without embedded metadata it shows `unknown`, since the
   category/flag split was only guessed from the filename and may be wrong. You can still confirm or change the version, category, and flag before the
-  files are added. Both the flag field and the `Exported as` line show the flag without its leading underscore; leaving
-  the pre-filled flag as it is imports under the zip's exact original flag, so COOP identities keep matching. If the zip contains bundled icon files, an **Import bundled icon
+  files are added. Both the flag field and the `Exported as` line show the flag without its leading underscore, and
+  the `Add underscore` checkbox is pre-set to match the zip, so leaving both as they are imports under the zip's exact
+  original flag and COOP identities keep matching. If the zip contains bundled icon files, an **Import bundled icon
   files** checkbox will appear and enabling it extracts those icons directly into your `icons` folder so
   they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
   Importing uses the same replace-instead-of-error behaviour as creating, copying and renaming: if the chosen `version`,
@@ -2124,26 +2127,26 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                                                                                            | Optional Flag(s)             | Language(s)         | Layout(s)  |
-|--------------------|----------------------------------------------------------------------------------------------------------------|------------------------------|---------------------|------------|
-| `any%`             | 25w14craftmine                                                                                                 |                              | Default             |            |   
-| `AMI`              | 25w14craftmine                                                                                                 |                              | Default             |            |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                                                                    |                              | Default, ger        |            |
-| `all_achievements` | 1.6.4                                                                                                          | `_ssg_keimaseed`             | Default, ger        |            |
-| `all_achievements` | 1.11                                                                                                           |                              | Default             |            |
-| `all_advancements` | 1.12, 1.16.1                                                                                                   | `_glitched_categorical`      | Default, ger, zh_cn |            |
-| `all_advancements` | 1.16.1                                                                                                         | `_half%_categorical`         | Default, ger, zh_cn |            |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                                                                                     |                              | Default             |            |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                      |                              | Default, ger, zh_cn |            |
-| `all_advancements` | 1.12, 1.13, 1.14, 1.15, 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3 | `_categorical`               | Default, ger, zh_cn |            |
-| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.3                                                                        | `_aatool_optimized`          | Default, ger, zh_cn |            |
-| `all_advancements` | 1.16.1                                                                                                         | `_aatool_optimized`, `_coop` | Default, ger, zh_cn | `vertical` |
-| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                          | `_optimized`                 | Default, ger, zh_cn |            |
-| `all_advancements` | 1.16.1                                                                                                         | `_ssg_blackcat`, `_coop`     | Default, ger, zh_cn |            |
-| `all_blocks`       | 1.16.1                                                                                                         |                              | Default             |            |
-| `miku%`            | 1.21                                                                                                           |                              | Default             |            |
-| `all_trims`        | 1.21                                                                                                           |                              | Default             |            |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                                                     | `1`                          | Default             |            |
+| Category           | Template Version(s)                                                                                            | Optional Flag(s)           | Language(s)         | Layout(s)  |
+|--------------------|----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------|------------|
+| `any%`             | 25w14craftmine                                                                                                 |                            | Default             |            |   
+| `AMI`              | 25w14craftmine                                                                                                 |                            | Default             |            |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4                                                                    |                            | Default, ger        |            |
+| `all_achievements` | 1.6.4                                                                                                          | `ssg_keimaseed`            | Default, ger        |            |
+| `all_achievements` | 1.11                                                                                                           |                            | Default             |            |
+| `all_advancements` | 1.12, 1.16.1                                                                                                   | `glitched_categorical`     | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `half%_categorical`        | Default, ger, zh_cn |            |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                                                                                     |                            | Default             |            |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                      |                            | Default, ger, zh_cn |            |
+| `all_advancements` | 1.12, 1.13, 1.14, 1.15, 1.16.1, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3 | `categorical`              | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.3                                                                        | `aatool_optimized`         | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `aatool_optimized`, `coop` | Default, ger, zh_cn | `vertical` |
+| `all_advancements` | 1.14, 1.15, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                          | `optimized`                | Default, ger, zh_cn |            |
+| `all_advancements` | 1.16.1                                                                                                         | `ssg_blackcat`, `coop`     | Default, ger, zh_cn |            |
+| `all_blocks`       | 1.16.1                                                                                                         |                            | Default             |            |
+| `miku%`            | 1.21                                                                                                           |                            | Default             |            |
+| `all_trims`        | 1.21                                                                                                           |                            | Default             |            |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine                                                                     | `1`                        | Default             |            |
 
 If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the `View` menu in the bottom right of the tracker.
 

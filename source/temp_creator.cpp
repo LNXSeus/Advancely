@@ -199,12 +199,29 @@ using EditorLanguageTextRef = std::shared_ptr<const std::vector<EditorLanguageTe
 // the active one.
 using TcLangFileWrites = std::map<std::string, std::vector<std::pair<std::string, std::string> > >;
 
-static void tc_prefix_optional_flag(char *flag, size_t size) {
-    if (flag[0] == '\0' || flag[0] == '_') return;
-    size_t len = strlen(flag);
-    if (len + 2 > size) return;
-    memmove(flag + 1, flag, len + 1);
-    flag[0] = '_';
+static std::string tc_resolve_optional_flag(const char *flag, bool add_underscore) {
+    if (!add_underscore || flag[0] == '\0' || flag[0] == '_') return flag;
+    return std::string("_") + flag;
+}
+
+static void tc_optional_flag_underscore_checkbox(const char *label, bool *add_underscore, const char *version,
+                                                 const char *category, const char *flag) {
+    ImGui::Checkbox(label, add_underscore);
+    if (ImGui::IsItemHovered()) {
+        char version_filename[64] = "";
+        if (version) {
+            strncpy(version_filename, version, sizeof(version_filename) - 1);
+            for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+        }
+        const std::string resolved_flag = tc_resolve_optional_flag(flag, *add_underscore);
+        char tooltip_buffer[MAX_PATH_LENGTH * 3];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Puts an underscore between the category name and the optional flag.\n"
+                 "Untick it to attach the flag directly (e.g., 'test' + '1' becomes 'test1').\n\n"
+                 "Creates: %s_%s%s.json",
+                 version_filename[0] != '\0' ? version_filename : "<version>", category, resolved_flag.c_str());
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
 }
 
 // Sets one language's text on a goal, replacing what that language said before. Null means the
@@ -6031,6 +6048,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_create_new_view = false;
     static char new_template_category[MAX_PATH_LENGTH] = "";
     static char new_template_flag[MAX_PATH_LENGTH] = "";
+    static bool new_template_add_underscore = true;
     // Set when a create attempt hits an existing name, prompting a replace-confirmation popup.
     static bool show_replace_template_popup = false;
     // Set when a copy/rename attempt hits an existing destination name, each prompting its own
@@ -6045,12 +6063,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int copy_template_version_idx = -1;
     static char copy_template_category[MAX_PATH_LENGTH] = "";
     static char copy_template_flag[MAX_PATH_LENGTH] = "";
+    static bool copy_template_add_underscore = true;
 
     // State for the "Rename" view
     static bool show_rename_view = false;
     static int rename_template_version_idx = -1;
     static char rename_template_category[MAX_PATH_LENGTH] = "";
     static char rename_template_flag[MAX_PATH_LENGTH] = "";
+    static bool rename_template_add_underscore = true;
 
     // State for language import
     static bool show_import_lang_popup = false;
@@ -6196,6 +6216,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int import_version_idx = -1;
     static char import_category[MAX_PATH_LENGTH] = "";
     static char import_flag[MAX_PATH_LENGTH] = "";
+    static bool import_add_underscore = true;
 
     // The original identity declared by the zip (from its embedded metadata or filename),
     // shown so the user can tell if they changed the pre-filled fields.
@@ -7687,6 +7708,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         status_message[0] = '\0';
         new_template_category[0] = '\0';
         new_template_flag[0] = '\0';
+        new_template_add_underscore = true;
 
         // Reset search buffer
         tc_search_buffer[0] = '\0';
@@ -8098,6 +8120,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             copy_counter++; // Increment and try the next number
         }
         // Apply the new unique flag to the copy view's buffer
+        copy_template_add_underscore = new_flag[0] == '_';
         strncpy(copy_template_flag, new_flag[0] == '_' ? new_flag + 1 : new_flag, sizeof(copy_template_flag) - 1);
         copy_template_flag[sizeof(copy_template_flag) - 1] = '\0';
     }
@@ -8113,6 +8136,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         strncpy(rename_template_category, selected.category, sizeof(rename_template_category) - 1);
         rename_template_category[sizeof(rename_template_category) - 1] = '\0';
+        rename_template_add_underscore = selected.optional_flag[0] == '_' || selected.optional_flag[0] == '\0';
         strncpy(rename_template_flag, selected.optional_flag[0] == '_' ? selected.optional_flag + 1
                                                                        : selected.optional_flag,
                 sizeof(rename_template_flag) - 1);
@@ -8140,6 +8164,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(import_category, category, sizeof(import_category) - 1);
             import_category[sizeof(import_category) - 1] = '\0';
 
+            import_add_underscore = flag[0] == '_' || flag[0] == '\0';
             strncpy(import_flag, flag[0] == '_' ? flag + 1 : flag, sizeof(import_flag) - 1);
             import_flag[sizeof(import_flag) - 1] = '\0';
 
@@ -22027,21 +22052,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
                      "A variant for the category (e.g., 'optimized', 'modded').\n"
-                     "It follows the category name with an underscore in between,\n"
-                     "which is added automatically, so you don't need to type it.\n"
+                     "It follows the category name. Leave out the leading underscore,\n"
+                     "'Add underscore' below puts it in for you.\n"
                      "Cannot contain spaces or special characters besides the %% sign.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
+        tc_optional_flag_underscore_checkbox("Add underscore##new_template", &new_template_add_underscore,
+                                             creator_version_idx >= 0 ? creator_version_str : nullptr,
+                                             new_template_category, new_template_flag);
 
         // Also allow enter key ONLY WHEN the window is focused
         if (ImGui::Button("Create Template") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
                                                      ImGuiFocusedFlags_RootAndChildWindows))) {
-            tc_prefix_optional_flag(new_template_flag, sizeof(new_template_flag));
+            const std::string new_flag_final = tc_resolve_optional_flag(new_template_flag, new_template_add_underscore);
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
                 bool name_collision = false;
 
-                if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
+                if (validate_and_create_template(creator_version_str, new_template_category, new_flag_final.c_str(),
                                                  error_msg,
                                                  sizeof(error_msg), false, &name_collision)) {
                     show_create_new_view = false;
@@ -22104,16 +22132,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., 'optimized').\n"
-                     "It follows the category name with an underscore in between,\n"
-                     "which is added automatically, so you don't need to type it.\n"
+                     "It follows the category name. Leave out the leading underscore,\n"
+                     "'Add underscore' below puts it in for you.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
+        tc_optional_flag_underscore_checkbox("Add underscore##copy_template", &copy_template_add_underscore,
+                                             copy_template_version_idx >= 0
+                                                 ? VERSION_STRINGS[copy_template_version_idx]
+                                                 : nullptr,
+                                             copy_template_category, copy_template_flag);
 
         // Allowing enter key to confirm copy WHEN the window is focused
         if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
                                                   ImGuiFocusedFlags_RootAndChildWindows))) {
-            tc_prefix_optional_flag(copy_template_flag, sizeof(copy_template_flag));
+            const std::string copy_flag_final =
+                    tc_resolve_optional_flag(copy_template_flag, copy_template_add_underscore);
             if (selected_template_index != -1 && copy_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
@@ -22122,7 +22156,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // Properly copy the template selected in the template creator
                 if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
-                                        dest_version, copy_template_category, copy_template_flag,
+                                        dest_version, copy_template_category, copy_flag_final.c_str(),
                                         error_msg, sizeof(error_msg), false, &name_collision)) {
                     status_message[0] = '\0'; // Ensure status message is clear
                     show_copy_view = false;
@@ -22194,11 +22228,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the category (e.g., 'optimized').\n"
-                     "It follows the category name with an underscore in between,\n"
-                     "which is added automatically, so you don't need to type it.\n"
+                     "It follows the category name. Leave out the leading underscore,\n"
+                     "'Add underscore' below puts it in for you.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
+        tc_optional_flag_underscore_checkbox("Add underscore##rename_template", &rename_template_add_underscore,
+                                             rename_template_version_idx >= 0
+                                                 ? VERSION_STRINGS[rename_template_version_idx]
+                                                 : nullptr,
+                                             rename_template_category, rename_template_flag);
 
         // Allow enter key to confirm rename WHEN the window is focused
         if (ImGui::Button("Confirm Rename") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
@@ -22208,14 +22247,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const char *dest_version = VERSION_STRINGS[rename_template_version_idx];
                 char error_msg[256] = "";
                 bool name_collision = false;
-                const char *prefilled_flag = selected.optional_flag[0] == '_' ? selected.optional_flag + 1
-                                                                               : selected.optional_flag;
-                if (strcmp(rename_template_flag, prefilled_flag) == 0) {
-                    strncpy(rename_template_flag, selected.optional_flag, sizeof(rename_template_flag) - 1);
-                    rename_template_flag[sizeof(rename_template_flag) - 1] = '\0';
-                } else {
-                    tc_prefix_optional_flag(rename_template_flag, sizeof(rename_template_flag));
-                }
+                const std::string rename_flag_final =
+                        tc_resolve_optional_flag(rename_template_flag, rename_template_add_underscore);
 
                 // Capture whether this is the in-use template BEFORE the files move.
                 bool was_current = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
@@ -22223,7 +22256,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
 
                 if (rename_template_files(creator_version_str, selected.category, selected.optional_flag,
-                                          dest_version, rename_template_category, rename_template_flag,
+                                          dest_version, rename_template_category, rename_flag_final.c_str(),
                                           error_msg, sizeof(error_msg), false, &name_collision)) {
                     status_message[0] = '\0';
                     show_rename_view = false;
@@ -22235,7 +22268,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
                         strncpy(app_settings->category, rename_template_category, sizeof(app_settings->category) - 1);
                         app_settings->category[sizeof(app_settings->category) - 1] = '\0';
-                        strncpy(app_settings->optional_flag, rename_template_flag,
+                        strncpy(app_settings->optional_flag, rename_flag_final.c_str(),
                                 sizeof(app_settings->optional_flag) - 1);
                         app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
                         recompute_display_category(app_settings);
@@ -22343,11 +22376,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., 'optimized').\n"
-                     "It follows the category name with an underscore in between,\n"
-                     "which is added automatically, so you don't need to type it.\n"
+                     "It follows the category name. Leave out the leading underscore,\n"
+                     "'Add underscore' below puts it in for you.\n"
                      "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
+        tc_optional_flag_underscore_checkbox("Add underscore##import_template", &import_add_underscore,
+                                             import_version_idx >= 0 ? VERSION_STRINGS[import_version_idx] : nullptr,
+                                             import_category, import_flag);
         ImGui::Spacing();
 
         // Import icon files checkbox (only shown if the zip contains icons)
@@ -22380,19 +22416,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Spacing();
 
         if (ImGui::Button("Confirm Import") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused())) {
-            const char *prefilled_flag = import_orig_flag[0] == '_' ? import_orig_flag + 1 : import_orig_flag;
-            if (strcmp(import_flag, prefilled_flag) == 0) {
-                strncpy(import_flag, import_orig_flag, sizeof(import_flag) - 1);
-                import_flag[sizeof(import_flag) - 1] = '\0';
-            } else {
-                tc_prefix_optional_flag(import_flag, sizeof(import_flag));
-            }
+            const std::string import_flag_final = tc_resolve_optional_flag(import_flag, import_add_underscore);
             if (import_version_idx != -1) {
                 const char *version_str = VERSION_STRINGS[import_version_idx];
                 MC_Version version_enum = settings_get_version_from_string(version_str);
 
                 char combined_name[MAX_PATH_LENGTH * 2];
-                snprintf(combined_name, sizeof(combined_name), "%s%s", import_category, import_flag);
+                snprintf(combined_name, sizeof(combined_name), "%s%s", import_category, import_flag_final.c_str());
                 // Add validation before executing the import
                 if (import_category[0] == '\0') {
                     snprintf(status_message, sizeof(status_message), "Error: Category name cannot be empty.");
@@ -22400,7 +22430,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else if (!is_valid_filename_part_for_ui(import_category)) {
                     snprintf(status_message, sizeof(status_message), "Error: Category contains invalid characters.");
                     save_message_type = MSG_ERROR;
-                } else if (!is_valid_filename_part_for_ui(import_flag)) {
+                } else if (!is_valid_filename_part_for_ui(import_flag_final.c_str())) {
                     snprintf(status_message, sizeof(status_message), "Error: Flag contains invalid characters.");
                     save_message_type = MSG_ERROR;
                 } else if (strcasecmp(combined_name, "advancely_template") == 0) {
@@ -22420,7 +22450,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_ERROR;
                 } else {
                     bool name_collision = false;
-                    if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag,
+                    if (execute_import_from_zip(import_zip_path, version_str, import_category,
+                                                import_flag_final.c_str(),
                                                 import_zip_has_icons && import_icons_checkbox,
                                                 status_message,
                                                 sizeof(status_message), false, &name_collision)) {
@@ -22483,8 +22514,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_replace_template_popup) ImGui::OpenPopup("Replace Existing Template?");
     if (ImGui::BeginPopupModal("Replace Existing Template?", &show_replace_template_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::string new_flag_final = tc_resolve_optional_flag(new_template_flag, new_template_add_underscore);
         ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
-                    new_template_category, new_template_flag, creator_version_str);
+                    new_template_category, new_flag_final.c_str(), creator_version_str);
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                            "Replacing it permanently deletes the existing template and ALL of its\n"
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
@@ -22496,7 +22528,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          !ImGui::IsWindowAppearing() &&
                                                          ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256] = "";
-            if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
+            if (validate_and_create_template(creator_version_str, new_template_category, new_flag_final.c_str(),
                                              error_msg, sizeof(error_msg), true, nullptr)) {
                 show_create_new_view = false;
                 status_message[0] = '\0';
@@ -22508,7 +22540,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (app_settings &&
                     strcmp(creator_version_str, app_settings->version_str) == 0 &&
                     strcmp(new_template_category, app_settings->category) == 0 &&
-                    strcmp(new_template_flag, app_settings->optional_flag) == 0) {
+                    strcmp(new_flag_final.c_str(), app_settings->optional_flag) == 0) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
             } else {
@@ -22543,11 +22575,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_replace_copy_popup) ImGui::OpenPopup("Replace Existing Template? (Copy)");
     if (ImGui::BeginPopupModal("Replace Existing Template? (Copy)", &show_replace_copy_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::string copy_flag_final = tc_resolve_optional_flag(copy_template_flag, copy_template_add_underscore);
         const char *dest_version = (copy_template_version_idx >= 0)
                                        ? VERSION_STRINGS[copy_template_version_idx]
                                        : creator_version_str;
         ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
-                    copy_template_category, copy_template_flag, dest_version);
+                    copy_template_category, copy_flag_final.c_str(), dest_version);
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                            "Replacing it permanently deletes the existing template and ALL of its\n"
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
@@ -22562,7 +22595,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 char error_msg[256] = "";
                 if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
-                                        dest_version, copy_template_category, copy_template_flag,
+                                        dest_version, copy_template_category, copy_flag_final.c_str(),
                                         error_msg, sizeof(error_msg), true, nullptr)) {
                     status_message[0] = '\0';
                     show_copy_view = false;
@@ -22577,7 +22610,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (app_settings &&
                         strcmp(dest_version, app_settings->version_str) == 0 &&
                         strcmp(copy_template_category, app_settings->category) == 0 &&
-                        strcmp(copy_template_flag, app_settings->optional_flag) == 0) {
+                        strcmp(copy_flag_final.c_str(), app_settings->optional_flag) == 0) {
                         SDL_SetAtomicInt(&g_settings_changed, 1);
                     }
                 } else {
@@ -22613,11 +22646,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_replace_rename_popup) ImGui::OpenPopup("Replace Existing Template? (Rename)");
     if (ImGui::BeginPopupModal("Replace Existing Template? (Rename)", &show_replace_rename_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::string rename_flag_final =
+                tc_resolve_optional_flag(rename_template_flag, rename_template_add_underscore);
         const char *dest_version = (rename_template_version_idx >= 0)
                                        ? VERSION_STRINGS[rename_template_version_idx]
                                        : creator_version_str;
         ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
-                    rename_template_category, rename_template_flag, dest_version);
+                    rename_template_category, rename_flag_final.c_str(), dest_version);
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                            "Replacing it permanently deletes the existing template and ALL of its\n"
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
@@ -22639,7 +22674,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
 
                 if (rename_template_files(creator_version_str, selected.category, selected.optional_flag,
-                                          dest_version, rename_template_category, rename_template_flag,
+                                          dest_version, rename_template_category, rename_flag_final.c_str(),
                                           error_msg, sizeof(error_msg), true, nullptr)) {
                     status_message[0] = '\0';
                     show_rename_view = false;
@@ -22651,7 +22686,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         app_settings->version_str[sizeof(app_settings->version_str) - 1] = '\0';
                         strncpy(app_settings->category, rename_template_category, sizeof(app_settings->category) - 1);
                         app_settings->category[sizeof(app_settings->category) - 1] = '\0';
-                        strncpy(app_settings->optional_flag, rename_template_flag,
+                        strncpy(app_settings->optional_flag, rename_flag_final.c_str(),
                                 sizeof(app_settings->optional_flag) - 1);
                         app_settings->optional_flag[sizeof(app_settings->optional_flag) - 1] = '\0';
                         recompute_display_category(app_settings);
@@ -22700,11 +22735,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_replace_import_popup) ImGui::OpenPopup("Replace Existing Template? (Import)");
     if (ImGui::BeginPopupModal("Replace Existing Template? (Import)", &show_replace_import_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::string import_flag_final = tc_resolve_optional_flag(import_flag, import_add_underscore);
         const char *dest_version = (import_version_idx >= 0)
                                        ? VERSION_STRINGS[import_version_idx]
                                        : creator_version_str;
         ImGui::Text("A template with category '%s' and flag '%s' already exists for %s.",
-                    import_category, import_flag, dest_version);
+                    import_category, import_flag_final.c_str(), dest_version);
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
                            "Replacing it permanently deletes the existing template and ALL of its\n"
                            "associated files (language, layout, notes and snapshot). This cannot be undone.");
@@ -22716,7 +22752,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          !ImGui::IsWindowAppearing() &&
                                                          ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (import_version_idx >= 0) {
-                if (execute_import_from_zip(import_zip_path, dest_version, import_category, import_flag,
+                if (execute_import_from_zip(import_zip_path, dest_version, import_category, import_flag_final.c_str(),
                                             import_zip_has_icons && import_icons_checkbox,
                                             status_message,
                                             sizeof(status_message), true, nullptr)) {
@@ -22743,7 +22779,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (app_settings &&
                         strcmp(dest_version, app_settings->version_str) == 0 &&
                         strcmp(import_category, app_settings->category) == 0 &&
-                        strcmp(import_flag, app_settings->optional_flag) == 0) {
+                        strcmp(import_flag_final.c_str(), app_settings->optional_flag) == 0) {
                         SDL_SetAtomicInt(&g_settings_changed, 1);
                     }
                 }
