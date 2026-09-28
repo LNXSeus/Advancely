@@ -255,8 +255,8 @@ typedef enum {
     \
     X("general.show_welcome_on_startup", PRESET_GROUP_STARTUP, "Show Welcome Window on Startup", PRESET_KEY_USER, \
       NULL) \
-    X("general.launch_count", PRESET_GROUP_STARTUP, "Launch Count", PRESET_KEY_USER, NULL) \
-    X("general.support_prompt_shown", PRESET_GROUP_STARTUP, "Support Prompt Shown", PRESET_KEY_USER, NULL) \
+    X("general.launch_count|general.support_prompt_shown", PRESET_GROUP_STARTUP, "Support Prompt State", \
+      PRESET_KEY_SKIP, NULL) \
     \
     X("custom_progress", PRESET_GROUP_PROGRESS, "Custom Goal Progress", PRESET_KEY_USER | PRESET_KEY_PROGRESS, NULL) \
     X("stat_progress_override", PRESET_GROUP_PROGRESS, "Manually Completed Stats", \
