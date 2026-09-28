@@ -2858,7 +2858,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float icon_size = settings->compact_row1_icon_size;
     float icon_full_w = snap_px(icon_size + settings->compact_row1_spacing);
     bool have_icons = false;
-    if (settings->compact_show_row1_icons && !run_complete) {
+    if (settings->compact_show_row1_icons && !run_complete &&
+        overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals)) {
         build_row1_items(t, settings, icon_items, icon_removed, icon_sig);
         have_icons = !icon_items.empty();
     }
@@ -3081,6 +3082,25 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
     o->layout_row2_y = snap_px(BASE_ROW2_Y + dt + g1 + g2 + s1);
     o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr + g1 + g2 + g3 + s1 + s2);
     o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr + g1 + g2 + g3 + g4 + s1 + s2 + s3);
+    o->layout_row1_shift = o->layout_row2_y - o->layout_row1_y;
+    o->layout_row1_collapsed = false;
+}
+
+// Only a template or "Show Hidden Goals" change flips this, never goal progress, so the window
+// stays put during a run.
+static void overlay_apply_row1_collapse(Overlay *o, const TemplateData *td, const AppSettings *settings) {
+    bool collapse = !overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals);
+    if (collapse == o->layout_row1_collapsed) return;
+    o->layout_row1_collapsed = collapse;
+
+    float delta = collapse ? -o->layout_row1_shift : o->layout_row1_shift;
+    o->layout_row2_y += delta;
+    o->layout_row3_y += delta;
+    o->layout_height = (int) snap_px((float) o->layout_height + delta);
+
+    int w = 0;
+    SDL_GetWindowSize(o->window, &w, nullptr);
+    SDL_SetWindowSize(o->window, w, o->layout_height);
 }
 
 
@@ -3769,6 +3789,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         SDL_RenderPresent(o->renderer);
         return;
     }
+
+    overlay_apply_row1_collapse(o, t->template_data, settings);
 
     int window_w;
     SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);

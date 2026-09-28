@@ -111,6 +111,8 @@ struct Overlay {
     float layout_row2_y; // Top of row 2 icons
     float layout_row3_y; // Top of row 3 icons
     int layout_height; // Total overlay window height
+    float layout_row1_shift; // How far rows 2/3 move up when a template has no row 1 icons
+    bool layout_row1_collapsed;
 
     // Co-op view state received live from the tracker via the IPC header (the overlay process has no
     // g_coop_ctx of its own). Drives Compact-mode contributor faces: per-line faces in the merged

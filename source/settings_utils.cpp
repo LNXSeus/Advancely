@@ -700,6 +700,30 @@ bool compact_type_has_progress(OverlayCompactCounterType kind) {
            kind == COMPACT_COUNTER_COUNTERS;
 }
 
+bool overlay_template_has_row1_icons(const TemplateData *td, bool show_hidden) {
+    if (!td) return false;
+    for (int i = 0; i < td->advancement_count; i++) {
+        const TrackableCategory *cat = td->advancements[i];
+        if (cat->is_hidden && !show_hidden) continue;
+        for (int j = 0; j < cat->criteria_count; j++) {
+            const TrackableItem *crit = cat->criteria[j];
+            if (crit->hidden_by_group) continue;
+            if (crit->is_hidden && !show_hidden) continue;
+            return true;
+        }
+    }
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *cat = td->stats[i];
+        if (cat->is_single_stat_category || cat->hide_substats_in_row1) continue;
+        if (cat->is_hidden && !show_hidden) continue;
+        for (int j = 0; j < cat->criteria_count; j++) {
+            if (cat->criteria[j]->is_hidden && !show_hidden) continue;
+            return true;
+        }
+    }
+    return false;
+}
+
 void settings_prune_compact_stack_items(AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
     prune_compact_items(td, settings->compact_stack_items, &settings->compact_stack_item_count,

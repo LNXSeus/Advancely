@@ -12390,7 +12390,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "of the second row unless the advancement is hidden.\n"
                                          "Does not affect the manual layout. Use the per-position\n"
                                          "\"Hide\" checkboxes to control manual layout visibility.\n"
-                                         "Visibility can be toggled in the main tracker settings.",
+                                         "Visibility can be toggled in the main tracker settings.\n"
+                                         "If no criterion or sub-stat is left to show in the 1st row, the\n"
+                                         "overlay leaves that row out and moves everything below it up.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                             }
@@ -13048,7 +13050,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s",
                                                   "Flip Hide Sub-Stats from Row 1 on every selected multi-stat category.\n"
                                                   "If most are off they all hide their sub-stats, and vice versa.\n"
-                                                  "Simple stats in the selection are skipped.");
+                                                  "Simple stats in the selection are skipped.\n"
+                                                  "If no criterion or sub-stat is left to show in the 1st row, the\n"
+                                                  "overlay leaves that row out and moves everything below it up.");
                             if (ImGui::Selectable("Layout Coordinates...##stat_ba")) ba_open_layout = true;
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
@@ -13948,12 +13952,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     snprintf(hide_substats_criteria_line, sizeof(hide_substats_criteria_line),
                                              "\n%s criteria are not affected by this.", advancements_label_upper);
                                 }
-                                char hide_substats_tooltip_buffer[512];
+                                char hide_substats_tooltip_buffer[768];
                                 snprintf(hide_substats_tooltip_buffer, sizeof(hide_substats_tooltip_buffer),
                                          "Keeps this category's sub-stats out of the overlay's 1st row\n"
                                          "in every render mode (scrolling belt, page and compact).\n"
                                          "The category itself is unaffected: it still shows in its own row\n"
-                                         "and still cycles through its sub-stats as the sub-text there.%s",
+                                         "and still cycles through its sub-stats as the sub-text there.%s\n"
+                                         "If no criterion or sub-stat is left to show in the 1st row, the\n"
+                                         "overlay leaves that row out and moves everything below it up.",
                                          hide_substats_criteria_line);
                                 ImGui::SetTooltip("%s", hide_substats_tooltip_buffer);
                             }
@@ -14907,13 +14913,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char hidden_tooltip_buffer[512];
+                                    char hidden_tooltip_buffer[768];
                                     snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                              "If checked, this sub-stat will be fully hidden on the overlay\n"
                                              "and hidden settings-based on the automatic layout.\n"
                                              "Does not affect the manual layout. Use the per-position\n"
                                              "\"Hide\" checkboxes to control manual layout visibility.\n"
-                                             "Visibility can be toggled in the main tracker settings.\n\n"
+                                             "Visibility can be toggled in the main tracker settings.\n"
+                                             "If no criterion or sub-stat is left to show in the 1st row, the\n"
+                                             "overlay leaves that row out and moves everything below it up.\n\n"
                                              "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
                                              "on the overlay.");
                                     ImGui::SetTooltip("%s", hidden_tooltip_buffer);

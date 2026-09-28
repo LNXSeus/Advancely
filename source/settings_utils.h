@@ -1065,6 +1065,12 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
 // Shared by the settings UI (which types to list) and the overlay (which to gate) so the two can't drift.
 bool compact_type_has_progress(OverlayCompactCounterType kind);
 
+// True if the template gives the overlay's first row (Belt/Page Row 1, Compact icon strip) anything
+// to ever show: a criterion or multi-stat sub-stat that is not hidden. Completed items still count, so
+// the answer only changes with the template or `show_hidden` (pass the "Show Hidden Goals" setting).
+// Shared by the overlay (collapses the row) and the settings UI (disables the row's settings).
+bool overlay_template_has_row1_icons(const TemplateData *td, bool show_hidden);
+
 // Drops any selected Compact individual-goal items that no longer exist in `td`, so switching
 // templates (including via the template editor) doesn't leave stale selections in the dropdowns.
 // A null template clears them all. Type-count selections (universal categories) are left untouched.

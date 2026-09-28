@@ -1283,7 +1283,9 @@ active template), so enabling manual positioning never teleports the element.
     * **Hide Sub-Stats from Row 1**: Only shown once a stat is a `Multi-Stat Category`. Ticking it keeps that category's
       sub-stats out of the overlay's first row in every render mode (`Scrolling Belt`, `Page`, and the `Compact` mode's
       `Row 1 Icons` strip). The category itself is unaffected: it still shows in its own row and still cycles through
-      its sub-stats as the sub-text there. Advancement criteria are never affected by this.
+      its sub-stats as the sub-text there. Advancement criteria are never affected by this. If no criterion or sub-stat
+      is left to show in the first row (all hidden or kept out this way), the overlay leaves that row out and moves
+      everything below it up, and the `Row 1` settings are disabled.
     * **Auto-Complete via Linked Goals**: Both stat categories and individual sub-stats support automatic completion
       through linked goals. Use the `Select Goals` button to pick any combination of advancements, criteria, stats,
       sub-stats, unlocks, custom goals, or multi-stage goal stages. Choose between `AND` mode (all selected goals must
