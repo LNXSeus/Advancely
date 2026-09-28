@@ -1703,23 +1703,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SameLine();
             if (!have_selection) ImGui::BeginDisabled();
             if (ImGui::Button("Load Preset")) {
-                char preset_path[MAX_PATH_LENGTH];
-                snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
-                         preset_names[preset_selected]);
-                if (settings_load_from_file(&temp_settings, preset_path)) {
-                    // Force the template list to rescan so the tabs refresh in place.
-                    last_scanned_version[0] = '\0';
-                    // Remember the source so Apply can restore its captured progress.
-                    strncpy(pending_preset_progress_path, preset_path, sizeof(pending_preset_progress_path) - 1);
-                    pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
-                    snprintf(preset_status_msg, sizeof(preset_status_msg),
-                             "Loaded preset '%s'. Click 'Apply Settings' to use it.", preset_names[preset_selected]);
-                    preset_status_is_error = false;
-                } else {
-                    snprintf(preset_status_msg, sizeof(preset_status_msg),
-                             "Failed to read preset '%s'.", preset_names[preset_selected]);
-                    preset_status_is_error = true;
-                }
+                ImGui::OpenPopup("Load Preset?");
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char load_tooltip_buffer[768];
@@ -1804,6 +1788,76 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char tooltip_buf[128];
                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                          "Keep the preset.\n"
+                         "You can also press 'ESCAPE'.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+
+            ImGui::EndPopup();
+        }
+
+        // Load confirmation popup (only opens via the enabled "Load Preset" button).
+        ImVec2 load_popup_center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(load_popup_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("Load Preset?", nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+            const char *load_name = (preset_selected >= 0 && preset_selected < preset_count)
+                                        ? preset_names[preset_selected]
+                                        : "";
+            char load_prompt_buffer[256];
+            snprintf(load_prompt_buffer, sizeof(load_prompt_buffer), "Load the preset '%s'?", load_name);
+            ImGui::Text("%s", load_prompt_buffer);
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+                               "Presets replace ALL settings, including your account settings\n"
+                               "and any manually set progress (stat and custom goal progress).\n"
+                               "They will be set to whatever is stored in the preset.");
+            ImGui::TextDisabled("Nothing changes until you click 'Apply Settings'.");
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+            if (ImGui::Button("Load") || enter_pressed) {
+                if (preset_selected >= 0 && preset_selected < preset_count) {
+                    char preset_path[MAX_PATH_LENGTH];
+                    snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
+                             preset_names[preset_selected]);
+                    if (settings_load_from_file(&temp_settings, preset_path)) {
+                        // Force the template list to rescan so the tabs refresh in place.
+                        last_scanned_version[0] = '\0';
+                        // Remember the source so Apply can restore its captured progress.
+                        strncpy(pending_preset_progress_path, preset_path, sizeof(pending_preset_progress_path) - 1);
+                        pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
+                        snprintf(preset_status_msg, sizeof(preset_status_msg),
+                                 "Loaded preset '%s'. Click 'Apply Settings' to use it.",
+                                 preset_names[preset_selected]);
+                        preset_status_is_error = false;
+                    } else {
+                        snprintf(preset_status_msg, sizeof(preset_status_msg),
+                                 "Failed to read preset '%s'.", preset_names[preset_selected]);
+                        preset_status_is_error = true;
+                    }
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Fill this window with the preset's values.\n"
+                         "You can also press 'ENTER'.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+
+            ImGui::SameLine();
+
+            bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+            if (ImGui::Button("Cancel") || esc_pressed) {
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Keep your current settings.\n"
                          "You can also press 'ESCAPE'.");
                 ImGui::SetTooltip("%s", tooltip_buf);
             }

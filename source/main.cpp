@@ -1516,7 +1516,8 @@ static bool external_overlay_attached(const Tracker *t) {
 // How a seeded subdirectory treats files that already exist at the destination.
 typedef enum {
     SEED_PRESERVE, // Never overwrite. For anything the user owns or imports.
-    SEED_REFRESH   // Overwrite with the shipped copy. For files the app owns and updates.
+    SEED_REFRESH,  // Overwrite with the shipped copy. For files the app owns and updates.
+    SEED_REFRESH_KEEP_SETTINGS // SEED_REFRESH, except an existing settings.json is never overwritten.
 } SeedPolicy;
 
 // Recursively copies src into dst. Under SEED_PRESERVE only files MISSING at the destination are
@@ -1551,6 +1552,10 @@ static bool seed_copy_recursive(const char *src, const char *dst, SeedPolicy pol
     }
 
     if (policy == SEED_PRESERVE && path_exists(dst)) return true;
+    if (policy == SEED_REFRESH_KEEP_SETTINGS && path_exists(dst)) {
+        const char *slash = strrchr(dst, '/');
+        if (strcmp(slash ? slash + 1 : dst, "settings.json") == 0) return true;
+    }
 
     FILE *in = fopen(src, "rb");
     if (!in) return false;
@@ -1646,7 +1651,7 @@ static void seed_user_data_dir(void) {
         {"templates", SEED_REFRESH},       // Updated default templates reach users here.
         {"ca_certificates", SEED_REFRESH}, // The cert bundle must not go stale.
         {"reference_files", SEED_REFRESH}, // Pure reference material, never user-edited.
-        {"config", SEED_PRESERVE},         // settings.json and presets.
+        {"config", SEED_REFRESH_KEEP_SETTINGS}, // Official presets refresh, the user's settings.json stays.
         {"notes", SEED_PRESERVE},          // The user's notes and their manifest.
         {"fonts", SEED_PRESERVE},          // User-imported fonts live alongside the defaults.
         {"gui", SEED_PRESERVE},            // User-imported backgrounds live alongside the defaults.

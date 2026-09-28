@@ -296,7 +296,7 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script, "copy /Y \"%s\\*.md\" .\\\n", temp_dir);
 
     // Safely merge resource subfolders using robocopy. This will overwrite existing files
-    // but will NOT delete user-created files or the config/notes folders.
+    // but will NOT delete user-created files, settings.json or the notes folder.
     fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /NFL /NDL\n",
             temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /NFL /NDL\n", temp_dir);
@@ -305,6 +305,10 @@ bool apply_update(const char *main_executable_path) {
             "robocopy \"%s\\resources\\reference_files\" \".\\resources\\reference_files\" /E /IS /NFL /NDL\n",
             temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
+    // Official settings presets are refreshed like templates. settings.json is the user's own file.
+    fprintf(updater_script,
+            "robocopy \"%s\\resources\\config\" \".\\resources\\config\" /E /IS /NFL /NDL /XF settings.json\n",
+            temp_dir);
 
     fprintf(updater_script, "echo Cleaning up temporary files...\n");
     fprintf(updater_script, "rmdir /S /Q \"%s\"\n", temp_dir);
@@ -386,7 +390,7 @@ bool apply_update(const char *main_executable_path) {
 #endif
 
     // For both Linux and macOS, safely merge the resource subdirectories using rsync.
-    // This overwrites official files but leaves user-created files and config/notes folders alone.
+    // This overwrites official files but leaves user-created files, settings.json and notes alone.
     // Non-fatal (|| true) in case a resource folder doesn't exist in this release.
     fprintf(updater_script, "rsync -av \"${SOURCE_DIR}/resources/fonts/\" ./resources/fonts/ 2>/dev/null || true\n");
     fprintf(updater_script, "rsync -av \"${SOURCE_DIR}/resources/gui/\" ./resources/gui/ 2>/dev/null || true\n");
@@ -395,6 +399,9 @@ bool apply_update(const char *main_executable_path) {
             "rsync -av \"${SOURCE_DIR}/resources/reference_files/\" ./resources/reference_files/ 2>/dev/null || true\n");
     fprintf(updater_script,
             "rsync -av \"${SOURCE_DIR}/resources/templates/\" ./resources/templates/ 2>/dev/null || true\n");
+    // Official settings presets are refreshed like templates. settings.json is the user's own file.
+    fprintf(updater_script,
+            "rsync -av --exclude=settings.json \"${SOURCE_DIR}/resources/config/\" ./resources/config/ 2>/dev/null || true\n");
 
 #if defined(__APPLE__)
     // macOS reads/writes user data from ~/Library/Application Support/Advancely, not the bundle.
