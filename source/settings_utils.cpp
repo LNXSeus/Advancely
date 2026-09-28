@@ -819,10 +819,16 @@ bool hotkey_slot_is_reserved(const char *key_name, Uint16 mods, char *out_reason
     // Ctrl+F focuses the tracker's search box in handle_global_events(). That handler is
     // independent of the counter hotkeys, so binding the same combo would do both at once.
     // Keep this in sync with the shortcuts handled there.
+    // On macOS Cmd and Ctrl share HOTKEY_MOD_CTRL, so this also covers Cmd+Ctrl+F (fullscreen).
     if ((mods & HOTKEY_MOD_CTRL) && strcmp(key_name, "F") == 0) {
         if (out_reason && reason_size > 0) {
+#ifdef __APPLE__
+            snprintf(out_reason, reason_size,
+                     "cannot use Cmd+F or Cmd+Ctrl+F, which are reserved for the search box and macOS fullscreen");
+#else
             snprintf(out_reason, reason_size,
                      "cannot use Ctrl+F, which Advancely reserves for the search box");
+#endif
         }
         return true;
     }
