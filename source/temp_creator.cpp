@@ -217,6 +217,7 @@ static void tc_optional_flag_underscore_checkbox(const char *label, bool *add_un
         char tooltip_buffer[MAX_PATH_LENGTH * 3];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Puts an underscore between the category name and the optional flag.\n"
+                 "On by default, which is how all official templates are named.\n"
                  "Untick it to attach the flag directly (e.g., 'test' + '1' becomes 'test1').\n\n"
                  "Creates: %s_%s%s.json",
                  version_filename[0] != '\0' ? version_filename : "<version>", category, resolved_flag.c_str());
