@@ -3071,10 +3071,16 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
         g4 = settings->overlay_gap_row3_to_bottom;
     }
 
+    // Row size deltas against the stock 48px row 1 icon and 96px row 2/3 backgrounds. Each one
+    // pushes every row below it down and grows the window by the same amount.
+    float s1 = settings->overlay_row1_icon_size - DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+    float s2 = settings->overlay_row2_bg_size - DEFAULT_OVERLAY_ROW_BG_SIZE;
+    float s3 = settings->overlay_row3_bg_size - DEFAULT_OVERLAY_ROW_BG_SIZE;
+
     o->layout_row1_y = snap_px(BASE_ROW1_Y + dt + g1);
-    o->layout_row2_y = snap_px(BASE_ROW2_Y + dt + g1 + g2);
-    o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr + g1 + g2 + g3);
-    o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr + g1 + g2 + g3 + g4);
+    o->layout_row2_y = snap_px(BASE_ROW2_Y + dt + g1 + g2 + s1);
+    o->layout_row3_y = snap_px(BASE_ROW3_Y + dt + 2.0f * dr + g1 + g2 + g3 + s1 + s2);
+    o->layout_height = (int) snap_px(BASE_HEIGHT + dt + 4.0f * dr + g1 + g2 + g3 + g4 + s1 + s2 + s3);
 }
 
 
@@ -3786,8 +3792,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
         const float ROW1_Y_POS = o->layout_row1_y;
-        const float ROW1_ICON_SIZE = 48.0f;
-        const float ROW1_SHARED_ICON_SIZE = settings->overlay_row1_shared_icon_size; // Originally 30.0f
+        const float ROW1_ICON_SIZE = settings->overlay_row1_icon_size;
+        const float ROW1_SHARED_ICON_SIZE = fminf(settings->overlay_row1_shared_icon_size, ROW1_ICON_SIZE);
         const float item_full_width = snap_px(ROW1_ICON_SIZE + settings->overlay_row1_spacing);
 
         // Gather items, then build the removal mask (cleared items become gaps) and a
@@ -3896,7 +3902,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     // ROW 2 ALSO SHOWS SUPPORTERS WHEN RUN IS COMPLETED
     {
         const float ROW2_Y_POS = o->layout_row2_y;
-        const float ITEM_WIDTH = 96.0f; // Minimum Width based on icon bg
+        const float ITEM_WIDTH = settings->overlay_row2_bg_size; // Minimum Width based on icon bg
+        const float ICON_SCALE = ITEM_WIDTH / ADV_ICON_BG_SIZE; // Icon box settings are in 96x96 bg space
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;
 
@@ -3979,8 +3986,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                 // Render icon
                 SDL_FRect icon_rect = {
-                    bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
-                    settings->adv_icon_size, settings->adv_icon_size
+                    bg_rect.x + settings->adv_icon_offset_x * ICON_SCALE,
+                    bg_rect.y + settings->adv_icon_offset_y * ICON_SCALE,
+                    settings->adv_icon_size * ICON_SCALE, settings->adv_icon_size * ICON_SCALE
                 };
 
                 // Also support .gif icons
@@ -4260,7 +4268,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             float item_full_width_row2;
 
             if (settings->overlay_row2_custom_spacing_enabled) {
-                item_full_width_row2 = snap_px(settings->overlay_row2_custom_spacing);
+                item_full_width_row2 = snap_px(fmaxf(settings->overlay_row2_custom_spacing, ITEM_WIDTH));
                 cell_width_row2 = item_full_width_row2 - ITEM_SPACING;
             } else {
                 cell_width_row2 = snap_px(fmaxf(ITEM_WIDTH, max_text_width_row2));
@@ -4514,8 +4522,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, tile_alpha);
 
                         SDL_FRect icon_rect = {
-                            bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
-                            settings->adv_icon_size, settings->adv_icon_size
+                            bg_rect.x + settings->adv_icon_offset_x * ICON_SCALE,
+                            bg_rect.y + settings->adv_icon_offset_y * ICON_SCALE,
+                            settings->adv_icon_size * ICON_SCALE, settings->adv_icon_size * ICON_SCALE
                         };
                         SDL_Texture *tex = nullptr;
                         AnimatedTexture *anim_tex = nullptr;
@@ -4571,7 +4580,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     // (excluding forced items with "in_2nd_row" flag)
     {
         const float ROW3_Y_POS = o->layout_row3_y; // Grows with font line height
-        const float ITEM_WIDTH = 96.0f; // Minimum width based on icon bg
+        const float ITEM_WIDTH = settings->overlay_row3_bg_size; // Minimum width based on icon bg
+        const float ICON_SCALE = ITEM_WIDTH / ADV_ICON_BG_SIZE; // Icon box settings are in 96x96 bg space
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;
 
@@ -4769,7 +4779,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (settings->overlay_row3_custom_spacing_enabled) {
             // Use fixed width from setting
-            item_full_width_row3 = snap_px(settings->overlay_row3_custom_spacing);
+            item_full_width_row3 = snap_px(fmaxf(settings->overlay_row3_custom_spacing, ITEM_WIDTH));
             cell_width_row3 = item_full_width_row3 - ITEM_SPACING;
         } else {
             cell_width_row3 = snap_px(fmaxf(ITEM_WIDTH, max_text_width_row3));
@@ -5038,8 +5048,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, tile_alpha);
 
                     SDL_FRect icon_rect = {
-                        bg_rect.x + settings->adv_icon_offset_x, bg_rect.y + settings->adv_icon_offset_y,
-                        settings->adv_icon_size, settings->adv_icon_size
+                        bg_rect.x + settings->adv_icon_offset_x * ICON_SCALE,
+                        bg_rect.y + settings->adv_icon_offset_y * ICON_SCALE,
+                        settings->adv_icon_size * ICON_SCALE, settings->adv_icon_size * ICON_SCALE
                     };
                     SDL_Texture *tex = nullptr;
                     AnimatedTexture *anim_tex = nullptr;

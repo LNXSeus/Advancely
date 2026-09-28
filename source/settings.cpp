@@ -626,6 +626,9 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
         a->compact_row1_icon_size != b->compact_row1_icon_size ||
         a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+        a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
+        a->overlay_row2_bg_size != b->overlay_row2_bg_size ||
+        a->overlay_row3_bg_size != b->overlay_row3_bg_size ||
         a->overlay_shared_icon_keep_redundant != b->overlay_shared_icon_keep_redundant ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -908,6 +911,9 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row1_spacing != b->overlay_row1_spacing ||
             a->compact_row1_icon_size != b->compact_row1_icon_size ||
             a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
+            a->overlay_row1_icon_size != b->overlay_row1_icon_size ||
+            a->overlay_row2_bg_size != b->overlay_row2_bg_size ||
+            a->overlay_row3_bg_size != b->overlay_row3_bg_size ||
             a->overlay_shared_icon_keep_redundant != b->overlay_shared_icon_keep_redundant ||
             a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
             a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
@@ -5149,6 +5155,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
                                        OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
 
+                    if (ImGui::DragFloat("Row 1 Icon Size", &temp_settings.overlay_row1_icon_size, 1.0f,
+                                         OVERLAY_ROW1_ICON_SIZE_MIN, OVERLAY_ROW1_ICON_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
+                            temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
+                        if (temp_settings.overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
+                            temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Size in pixels of each icon in the top row (Row 1) of the overlay.\n"
+                                 "The rows below move down or up to make room.\n"
+                                 "Default: %.0f px",
+                                 DEFAULT_OVERLAY_ROW1_ICON_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
                     if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f,
                                          "%.0f px")) {
                         if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
@@ -5166,14 +5189,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
+                    // Drawn on top of the row 1 icon, so it can never outgrow it.
+                    if (temp_settings.overlay_row1_shared_icon_size > temp_settings.overlay_row1_icon_size)
+                        temp_settings.overlay_row1_shared_icon_size = temp_settings.overlay_row1_icon_size;
                     if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f,
                                          0.0f,
-                                         48.0f,
+                                         temp_settings.overlay_row1_icon_size,
                                          "%.0f px")) {
                         if (temp_settings.overlay_row1_shared_icon_size < 0.0f)
                             temp_settings.overlay_row1_shared_icon_size = 0.0f;
-                        if (temp_settings.overlay_row1_shared_icon_size > 48.0f)
-                            temp_settings.overlay_row1_shared_icon_size = 48.0f;
+                        if (temp_settings.overlay_row1_shared_icon_size > temp_settings.overlay_row1_icon_size)
+                            temp_settings.overlay_row1_shared_icon_size = temp_settings.overlay_row1_icon_size;
                     }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
@@ -5199,6 +5225,42 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
+                    if (ImGui::DragFloat("Row 2 Background Size", &temp_settings.overlay_row2_bg_size, 1.0f,
+                                         OVERLAY_ROW_BG_SIZE_MIN, OVERLAY_ROW_BG_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.overlay_row2_bg_size < OVERLAY_ROW_BG_SIZE_MIN)
+                            temp_settings.overlay_row2_bg_size = OVERLAY_ROW_BG_SIZE_MIN;
+                        if (temp_settings.overlay_row2_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
+                            temp_settings.overlay_row2_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Size in pixels of the background texture behind each item in Row 2.\n"
+                                 "The icon inside scales with it, keeping the Icon Size and position\n"
+                                 "set under Tracker Visuals. Row 3 moves down or up to make room.\n"
+                                 "Default: %.0f px",
+                                 DEFAULT_OVERLAY_ROW_BG_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    if (ImGui::DragFloat("Row 3 Background Size", &temp_settings.overlay_row3_bg_size, 1.0f,
+                                         OVERLAY_ROW_BG_SIZE_MIN, OVERLAY_ROW_BG_SIZE_MAX, "%.0f px")) {
+                        if (temp_settings.overlay_row3_bg_size < OVERLAY_ROW_BG_SIZE_MIN)
+                            temp_settings.overlay_row3_bg_size = OVERLAY_ROW_BG_SIZE_MIN;
+                        if (temp_settings.overlay_row3_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
+                            temp_settings.overlay_row3_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[512];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Size in pixels of the background texture behind each item in Row 3.\n"
+                                 "The icon inside scales with it, keeping the Icon Size and position\n"
+                                 "set under Tracker Visuals. The overlay grows or shrinks to fit.\n"
+                                 "Default: %.0f px",
+                                 DEFAULT_OVERLAY_ROW_BG_SIZE);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
                     // --- Custom Row 2 Spacing ---
                     ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
                     if (ImGui::IsItemHovered()) {
@@ -5216,12 +5278,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (temp_settings.overlay_row2_custom_spacing_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                        // Never narrower than the background, so neighbouring icons cannot overlap.
+                        if (temp_settings.overlay_row2_custom_spacing < temp_settings.overlay_row2_bg_size)
+                            temp_settings.overlay_row2_custom_spacing = temp_settings.overlay_row2_bg_size;
                         if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f,
-                                             96.0f,
+                                             temp_settings.overlay_row2_bg_size,
                                              7680.0f,
                                              "%.0f px")) {
-                            if (temp_settings.overlay_row2_custom_spacing < 96.0f)
-                                temp_settings.overlay_row2_custom_spacing = 96.0f;
+                            if (temp_settings.overlay_row2_custom_spacing < temp_settings.overlay_row2_bg_size)
+                                temp_settings.overlay_row2_custom_spacing = temp_settings.overlay_row2_bg_size;
                             if (temp_settings.overlay_row2_custom_spacing > 7680.0f)
                                 temp_settings.overlay_row2_custom_spacing = 7680.0f;
                         }
@@ -5230,8 +5295,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
                                      "WARNING: If this value is too small, item text will overlap.\n"
-                                     "The item icon is %dpx wide. Default: %.0fpx.",
-                                     96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
+                                     "It never goes below the Background Size (%.0fpx), so icons never overlap.\n"
+                                     "Default: %.0fpx.",
+                                     temp_settings.overlay_row2_bg_size, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                     }
@@ -5253,12 +5319,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (temp_settings.overlay_row3_custom_spacing_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                        // Never narrower than the background, so neighbouring icons cannot overlap.
+                        if (temp_settings.overlay_row3_custom_spacing < temp_settings.overlay_row3_bg_size)
+                            temp_settings.overlay_row3_custom_spacing = temp_settings.overlay_row3_bg_size;
                         if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f,
-                                             96.0f,
+                                             temp_settings.overlay_row3_bg_size,
                                              7680.0f,
                                              "%.0f px")) {
-                            if (temp_settings.overlay_row3_custom_spacing < 96.0f)
-                                temp_settings.overlay_row3_custom_spacing = 96.0f;
+                            if (temp_settings.overlay_row3_custom_spacing < temp_settings.overlay_row3_bg_size)
+                                temp_settings.overlay_row3_custom_spacing = temp_settings.overlay_row3_bg_size;
                             if (temp_settings.overlay_row3_custom_spacing > 7680.0f)
                                 temp_settings.overlay_row3_custom_spacing = 7680.0f;
                         }
@@ -5267,8 +5336,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
                                      "WARNING: If this value is too small, item text will overlap.\n"
-                                     "The item icon is %dpx wide. Default: %.0fpx.",
-                                     96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
+                                     "It never goes below the Background Size (%.0fpx), so icons never overlap.\n"
+                                     "Default: %.0fpx.",
+                                     temp_settings.overlay_row3_bg_size, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                     }

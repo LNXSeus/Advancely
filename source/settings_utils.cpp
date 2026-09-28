@@ -1111,6 +1111,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
     settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
     settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
+    settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+    settings->overlay_row2_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
+    settings->overlay_row3_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
     settings->overlay_shared_icon_keep_redundant = DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT;
     settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -2578,6 +2581,46 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *overlay_row1_icon_size_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_icon_size");
+        if (overlay_row1_icon_size_json && cJSON_IsNumber(overlay_row1_icon_size_json)) {
+            settings->overlay_row1_icon_size = (float) overlay_row1_icon_size_json->valuedouble;
+            if (settings->overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
+                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MIN;
+            if (settings->overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
+                settings->overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
+        } else {
+            settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+            defaults_were_used = true;
+        }
+
+        // The shared-parent overlay is drawn ON the row 1 icon, so it can never be larger.
+        if (settings->overlay_row1_shared_icon_size > settings->overlay_row1_icon_size)
+            settings->overlay_row1_shared_icon_size = settings->overlay_row1_icon_size;
+
+        const cJSON *row2_bg_size_json = cJSON_GetObjectItem(visual_settings, "overlay_row2_bg_size");
+        if (row2_bg_size_json && cJSON_IsNumber(row2_bg_size_json)) {
+            settings->overlay_row2_bg_size = (float) row2_bg_size_json->valuedouble;
+            if (settings->overlay_row2_bg_size < OVERLAY_ROW_BG_SIZE_MIN)
+                settings->overlay_row2_bg_size = OVERLAY_ROW_BG_SIZE_MIN;
+            if (settings->overlay_row2_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
+                settings->overlay_row2_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
+        } else {
+            settings->overlay_row2_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row3_bg_size_json = cJSON_GetObjectItem(visual_settings, "overlay_row3_bg_size");
+        if (row3_bg_size_json && cJSON_IsNumber(row3_bg_size_json)) {
+            settings->overlay_row3_bg_size = (float) row3_bg_size_json->valuedouble;
+            if (settings->overlay_row3_bg_size < OVERLAY_ROW_BG_SIZE_MIN)
+                settings->overlay_row3_bg_size = OVERLAY_ROW_BG_SIZE_MIN;
+            if (settings->overlay_row3_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
+                settings->overlay_row3_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
+        } else {
+            settings->overlay_row3_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
+            defaults_were_used = true;
+        }
+
         const cJSON *shared_keep_json = cJSON_GetObjectItem(visual_settings,
                                                                  "overlay_shared_icon_keep_redundant");
         if (shared_keep_json && cJSON_IsBool(shared_keep_json))
@@ -2902,6 +2945,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
         settings->compact_row1_icon_size = DEFAULT_COMPACT_ROW1_ICON_SIZE;
         settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
+        settings->overlay_row1_icon_size = DEFAULT_OVERLAY_ROW1_ICON_SIZE;
+        settings->overlay_row2_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
+        settings->overlay_row3_bg_size = DEFAULT_OVERLAY_ROW_BG_SIZE;
         settings->overlay_shared_icon_keep_redundant = DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT;
         settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
@@ -3948,6 +3994,15 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size",
                               cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_icon_size",
+                              cJSON_CreateNumber(settings->overlay_row1_icon_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_bg_size");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_bg_size",
+                              cJSON_CreateNumber(settings->overlay_row2_bg_size));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_bg_size");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_bg_size",
+                              cJSON_CreateNumber(settings->overlay_row3_bg_size));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_shared_icon_keep_redundant");
         cJSON_AddItemToObject(visuals_obj, "overlay_shared_icon_keep_redundant",
                               cJSON_CreateBool(settings->overlay_shared_icon_keep_redundant));

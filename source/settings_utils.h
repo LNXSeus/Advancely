@@ -131,6 +131,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define COMPACT_ROW1_ICON_SIZE_MIN 8.0f
 #define COMPACT_ROW1_ICON_SIZE_MAX 96.0f
 #define DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE 32.0f // Default shared icon size in pixels for row 1
+// Belt/Page row sizes: row 1 icon edge, and the row 2/3 background edge the icon inside scales with.
+#define DEFAULT_OVERLAY_ROW1_ICON_SIZE 48.0f
+#define OVERLAY_ROW1_ICON_SIZE_MIN 12.0f
+#define OVERLAY_ROW1_ICON_SIZE_MAX 96.0f
+#define DEFAULT_OVERLAY_ROW_BG_SIZE 96.0f
+#define OVERLAY_ROW_BG_SIZE_MIN 12.0f
+#define OVERLAY_ROW_BG_SIZE_MAX 192.0f
 #define DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT false // Keep the shared icon when it looks the same on another sharer
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED false
 #define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING 192.0f // 96px icon + more (took spacing from 1.16 AA template)
@@ -882,6 +889,9 @@ struct AppSettings {
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
     float compact_row1_icon_size; // Icon size for the compact-mode row-1 icon strip.
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1
+    float overlay_row1_icon_size; // Row 1 icon size (Belt/Page).
+    float overlay_row2_bg_size; // Row 2 background size, the icon inside scales with it (Belt/Page).
+    float overlay_row3_bg_size; // Row 3 background size, the icon inside scales with it (Belt/Page).
     bool overlay_shared_icon_keep_redundant; // Draw the overlay shared icon (Row 1 and compact strip/stack) even when identical on another sharer
     bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
     float overlay_row2_custom_spacing; // The custom spacing value for row 2
