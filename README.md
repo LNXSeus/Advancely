@@ -717,6 +717,9 @@ box (here or anywhere in the template editor's search menus) automatically re-fo
 * **Text Headers**: Searching for a text header's display text shows all goals and counters directly linked to that
   header. Like counters, this uses exact matching and is one layer deep so a linked counter will show up, but the
   counter's own linked goals will not.
+* **Descriptions**: A goal's description is searched too, and matching one shows the goal on its own, without expanding
+  its criteria or sub-stats. For a multi-stage goal the tracker searches the goal's own description and that of its
+  currently active stage, the same ones its hover tooltip can show. The template editor searches every stage.
 
 You can also filter by the status indicators shown as colored tags in the template editor by typing one of these
 keywords (the term must match exactly):
@@ -734,6 +737,9 @@ keywords (the term must match exactly):
 * `multi`/`multistat`/`multi-stat`: multi-stat categories, meaning stats that track several sub-stats.
 * `nor1`/`no-r1`/`norow1`: multi-stats whose sub-stats are kept out of the 1st overlay row.
 * `pos`/`position`/`manual`: goals with custom manual-layout coordinates.
+* `desc`: goals with a description. Only main goals carry one, so criteria and sub-stats never match. A multi-stage goal
+  counts if it or any of its stages has one (in the tracker: its own or its active stage's), and under the editor's
+  `MS Goal Details` scope `desc` filters the stages themselves.
 
 Unlike the row keywords, which show a matching goal on its own, `complex`, `multi` and `nor1` expand each matching goal
 in the tracker with all of its criteria or sub-stats, since these keywords are about the sub-items themselves.
@@ -1195,8 +1201,9 @@ list has a `Show Display Names` checkbox to toggle between display names and roo
   detail pane: `rcp` (recipe, advancements only), `cmplx` (has criteria, advancements only), `H` (hidden from the
   overlay and automatic tracker layout),
   `R2`/`R3` (forced to the 2nd/3rd overlay row), `multi` (multi-stat category, stats only), `noR1` (sub-stats kept out
-  of the 1st overlay row, multi-stats only), and `pos` (has custom manual-layout coordinates). The tags appear in the
-  same order as the matching checkboxes in the detail pane. Hover the tags for a tooltip describing the active ones.
+  of the 1st overlay row, multi-stats only), `pos` (has custom manual-layout coordinates), and `desc` (has a
+  description, on a multi-stage goal also when only one of its stages has one). The tags appear in the same order as
+  the matching checkboxes in the detail pane, with `desc` last. Hover the tags for a tooltip describing the active ones.
   Decorations have none of those flags, so their rows carry a type tag instead: `txt` (text header), `line`, or `arw`
   (arrow). The full type name (`Text Header`, `Line`, `Arrow`) is also matched by the editor's search box.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,

@@ -645,7 +645,8 @@ static char s_description_scratch_buffer[TC_DESCRIPTION_BUFFER_BYTES];
 // The text lives in a std::string on the goal and a scratch buffer bridges it to ImGui, refilled
 // from the goal on every frame the box is not being typed into. That is what makes switching goals
 // and stepping through the undo history show up here without any bookkeeping of their own.
-static bool draw_editor_description_box(const char *id, std::string &description, const char *what) {
+static bool draw_editor_description_box(const char *id, std::string &description, const char *what,
+                                        const char *extra_note = nullptr) {
     bool changed = false;
     ImGui::PushID(id);
 
@@ -691,12 +692,12 @@ static bool draw_editor_description_box(const char *id, std::string &description
     }
 
     if (explain) {
-        char description_tooltip_buffer[256];
+        char description_tooltip_buffer[512];
         snprintf(description_tooltip_buffer, sizeof(description_tooltip_buffer),
                  "An optional explanation of this %s, shown as a tooltip when you hover it\n"
                  "on the tracker map. Newlines are allowed. Up to %d characters.\n"
-                 "Stored in the language file, so it can be translated.",
-                 what, TC_DESCRIPTION_MAX_CHARS);
+                 "Stored in the language file, so it can be translated.%s%s",
+                 what, TC_DESCRIPTION_MAX_CHARS, extra_note ? "\n\n" : "", extra_note ? extra_note : "");
         ImGui::SetTooltip("%s", description_tooltip_buffer);
     }
 
@@ -760,13 +761,15 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
                                       bool is_recipe, bool manual_pos_set,
                                       bool is_multi_stat = false,
                                       bool substats_hidden_in_row1 = false,
-                                      bool is_complex = false) {
-    EditorRowTag tags[8];
+                                      bool is_complex = false,
+                                      bool has_description = false) {
+    EditorRowTag tags[9];
     int n = 0;
     // Tag order mirrors the order of the checkboxes in the detail pane of every goal type:
     // Is Recipe, Hidden, Row 2 / Row 3, Multi-Stat Category, Hide Sub-Stats from Row 1, then the
     // manual-layout coordinates further down the pane. The complex tag has no checkbox and sits
-    // next to the recipe tag since both describe what kind of goal this is.
+    // next to the recipe tag since both describe what kind of goal this is. The description tag
+    // comes last.
     if (is_recipe)
         tags[n++] = {
             "rcp", IM_COL32(130, 220, 130, 255),
@@ -798,6 +801,11 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
         };
     if (manual_pos_set)
         tags[n++] = {"pos", IM_COL32(90, 210, 200, 255), "Has custom manual-layout coordinates"};
+    if (has_description)
+        tags[n++] = {
+            "desc", IM_COL32(215, 215, 120, 255),
+            "Has a description (shown when hovering the goal on the tracker map)"
+        };
     draw_editor_row_status_tags(tags, n);
 }
 
@@ -830,6 +838,23 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
     if (manual_pos_set && (strcasecmp(search, "pos") == 0 || strcasecmp(search, "position") == 0
                            || strcasecmp(search, "manual") == 0))
         return true;
+    return false;
+}
+
+// Matches the search term against a goal's description: its text, or the "desc" keyword for any
+// goal that has one. Only main goals carry descriptions, so criteria and sub-stats never match.
+static bool description_matches_search(const std::string &description, const char *search) {
+    if (!search || search[0] == '\0' || description.empty()) return false;
+    if (strcasecmp(search, "desc") == 0) return true;
+    return str_contains_insensitive(description.c_str(), search);
+}
+
+// A multi-stage goal has a description if the goal itself or any of its stages carries one.
+static bool ms_goal_has_description(const EditorMultiStageGoal &goal) {
+    if (!goal.description.empty()) return true;
+    for (const auto &stage: goal.stages) {
+        if (!stage.description.empty()) return true;
+    }
     return false;
 }
 
@@ -7374,25 +7399,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // exposes a different subset (e.g. only advancements have recipes; only criteria/sub-stats
             // sit on Row 1). Build the keyword list to match the scope currently being searched.
             bool ind_hidden = false, ind_row1 = false, ind_row23 = false, ind_recipe = false, ind_pos = false;
-            bool ind_multi = false, ind_subh = false, ind_complex = false;
+            bool ind_multi = false, ind_subh = false, ind_complex = false, ind_desc = false;
             switch (current_search_scope) {
                 case SCOPE_ADVANCEMENTS:
-                    ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = true;
+                    ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = ind_desc = true;
                     ind_complex = creator_selected_version >= MC_VERSION_1_7_2;
                     break;
                 case SCOPE_STATS:
-                    ind_hidden = ind_row1 = ind_row23 = ind_pos = true;
+                    ind_hidden = ind_row1 = ind_row23 = ind_pos = ind_desc = true;
                     ind_multi = ind_subh = true;
                     break;
                 case SCOPE_UNLOCKS:
                 case SCOPE_CUSTOM:
                 case SCOPE_MULTISTAGE:
                 case SCOPE_COUNTERS:
-                    ind_hidden = ind_row23 = ind_pos = true;
+                    ind_hidden = ind_row23 = ind_pos = ind_desc = true;
                     break;
                 case SCOPE_ADVANCEMENT_DETAILS:
                 case SCOPE_STAT_DETAILS:
                     ind_hidden = ind_row1 = ind_pos = true;
+                    break;
+                case SCOPE_MULTISTAGE_DETAILS:
+                    ind_desc = true;
                     break;
                 default:
                     break;
@@ -7402,10 +7430,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             char tooltip_buffer[1024];
             int p = snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Filter the list by name, ID, icon path, or target value.");
-            if (any_indicator) {
+                             ind_desc
+                                 ? "Filter the list by name, ID, icon path, target value, or description."
+                                 : "Filter the list by name, ID, icon path, or target value.");
+            if (any_indicator || ind_desc) {
                 p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
-                              "\n\nIndicator keywords (match the colored row tags):");
+                              any_indicator
+                                  ? "\n\nIndicator keywords (match the colored row tags):"
+                                  : "\n\nKeywords:");
                 if (ind_recipe)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  recipe / rcp  - recipe advancements");
@@ -7431,6 +7463,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ind_pos)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  pos / manual  - goals with custom manual-layout coordinates");
+                if (ind_desc)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  current_search_scope == SCOPE_MULTISTAGE
+                                      ? "\n  desc          - goals with a description (own or on a stage)"
+                                      : current_search_scope == SCOPE_MULTISTAGE_DETAILS
+                                            ? "\n  desc          - stages with a description"
+                                            : "\n  desc          - goals with a description");
             }
             snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                      "\n\nPress Ctrl+F (Cmd+F on macOS) to focus this field.");
@@ -10075,6 +10114,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
                                                 str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
                                                 str_contains_insensitive(advancement.icon_path, tc_search_buffer) ||
+                                                description_matches_search(advancement.description,
+                                                                           tc_search_buffer) ||
                                                 indicator_matches_search(tc_search_buffer, advancement.is_hidden,
                                                                          advancement.in_3rd_row ? 3 : 2,
                                                                          advancement.is_recipe,
@@ -10933,7 +10974,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             advancement.is_recipe,
                             advancement.icon_pos.is_set || advancement.text_pos.is_set ||
                             advancement.progress_pos.is_set,
-                            false, false, adv_is_complex(advancement, creator_selected_version));
+                            false, false, adv_is_complex(advancement, creator_selected_version),
+                            !advancement.description.empty());
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -12840,6 +12882,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(stat_cat.icon_path, tc_search_buffer) ||
+                                description_matches_search(stat_cat.description, tc_search_buffer) ||
                                 indicator_matches_search(tc_search_buffer, stat_cat.is_hidden,
                                                          stat_cat.in_2nd_row ? 2 : 3, stat_cat.is_recipe,
                                                          stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
@@ -13462,7 +13505,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             stat.is_hidden, stat.in_2nd_row, stat.in_3rd_row, false,
                             stat.icon_pos.is_set || stat.text_pos.is_set || stat.progress_pos.is_set,
                             !stat.is_simple_stat,
-                            !stat.is_simple_stat && stat.hide_substats_in_row1);
+                            !stat.is_simple_stat && stat.hide_substats_in_row1,
+                            false, !stat.description.empty());
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -15353,6 +15397,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         return str_contains_insensitive(u.display_name, tc_search_buffer) ||
                                str_contains_insensitive(u.root_name, tc_search_buffer) ||
                                str_contains_insensitive(u.icon_path, tc_search_buffer) ||
+                               description_matches_search(u.description, tc_search_buffer) ||
                                indicator_matches_search(tc_search_buffer, u.is_hidden,
                                                         u.in_3rd_row ? 3 : 2, false,
                                                         u.icon_pos.is_set || u.text_pos.is_set ||
@@ -15832,7 +15877,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         draw_goal_row_status_tags(
                             unlock.is_hidden, false, unlock.in_3rd_row, false,
                             unlock.icon_pos.is_set || unlock.text_pos.is_set ||
-                            unlock.progress_pos.is_set);
+                            unlock.progress_pos.is_set,
+                            false, false, false, !unlock.description.empty());
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -16284,6 +16330,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                str_contains_insensitive(g.root_name, tc_search_buffer) ||
                                str_contains_insensitive(g.icon_path, tc_search_buffer) ||
                                (g.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                               description_matches_search(g.description, tc_search_buffer) ||
                                indicator_matches_search(tc_search_buffer, g.is_hidden,
                                                         g.in_2nd_row ? 2 : 3, false,
                                                         g.icon_pos.is_set || g.text_pos.is_set ||
@@ -16768,7 +16815,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         draw_goal_row_status_tags(
                             goal.is_hidden, goal.in_2nd_row, false, false,
                             goal.icon_pos.is_set || goal.text_pos.is_set ||
-                            goal.progress_pos.is_set);
+                            goal.progress_pos.is_set,
+                            false, false, false, !goal.description.empty());
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -17493,6 +17541,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
                                                 str_contains_insensitive(goal.root_name, tc_search_buffer) ||
                                                 str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
+                                                description_matches_search(goal.description, tc_search_buffer) ||
                                                 indicator_matches_search(tc_search_buffer, goal.is_hidden,
                                                                          goal.in_2nd_row ? 2 : 3, false,
                                                                          goal.icon_pos.is_set || goal.text_pos.is_set ||
@@ -17536,7 +17585,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       str_contains_insensitive(
                                                           stage.parent_advancement, tc_search_buffer)
                                                       ||
-                                                      strstr(target_val_str, tc_search_buffer) != nullptr;
+                                                      strstr(target_val_str, tc_search_buffer) != nullptr ||
+                                                      description_matches_search(stage.description, tc_search_buffer);
 
                                 // Check the type name
                                 bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
@@ -18070,7 +18120,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         draw_goal_row_status_tags(
                             goal.is_hidden, goal.in_2nd_row, false, false,
-                            goal.icon_pos.is_set || goal.text_pos.is_set || goal.progress_pos.is_set);
+                            goal.icon_pos.is_set || goal.text_pos.is_set || goal.progress_pos.is_set,
+                            false, false, false, ms_goal_has_description(goal));
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -18375,7 +18426,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "under the icon even if the name itself was moved.");
                             ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                         }
-                        if (draw_editor_description_box("MSGoalDesc", goal.description, "multi-stage goal")) {
+                        if (draw_editor_description_box("MSGoalDesc", goal.description, "multi-stage goal",
+                                                        "The tracker shows this whenever the current stage has no\n"
+                                                        "description of its own. A stage's description takes priority.")) {
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -18532,7 +18585,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
                                     str_contains_insensitive(stage_type_name, tc_search_buffer) ||
                                     (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) !=
-                                     nullptr)) {
+                                     nullptr) ||
+                                    description_matches_search(stage.description, tc_search_buffer)) {
                                     visible_stages_count++;
                                 }
                             }
@@ -18903,7 +18957,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           stage.parent_advancement, tc_search_buffer)
                                                       ||
                                                       (stage.required_progress != 0 && strstr(
-                                                           target_val_str, tc_search_buffer) != nullptr);
+                                                           target_val_str, tc_search_buffer) != nullptr) ||
+                                                      description_matches_search(stage.description, tc_search_buffer);
 
                                 // Check the type name
                                 bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
@@ -20053,6 +20108,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(c.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(c.icon_path, tc_search_buffer) ||
+                                    description_matches_search(c.description, tc_search_buffer) ||
                                     indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
                                                              false, c.icon_pos.is_set || c.text_pos.is_set ||
                                                                     c.progress_pos.is_set)) {
@@ -20081,6 +20137,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.icon_path, tc_search_buffer) ||
+                                description_matches_search(c.description, tc_search_buffer) ||
                                 indicator_matches_search(tc_search_buffer, c.is_hidden, c.in_2nd_row ? 2 : 3,
                                                          false, c.icon_pos.is_set || c.text_pos.is_set ||
                                                                 c.progress_pos.is_set)) {
@@ -20562,7 +20619,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         draw_goal_row_status_tags(
                             counter.is_hidden, counter.in_2nd_row, false, false,
                             counter.icon_pos.is_set || counter.text_pos.is_set ||
-                            counter.progress_pos.is_set);
+                            counter.progress_pos.is_set,
+                            false, false, false, !counter.description.empty());
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
