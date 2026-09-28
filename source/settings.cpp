@@ -32,6 +32,7 @@
 #include "dialog_utils.h"
 #include "mojang_api.h"
 #include "settings_utils.h" // ImGui imported through this
+#include "settings_preset_import.h"
 #include "global_event_handler.h" // For global variables
 #include "global_hotkeys.h" // For per-row OS registration status in the Hotkeys tab
 #include "path_utils.h" // For path_exists()
@@ -67,20 +68,12 @@ static void update_coop_template_sync(const AppSettings *s) {
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
-// Preset sections holding per-world progress, not config. AppSettings doesn't carry
-// these, so settings_save() leaves them untouched and a preset's captured progress
-// would be lost on Apply; copy_preset_progress_to_settings() restores them. Add any
-// future non-AppSettings progress sections here.
-static const char *PRESET_PROGRESS_SECTIONS[] = {
-    "custom_progress",
-    "stat_progress_override",
-    "stat_stage_baselines",
-};
-
-// Overwrites the progress sections in settings.json with the given preset's versions.
+// Overwrites the picked progress sections (see PRESET_PROGRESS_SECTIONS) in settings.json with the
+// given preset's versions. AppSettings doesn't carry them, so settings_save() leaves them untouched.
 // Suppresses the settings watcher for the write; the caller drives the reload via
 // g_settings_changed. Safe to call right after settings_save().
-static void copy_preset_progress_to_settings(const char *preset_path) {
+static void copy_preset_progress_to_settings(const char *preset_path,
+                                             const bool picked[PRESET_PROGRESS_SECTION_COUNT]) {
     cJSON *preset_root = cJSON_from_file(preset_path);
     if (!preset_root) return;
 
@@ -90,7 +83,8 @@ static void copy_preset_progress_to_settings(const char *preset_path) {
         return;
     }
 
-    for (size_t i = 0; i < sizeof(PRESET_PROGRESS_SECTIONS) / sizeof(PRESET_PROGRESS_SECTIONS[0]); i++) {
+    for (int i = 0; i < PRESET_PROGRESS_SECTION_COUNT; i++) {
+        if (!picked[i]) continue;
         const char *section = PRESET_PROGRESS_SECTIONS[i];
         cJSON_DeleteItemFromObject(settings_root, section);
         cJSON *src = cJSON_GetObjectItem(preset_root, section);
@@ -1207,6 +1201,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Path of a preset loaded but not yet applied. Non-empty means its progress
     // sections should be restored into settings.json on the next Apply.
     static char pending_preset_progress_path[MAX_PATH_LENGTH] = "";
+    static bool pending_preset_progress_sections[PRESET_PROGRESS_SECTION_COUNT] = {};
+    // The preset whose selection popup is open.
+    static char preset_import_path[MAX_PATH_LENGTH] = "";
+    static char preset_import_name[SETTING_PRESET_NAME_LEN] = "";
+    // The ENTER that confirms the popup must not also reach the Apply shortcut once focus returns here.
+    static int preset_import_loaded_frame = -1;
 
     // Helper lambda to auto-select a language (and layout) for the currently selected template
     auto auto_select_language = [&]() {
@@ -1571,8 +1571,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Save and switch between full snapshots of your settings.\n"
                      "Presets are stored as .json files in %s/, right next to\n"
                      "settings.json. Advancely always reads only settings.json itself, so\n"
-                     "loading a preset just fills this window with its values - click\n"
-                     "'Apply Settings' afterwards to actually use them.",
+                     "loading a preset lets you pick which of its settings to take over and\n"
+                     "fills this window with them - click 'Apply Settings' afterwards to\n"
+                     "actually use them.",
                      get_config_display_path());
             ImGui::SetTooltip("%s", preset_help_buffer);
         }
@@ -1703,14 +1704,26 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SameLine();
             if (!have_selection) ImGui::BeginDisabled();
             if (ImGui::Button("Load Preset")) {
-                ImGui::OpenPopup("Load Preset?");
+                char preset_path[MAX_PATH_LENGTH];
+                snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
+                         preset_names[preset_selected]);
+                if (preset_import_open(preset_path, preset_names[preset_selected], &temp_settings)) {
+                    strncpy(preset_import_path, preset_path, sizeof(preset_import_path) - 1);
+                    preset_import_path[sizeof(preset_import_path) - 1] = '\0';
+                    strncpy(preset_import_name, preset_names[preset_selected], sizeof(preset_import_name) - 1);
+                    preset_import_name[sizeof(preset_import_name) - 1] = '\0';
+                } else {
+                    snprintf(preset_status_msg, sizeof(preset_status_msg),
+                             "Failed to read preset '%s'.", preset_names[preset_selected]);
+                    preset_status_is_error = true;
+                }
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char load_tooltip_buffer[768];
                 snprintf(load_tooltip_buffer, sizeof(load_tooltip_buffer),
-                         "Fill this window with the selected preset's values.\n"
-                         "Nothing is applied yet - review the tabs, then click 'Apply Settings'\n"
-                         "to switch to the preset (or 'Revert Changes' to discard it).");
+                         "Pick which of the selected preset's settings to take over.\n"
+                         "They fill this window, but nothing is applied yet - review the tabs, then\n"
+                         "click 'Apply Settings' to use them (or 'Revert Changes' to discard them).");
                 ImGui::SetTooltip("%s", load_tooltip_buffer);
             }
 
@@ -1727,6 +1740,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetTooltip("%s", remove_tooltip_buffer);
             }
             if (!have_selection) ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
+            ImGui::Text("(Official Presets)");
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered()) {
+                char open_official_presets_tooltip_buffer[512];
+                snprintf(open_official_presets_tooltip_buffer, sizeof(open_official_presets_tooltip_buffer),
+                         "Opens a table of officially added settings presets in your browser.\n"
+                         "These presets get replaced through auto-updates.");
+                ImGui::SetTooltip("%s", open_official_presets_tooltip_buffer);
+            }
+            if (ImGui::IsItemClicked()) {
+                open_content("https://github.com/LNXSeus/Advancely#Officially-Added-Settings-Presets");
+            }
         } else {
             ImGui::TextDisabled("No presets saved yet.");
         }
@@ -1795,74 +1823,23 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndPopup();
         }
 
-        // Load confirmation popup (only opens via the enabled "Load Preset" button).
-        ImVec2 load_popup_center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(load_popup_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        if (ImGui::BeginPopupModal("Load Preset?", nullptr,
-                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
-            const char *load_name = (preset_selected >= 0 && preset_selected < preset_count)
-                                        ? preset_names[preset_selected]
-                                        : "";
-            char load_prompt_buffer[256];
-            snprintf(load_prompt_buffer, sizeof(load_prompt_buffer), "Load the preset '%s'?", load_name);
-            ImGui::Text("%s", load_prompt_buffer);
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
-                               "Presets replace ALL settings, including your account settings\n"
-                               "and any manually set progress (stat and custom goal progress).\n"
-                               "They will be set to whatever is stored in the preset.");
-            ImGui::TextDisabled("Nothing changes until you click 'Apply Settings'.");
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
-            if (ImGui::Button("Load") || enter_pressed) {
-                if (preset_selected >= 0 && preset_selected < preset_count) {
-                    char preset_path[MAX_PATH_LENGTH];
-                    snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(),
-                             preset_names[preset_selected]);
-                    if (settings_load_from_file(&temp_settings, preset_path)) {
-                        // Force the template list to rescan so the tabs refresh in place.
-                        last_scanned_version[0] = '\0';
-                        // Remember the source so Apply can restore its captured progress.
-                        strncpy(pending_preset_progress_path, preset_path, sizeof(pending_preset_progress_path) - 1);
-                        pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
-                        snprintf(preset_status_msg, sizeof(preset_status_msg),
-                                 "Loaded preset '%s'. Click 'Apply Settings' to use it.",
-                                 preset_names[preset_selected]);
-                        preset_status_is_error = false;
-                    } else {
-                        snprintf(preset_status_msg, sizeof(preset_status_msg),
-                                 "Failed to read preset '%s'.", preset_names[preset_selected]);
-                        preset_status_is_error = true;
-                    }
+        bool progress_picked[PRESET_PROGRESS_SECTION_COUNT] = {};
+        if (preset_import_render(&temp_settings, progress_picked)) {
+            // Force the template list to rescan so the tabs refresh in place.
+            last_scanned_version[0] = '\0';
+            // Remember the source and the picked sections so Apply can restore that progress.
+            pending_preset_progress_path[0] = '\0';
+            for (int i = 0; i < PRESET_PROGRESS_SECTION_COUNT; i++) {
+                pending_preset_progress_sections[i] = progress_picked[i];
+                if (progress_picked[i]) {
+                    strncpy(pending_preset_progress_path, preset_import_path, sizeof(pending_preset_progress_path) - 1);
+                    pending_preset_progress_path[sizeof(pending_preset_progress_path) - 1] = '\0';
                 }
-                ImGui::CloseCurrentPopup();
             }
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buf[128];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Fill this window with the preset's values.\n"
-                         "You can also press 'ENTER'.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-
-            ImGui::SameLine();
-
-            bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
-            if (ImGui::Button("Cancel") || esc_pressed) {
-                ImGui::CloseCurrentPopup();
-            }
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buf[128];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Keep your current settings.\n"
-                         "You can also press 'ESCAPE'.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-
-            ImGui::EndPopup();
+            snprintf(preset_status_msg, sizeof(preset_status_msg),
+                     "Loaded preset '%s'. Click 'Apply Settings' to use it.", preset_import_name);
+            preset_status_is_error = false;
+            preset_import_loaded_frame = ImGui::GetFrameCount();
         }
 
         if (preset_status_msg[0] != '\0') {
@@ -8256,7 +8233,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
     // Apply Settings (Ctrl+S / Cmd+S by default, rebindable in the Hotkeys tab)
     const bool ctrl_s_pressed = (t && t->settings_apply_pressed);
-    const bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive();
+    const bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive() &&
+                               ImGui::GetFrameCount() != preset_import_loaded_frame;
     const bool window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     const bool no_popup_open = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 
@@ -8370,7 +8348,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // settings_save left the progress sections as-is; if this Apply is for a
                 // loaded preset, restore that preset's captured progress before the reload.
                 if (pending_preset_progress_path[0] != '\0') {
-                    copy_preset_progress_to_settings(pending_preset_progress_path);
+                    copy_preset_progress_to_settings(pending_preset_progress_path, pending_preset_progress_sections);
                     pending_preset_progress_path[0] = '\0';
                 }
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
@@ -8532,7 +8510,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
         // Restore a loaded preset's captured progress before the relaunch reads settings.json.
         if (pending_preset_progress_path[0] != '\0') {
-            copy_preset_progress_to_settings(pending_preset_progress_path);
+            copy_preset_progress_to_settings(pending_preset_progress_path, pending_preset_progress_sections);
             pending_preset_progress_path[0] = '\0';
         }
         saved_settings = temp_settings; // Sync so has_unsaved_changes stays false on future frames

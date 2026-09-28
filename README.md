@@ -44,6 +44,7 @@
 - [The Stream Overlay](#the-stream-overlay)
 - [The Template Editor](#the-template-editor-esc--open-template-editor)
 - [The Settings Window](#the-settings-window-esc)
+- [Officially Added Settings Presets](#officially-added-settings-presets)
 - [Co-op Multiplayer](#co-op-multiplayer)
 - [Extensive Version Support](#extensive-version-support)
 - [Officially Added Templates](#officially-added-templates)
@@ -1705,6 +1706,28 @@ A few controls stay fixed: `ESC` opens the settings, `Enter` also applies settin
 saves the template, `Ctrl+F` focuses the search box, and the mouse controls (left-click to select, right-click or middle
 mouse to pan, wheel to zoom). Right-clicking an element while the Visual Layout Editor runs shows that goal in the
 template editor without changing the map selection.
+</details>
+
+***
+
+## Officially Added Settings Presets
+
+> **These will get replaced through auto updates!**
+
+Settings presets are stored as `.json` files next to `settings.json` in the `resources/config/` folder. Select one in the
+`Settings Presets` bar at the top of the settings window and click `Load Preset` to pick which of its settings to take
+over. Your own `settings.json` is never touched by updates, but official presets are, so copy one under a new name
+before editing it.
+
+<details>
+<summary><strong>View Preset List</strong></summary>
+<br>
+
+| Preset          | Made for Template                            | Description                                                                                                                                       |
+|-----------------|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `1.16.1 AATool` | 1.16.1 `all_advancements` `aatool_optimized` | Most closely replicates the overlay and tracker layout of the classic 1.16.1 AATool compact mode. Only overlay settings differ from the defaults. |
+
+_(Submit your preset through the [official discord](https://discord.gg/TyNgXDz))._
 </details>
 
 ***

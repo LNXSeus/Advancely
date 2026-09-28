@@ -58,6 +58,7 @@ set(SOURCE_FILES
         "source/settings.cpp"
         "source/path_utils.cpp"
         "source/settings_utils.cpp"
+        "source/settings_preset_import.cpp"
         "source/file_utils.cpp"
         "source/format_utils.cpp" # for formatting strings
         "source/temp_creator.cpp"

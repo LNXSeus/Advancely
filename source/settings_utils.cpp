@@ -3445,28 +3445,16 @@ bool settings_load(AppSettings *settings) {
     return defaults_were_used;
 }
 
-bool settings_load_from_file(AppSettings *settings, const char *path) {
-    // Loads an alternate settings file (a preset) into `settings`. Unlike
-    // settings_load(), it skips the .bak recovery and the "corrupted" popup that
-    // are specific to the primary settings.json, and never writes anything.
-    settings_set_defaults(settings);
-    cJSON *json = cJSON_from_file(path);
-    if (json == nullptr) return false;
+void settings_load_from_json(AppSettings *settings, cJSON *json) {
+    if (!settings || !json) return;
     settings_apply_json(settings, json);
-    cJSON_Delete(json);
     construct_template_paths(settings);
-    return true;
 }
 
-void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context) {
-    if (!settings) return;
-
-    // Read the existing file, or create a new JSON object if it doesn't exist
-    cJSON *root = cJSON_from_file(get_settings_file_path());
-    if (!root) {
-        root = cJSON_CreateObject();
-    }
-
+// Writes `settings` into `root` the way settings_save() stores it on disk, according to `context`.
+// Keys it does not own (e.g. stat_stage_baselines) are left as they are in `root`.
+static void settings_fill_json(cJSON *root, const AppSettings *settings, const TemplateData *td,
+                               SettingsSaveContext context) {
     // General settings, paths, and progress are only saved with "ALL" context
     if (context == SAVE_CONTEXT_ALL) {
         // Update top-level settings using a safe "delete then add" pattern
@@ -4261,6 +4249,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(root, "view_state");
         cJSON_AddItemToObject(root, "view_state", view_state_obj);
     }
+}
+
+void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context) {
+    if (!settings) return;
+
+    // Read the existing file, or create a new JSON object if it doesn't exist
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) {
+        root = cJSON_CreateObject();
+    }
+
+    settings_fill_json(root, settings, td, context);
 
     // Atomically write the modified JSON object to the file. A temp-file + rename
     // keeps any concurrent reader (file watcher thread, a second process) from
@@ -4276,6 +4276,17 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                     get_settings_file_path());
     }
     cJSON_Delete(root);
+}
+
+cJSON *settings_to_json(const AppSettings *settings) {
+    if (!settings) return nullptr;
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) root = cJSON_CreateObject();
+    settings_fill_json(root, settings, nullptr, SAVE_CONTEXT_ALL);
+    // SAVE_CONTEXT_ALL leaves overlay_window alone because the overlay owns it on disk, but the
+    // settings window edits its width, so the in-memory copy is the one callers want to see.
+    save_window_rect(get_or_create_object(root, "visuals"), "overlay_window", &settings->overlay_window);
+    return root;
 }
 
 void settings_save_overlay_width_only(int width) {

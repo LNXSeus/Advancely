@@ -1167,18 +1167,16 @@ const char *app_hotkey_display_label(const AppHotkey *hk, char *buf, size_t buf_
 bool settings_load(AppSettings *settings);
 
 /**
- * @brief Loads settings from an arbitrary file (e.g. a settings preset) into `settings`.
+ * @brief Applies a settings JSON tree (in the settings.json format) on top of `settings`.
  *
- * Behaves like settings_load() but reads from `path` instead of settings.json, and
- * skips the .bak recovery and the "corrupted" popup that are specific to the primary
- * settings file. It never writes anything to disk. After parsing it calls
- * `construct_template_paths` to build the final file paths.
+ * Unlike settings_load() it does not reset to defaults first, never touches the disk and
+ * skips the .bak recovery. Pass a complete tree (see settings_to_json) so no key falls back
+ * to its default. Calls `construct_template_paths` afterwards.
  *
- * @param settings A pointer to the AppSettings struct to be populated.
- * @param path The full path to the settings file to read.
- * @return true if the file was read and parsed, false if it could not be read.
+ * @param settings The AppSettings struct to update.
+ * @param json The settings tree to apply. Not modified or freed.
  */
-bool settings_load_from_file(AppSettings *settings, const char *path);
+void settings_load_from_json(AppSettings *settings, cJSON *json);
 
 /**
  * @brief Saves settings to settings.json based on a specific context.
@@ -1188,6 +1186,17 @@ bool settings_load_from_file(AppSettings *settings, const char *path);
  * @param context The context determining which parts of the settings to save.
  */
 void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context);
+
+/**
+ * @brief Builds the settings.json tree `settings` would be saved as, without writing it.
+ *
+ * Starts from the current settings.json so sections AppSettings does not carry (the progress
+ * sections) are included, then writes every setting like settings_save(SAVE_CONTEXT_ALL), plus
+ * the in-memory overlay_window.
+ *
+ * @return A new cJSON tree the caller must cJSON_Delete, or NULL if `settings` is NULL.
+ */
+cJSON *settings_to_json(const AppSettings *settings);
 
 void settings_save_overlay_width_only(int width);
 
