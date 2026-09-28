@@ -2182,7 +2182,7 @@ Full credits to creators of templates displayed [here](#contributors).
 - @towardstars and @yumekotism on dc: `zh_cn` translations for `all_advancements` templates. _Make sure you use
   the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI)._
 
-_(Submit your template through the [official discord](https://discord.gg/TyNgXDz)._
+_(Submit your template through the [official discord](https://discord.gg/TyNgXDz))._
 </details>
 
 ***
