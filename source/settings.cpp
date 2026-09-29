@@ -640,6 +640,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row2_freeze_align != b->overlay_row2_freeze_align ||
         a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
         a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
+        a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
@@ -913,6 +914,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
             a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
             a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
+            a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
             a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
             a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
 
@@ -4008,6 +4010,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetTooltip("%s", separator_tooltip_buffer);
                     }
 
+                    ImGui::Checkbox("Show Completed Row 2 Goals", &temp_settings.overlay_row2_show_completed);
+                    if (ImGui::IsItemHovered()) {
+                        char show_completed_row_2_tooltip_buffer[1024];
+                        snprintf(show_completed_row_2_tooltip_buffer, sizeof(show_completed_row_2_tooltip_buffer),
+                                 "If checked, goals in Row 2 (%s, Unlocks, and any goals\n"
+                                 "forced to Row 2) stay visible when completed instead of disappearing.\n"
+                                 "This is independent of the main 'Goal Visibility' setting.\n"
+                                 "Default: Off", advancements_label_plural_uppercase);
+
+                        ImGui::SetTooltip("%s", show_completed_row_2_tooltip_buffer);
+                    }
+
                     ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
                     if (ImGui::IsItemHovered()) {
                         char hide_completed_row_3_tooltip_buffer[1024];
@@ -4016,8 +4030,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Multi-Stage Goals, Counters, and any %s/Unlocks\n"
                                  "forced to Row 3) will disappear when completed.\n"
                                  "This is independent of the main 'Goal Visibility' setting.\n\n"
-                                 "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
-                                 "ignoring this setting.\n"
+                                 "NOTE: Goals forced to Row 2 via the Template Editor follow\n"
+                                 "'Show Completed Row 2 Goals' instead.\n"
                                  "Default: Off", advancements_label_plural_uppercase);
 
                         ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
