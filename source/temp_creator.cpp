@@ -273,8 +273,8 @@ struct EditorTrackableItem {
     char display_name[192];
     char icon_path[256];
     int goal;
-    // Only meaningful with a target of exactly 1: leaves the "(0/1)" out everywhere the goal shows.
-    bool hide_progress = true;
+    // Only meaningful with a target: leaves the "(3/10)" out everywhere the goal shows.
+    bool hide_progress = false;
     bool is_hidden;
     bool in_2nd_row;
     bool in_3rd_row; // Forces unlocks from Row 2 to Row 3
@@ -340,7 +340,7 @@ struct EditorSubGoal {
     char parent_advancement[192];
     char root_name[192];
     int required_progress;
-    bool hide_progress = true; // Stat stages with a target of exactly 1: leave the "(0/1)" out
+    bool hide_progress = false; // Stat stages with a target: leave the "(3/10)" out
     char icon_path[256]; // Icon path for each stage
     int sort_order = 0;
 
@@ -2122,7 +2122,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
             new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
         }
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
-        new_item.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(item_json, "hide_progress"));
+        new_item.hide_progress = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "hide_progress"));
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_item.in_2nd_row = cJSON_IsTrue(in_2nd_row);
         if (cJSON_IsBool(in_3rd_row)) new_item.in_3rd_row = cJSON_IsTrue(in_3rd_row);
@@ -2340,7 +2340,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 }
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
                 if (cJSON_IsNumber(crit_target)) new_crit.goal = crit_target->valueint;
-                new_crit.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(criterion_json, "hide_progress"));
+                new_crit.hide_progress = cJSON_IsTrue(cJSON_GetObjectItem(criterion_json, "hide_progress"));
 
                 // Stat criteria language file
                 char crit_lang_key[512];
@@ -2381,7 +2381,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             }
 
             if (cJSON_IsNumber(target)) new_crit.goal = target->valueint;
-            new_crit.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(category_json, "hide_progress"));
+            new_crit.hide_progress = cJSON_IsTrue(cJSON_GetObjectItem(category_json, "hide_progress"));
 
             // For simple stats, the criterion's display name is the same as the category's
             new_cat.criteria.push_back(new_crit);
@@ -2469,7 +2469,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target)) new_stage.required_progress = target->valueint;
-                new_stage.hide_progress = !cJSON_IsFalse(cJSON_GetObjectItem(stage_json, "hide_progress"));
+                new_stage.hide_progress = cJSON_IsTrue(cJSON_GetObjectItem(stage_json, "hide_progress"));
 
                 // Per-stage icon file if used
                 cJSON *stage_icon = cJSON_GetObjectItem(stage_json, "icon");
@@ -3113,7 +3113,7 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
             // Only add target if it's not 0 (default for unlocks)
             cJSON_AddNumberToObject(item_json, "target", item.goal);
         }
-        if (item.goal == 1) cJSON_AddBoolToObject(item_json, "hide_progress", item.hide_progress);
+        if (item.goal > 0 && item.hide_progress) cJSON_AddBoolToObject(item_json, "hide_progress", true);
         if (item.is_hidden) {
             cJSON_AddBoolToObject(item_json, "hidden", item.is_hidden);
         }
@@ -3200,7 +3200,7 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
             if (crit.goal != 0) {
                 cJSON_AddNumberToObject(cat_json, "target", crit.goal);
             }
-            if (crit.goal == 1) cJSON_AddBoolToObject(cat_json, "hide_progress", crit.hide_progress);
+            if (crit.goal > 0 && crit.hide_progress) cJSON_AddBoolToObject(cat_json, "hide_progress", true);
         } else {
             // Complex (multi-stat)
             if (cat.hide_substats_in_row1) {
@@ -3216,7 +3216,7 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
                 if (crit.goal != 0) {
                     cJSON_AddNumberToObject(crit_json, "target", crit.goal);
                 }
-                if (crit.goal == 1) cJSON_AddBoolToObject(crit_json, "hide_progress", crit.hide_progress);
+                if (crit.goal > 0 && crit.hide_progress) cJSON_AddBoolToObject(crit_json, "hide_progress", true);
                 // Serialize sub-stat linked goals
                 serialize_linked_goals(crit_json, crit.linked_goals, crit.linked_goal_mode);
                 save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
@@ -3291,8 +3291,8 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
             cJSON_AddStringToObject(stage_json, "root_name", stage.root_name);
             if (stage.type != SUBGOAL_MANUAL) {
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
-                if (stage.type == SUBGOAL_STAT && stage.required_progress == 1)
-                    cJSON_AddBoolToObject(stage_json, "hide_progress", stage.hide_progress);
+                if (stage.type == SUBGOAL_STAT && stage.required_progress > 0 && stage.hide_progress)
+                    cJSON_AddBoolToObject(stage_json, "hide_progress", true);
                 // Serialize stage linked goals (non-final stages only)
                 serialize_linked_goals(stage_json, stage.linked_goals, stage.linked_goal_mode);
                 // Auto-complete this stage when the next stage is completed.
@@ -14146,14 +14146,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                 ImGui::SetTooltip("%s", target_tooltip_buffer);
                             }
-                            if (simple_crit.goal == 1) {
+                            if (simple_crit.goal > 0) {
                                 if (ImGui::Checkbox("Hide Progress", &simple_crit.hide_progress)) {
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char hide_progress_tooltip_buffer[256];
                                     snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
-                                             "Leaves the progress value (0/1) out everywhere this stat is shown:\n"
+                                             "Leaves the progress value (e.g. 3/10) out everywhere this stat is shown:\n"
                                              "the tracker, the overlay and the compact overlay.");
                                     ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
                                 }
@@ -14423,6 +14423,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 bool ba_open_layout = false;
                                 bool ba_open_delete = false;
                                 bool ba_do_toggle_hidden = false;
+                                bool ba_do_toggle_hide_progress = false;
 
                                 float ba_btn_w = ImGui::CalcTextSize("Bulk Actions...").x +
                                                  ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -14465,6 +14466,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         ImGui::SetTooltip("%s",
                                                           "Flip Hidden on every selected sub-stat.\n"
                                                           "If most are visible they all become hidden, and vice versa.");
+                                    if (ImGui::Selectable("Toggle Hide Progress##sub_ba")) ba_do_toggle_hide_progress = true;
+                                    if (ImGui::IsItemHovered())
+                                        ImGui::SetTooltip("%s",
+                                                          "Flip Hide Progress on every selected sub-stat with a target value.\n"
+                                                          "If most show their progress they all hide it, and vice versa.\n"
+                                                          "Sub-stats without a target value are left alone.");
                                     if (ImGui::Selectable("Layout Coordinates...##sub_ba")) ba_open_layout = true;
                                     if (ImGui::IsItemHovered())
                                         ImGui::SetTooltip("%s",
@@ -14491,6 +14498,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         stat_cat.criteria[idx].is_hidden = target_hidden;
                                     }
                                     save_message_type = MSG_NONE;
+                                }
+
+                                if (ba_do_toggle_hide_progress) {
+                                    int targeted_count = 0;
+                                    int hidden_progress_count = 0;
+                                    for (int idx: s_sub_selection) {
+                                        if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
+                                        if (stat_cat.criteria[idx].goal <= 0) continue;
+                                        targeted_count++;
+                                        if (stat_cat.criteria[idx].hide_progress) hidden_progress_count++;
+                                    }
+                                    bool target_hide_progress = (hidden_progress_count * 2 < targeted_count);
+                                    for (int idx: s_sub_selection) {
+                                        if (idx < 0 || (size_t) idx >= stat_cat.criteria.size()) continue;
+                                        if (stat_cat.criteria[idx].goal <= 0) continue;
+                                        stat_cat.criteria[idx].hide_progress = target_hide_progress;
+                                    }
+                                    if (targeted_count > 0) save_message_type = MSG_NONE;
                                 }
 
                                 if (ba_open_icon) {
@@ -14856,14 +14881,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                     ImGui::SetTooltip("%s", target_tooltip_buffer);
                                 }
-                                if (crit.goal == 1) {
+                                if (crit.goal > 0) {
                                     if (ImGui::Checkbox("Hide Progress", &crit.hide_progress)) {
                                         save_message_type = MSG_NONE;
                                     }
                                     if (ImGui::IsItemHovered()) {
                                         char hide_progress_tooltip_buffer[256];
                                         snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
-                                                 "Leaves the progress value (0/1) out everywhere this sub-stat is shown:\n"
+                                                 "Leaves the progress value (e.g. 3/10) out everywhere this sub-stat is shown:\n"
                                                  "the tracker, the overlay and the compact overlay.");
                                         ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
                                     }
@@ -17128,14 +17153,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      ">0 = Progress-based counter that completes at this value.");
                             ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
                         }
-                        if (goal.goal == 1) {
+                        if (goal.goal > 0) {
                             if (ImGui::Checkbox("Hide Progress##CustomGoal", &goal.hide_progress)) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char hide_progress_tooltip_buffer[256];
                                 snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
-                                         "Leaves the progress value (0/1) out everywhere this custom goal is shown:\n"
+                                         "Leaves the progress value (e.g. 3/10) out everywhere this custom goal is shown:\n"
                                          "the tracker, the overlay and the compact overlay.");
                                 ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
                             }
@@ -19559,7 +19584,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "'Auto-complete if next stage is completed' checkbox on this stage.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
-                                    if (stage.required_progress == 1) {
+                                    if (stage.required_progress > 0) {
                                         if (ImGui::Checkbox("Hide Progress", &stage.hide_progress)) {
                                             ms_goal_data_changed = true;
                                             save_message_type = MSG_NONE;
@@ -19567,7 +19592,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         if (ImGui::IsItemHovered()) {
                                             char hide_progress_tooltip_buffer[256];
                                             snprintf(hide_progress_tooltip_buffer, sizeof(hide_progress_tooltip_buffer),
-                                                     "Leaves the progress value (0/1) out everywhere this stage is shown:\n"
+                                                     "Leaves the progress value (e.g. 3/10) out everywhere this stage is shown:\n"
                                                      "the tracker, the overlay, the compact overlay and any stage mirroring it.");
                                             ImGui::SetTooltip("%s", hide_progress_tooltip_buffer);
                                         }

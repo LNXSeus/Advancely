@@ -284,8 +284,8 @@ struct TrackableItem {
     bool done; // For advancements/unlocks: Is it completed?
     int progress; // For stats: The current value, e.g., 5.
     int goal; // For stats: The target value, e.g., 40.
-    // Template "hide_progress": with a target of exactly 1 the "(0/1)" is left out everywhere the
-    // goal shows. On unless the template says otherwise. Read it through item_progress_hidden().
+    // Template "hide_progress": a goal with a target leaves its "(3/10)" out everywhere it shows.
+    // Off unless the template turns it on. Read it through item_progress_hidden().
     bool hide_progress;
 
     // For legacy stat snapshotting
@@ -341,9 +341,9 @@ struct TrackableItem {
     float cached_prog_font;
 };
 
-// True when a goal's "(0/1)" is left out: its target is exactly 1 and the template hides it.
+// True when a goal's "(3/10)" is left out: it has a target and the template hides it.
 inline bool item_progress_hidden(const TrackableItem *item) {
-    return item && item->goal == 1 && item->hide_progress;
+    return item && item->goal > 0 && item->hide_progress;
 }
 
 
@@ -522,8 +522,8 @@ inline int ms_stage_shown_target(const SubGoal *stage) {
     if (!stage) return 0;
     if (stage->type == SUBGOAL_MIRROR) return stage->mirror_required;
     if (stage->type == SUBGOAL_STAT) {
-        // A stage whose target is exactly 1 can leave its "(0/1)" out, as if it had no number.
-        if (stage->required_progress == 1 && stage->hide_progress) return 0;
+        // A stage with a target can leave its "(3/10)" out, as if it had no number.
+        if (stage->required_progress > 0 && stage->hide_progress) return 0;
         return stage->required_progress;
     }
     return 0;

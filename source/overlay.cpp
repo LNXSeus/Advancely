@@ -1063,7 +1063,7 @@ struct CompactEntry {
     bool percent; // overall progress percentage entry: shows percent_value as "45.32%"
     float percent_value;
     bool no_target; // open-ended goal: show the count with no denominator
-    bool no_count; // target-1 goal hiding its "(0/1)": shows only its completion marker
+    bool no_count; // goal hiding its "(3/10)": shows only its completion marker
     bool checkbox; // manually-checkable goal: shows [x] manual / [a] auto-done / [o] not done
     bool auto_mark; // auto-only goal (targeted custom, counter): shows [a] when done, nothing otherwise
     bool manual; // is_manually_completed (drives [x])
@@ -1857,7 +1857,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                         stat_face = s->criteria[0]->highest_contributor_uuid;
                 }
                 consider(COMPACT_COUNTER_STATS, COMPACT_COUNTER_STATS, s->root_name, key,
-                         compact_pop_progress(settings, COMPACT_COUNTER_STATS, prog),
+                         compact_pop_progress(settings, COMPACT_COUNTER_STATS, item_progress_hidden(s->criteria[0]) ? 0 : prog),
                          compact_pop_done(settings, COMPACT_COUNTER_STATS, s->done), false,
                          nullptr, nullptr, s->icon_path, itext, false, stat_face);
             } else {
@@ -1920,7 +1920,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                             sub_face = sub->highest_contributor_uuid;
                     }
                     consider(COMPACT_COUNTER_SUB_STATS, COMPACT_COUNTER_SUB_STATS, s->root_name, key,
-                             compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, sub->progress),
+                             compact_pop_progress(settings, COMPACT_COUNTER_SUB_STATS, item_progress_hidden(sub) ? 0 : sub->progress),
                              compact_pop_done(settings, COMPACT_COUNTER_SUB_STATS, sub->done), true,
                              s->icon_path, ptext, sub->icon_path, itext,
                              sub->is_shared && (!sub->is_shared_same_parent ||
@@ -1966,7 +1966,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 else if (c->custom_contributor_uuid[0]) cus_face = c->custom_contributor_uuid;
             }
             consider(COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name, key,
-                     compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, c->progress),
+                     compact_pop_progress(settings, COMPACT_COUNTER_CUSTOM, item_progress_hidden(c) ? 0 : c->progress),
                      compact_pop_done(settings, COMPACT_COUNTER_CUSTOM, c->done), false,
                      nullptr, nullptr, c->icon_path, itext, false, cus_face);
         }

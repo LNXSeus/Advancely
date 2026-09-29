@@ -2273,10 +2273,10 @@ static void tracker_apply_stat_overrides_without_file(Tracker *t, cJSON *setting
     }
 }
 
-// Template "hide_progress" of a goal or stage: leaves its "(0/1)" out when the target is exactly 1.
-// On unless the template sets it to false.
+// Template "hide_progress" of a goal or stage: leaves its "(3/10)" out when it has a target.
+// Off unless the template sets it to true.
 static bool parse_hide_progress(cJSON *json_obj) {
-    return !cJSON_IsFalse(cJSON_GetObjectItem(json_obj, "hide_progress"));
+    return cJSON_IsTrue(cJSON_GetObjectItem(json_obj, "hide_progress"));
 }
 
 /**
