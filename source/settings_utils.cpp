@@ -1267,7 +1267,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->igt_unit_spacing = false;
     settings->igt_always_show_ms = false;
     settings->igt_freeze_on_completion = DEFAULT_IGT_FREEZE_ON_COMPLETION;
-    settings->overlay_show_update_timer = true;
+    settings->overlay_show_update_timer = false;
     strncpy(settings->overlay_progress_separator, "|", sizeof(settings->overlay_progress_separator) - 1);
     settings->overlay_progress_separator[sizeof(settings->overlay_progress_separator) - 1] = '\0';
 
@@ -1789,7 +1789,7 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         const cJSON *show_update = cJSON_GetObjectItem(general_settings, "overlay_show_update_timer");
         if (show_update && cJSON_IsBool(show_update)) settings->overlay_show_update_timer = cJSON_IsTrue(show_update);
         else {
-            settings->overlay_show_update_timer = true;
+            settings->overlay_show_update_timer = false;
             defaults_were_used = true;
         }
 

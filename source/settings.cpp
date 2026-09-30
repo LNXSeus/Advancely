@@ -3994,7 +3994,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Shows the time since the last game file update.\n"
                                  "When Hermes is active this timer only represents the time\n"
                                  "since the last full game-save sync from disk.\n"
-                                 "Default: On");
+                                 "Default: Off");
                         ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
                     }
 
