@@ -150,6 +150,9 @@ typedef enum {
     X("visuals.compact_chain_entries", PRESET_GROUP_OVERLAY, "Compact Panel: Chain All Entries", 0, NULL) \
     X("visuals.compact_chain_separator", PRESET_GROUP_OVERLAY, "Compact Panel: Chain Separator", 0, NULL) \
     X("visuals.compact_cycle_interval", PRESET_GROUP_OVERLAY, "Compact Panel: Cycle Interval", 0, NULL) \
+    X("visuals.compact_panel_goal_icon", PRESET_GROUP_OVERLAY, "Compact Panel: Show Goal Icon", 0, NULL) \
+    X("visuals.compact_panel_text_align", PRESET_GROUP_OVERLAY, "Compact Panel: Text Alignment", 0, \
+      "Left|Center|Right") \
     X("visuals.compact_stack_types|visuals.compact_stack_items", PRESET_GROUP_OVERLAY, "Compact Stack: Content", 0, \
       NULL) \
     X("visuals.compact_stack_pop_on_progress", PRESET_GROUP_OVERLAY, "Compact Stack: Pop On Progress", 0, NULL) \

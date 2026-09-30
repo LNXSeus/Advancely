@@ -185,6 +185,8 @@
 		"compact_panel_pixel_scale":	4,
 		"compact_panel_padding":	12,
 		"compact_panel_align":	0,
+		"compact_panel_text_align":	1,
+		"compact_panel_goal_icon":	false,
 		"compact_label_font_name":	"Minecraft.ttf",
 		"compact_count_font_name":	"MinecraftBold.otf",
 		"compact_stack_font_name":	"Minecraft.ttf",

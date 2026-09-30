@@ -583,6 +583,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
         a->compact_panel_padding != b->compact_panel_padding ||
         a->compact_panel_align != b->compact_panel_align ||
+        a->compact_panel_text_align != b->compact_panel_text_align ||
+        a->compact_panel_goal_icon != b->compact_panel_goal_icon ||
         strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
         strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
         strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
@@ -848,6 +850,8 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->compact_panel_pixel_scale != b->compact_panel_pixel_scale ||
             a->compact_panel_padding != b->compact_panel_padding ||
             a->compact_panel_align != b->compact_panel_align ||
+            a->compact_panel_text_align != b->compact_panel_text_align ||
+            a->compact_panel_goal_icon != b->compact_panel_goal_icon ||
             strcmp(a->compact_label_font_name, b->compact_label_font_name) != 0 ||
             strcmp(a->compact_count_font_name, b->compact_count_font_name) != 0 ||
             strcmp(a->compact_stack_font_name, b->compact_stack_font_name) != 0 ||
@@ -4670,6 +4674,32 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "to jump to the next goal, which also flips the Row 1 icons.\n"
                                      "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
                             ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
+                        }
+
+                        ImGui::Checkbox("Show Goal Icon", &temp_settings.compact_panel_goal_icon);
+                        if (ImGui::IsItemHovered()) {
+                            char compact_goal_icon_tooltip_buffer[512];
+                            snprintf(compact_goal_icon_tooltip_buffer, sizeof(compact_goal_icon_tooltip_buffer),
+                                     "While the panel shows an individual goal, its icon is drawn next to\n"
+                                     "the text, as tall as both text lines together. It sits on the left\n"
+                                     "for a Left or Center panel alignment and on the right for Right.\n"
+                                     "Type counts and the progress text have no icon.\n"
+                                     "Default: %s", DEFAULT_COMPACT_PANEL_GOAL_ICON ? "On" : "Off");
+                            ImGui::SetTooltip("%s", compact_goal_icon_tooltip_buffer);
+                        }
+                        if (temp_settings.compact_panel_goal_icon) {
+                            ImGui::SetNextItemWidth(120.0f);
+                            ImGui::Combo("Text Alignment", (int *) &temp_settings.compact_panel_text_align,
+                                         "Left\0Center\0Right\0");
+                            if (ImGui::IsItemHovered()) {
+                                const char *compact_text_align_names[] = {"Left", "Center", "Right"};
+                                char compact_text_align_tooltip_buffer[512];
+                                snprintf(compact_text_align_tooltip_buffer, sizeof(compact_text_align_tooltip_buffer),
+                                         "How both text lines (the label and the count) are aligned next to\n"
+                                         "the goal icon. Entries without an icon always stay centered.\n"
+                                         "Default: %s", compact_text_align_names[DEFAULT_COMPACT_PANEL_TEXT_ALIGN]);
+                                ImGui::SetTooltip("%s", compact_text_align_tooltip_buffer);
+                            }
                         }
                     }
 

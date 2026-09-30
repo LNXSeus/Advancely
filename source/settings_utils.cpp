@@ -1057,6 +1057,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
     settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
     settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
+    settings->compact_panel_text_align = DEFAULT_COMPACT_PANEL_TEXT_ALIGN;
+    settings->compact_panel_goal_icon = DEFAULT_COMPACT_PANEL_GOAL_ICON;
     strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT,
             sizeof(settings->compact_label_font_name) - 1);
     settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
@@ -2096,6 +2098,24 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
+        const cJSON *compact_text_align = cJSON_GetObjectItem(visual_settings, "compact_panel_text_align");
+        if (compact_text_align && cJSON_IsNumber(compact_text_align) && compact_text_align->valueint >=
+            OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
+            && compact_text_align->valueint <= OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) {
+            settings->compact_panel_text_align = (OverlayProgressTextAlignment) compact_text_align->valueint;
+        } else {
+            settings->compact_panel_text_align = DEFAULT_COMPACT_PANEL_TEXT_ALIGN;
+            defaults_were_used = true;
+        }
+
+        const cJSON *compact_goal_icon = cJSON_GetObjectItem(visual_settings, "compact_panel_goal_icon");
+        if (compact_goal_icon && cJSON_IsBool(compact_goal_icon)) {
+            settings->compact_panel_goal_icon = cJSON_IsTrue(compact_goal_icon);
+        } else {
+            settings->compact_panel_goal_icon = DEFAULT_COMPACT_PANEL_GOAL_ICON;
+            defaults_were_used = true;
+        }
+
         const cJSON *compact_label_font = cJSON_GetObjectItem(visual_settings, "compact_label_font_name");
         if (compact_label_font && cJSON_IsString(compact_label_font)) {
             strncpy(settings->compact_label_font_name, compact_label_font->valuestring,
@@ -3047,6 +3067,8 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         settings->compact_panel_pixel_scale = DEFAULT_COMPACT_PANEL_PIXEL_SCALE;
         settings->compact_panel_padding = DEFAULT_COMPACT_PANEL_PADDING;
         settings->compact_panel_align = DEFAULT_COMPACT_PANEL_ALIGN;
+        settings->compact_panel_text_align = DEFAULT_COMPACT_PANEL_TEXT_ALIGN;
+        settings->compact_panel_goal_icon = DEFAULT_COMPACT_PANEL_GOAL_ICON;
         strncpy(settings->compact_label_font_name, DEFAULT_COMPACT_LABEL_FONT,
                 sizeof(settings->compact_label_font_name) - 1);
         settings->compact_label_font_name[sizeof(settings->compact_label_font_name) - 1] = '\0';
@@ -3841,6 +3863,12 @@ static void settings_fill_json(cJSON *root, const AppSettings *settings, const T
         cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_align");
         cJSON_AddItemToObject(visuals_obj, "compact_panel_align",
                               cJSON_CreateNumber(settings->compact_panel_align));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_text_align");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_text_align",
+                              cJSON_CreateNumber(settings->compact_panel_text_align));
+        cJSON_DeleteItemFromObject(visuals_obj, "compact_panel_goal_icon");
+        cJSON_AddItemToObject(visuals_obj, "compact_panel_goal_icon",
+                              cJSON_CreateBool(settings->compact_panel_goal_icon));
         cJSON_DeleteItemFromObject(visuals_obj, "compact_label_font_name");
         cJSON_AddItemToObject(visuals_obj, "compact_label_font_name",
                               cJSON_CreateString(settings->compact_label_font_name));

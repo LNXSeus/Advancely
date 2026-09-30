@@ -172,6 +172,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COMPACT_PANEL_PIXEL_SCALE 4 // On-screen px per source px, matching the 24x24 -> 96px backgrounds
 #define DEFAULT_COMPACT_PANEL_PADDING 12.0f // On-screen px between the panel text and its border
 #define DEFAULT_COMPACT_PANEL_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT // Panel alignment within the overlay window
+#define DEFAULT_COMPACT_PANEL_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_CENTER // Alignment of both text lines inside the panel
+#define DEFAULT_COMPACT_PANEL_GOAL_ICON false // Icon of an individual goal next to its panel text
 #define DEFAULT_COMPACT_CYCLE_INTERVAL 3.0f // Seconds each selected entry shows before the cycle advances
 #define COMPACT_CYCLE_INTERVAL_MIN 0.5f
 #define COMPACT_CYCLE_INTERVAL_MAX 60.0f
@@ -806,6 +808,8 @@ struct AppSettings {
     int compact_panel_pixel_scale; // On-screen pixels per source pixel (keeps the border pixel size consistent).
     float compact_panel_padding; // On-screen px between the counter text and the panel border.
     OverlayProgressTextAlignment compact_panel_align; // Panel alignment (left/center/right) within the window.
+    OverlayProgressTextAlignment compact_panel_text_align; // Alignment of both text lines inside the panel.
+    bool compact_panel_goal_icon; // Draws an individual goal's icon beside the panel text (not when chained).
     char compact_label_font_name[256]; // Font face for the goal-type label (e.g. "Advancements:").
     char compact_count_font_name[256]; // Font face for the big progress count (e.g. "70/80").
     char compact_stack_font_name[256]; // Font face for the pop-out stack text below the panel.

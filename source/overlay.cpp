@@ -1069,6 +1069,7 @@ struct CompactEntry {
     bool manual; // is_manually_completed (drives [x])
     bool done; // completed by any means (drives [a])
     int order; // the entry's place in the user's selection order (0 = unordered, sorts last)
+    const char *icon; // an individual goal's icon path, nullptr for type counts and the progress text
 };
 
 // The selection order of the individual goal (kind + root_name) in the Compact cycle, 0 when it is
@@ -1110,7 +1111,10 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
     compact_compute_type_counters(td, version, cc, true); // panel counts show the real totals
 
     // Only the two goal kinds with a target of their own ever set this, so clear it for the rest.
-    for (int i = 0; i < max_entries; i++) out[i].no_count = false;
+    for (int i = 0; i < max_entries; i++) {
+        out[i].no_count = false;
+        out[i].icon = nullptr;
+    }
 
     int n = 0;
     // The progress text: the same counter and percentage the Belt/Page top bar shows, with the same
@@ -1190,6 +1194,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].manual = false;
                 out[n].done = false;
                 out[n].order = item_order;
+                out[n].icon = a->icon_path;
                 n++;
             }
         }
@@ -1220,6 +1225,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].no_target = true;
             }
             out[n].order = item_order;
+            out[n].icon = s->icon_path;
             n++;
         }
         // Multi-stats (complex stat categories) -> their sub-stat progress.
@@ -1239,6 +1245,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].manual = s->is_manually_completed;
             out[n].done = s->done;
             out[n].order = item_order;
+            out[n].icon = s->icon_path;
             n++;
         }
         // Custom goals -> a real target (goal > 0) shows progress / goal; an open-ended custom goal
@@ -1270,6 +1277,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
                 out[n].done = c->done;
             }
             out[n].order = item_order;
+            out[n].icon = c->icon_path;
             n++;
         }
         // Completion counters -> completed/linked goals.
@@ -1289,6 +1297,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             out[n].manual = false;
             out[n].done = c->done;
             out[n].order = item_order;
+            out[n].icon = c->icon_path;
             n++;
         }
     }
@@ -2730,6 +2739,19 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // compact_build_cycle fully rewrites the [0, entry_count) range it returns each call.
     static CompactEntry entries[2 + COMPACT_COUNTER_TYPE_COUNT + MAX_COMPACT_CYCLE_ITEMS];
 
+    // Goal icon beside the panel text: a square as tall as both text lines, for an individual goal
+    // while the panel cycles. Entries that can show one reserve its slot (plus a padding-sized gap) in
+    // the worst-case width, so the panel still keeps a fixed size for the whole run.
+    bool goal_icon_on = settings->compact_panel_goal_icon && !settings->compact_chain_entries;
+    int goal_icon_descent = TTF_GetFontDescent(count_font);
+    if (goal_icon_descent < 0) goal_icon_descent = -goal_icon_descent;
+    float goal_icon_size = snap_px(fmaxf(0.0f, (float) TTF_GetFontHeight(label_font) +
+                                                settings->compact_panel_line_gap +
+                                                (float) TTF_GetFontHeight(count_font) -
+                                                (float) goal_icon_descent));
+    float goal_icon_slot = goal_icon_size + settings->compact_panel_padding;
+    const char *panel_icon = nullptr;
+
     if (run_complete) {
         // The run is over: the panel stops cycling and freezes on the completion screen. The final
         // time comes from the frozen tick count and honors the same IGT options as the other modes.
@@ -2794,6 +2816,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
         compact_format_count(count_buf, sizeof(count_buf), settings, cur);
         label_str = label_buf;
         count_str = count_buf;
+        if (goal_icon_on && cur->icon && cur->icon[0] != '\0') panel_icon = cur->icon;
 
         // Worst-case content width across EVERY selected entry: the widest "Label:" plus the widest
         // possible count each can display (widest digit repeated over the total, never the live count).
@@ -2810,6 +2833,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
             int cwm = 0;
             TTF_MeasureString(count_font, wc, 0, 0, &cwm, nullptr);
             float w = fmaxf((float) lwm, (float) cwm);
+            if (goal_icon_on && entries[i].icon && entries[i].icon[0] != '\0') w += goal_icon_slot;
             if (w > content_w) content_w = w;
         }
     }
@@ -2904,13 +2928,33 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
 
     float content_top = panel_y + (float) (settings->compact_panel_inset_top * settings->compact_panel_pixel_scale) +
                         pad;
+
+    // The text area inside the border and padding. A goal icon takes its slot off the left for a Left or
+    // Center panel and off the right for a Right panel, and the text aligns within what remains. Without
+    // an icon the text always stays centered.
+    float text_l = panel_x + (float) (settings->compact_panel_inset_left * settings->compact_panel_pixel_scale) + pad;
+    float text_r = panel_x + panel_w -
+                   (float) (settings->compact_panel_inset_right * settings->compact_panel_pixel_scale) - pad;
+    if (panel_icon) {
+        bool icon_right = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
+        float icon_x = icon_right ? (text_r - goal_icon_size) : text_l;
+        compact_draw_icon(o, panel_icon, icon_x, content_top + (content_h - goal_icon_size) / 2.0f, goal_icon_size);
+        if (icon_right) text_r -= goal_icon_slot;
+        else text_l += goal_icon_slot;
+    }
+    auto text_line_x = [&](float w) {
+        if (!panel_icon) return snap_px(panel_x + (panel_w - w) / 2.0f);
+        if (settings->compact_panel_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_LEFT) return snap_px(text_l);
+        if (settings->compact_panel_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) return snap_px(text_r - w);
+        return snap_px((text_l + text_r - w) / 2.0f);
+    };
     if (label_tex) {
-        SDL_FRect d = {snap_px(panel_x + (panel_w - lw) / 2.0f), content_top, lw, lh};
+        SDL_FRect d = {text_line_x(lw), content_top, lw, lh};
         SDL_RenderTexture(o->renderer, label_tex, nullptr, &d);
     }
-    // The whole count line (completion marker included) is centered as one block.
+    // The whole count line (completion marker included) is aligned as one block.
     if (count_tex) {
-        SDL_FRect d = {snap_px(panel_x + (panel_w - cw) / 2.0f), snap_px(content_top + lh + line_gap), cw, ch};
+        SDL_FRect d = {text_line_x(cw), snap_px(content_top + lh + line_gap), cw, ch};
         SDL_RenderTexture(o->renderer, count_tex, nullptr, &d);
     }
 
