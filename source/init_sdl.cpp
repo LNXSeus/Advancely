@@ -94,6 +94,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->toggle_visual_editing_request_ttl = 0;
     t->visual_toggle_layout_hidden_pressed = false;
     t->visual_toggle_goal_hidden_pressed = false;
+    t->visual_toggle_manual_pos_pressed = false;
     t->visual_delete_pressed = false;
     t->visual_copy_pressed = false;
     t->editor_save_pressed = false;

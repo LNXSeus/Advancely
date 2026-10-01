@@ -4485,15 +4485,25 @@ static int tc_apply_visual_structure_request(EditorTemplate &tpl, TcEditorSelect
     return affected;
 }
 
+// Maps the "Icon Pos." / "Text Pos." / "Progress Pos." labels onto the tracker's element ids.
+static const char *manual_pos_element_id(const char *pos_type) {
+    if (strncmp(pos_type, "Icon", 4) == 0) return "icon";
+    if (strncmp(pos_type, "Text", 4) == 0) return "text";
+    if (strncmp(pos_type, "Progress", 8) == 0) return "progress";
+    return nullptr;
+}
+
 // Carries out a hotkey pressed in the Visual Layout Editor. The change is made here rather than on
 // the map, because this copy of the template is the one that gets saved.
 // For the two visibility hotkeys the whole selection ends up in the same state: as long as anything
 // in it is still visible, everything is hidden; once everything is hidden, they are shown again.
+// The manual position toggle follows the same rule: if any selected element has no position of its
+// own yet, all of them get one, seeded from where seed_tracker currently draws them.
 // Returns true when something actually changed. out_structural reports whether goals were added or
 // removed, which is what the map has to be told about; the visibility hotkeys change nothing there,
 // because layout editing shows everything anyway.
 static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection selection,
-                                         bool &out_structural) {
+                                         Tracker *seed_tracker, bool &out_structural) {
     out_structural = false;
     VisualEditRequest request = tracker_get_visual_edit_request();
     if (request == VISUAL_EDIT_NONE) return false;
@@ -4535,6 +4545,91 @@ static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection 
         return true;
     }
 
+    auto element_pos = [](const TcVisualEditTarget &target, const char *element) -> ManualPos *{
+        if (strcmp(element, "Icon") == 0) return target.icon;
+        if (strcmp(element, "Text") == 0) return target.text;
+        if (strcmp(element, "Progress") == 0) return target.progress;
+        return nullptr;
+    };
+
+    if (request == VISUAL_EDIT_TOGGLE_MANUAL_POS) {
+        struct PosTarget {
+            ManualPos *pos;
+            const VisualEditItem *item;
+        };
+        std::vector<PosTarget> targets;
+        for (int i = 0; i < count; i++) {
+            ManualPos *pos = element_pos(tc_resolve_visual_edit_target(tpl, items[i].link), items[i].element);
+            if (!pos) continue;
+            bool already = false;
+            for (const auto &seen: targets) {
+                if (seen.pos == pos) {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already) targets.push_back({pos, &items[i]});
+        }
+
+        if (targets.empty()) {
+            tracker_clear_visual_edit_request();
+            return false;
+        }
+
+        bool any_unset = false;
+        for (const auto &target: targets) {
+            if (!target.pos->is_set) {
+                any_unset = true;
+                break;
+            }
+        }
+
+        for (const auto &target: targets) {
+            ManualPos *pos = target.pos;
+            if (!any_unset) {
+                pos->is_set = false;
+                continue;
+            }
+            if (pos->is_set) continue;
+            pos->is_set = true;
+
+            const char *section = nullptr;
+            switch (target.item->link.type) {
+                case LINK_TYPE_ADVANCEMENT: section = "advancement";
+                    break;
+                case LINK_TYPE_STAT: section = "stat";
+                    break;
+                case LINK_TYPE_UNLOCK: section = "unlock";
+                    break;
+                case LINK_TYPE_CUSTOM: section = "custom";
+                    break;
+                case LINK_TYPE_MULTI_STAGE: section = "multi_stage";
+                    break;
+                case LINK_TYPE_COUNTER: section = "counter";
+                    break;
+                default: break;
+            }
+            const char *element_id = manual_pos_element_id(target.item->element);
+            float current_x = 0.0f, current_y = 0.0f;
+            if (seed_tracker && section && element_id &&
+                tracker_get_current_element_pos(seed_tracker, section, target.item->link.root_name,
+                                                target.item->link.parent_root, element_id, pos->anchor,
+                                                &current_x, &current_y)) {
+                pos->x = current_x;
+                pos->y = current_y;
+            } else if (pos->x == 0.0f && pos->y == 0.0f) {
+                pos->x = 100.0f;
+                pos->y = 100.0f;
+            }
+        }
+
+        // The items point into the tracker's list, so the request is only cleared once they are read.
+        tracker_clear_visual_edit_request();
+        snprintf(s_visual_edit_message, sizeof(s_visual_edit_message), "%s (%d)",
+                 any_unset ? "Manual position on" : "Manual position off", (int) targets.size());
+        return true;
+    }
+
     // Deduplicated, because one goal contributes several selected elements and the icon, text and
     // progress of one goal all point at the same "Hidden" checkbox.
     std::vector<bool *> flags;
@@ -4550,10 +4645,7 @@ static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection 
             remember(target.hidden);
             continue;
         }
-        ManualPos *pos = nullptr;
-        if (strcmp(items[i].element, "Icon") == 0) pos = target.icon;
-        else if (strcmp(items[i].element, "Text") == 0) pos = target.text;
-        else if (strcmp(items[i].element, "Progress") == 0) pos = target.progress;
+        ManualPos *pos = element_pos(target, items[i].element);
         if (pos) remember(&pos->is_hidden_in_layout);
     }
 
@@ -5405,14 +5497,6 @@ struct ManualPosContext {
     bool is_sub_item = false;
     bool has_sub_items = false;
 };
-
-// Maps the "Icon Pos." / "Text Pos." / "Progress Pos." labels onto the tracker's element ids.
-static const char *manual_pos_element_id(const char *pos_type) {
-    if (strncmp(pos_type, "Icon", 4) == 0) return "icon";
-    if (strncmp(pos_type, "Text", 4) == 0) return "text";
-    if (strncmp(pos_type, "Progress", 8) == 0) return "progress";
-    return nullptr;
-}
 
 // Seeds a never-placed manual position with the spot the element currently occupies on the tracker.
 // Used by the bulk Layout Coordinates popup when the apply only enables positioning, so the selected
@@ -9143,6 +9227,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // --- END SYNC BLOCK ---
 
+        bool is_editing_active_template = t && t->template_data &&
+                                          strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                          strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                          strcmp(selected_template_info.optional_flag,
+                                                 app_settings->optional_flag) == 0;
+
+        // Only the running template's data knows where an element currently sits, so manual
+        // positions can only be seeded from it while the active template is being edited.
+        Tracker *layout_seed_tracker = is_editing_active_template ? t : nullptr;
+
         // Hotkeys pressed on the map act on this copy of the template, so they show up as unsaved
         // changes exactly like using the checkboxes and buttons here by hand.
         {
@@ -9151,7 +9245,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 selected_unlock_index, selected_custom_index, selected_counter_index, selected_deco_index
             };
             bool visual_edit_was_structural = false;
-            if (tc_apply_visual_edit_request(current_template_data, hotkey_selection,
+            if (tc_apply_visual_edit_request(current_template_data, hotkey_selection, layout_seed_tracker,
                                              visual_edit_was_structural)) {
                 save_message_type = MSG_NONE;
                 // Goals appear or vanish on the map right away, so a duplicate can be moved and a
@@ -9268,16 +9362,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // to the runtime tracker structs so they are immediately reflected on the tracker map.
         // This runs whenever the edited template is the active one, not just during visual editing,
         // to prevent flickering when entering visual editing mode with pending position changes.
-        bool is_editing_active_template = t && t->template_data &&
-                                          strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                          strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                          strcmp(selected_template_info.optional_flag,
-                                                 app_settings->optional_flag) == 0;
-
-        // Only the running template's data knows where an element currently sits, so manual
-        // positions can only be seeded from it while the active template is being edited.
-        Tracker *layout_seed_tracker = is_editing_active_template ? t : nullptr;
-
         if (is_editing_active_template) {
             // The fields copied here are the ones are_manual_positions_different's
             // ignore_synced_layout mode is allowed to skip. Adding one here means adding it there.

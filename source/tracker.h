@@ -154,6 +154,7 @@ struct Tracker {
     // where the selection is known.
     bool visual_toggle_layout_hidden_pressed;
     bool visual_toggle_goal_hidden_pressed;
+    bool visual_toggle_manual_pos_pressed;
     bool visual_delete_pressed;
     bool visual_copy_pressed;
     // Save/apply/revert hotkeys, consumed by whichever window owns them. They are cleared at the
@@ -823,6 +824,7 @@ typedef enum {
     VISUAL_EDIT_NONE = 0,
     VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN, // Per element: the manual layout "Hide" checkbox
     VISUAL_EDIT_TOGGLE_GOAL_HIDDEN, // Per goal: the "Hidden" checkbox (automatic layout + overlay)
+    VISUAL_EDIT_TOGGLE_MANUAL_POS, // Per element: the Icon/Text/Progress manual positioning checkbox
     VISUAL_EDIT_DELETE, // Remove the selected goals and decorations from the template
     VISUAL_EDIT_COPY // Duplicate them, coordinates included, under a "_copy" id
 } VisualEditRequest;

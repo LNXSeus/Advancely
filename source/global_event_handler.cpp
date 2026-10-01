@@ -410,6 +410,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, key, app_mods)) {
                         t->visual_toggle_goal_hidden_pressed = true;
                     }
+                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_MANUAL_POS, key, app_mods)) {
+                        t->visual_toggle_manual_pos_pressed = true;
+                    }
                     if (app_hotkey_matches(app_settings, APP_HOTKEY_DELETE_SELECTION, key, app_mods)) {
                         t->visual_delete_pressed = true;
                     }

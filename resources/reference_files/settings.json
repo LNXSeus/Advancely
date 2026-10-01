@@ -330,6 +330,10 @@
 			"key":	"H",
 			"mods":	0
 		},
+		"toggle_manual_pos":	{
+			"key":	"P",
+			"mods":	0
+		},
 		"delete_selection":	{
 			"key":	"Delete",
 			"mods":	0

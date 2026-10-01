@@ -13806,12 +13806,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         VisualEditRequest pressed_request = VISUAL_EDIT_NONE;
         if (t->visual_toggle_layout_hidden_pressed) pressed_request = VISUAL_EDIT_TOGGLE_LAYOUT_HIDDEN;
         else if (t->visual_toggle_goal_hidden_pressed) pressed_request = VISUAL_EDIT_TOGGLE_GOAL_HIDDEN;
+        else if (t->visual_toggle_manual_pos_pressed) pressed_request = VISUAL_EDIT_TOGGLE_MANUAL_POS;
         else if (t->visual_delete_pressed) pressed_request = VISUAL_EDIT_DELETE;
         else if (t->visual_copy_pressed) pressed_request = VISUAL_EDIT_COPY;
 
         if (pressed_request != VISUAL_EDIT_NONE &&
             s_visual_edit_request == VISUAL_EDIT_NONE && !s_visual_selected_items.empty()) {
-            // Only delete and copy reach decorations; the two visibility checkboxes don't exist there.
+            // Only delete and copy reach decorations; the visibility and position checkboxes don't exist there.
             bool decorations_included = (pressed_request == VISUAL_EDIT_DELETE ||
                                          pressed_request == VISUAL_EDIT_COPY);
             s_visual_edit_items.clear();
@@ -13828,6 +13829,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
         t->visual_toggle_layout_hidden_pressed = false;
         t->visual_toggle_goal_hidden_pressed = false;
+        t->visual_toggle_manual_pos_pressed = false;
         t->visual_delete_pressed = false;
         t->visual_copy_pressed = false;
 
@@ -13846,6 +13848,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->pending_visual_move_y = 0.0f;
         t->visual_toggle_layout_hidden_pressed = false;
         t->visual_toggle_goal_hidden_pressed = false;
+        t->visual_toggle_manual_pos_pressed = false;
         t->visual_delete_pressed = false;
         t->visual_copy_pressed = false;
         tracker_clear_visual_edit_request();

@@ -619,6 +619,14 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "and the automatic layout.\n" \
       "If any of them is still visible, all of them are hidden; otherwise all are shown again.\n" \
       "The change lands in the template editor, so it needs a save like every other edit.") \
+    X(APP_HOTKEY_TOGGLE_MANUAL_POS, "toggle_manual_pos", "P", HOTKEY_MOD_NONE, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Toggle Manual Position of Selection", \
+      "Flips the manual positioning checkbox (Icon, Text or Progress) of every selected\n" \
+      "element, so it gets coordinates of its own without having to drag it.\n" \
+      "If any of them has no position yet, all of them get one, starting where they sit\n" \
+      "right now; otherwise all of them go back to the automatic layout.\n" \
+      "The change lands in the template editor, so it needs a save like every other edit.") \
     X(APP_HOTKEY_DELETE_SELECTION, "delete_selection", "Delete", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
       "Delete Selection", \

@@ -1425,7 +1425,8 @@ the live tracker map instead of typing coordinates by hand.
 * **Dragging**: Left-click and drag any goal icon, text label, progress text, decoration, or criterion to reposition
   it. A crosshair appears at the item's anchor point while dragging, and a tooltip shows the current coordinates.
 * **Hotkeys**: With one or more items selected, the arrow keys nudge the selection by one pixel and `WASD` moves it by
-  ten (holding a key repeats). `V` and `H` toggle the selection's manual layout and overlay visibility, `Delete` removes
+  ten (holding a key repeats). `V` and `H` toggle the selection's manual layout and overlay visibility, `P` toggles
+  whether it has manual positions of its own, `Delete` removes
   the selected goals and decorations from the template, and `Ctrl+C` duplicates them with their coordinates. Right-click
   any element to show it in the Template Editor without changing the selection. All of these keys are rebindable, see
   [Advancely Hotkeys](#advancely-hotkeys).
@@ -1699,6 +1700,7 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 |                          | `A` `D` `W` `S`            | Move the selection by 10 pixels. Holding repeats, and two directions can be held at once for a diagonal.                                                                                                                                                      |
 |                          | `V`                        | Toggle the manual layout `Hide` checkbox of every selected element. If any is still visible they all get hidden, otherwise they are all shown again.                                                                                                          |
 |                          | `H`                        | Toggle the `Hidden` checkbox (overlay and automatic layout) of every selected goal, with the same rule.                                                                                                                                                       |
+|                          | `P`                        | Toggle the manual positioning checkbox (`Icon`, `Text` or `Progress`) of every selected element. If any has no position yet they all get one, starting where they currently sit, otherwise they all return to the automatic layout. |
 |                          | `Delete`                   | Remove the selected goals, criteria, sub-stats and decorations from the template.                                                                                                                                                                             |
 |                          | `Ctrl+C`                   | Duplicate them, layout coordinates included, under the usual `_copy` id. The copy ends up selected in the editor.                                                                                                                                             |
 
@@ -1709,7 +1711,7 @@ changed is visible. That menu fades away again five seconds later unless you mov
 stays like one you opened by clicking. Pressing the key again while the menu is up toggles the checkbox back and
 restarts the five seconds.
 
-`V`, `H`, `Delete` and `Ctrl+C` change the template editor's copy of the template, which is the one that gets saved, so
+`V`, `H`, `P`, `Delete` and `Ctrl+C` change the template editor's copy of the template, which is the one that gets saved, so
 the map catches up right away while the Visual Layout Editor runs, and `Undo` takes each press back one step. What each press did is
 reported in a short green message left of the `Visual Layout Editor` button, which disappears as soon as the next editor
 message appears or the changes are saved or reverted.
