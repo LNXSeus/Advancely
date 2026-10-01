@@ -5282,7 +5282,6 @@ static const char *anchor_point_labels[] = {
 static bool render_layout_coordinates_header(const char *goal_type_name, bool force_open = false) {
     if (force_open) ImGui::SetNextItemOpen(true);
     bool open = ImGui::CollapsingHeader("Layout Coordinates");
-    if (force_open) ImGui::SetScrollHereY(0.0f);
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
@@ -9249,8 +9248,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
 
-            if (t->visual_layout_just_clicked) {
-                // Scroll to the clicked goal in the editor list, aligning it to the very top of the list
+            if (t->visual_layout_just_clicked || was_just_dragged) {
+                // Scroll to the clicked or dragged goal in the editor list, aligning it to the very top of the list
                 // (ImGui clamps when the bottom is reached).
                 // Always use the parent root name — criteria/sub-stats are not top-level list items.
                 strncpy(scroll_to_goal_root_name, t->visual_drag_root_name, sizeof(scroll_to_goal_root_name) - 1);
