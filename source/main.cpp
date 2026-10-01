@@ -3356,8 +3356,10 @@ int main(int argc, char *argv[]) {
             // state - no disk reads. The game files are only read when the game
             // saves and dmon fires a normal tracker_update(), which corrects and
             // confirms everything.
+            // Paused in the Visual Layout Editor, whose map shows every goal incomplete; the overlay
+            // catches up with the next full update.
             PROFILE_BEGIN(hermes_poll, "hermes_poll");
-            if (app_settings.using_hermes && tracker->hermes_active) {
+            if (app_settings.using_hermes && tracker->hermes_active && !tracker->is_visual_layout_editing) {
                 tracker_poll_hermes_log(tracker, &app_settings);
 
                 // If in-memory state changed and no full update is already pending,
@@ -3921,6 +3923,16 @@ int main(int argc, char *argv[]) {
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
             PROFILE_BEGIN(needs_update, "tracker_update_full");
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
+                // The Visual Layout Editor shows every goal incomplete on the map, while the overlay
+                // keeps getting the real progress (and the template's current "Hidden" flags). The
+                // map's state between updates is that incomplete one, so it is kept aside here, the
+                // world is read and sent to the overlay as usual, and it is put back afterwards.
+                char *vle_incomplete_state = nullptr;
+                if (tracker->is_visual_layout_editing && tracker->template_data) {
+                    vle_incomplete_state = (char *) malloc(4 * 1024 * 1024);
+                    if (vle_incomplete_state) serialize_template_data(tracker->template_data, vle_incomplete_state);
+                }
+                if (tracker->template_data) tracker->template_data->world_reading_paused = false;
                 // Full update covers broadcast needs too
                 SDL_SetAtomicInt(&g_coop_broadcast_needed, 0);
                 // --- TODO: Debug Print ---
@@ -4284,6 +4296,17 @@ int main(int argc, char *argv[]) {
                         sem_post(tracker->mutex);
 #endif
                     }
+                }
+
+                // Back to the incomplete map. The real progress is no longer in memory then, so it
+                // must not be written to settings.json until the next read.
+                if (vle_incomplete_state) {
+                    if (tracker->template_data) {
+                        merge_coop_progress(vle_incomplete_state, tracker->template_data);
+                        tracker_recalculate_progress(tracker, &app_settings);
+                        tracker->template_data->world_reading_paused = true;
+                    }
+                    free(vle_incomplete_state);
                 }
             }
 

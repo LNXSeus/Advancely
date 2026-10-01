@@ -781,6 +781,10 @@ struct TemplateData {
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
     char last_known_world_name[MAX_PATH_LENGTH]; // The last world the tracker was active in, to detect changes.
+
+    // True while the Visual Layout Editor shows every goal as incomplete on the map. The progress in
+    // memory is not the player's then and must never be saved.
+    bool world_reading_paused;
 };
 
 // PATHMODE AND VERSION STUFF

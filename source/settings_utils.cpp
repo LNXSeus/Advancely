@@ -4200,7 +4200,7 @@ static void settings_fill_json(cJSON *root, const AppSettings *settings, const T
     }
 
     // Update Custom Progress if provided (per-UUID schema)
-    if (td) {
+    if (td && !td->world_reading_paused) {
         const char *local_uuid = settings->local_player.uuid;
         cJSON *progress_root = get_or_create_object(root, "custom_progress");
         cJSON *progress_obj = settings_get_player_progress_subobj(progress_root, local_uuid, local_uuid);

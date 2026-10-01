@@ -1422,6 +1422,13 @@ the live tracker map instead of typing coordinates by hand.
   button is only available when the template you are editing is also the one currently applied in Settings. Activating
   the editor automatically enables "Manual Layout" mode and sets "Goal Visibility" to "Show All". Unsaved template
   changes are shown on the map as they are, without being written to disk.
+* **Incomplete Map**: While the editor is active, every goal on the map shows as incomplete, so completed goals don't
+  look different from the rest while you place them. The overlay keeps showing your real progress, and the map gets it
+  back when you stop editing.
+* **Hidden Elements**: Elements that would be hidden outside the editor stay on the map, drawn see-through: anything
+  with its manual layout `Hide` checkbox ticked, and goals with the `Hidden` checkbox that have no manual position of
+  their own. Criteria and sub-stats without their own position fade along with a fully hidden parent. Toggling either
+  checkbox (or pressing `V` / `H`) updates the map right away, before saving.
 * **Dragging**: Left-click and drag any goal icon, text label, progress text, decoration, or criterion to reposition
   it. A crosshair appears at the item's anchor point while dragging, and a tooltip shows the current coordinates.
 * **Hotkeys**: With one or more items selected, the arrow keys nudge the selection by one pixel and `WASD` moves it by

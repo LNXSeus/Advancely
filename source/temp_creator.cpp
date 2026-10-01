@@ -140,14 +140,13 @@ static void save_editor_manual_pos(cJSON *parent_json, const char *key, const Ma
 }
 
 // ignore_synced_layout skips exactly the fields the Visual Layout Editor's reverse sync block
-// already copies into the tracker's structs every frame (x, y, is_set, anchor), so a caller can ask
-// the narrower question "did anything change that the map would NOT pick up on its own?".
-// is_hidden_in_layout deliberately still counts: it sits in ManualPos but the reverse sync does not
-// copy it. Keep this in step with reverse_sync_pos.
+// already copies into the tracker's structs every frame (x, y, is_set, anchor, is_hidden_in_layout),
+// so a caller can ask the narrower question "did anything change that the map would NOT pick up on
+// its own?". Keep this in step with reverse_sync_pos.
 static bool are_manual_positions_different(const ManualPos &a, const ManualPos &b,
                                            bool ignore_synced_layout = false) {
-    if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
     if (ignore_synced_layout) return false;
+    if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
     if (a.is_set != b.is_set) return true;
     if (a.is_set) {
         if (a.x != b.x || a.y != b.y) return true;
@@ -1165,7 +1164,7 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.goal != b.goal ||
            a.hide_progress != b.hide_progress ||
-           a.is_hidden != b.is_hidden ||
+           (!ignore_synced_layout && a.is_hidden != b.is_hidden) ||
            a.in_2nd_row != b.in_2nd_row ||
            a.in_3rd_row != b.in_3rd_row ||
            a.linked_goal_mode != b.linked_goal_mode ||
@@ -1183,7 +1182,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
-        a.is_hidden != b.is_hidden ||
+        (!ignore_synced_layout && a.is_hidden != b.is_hidden) ||
         a.in_2nd_row != b.in_2nd_row ||
         a.in_3rd_row != b.in_3rd_row ||
         a.is_recipe != b.is_recipe ||
@@ -1237,7 +1236,7 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
-        a.is_hidden != b.is_hidden ||
+        (!ignore_synced_layout && a.is_hidden != b.is_hidden) ||
         a.in_2nd_row != b.in_2nd_row ||
         a.use_stage_icons != b.use_stage_icons ||
         are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
@@ -1263,7 +1262,7 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
-        a.is_hidden != b.is_hidden ||
+        (!ignore_synced_layout && a.is_hidden != b.is_hidden) ||
         a.in_2nd_row != b.in_2nd_row ||
         are_manual_positions_different(a.icon_pos, b.icon_pos, ignore_synced_layout) ||
         are_manual_positions_different(a.text_pos, b.text_pos, ignore_synced_layout) ||
@@ -4500,8 +4499,7 @@ static const char *manual_pos_element_id(const char *pos_type) {
 // The manual position toggle follows the same rule: if any selected element has no position of its
 // own yet, all of them get one, seeded from where seed_tracker currently draws them.
 // Returns true when something actually changed. out_structural reports whether goals were added or
-// removed, which is what the map has to be told about; the visibility hotkeys change nothing there,
-// because layout editing shows everything anyway.
+// removed, which is what the map has to be told about; visibility reaches it through the reverse sync.
 static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection selection,
                                          Tracker *seed_tracker, bool &out_structural) {
     out_structural = false;
@@ -4661,8 +4659,9 @@ static bool tc_apply_visual_edit_request(EditorTemplate &tpl, TcEditorSelection 
     }
     for (bool *flag: flags) *flag = any_visible;
 
-    // Nothing on the map changes (layout editing forces "Show All"), so this line is the only
-    // feedback the hotkey gives. It names the side that was affected so the two are never mixed up.
+    // The map fades the affected elements through the reverse sync, but the fade alone doesn't say
+    // which visibility changed, so this line names the side that was affected and the two are never
+    // mixed up.
     const char *what = (request == VISUAL_EDIT_TOGGLE_GOAL_HIDDEN)
                            ? (any_visible ? "Hidden from overlay" : "Shown on overlay")
                            : (any_visible ? "Hidden from manual layout" : "Shown in manual layout");
@@ -9363,13 +9362,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // This runs whenever the edited template is the active one, not just during visual editing,
         // to prevent flickering when entering visual editing mode with pending position changes.
         if (is_editing_active_template) {
-            // The fields copied here are the ones are_manual_positions_different's
-            // ignore_synced_layout mode is allowed to skip. Adding one here means adding it there.
-            auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
+            // The fields copied here are the ones the ignore_synced_layout mode of the template
+            // comparison is allowed to skip. Adding one here means adding it there.
+            // The visibility flags only travel while the Visual Layout Editor runs, where the map fades
+            // hidden elements; everywhere else they keep needing a save, as their tooltips say.
+            bool sync_visibility = t->is_visual_layout_editing;
+            auto reverse_sync_pos = [sync_visibility](const ManualPos &editor_pos, ManualPos &tracker_pos) {
                 tracker_pos.x = editor_pos.x;
                 tracker_pos.y = editor_pos.y;
                 tracker_pos.is_set = editor_pos.is_set;
                 tracker_pos.anchor = editor_pos.anchor;
+                if (sync_visibility) tracker_pos.is_hidden_in_layout = editor_pos.is_hidden_in_layout;
             };
 
             auto reverse_sync_item = [&](const EditorTrackableItem &ed_item, TrackableItem *tr_item) {
@@ -9377,6 +9380,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 reverse_sync_pos(ed_item.icon_pos, tr_item->icon_pos);
                 reverse_sync_pos(ed_item.text_pos, tr_item->text_pos);
                 reverse_sync_pos(ed_item.progress_pos, tr_item->progress_pos);
+                if (sync_visibility) tr_item->is_hidden = ed_item.is_hidden;
             };
 
             // Reverse Sync Advancements
@@ -9389,6 +9393,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
                         reverse_sync_pos(ed_adv.text_pos, tr_adv->text_pos);
                         reverse_sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
+                        if (sync_visibility) tr_adv->is_hidden = ed_adv.is_hidden;
                         for (const auto &ed_crit: ed_adv.criteria) {
                             for (int j = 0; j < tr_adv->criteria_count; j++) {
                                 if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) ==
@@ -9410,11 +9415,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_stat.icon_pos, tr_stat->icon_pos);
                         reverse_sync_pos(ed_stat.text_pos, tr_stat->text_pos);
                         reverse_sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
+                        if (sync_visibility) tr_stat->is_hidden = ed_stat.is_hidden;
                         for (const auto &ed_crit: ed_stat.criteria) {
                             for (int j = 0; j < tr_stat->criteria_count; j++) {
                                 if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name)
                                     == 0) {
+                                    // A simple stat's lone sub-stat has no "Hidden" checkbox of its own.
+                                    bool crit_hidden = tr_stat->criteria[j]->is_hidden;
                                     reverse_sync_item(ed_crit, tr_stat->criteria[j]);
+                                    if (ed_stat.is_simple_stat) tr_stat->criteria[j]->is_hidden = crit_hidden;
                                 }
                             }
                         }
@@ -9452,6 +9461,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
                         reverse_sync_pos(ed_msg.text_pos, tr_msg->text_pos);
                         reverse_sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
+                        if (sync_visibility) tr_msg->is_hidden = ed_msg.is_hidden;
                     }
                 }
             }
@@ -9465,6 +9475,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_counter.icon_pos, tr_counter->icon_pos);
                         reverse_sync_pos(ed_counter.text_pos, tr_counter->text_pos);
                         reverse_sync_pos(ed_counter.progress_pos, tr_counter->progress_pos);
+                        if (sync_visibility) tr_counter->is_hidden = ed_counter.is_hidden;
                     }
                 }
             }
@@ -9875,7 +9886,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 char vis_hotkey_label[96];
                 app_hotkey_display_label(&app_settings->app_hotkeys[APP_HOTKEY_TOGGLE_VISUAL_EDITING],
                                          vis_hotkey_label, sizeof(vis_hotkey_label));
-                char tooltip_buffer[1024];
+                char tooltip_buffer[1536];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
                          "Hotkey: %s (configurable in Settings > Hotkeys).\n"
@@ -9883,14 +9894,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
                          "Applying settings is also disabled while active to prevent template reloads.\n"
-                         "Unsaved template changes are shown on the map without being saved.\n\n"
+                         "Unsaved template changes are shown on the map without being saved.\n"
+                         "Every goal shows as incomplete on the map while active (the overlay is unaffected).\n"
+                         "Hidden goals and elements stay on the map, drawn see-through.\n\n"
                          "Multi-Select:\n"
                          " - Click and drag on empty space to draw a selection rectangle.\n"
                          " - Hold Ctrl (Cmd on macOS) and click items to add/remove them individually.\n"
                          " - Ctrl + drag on empty space adds the rectangle selection to existing.\n"
                          "All selected items can be dragged together.\n\n"
                          "WARNING:\n"
-                         "Make sure you're tracking a world.\n"
                          "Make sure to always work on your own 'Layout' to keep your custom positions,\n"
                          "since the default layout of official templates can be overwritten on updates.",
                          vis_hotkey_label);

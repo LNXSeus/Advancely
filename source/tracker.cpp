@@ -8447,6 +8447,34 @@ static inline bool tracker_is_faded_by_mode(const AppSettings *settings, bool is
     return settings->invert_hiding_mode ? !is_done : is_done;
 }
 
+// Opacity of elements the Visual Layout Editor shows although they are hidden outside of it, the same
+// fade completed goals get.
+static const float VLE_HIDDEN_ELEMENT_ALPHA = ADVANCELY_FADED_ALPHA / 255.0f;
+
+/**
+ * @brief Decides whether an element is drawn see-through in the Visual Layout Editor.
+ *
+ * The editor shows everything, so whatever would be hidden without it is faded instead: an element
+ * with its manual layout "Hide" checkbox, or one without a position of its own that belongs to a
+ * goal with the "Hidden" checkbox, which is what hides automatically placed goals.
+ *
+ * @param pos The element's manual position.
+ * @param goal_hidden The "Hidden" checkbox of the goal the element belongs to.
+ */
+static inline bool tracker_vle_fades_element(const Tracker *t, const ManualPos &pos, bool goal_hidden) {
+    return t->is_visual_layout_editing && (pos.is_hidden_in_layout || (goal_hidden && !pos.is_set));
+}
+
+// Scales the opacity of every vertex added to the draw list since vtx_start, so whatever was drawn in
+// between (images, text, checkboxes) becomes see-through as a whole.
+static void tracker_fade_vertices_since(ImDrawList *draw_list, int vtx_start, float alpha) {
+    for (int i = vtx_start; i < draw_list->VtxBuffer.Size; i++) {
+        ImU32 &col = draw_list->VtxBuffer[i].col;
+        ImU32 a = (col & IM_COL32_A_MASK) >> IM_COL32_A_SHIFT;
+        col = (col & ~IM_COL32_A_MASK) | ((ImU32) ((float) a * alpha) << IM_COL32_A_SHIFT);
+    }
+}
+
 /**
  * @brief Helper to draw a separator line with a title and completion counters for a new section.
  *
@@ -9390,6 +9418,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Render Background (Always Visible)
+                bool fade_cat_icon = tracker_vle_fades_element(t, cat->icon_pos, cat->is_hidden);
+                int cat_icon_vtx = draw_list->VtxBuffer.Size;
                 ImVec2 bg_max = ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                        screen_pos.y + bg_size.y * t->zoom_level);
                 if (!hide_icon_in_layout && texture_to_draw && rect_on_screen(screen_pos, bg_max, io.DisplaySize))
@@ -9511,6 +9541,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             draw_list->AddImage((void *) face_tex, face_min, face_max);
                     }
                 }
+                if (fade_cat_icon) tracker_fade_vertices_since(draw_list, cat_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
                 // --- VISUAL LAYOUT DRAGGING (PARENT ICON) ---
                 char drag_id[256];
@@ -9563,9 +9594,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                        ImVec2(main_text_pos.x + text_size.x * t->zoom_level,
                                               main_text_pos.y + text_size.y * t->zoom_level),
                                        reveal_anchor(settings, cat->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
-                                       settings, t))
+                                       settings, t)) {
+                        int cat_text_vtx = draw_list->VtxBuffer.Size;
                         draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                            main_text_pos, current_text_color, cat->display_name);
+                        if (tracker_vle_fades_element(t, cat->text_pos, cat->is_hidden))
+                            tracker_fade_vertices_since(draw_list, cat_text_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                    }
 
                     // --- VISUAL LAYOUT DRAGGING (PARENT TEXT) ---
                     snprintf(drag_id, sizeof(drag_id), "drag_cat_text_%s_%s", is_stat_section ? "stat" : "adv",
@@ -9633,9 +9668,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                ImVec2(prog_text_pos.x + progress_text_size.x * t->zoom_level,
                                                       prog_text_pos.y + progress_text_size.y * t->zoom_level),
                                                reveal_anchor(settings, cat->progress_pos, ANCHOR_TOP_CENTER),
-                                               io.DisplaySize, settings, t))
+                                               io.DisplaySize, settings, t)) {
+                                int cat_prog_vtx = draw_list->VtxBuffer.Size;
                                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                    prog_text_pos, current_text_color, progress_text);
+                                if (tracker_vle_fades_element(t, cat->progress_pos, cat->is_hidden))
+                                    tracker_fade_vertices_since(draw_list, cat_prog_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                            }
 
                             // --- VISUAL LAYOUT DRAGGING (PARENT PROGRESS) ---
                             snprintf(drag_id, sizeof(drag_id), "drag_cat_prog_%s_%s", is_stat_section ? "stat" : "adv",
@@ -9682,9 +9721,21 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         draw_list->PushClipRect(list_min_screen, list_max_screen, true);
                     }
 
+                    // Sub-item elements without a position of their own ride along with the parent, so
+                    // in the Visual Layout Editor they are faded whenever the whole parent would be hidden.
+                    bool vle_parent_faded = t->is_visual_layout_editing &&
+                                            ((cat->icon_pos.is_hidden_in_layout && cat->text_pos.is_hidden_in_layout &&
+                                              (!has_progress_text || cat->progress_pos.is_hidden_in_layout)) ||
+                                             (cat->is_hidden && !cat->icon_pos.is_set));
+
                     int render_index = 0; // Needed for relative positioning of UNPLACED items
                     for (TrackableItem *crit: children_to_render) {
                         if (!crit) continue;
+
+                        auto vle_fades_crit = [&](const ManualPos &pos) {
+                            return tracker_vle_fades_element(t, pos, crit->is_hidden) ||
+                                   (vle_parent_faded && !pos.is_set);
+                        };
 
                         bool is_manually_placed =
                                 settings->use_manual_layout && crit->icon_pos.is_set;
@@ -9737,7 +9788,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         float current_element_x_screen = crit_base_pos_screen.x;
 
-                        // LOD for Sub-Item Icon
+                        bool fade_crit_icon = vle_fades_crit(crit->icon_pos);
+                        int crit_icon_vtx = draw_list->VtxBuffer.Size;
 
                         // LOD for Sub-Item Icon
                         if (t->zoom_level > LOD_ICON_DETAIL_THRESHOLD && !hide_crit_icon_in_layout) {
@@ -9857,6 +9909,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             if (rect_on_screen(p_min, p_max, io.DisplaySize))
                                 draw_list->AddRectFilled(p_min, p_max, avg_placeholder_color);
                         }
+                        if (fade_crit_icon)
+                            tracker_fade_vertices_since(draw_list, crit_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
                         // --- VISUAL LAYOUT DRAGGING (CRIT ICON) ---
                         snprintf(drag_id, sizeof(drag_id), "drag_crit_icon_%s_%s", cat->root_name, crit->root_name);
@@ -9967,6 +10021,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImU32 crit_cb_outline_color = crit_cb_faded ? text_color_faded : text_color;
                             ImU32 crit_cb_checkmark_color = crit_cb_faded ? text_color_faded : checkmark_color;
                             if (crit_cb_visible) {
+                                int crit_cb_vtx = draw_list->VtxBuffer.Size;
                                 float cb_round = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
                                 draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill, cb_round);
                                 if (!t->is_visual_layout_editing) {
@@ -9985,6 +10040,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     draw_list->AddLine(p1, p2, crit_cb_checkmark_color, 2.0f * t->zoom_level);
                                     draw_list->AddLine(p2, p3, crit_cb_checkmark_color, 2.0f * t->zoom_level);
                                 }
+                                if (fade_crit_icon)
+                                    tracker_fade_vertices_since(draw_list, crit_cb_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
                             }
 
                             bool view_editable_self = tracker_view_editable_by_self(t, settings);
@@ -10264,9 +10321,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                        ImVec2(child_text_pos.x + child_text_size.x * t->zoom_level,
                                                               child_text_pos.y + child_text_size.y * t->zoom_level),
                                                        reveal_anchor(settings, crit->text_pos, ANCHOR_TOP_LEFT),
-                                                       io.DisplaySize, settings, t))
+                                                       io.DisplaySize, settings, t)) {
+                                        int crit_text_vtx = draw_list->VtxBuffer.Size;
                                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
                                                            current_child_text_color, crit->display_name);
+                                        if (vle_fades_crit(crit->text_pos))
+                                            tracker_fade_vertices_since(draw_list, crit_text_vtx,
+                                                                        VLE_HIDDEN_ELEMENT_ALPHA);
+                                    }
 
                                     // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
                                     snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name,
@@ -10322,10 +10384,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                            ImVec2(crit_progress_pos.x + crit_progress_screen_size.x,
                                                                   crit_progress_pos.y + crit_progress_screen_size.y),
                                                            reveal_anchor(settings, crit->progress_pos, ANCHOR_TOP_LEFT),
-                                                           io.DisplaySize, settings, t))
+                                                           io.DisplaySize, settings, t)) {
+                                            int crit_prog_vtx = draw_list->VtxBuffer.Size;
                                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                                crit_progress_pos,
                                                                current_child_text_color, crit_progress_text);
+                                            if (vle_fades_crit(crit->progress_pos))
+                                                tracker_fade_vertices_since(draw_list, crit_prog_vtx,
+                                                                            VLE_HIDDEN_ELEMENT_ALPHA);
+                                        }
 
                                         snprintf(drag_id, sizeof(drag_id), "drag_crit_prog_%s_%s",
                                                  cat->root_name, crit->root_name);
@@ -10501,6 +10568,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                   ? checkbox_hover_color
                                                   : checkbox_fill_color;
                     if (parent_cb_visible) {
+                        int parent_cb_vtx = draw_list->VtxBuffer.Size;
                         float cb_round_parent = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
                         draw_list->AddRectFilled(checkbox_rect_parent.Min, checkbox_rect_parent.Max, check_fill_parent,
                                                  cb_round_parent);
@@ -10520,6 +10588,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
                             draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                         }
+                        if (tracker_vle_fades_element(t, cat->icon_pos, cat->is_hidden))
+                            tracker_fade_vertices_since(draw_list, parent_cb_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
                     }
 
                     bool view_editable_self_p = tracker_view_editable_by_self(t, settings);
@@ -10928,6 +10998,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             }
 
             // Render Background
+            int unlock_icon_vtx = draw_list->VtxBuffer.Size;
             ImVec2 bg_max = ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                    screen_pos.y + bg_size.y * t->zoom_level);
             if (!hide_item_icon_in_layout && texture_to_draw && rect_on_screen(screen_pos, bg_max, io.DisplaySize))
@@ -10986,6 +11057,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
+            if (tracker_vle_fades_element(t, item->icon_pos, item->is_hidden))
+                tracker_fade_vertices_since(draw_list, unlock_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
@@ -11036,9 +11109,13 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                        ImVec2(unlock_text_pos.x + text_size.x * t->zoom_level,
                                               unlock_text_pos.y + text_size.y * t->zoom_level),
                                        reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
-                                       settings, t))
+                                       settings, t)) {
+                        int unlock_text_vtx = draw_list->VtxBuffer.Size;
                         draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                            unlock_text_pos, current_text_color, item->display_name);
+                        if (tracker_vle_fades_element(t, item->text_pos, item->is_hidden))
+                            tracker_fade_vertices_since(draw_list, unlock_text_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                    }
 
                     // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                     snprintf(drag_id, sizeof(drag_id), "drag_unlock_text_%s", item->root_name);
@@ -11066,9 +11143,14 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                             if (text_reveal_ok(unlock_prog_pos,
                                                ImVec2(unlock_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                       unlock_prog_pos.y + progress_text_size.y * t->zoom_level),
-                                               ANCHOR_TOP_CENTER, io.DisplaySize, settings, t))
+                                               ANCHOR_TOP_CENTER, io.DisplaySize, settings, t)) {
+                                int unlock_prog_vtx = draw_list->VtxBuffer.Size;
                                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                    unlock_prog_pos, current_text_color, progress_text);
+                                if (tracker_vle_fades_element(t, item->progress_pos, item->is_hidden))
+                                    tracker_fade_vertices_since(draw_list, unlock_prog_vtx,
+                                                                VLE_HIDDEN_ELEMENT_ALPHA);
+                            }
                         }
                     }
                 }
@@ -11402,6 +11484,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Render Background (Always Visible)
+            bool fade_cg_icon = tracker_vle_fades_element(t, item->icon_pos, item->is_hidden);
+            int cg_icon_vtx = draw_list->VtxBuffer.Size;
             ImVec2 bg_max = ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                    screen_pos.y + bg_size.y * t->zoom_level);
             if (!hide_item_icon_in_layout && texture_to_draw && rect_on_screen(screen_pos, bg_max, io.DisplaySize))
@@ -11460,6 +11544,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
+            if (fade_cg_icon) tracker_fade_vertices_since(draw_list, cg_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
@@ -11557,9 +11642,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                        ImVec2(cg_text_pos.x + text_size.x * t->zoom_level,
                                               cg_text_pos.y + text_size.y * t->zoom_level),
                                        reveal_anchor(settings, item->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
-                                       settings, t))
+                                       settings, t)) {
+                        int cg_text_vtx = draw_list->VtxBuffer.Size;
                         draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                            cg_text_pos, current_text_color, item->display_name);
+                        if (tracker_vle_fades_element(t, item->text_pos, item->is_hidden))
+                            tracker_fade_vertices_since(draw_list, cg_text_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                    }
 
                     // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                     snprintf(drag_id, sizeof(drag_id), "drag_cg_text_%s", item->root_name);
@@ -11603,9 +11692,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                            ImVec2(cg_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   cg_prog_pos.y + progress_text_size.y * t->zoom_level),
                                            reveal_anchor(settings, item->progress_pos, ANCHOR_TOP_CENTER),
-                                           io.DisplaySize, settings, t))
+                                           io.DisplaySize, settings, t)) {
+                            int cg_prog_vtx = draw_list->VtxBuffer.Size;
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                cg_prog_pos, current_text_color, progress_text);
+                            if (tracker_vle_fades_element(t, item->progress_pos, item->is_hidden))
+                                tracker_fade_vertices_since(draw_list, cg_prog_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                        }
 
                         // --- VISUAL LAYOUT DRAGGING (CG PROGRESS) ---
                         char prog_drag_id[256];
@@ -11667,6 +11760,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                              ? checkbox_hover_color
                                              : checkbox_fill_color;
                 if (cg_cb_visible) {
+                    int cg_cb_vtx = draw_list->VtxBuffer.Size;
                     float cb_round = t->is_visual_layout_editing ? 0.0f : 3.0f * t->zoom_level;
                     draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, cb_round);
                     if (!t->is_visual_layout_editing) {
@@ -11681,6 +11775,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
                         draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                     }
+                    if (fade_cg_icon) tracker_fade_vertices_since(draw_list, cg_cb_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
                 }
 
                 // Handle click interaction
@@ -12029,6 +12124,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             }
 
             // Render Background
+            int counter_icon_vtx = draw_list->VtxBuffer.Size;
             ImVec2 bg_max = ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                    screen_pos.y + bg_size.y * t->zoom_level);
             if (!hide_goal_icon_in_layout && texture_to_draw && rect_on_screen(screen_pos, bg_max, io.DisplaySize))
@@ -12076,6 +12172,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 if (!hide_goal_icon_in_layout && rect_on_screen(p_min, p_max, io.DisplaySize))
                     draw_list->AddImage((void *) icon_texture, p_min, p_max);
             }
+            if (tracker_vle_fades_element(t, goal->icon_pos, goal->is_hidden))
+                tracker_fade_vertices_since(draw_list, counter_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
@@ -12125,9 +12223,13 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                        ImVec2(counter_text_pos.x + text_size.x * t->zoom_level,
                                               counter_text_pos.y + text_size.y * t->zoom_level),
                                        reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
-                                       settings, t))
+                                       settings, t)) {
+                        int counter_text_vtx = draw_list->VtxBuffer.Size;
                         draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                            counter_text_pos, current_text_color, goal->display_name);
+                        if (tracker_vle_fades_element(t, goal->text_pos, goal->is_hidden))
+                            tracker_fade_vertices_since(draw_list, counter_text_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                    }
 
                     // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                     snprintf(drag_id, sizeof(drag_id), "drag_counter_text_%s", goal->root_name);
@@ -12170,9 +12272,13 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                            ImVec2(counter_prog_pos.x + progress_text_size.x * t->zoom_level,
                                                   counter_prog_pos.y + progress_text_size.y * t->zoom_level),
                                            reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER),
-                                           io.DisplaySize, settings, t))
+                                           io.DisplaySize, settings, t)) {
+                            int counter_prog_vtx = draw_list->VtxBuffer.Size;
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                                counter_prog_pos, current_text_color, progress_text);
+                            if (tracker_vle_fades_element(t, goal->progress_pos, goal->is_hidden))
+                                tracker_fade_vertices_since(draw_list, counter_prog_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                        }
 
                         // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
                         snprintf(drag_id, sizeof(drag_id), "drag_counter_prog_%s", goal->root_name);
@@ -12529,6 +12635,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
 
             // Render Background
+            int ms_icon_vtx = draw_list->VtxBuffer.Size;
             ImVec2 bg_max = ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                    screen_pos.y + bg_size.y * t->zoom_level);
             if (!hide_goal_icon_in_layout && texture_to_draw && rect_on_screen(screen_pos, bg_max, io.DisplaySize))
@@ -12605,6 +12712,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
+            if (tracker_vle_fades_element(t, goal->icon_pos, goal->is_hidden))
+                tracker_fade_vertices_since(draw_list, ms_icon_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
@@ -12652,9 +12761,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                    ImVec2(ms_text_pos.x + text_size.x * t->zoom_level,
                                           ms_text_pos.y + text_size.y * t->zoom_level),
                                    reveal_anchor(settings, goal->text_pos, ANCHOR_TOP_CENTER), io.DisplaySize, settings,
-                                   t))
+                                   t)) {
+                    int ms_text_vtx = draw_list->VtxBuffer.Size;
                     draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                        ms_text_pos, current_text_color, goal->display_name);
+                    if (tracker_vle_fades_element(t, goal->text_pos, goal->is_hidden))
+                        tracker_fade_vertices_since(draw_list, ms_text_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                }
 
                 // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_text_%s", goal->root_name);
@@ -12697,9 +12810,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                    ImVec2(ms_stage_pos.x + stage_text_size.x * t->zoom_level,
                                           ms_stage_pos.y + stage_text_size.y * t->zoom_level),
                                    reveal_anchor(settings, goal->progress_pos, ANCHOR_TOP_CENTER), io.DisplaySize,
-                                   settings, t))
+                                   settings, t)) {
+                    int ms_stage_vtx = draw_list->VtxBuffer.Size;
                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                        ms_stage_pos, current_text_color, stage_text); // Use formatted stage text
+                    if (tracker_vle_fades_element(t, goal->progress_pos, goal->is_hidden))
+                        tracker_fade_vertices_since(draw_list, ms_stage_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                }
 
                 // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_prog_%s", goal->root_name);
@@ -12797,9 +12914,12 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     if (text_reveal_ok(header_min, header_max,
                                        elem->pos.is_set ? elem->pos.anchor : ANCHOR_TOP_LEFT,
                                        ImGui::GetIO().DisplaySize, settings, t)) {
+                        int header_vtx = draw_list->VtxBuffer.Size;
                         draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                            ImVec2(text_x, text_y),
                                            text_color, elem->display_text);
+                        if (t->is_visual_layout_editing && elem->pos.is_hidden_in_layout)
+                            tracker_fade_vertices_since(draw_list, header_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
                     }
 
                     // Visual layout dragging

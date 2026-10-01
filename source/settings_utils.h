@@ -611,7 +611,7 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "progress are separate elements).\n" \
       "If any of them is still visible, all of them are hidden; otherwise all are shown again.\n" \
       "The change lands in the template editor, so it needs a save like every other edit.\n" \
-      "Layout editing forces \"Show All\", so hidden elements stay on screen while you work.") \
+      "Layout editing forces \"Show All\", so hidden elements stay on screen, drawn see-through.") \
     X(APP_HOTKEY_TOGGLE_GOAL_HIDDEN, "toggle_goal_hidden", "H", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
       "Toggle Overlay Visibility of Selection", \
