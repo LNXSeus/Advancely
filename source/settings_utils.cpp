@@ -1145,6 +1145,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
     settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
     settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
+    settings->overlay_show_row1 = DEFAULT_OVERLAY_SHOW_ROW1;
     settings->overlay_row2_show_completed = DEFAULT_OVERLAY_ROW2_SHOW_COMPLETED;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_show_hidden_goals = DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS;
@@ -1618,6 +1619,13 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             settings->overlay_progress_text_align = string_to_overlay_text_align(align_text->valuestring);
         else {
             settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
+            defaults_were_used = true;
+        }
+
+        const cJSON *show_row1 = cJSON_GetObjectItem(general_settings, "overlay_show_row1");
+        if (show_row1 && cJSON_IsBool(show_row1)) settings->overlay_show_row1 = cJSON_IsTrue(show_row1);
+        else {
+            settings->overlay_show_row1 = DEFAULT_OVERLAY_SHOW_ROW1;
             defaults_were_used = true;
         }
 
@@ -3625,6 +3633,8 @@ static void settings_fill_json(cJSON *root, const AppSettings *settings, const T
         cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
         cJSON_AddItemToObject(general_obj, "overlay_progress_text_align",
                               cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_row1");
+        cJSON_AddItemToObject(general_obj, "overlay_show_row1", cJSON_CreateBool(settings->overlay_show_row1));
         cJSON_DeleteItemFromObject(general_obj, "overlay_row2_show_completed");
         cJSON_AddItemToObject(general_obj, "overlay_row2_show_completed",
                               cJSON_CreateBool(settings->overlay_row2_show_completed));

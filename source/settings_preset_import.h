@@ -118,6 +118,7 @@ typedef enum {
     X("general.overlay_show_igt", PRESET_GROUP_OVERLAY, "Show IGT", 0, NULL) \
     X("general.overlay_show_update_timer", PRESET_GROUP_OVERLAY, "Show Update Timer", 0, NULL) \
     X("general.overlay_progress_separator", PRESET_GROUP_OVERLAY, "Segment Separator", 0, NULL) \
+    X("general.overlay_show_row1", PRESET_GROUP_OVERLAY, "Show Row 1", 0, NULL) \
     X("general.overlay_row2_show_completed", PRESET_GROUP_OVERLAY, "Show Completed Row 2 Goals", 0, NULL) \
     X("general.overlay_row3_remove_completed", PRESET_GROUP_OVERLAY, "Hide Completed Row 3 Goals", 0, NULL) \
     X("general.overlay_stat_cycle_speed", PRESET_GROUP_OVERLAY, "Sub-Stat Cycle Interval (s)", 0, NULL) \

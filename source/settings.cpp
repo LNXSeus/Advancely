@@ -642,6 +642,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row2_freeze_align != b->overlay_row2_freeze_align ||
         a->overlay_row3_freeze_enabled != b->overlay_row3_freeze_enabled ||
         a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
+        a->overlay_show_row1 != b->overlay_show_row1 ||
         a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
@@ -918,6 +919,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
             a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
             a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
+            a->overlay_show_row1 != b->overlay_show_row1 ||
             a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
             a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
             a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
@@ -3853,16 +3855,27 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         !overlay_template_has_row1_icons(row1_td,
                                                                          temp_settings.overlay_show_hidden_goals);
                 const bool row1_all_hidden = row1_empty && overlay_template_has_row1_icons(row1_td, true);
-                auto row1_empty_tooltip = [&]() -> bool {
-                    if (!row1_empty || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) return false;
-                    char row1_empty_tooltip_buffer[512];
-                    snprintf(row1_empty_tooltip_buffer, sizeof(row1_empty_tooltip_buffer),
-                             "Disabled because the current template has no Row 1 icons to show\n"
-                             "(%s criteria or sub-stats of complex stats), so the overlay leaves\n"
-                             "Row 1 out and moves everything below it up.%s",
-                             advancement_label_uppercase,
-                             row1_all_hidden ? "\nThey are all hidden. Turn on Show Hidden Goals to show them." : "");
-                    ImGui::SetTooltip("%s", row1_empty_tooltip_buffer);
+                // Read live, since the Show Row 1 checkbox sits below this point.
+                auto row1_hidden = [&]() -> bool {
+                    return !overlay_compact_mode && !temp_settings.overlay_show_row1;
+                };
+                auto row1_off = [&]() -> bool { return row1_empty || row1_hidden(); };
+                auto row1_off_tooltip = [&]() -> bool {
+                    if (!row1_off() || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) return false;
+                    char row1_off_tooltip_buffer[512];
+                    if (row1_empty) {
+                        snprintf(row1_off_tooltip_buffer, sizeof(row1_off_tooltip_buffer),
+                                 "Disabled because the current template has no Row 1 icons to show\n"
+                                 "(%s criteria or sub-stats of complex stats), so the overlay leaves\n"
+                                 "Row 1 out and moves everything below it up.%s",
+                                 advancement_label_uppercase,
+                                 row1_all_hidden ? "\nThey are all hidden. Turn on Show Hidden Goals to show them." : "");
+                    } else {
+                        snprintf(row1_off_tooltip_buffer, sizeof(row1_off_tooltip_buffer),
+                                 "Disabled because Show Row 1 is off, so the overlay leaves\n"
+                                 "Row 1 out and moves everything below it up.");
+                    }
+                    ImGui::SetTooltip("%s", row1_off_tooltip_buffer);
                     return true;
                 };
 
@@ -4012,6 +4025,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Default: \"|\"",
                                  sizeof(temp_settings.overlay_progress_separator) - 1);
                         ImGui::SetTooltip("%s", separator_tooltip_buffer);
+                    }
+
+                    ImGui::BeginDisabled(row1_empty);
+                    ImGui::Checkbox("Show Row 1", &temp_settings.overlay_show_row1);
+                    ImGui::EndDisabled();
+                    if (!(row1_empty && row1_off_tooltip()) && ImGui::IsItemHovered()) {
+                        char show_row1_tooltip_buffer[512];
+                        snprintf(show_row1_tooltip_buffer, sizeof(show_row1_tooltip_buffer),
+                                 "Shows Row 1 (%s criteria and sub-stat icons).\n"
+                                 "When off, the overlay leaves Row 1 out and moves Rows 2 and 3 up,\n"
+                                 "shrinking the overlay window to match.\n"
+                                 "Default: %s", advancement_label_uppercase,
+                                 DEFAULT_OVERLAY_SHOW_ROW1 ? "On" : "Off");
+                        ImGui::SetTooltip("%s", show_row1_tooltip_buffer);
                     }
 
                     ImGui::Checkbox("Show Completed Row 2 Goals", &temp_settings.overlay_row2_show_completed);
@@ -4207,9 +4234,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     // (icons, then panel, then stack). Alignment follows the panel alignment below;
                     // horizontal spacing uses the compact Row 1 Icon Spacing control below.
                     ImGui::Text("Row 1 Icons");
-                    ImGui::BeginDisabled(row1_empty);
+                    ImGui::BeginDisabled(row1_off());
                     ImGui::Checkbox("Show Row 1 Icons", &temp_settings.compact_show_row1_icons);
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char compact_show_icons_tooltip_buffer[512];
                         snprintf(compact_show_icons_tooltip_buffer, sizeof(compact_show_icons_tooltip_buffer),
                                  "Shows the first-row icons (advancement criteria and sub-stats) in a\n"
@@ -4228,7 +4255,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_icon_size > COMPACT_ROW1_ICON_SIZE_MAX)
                                 temp_settings.compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MAX;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_icon_size_tooltip_buffer[384];
                             snprintf(compact_icon_size_tooltip_buffer, sizeof(compact_icon_size_tooltip_buffer),
                                      "Size in on-screen pixels of each icon in the strip above the panel.\n"
@@ -4250,7 +4277,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_shared_size > temp_settings.compact_row1_icon_size)
                                 temp_settings.compact_icon_shared_size = temp_settings.compact_row1_icon_size;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_icon_shared_tooltip_buffer[512];
                             snprintf(compact_icon_shared_tooltip_buffer, sizeof(compact_icon_shared_tooltip_buffer),
                                      "Size of the small parent icon overlaid on a shared criterion in the\n"
@@ -4268,7 +4295,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_spacing > 7680.0f)
                                 temp_settings.compact_row1_spacing = 7680.0f;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_row1_spacing_tooltip_buffer[256];
                             snprintf(compact_row1_spacing_tooltip_buffer, sizeof(compact_row1_spacing_tooltip_buffer),
                                      "Adjusts the horizontal gap (in pixels) between icons in the\n"
@@ -4284,7 +4311,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
                                 temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_icon_gap_tooltip_buffer[384];
                             snprintf(compact_icon_gap_tooltip_buffer, sizeof(compact_icon_gap_tooltip_buffer),
                                      "Vertical space in on-screen pixels between the icon strip and the\n"
@@ -4301,7 +4328,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_cycle_interval > COMPACT_ICON_CYCLE_INTERVAL_MAX)
                                 temp_settings.compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MAX;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_icon_cycle_tooltip_buffer[384];
                             snprintf(compact_icon_cycle_tooltip_buffer, sizeof(compact_icon_cycle_tooltip_buffer),
                                      "How long each page of icons stays before flipping to the next set.\n"
@@ -4323,7 +4350,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 temp_settings.compact_row1_clear_animation = 10.0f;
                         }
                         ImGui::EndDisabled();
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_clear_anim_tooltip_buffer[640];
                             if (temp_settings.compact_row1_fade_enabled) {
                                 snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
@@ -4346,7 +4373,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::BeginDisabled(!temp_settings.overlay_transparent);
                         ImGui::Checkbox("Fade Out##CompactRow1Icons", &temp_settings.compact_row1_fade_enabled);
                         ImGui::EndDisabled();
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_row1_fade_tooltip_buffer[768];
                             if (temp_settings.overlay_transparent) {
                                 snprintf(compact_row1_fade_tooltip_buffer, sizeof(compact_row1_fade_tooltip_buffer),
@@ -4380,7 +4407,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     temp_settings.compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MAX;
                             }
                             ImGui::EndDisabled();
-                            if (!row1_empty_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 char compact_row1_fade_time_tooltip_buffer[512];
                                 snprintf(compact_row1_fade_time_tooltip_buffer,
                                          sizeof(compact_row1_fade_time_tooltip_buffer),
@@ -4401,7 +4428,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_settle_time > OVERLAY_SETTLE_TIME_MAX)
                                 temp_settings.compact_row1_settle_time = OVERLAY_SETTLE_TIME_MAX;
                         }
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char compact_row1_settle_tooltip_buffer[512];
                             snprintf(compact_row1_settle_tooltip_buffer, sizeof(compact_row1_settle_tooltip_buffer),
                                      "How long the remaining icons take to slide over into the gap a cleared\n"
@@ -5058,9 +5085,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     // --- Row 1 Custom Speed + Freeze ---
-                    ImGui::BeginDisabled(row1_empty);
+                    ImGui::BeginDisabled(row1_off());
                     ImGui::Checkbox("Row 1 Custom Speed", &temp_settings.overlay_row1_custom_scroll_speed_enabled);
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
@@ -5080,11 +5107,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.overlay_row1_scroll_speed > 25.0f)
                                 temp_settings.overlay_row1_scroll_speed = 25.0f;
                         }
-                        row1_empty_tooltip();
+                        row1_off_tooltip();
                     }
 
                     ImGui::Checkbox("Row 1 Auto-Freeze", &temp_settings.overlay_row1_freeze_enabled);
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "When Row 1's still-visible items fit within the overlay width, stop scrolling\n"
@@ -5098,7 +5125,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::Combo("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
                                      "Left\0Center\0Right\0");
-                        if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "How to align Row 1's frozen items within the overlay width.\n"
@@ -5253,7 +5280,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
                                        OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
 
-                    ImGui::BeginDisabled(row1_empty);
+                    ImGui::BeginDisabled(row1_off());
                     if (ImGui::DragFloat("Row 1 Icon Size", &temp_settings.overlay_row1_icon_size, 1.0f,
                                          OVERLAY_ROW1_ICON_SIZE_MIN, OVERLAY_ROW1_ICON_SIZE_MAX, "%.0f px")) {
                         if (temp_settings.overlay_row1_icon_size < OVERLAY_ROW1_ICON_SIZE_MIN)
@@ -5261,7 +5288,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
                             temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
                     }
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Size in pixels of each icon in the top row (Row 1) of the overlay.\n"
@@ -5276,7 +5303,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
                         if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
                     }
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Adjusts the horizontal gap (in pixels) between icons\n"
@@ -5300,7 +5327,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_shared_icon_size > temp_settings.overlay_row1_icon_size)
                             temp_settings.overlay_row1_shared_icon_size = temp_settings.overlay_row1_icon_size;
                     }
-                    if (!row1_empty_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Adjusts the size of the 'Parent Icon' overlay that appears when\n"
@@ -5477,12 +5504,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         vspacing_gap("Top Bar -> Row 1 Gap", &temp_settings.overlay_gap_top_to_row1,
                                      DEFAULT_OVERLAY_GAP_TOP_TO_ROW1,
                                      "Extra vertical space between the top info bar and the first row.");
-                        ImGui::BeginDisabled(row1_empty);
+                        ImGui::BeginDisabled(row1_off());
                         vspacing_gap("Row 1 -> Row 2 Gap", &temp_settings.overlay_gap_row1_to_row2,
                                      DEFAULT_OVERLAY_GAP_ROW1_TO_ROW2,
                                      "Extra vertical space between the first and second rows.");
                         ImGui::EndDisabled();
-                        row1_empty_tooltip();
+                        row1_off_tooltip();
                         vspacing_gap("Row 2 -> Row 3 Gap", &temp_settings.overlay_gap_row2_to_row3,
                                      DEFAULT_OVERLAY_GAP_ROW2_TO_ROW3,
                                      "Extra vertical space between the second and third rows.");

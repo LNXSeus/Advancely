@@ -3130,10 +3130,11 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
     o->layout_row1_collapsed = false;
 }
 
-// Only a template or "Show Hidden Goals" change flips this, never goal progress, so the window
-// stays put during a run.
+// Only a template, "Show Hidden Goals" or "Show Row 1" change flips this, never goal progress,
+// so the window stays put during a run.
 static void overlay_apply_row1_collapse(Overlay *o, const TemplateData *td, const AppSettings *settings) {
-    bool collapse = !overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals);
+    bool collapse = !settings->overlay_show_row1 ||
+                    !overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals);
     if (collapse == o->layout_row1_collapsed) return;
     o->layout_row1_collapsed = collapse;
 
@@ -3856,7 +3857,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     };
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
-    {
+    if (!o->layout_row1_collapsed) {
         const float ROW1_Y_POS = o->layout_row1_y;
         const float ROW1_ICON_SIZE = settings->overlay_row1_icon_size;
         const float ROW1_SHARED_ICON_SIZE = fminf(settings->overlay_row1_shared_icon_size, ROW1_ICON_SIZE);

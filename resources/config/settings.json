@@ -24,6 +24,7 @@
 		"overlay_page_align":	0,
 		"overlay_scroll_speed":	1,
 		"overlay_progress_text_align":	"left",
+		"overlay_show_row1":	true,
 		"overlay_row2_show_completed":	false,
 		"overlay_row3_remove_completed":	false,
 		"overlay_show_hidden_goals":	false,
