@@ -1206,7 +1206,7 @@ list has a `Show Display Names` checkbox to toggle between display names and roo
   description, on a multi-stage goal also when only one of its stages has one). The tags appear in the same order as
   the matching checkboxes in the detail pane, with `desc` last. Hover the tags for a tooltip describing the active ones.
   Decorations have none of those flags, so their rows carry a type tag instead: `txt` (text header), `line`, or `arw`
-  (arrow). The full type name (`Text Header`, `Line`, `Arrow`) is also matched by the editor's search box.
+  (arrow), plus `desc` for a text header with a description. The full type name (`Text Header`, `Line`, `Arrow`) is also matched by the editor's search box.
 * **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
   multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
   selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
@@ -1379,7 +1379,8 @@ right. Each row is tagged with its type (`txt`, `line`, `arw`) so you can tell t
   labeling different sections or areas of your layout. Each text header has a position that can be set numerically
   or dragged in the Visual Layout Editor. Its display text is stored in the language files under its ID, which all
   layouts of the template share, so a header with the same ID in another layout shows the same text (see
-  [Layout File Management](#layout-file-management)).
+  [Layout File Management](#layout-file-management)). Like a goal, a text header can have an optional `Description`,
+  shown as a tooltip when hovering the header on the tracker map and shared across layouts the same way.
 * **Lines**: Draw a line between two endpoints on the map. Lines use the tracker's text color and have configurable
   **Thickness** and **Opacity** sliders. Each endpoint can be dragged independently in the Visual Layout Editor, or
   you can drag the line's midpoint marker to move the entire line at once.

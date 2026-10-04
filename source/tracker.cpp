@@ -419,6 +419,14 @@ static void tracker_build_goal_descriptions(const TemplateData *td, cJSON *lang_
         }
     }
 
+    // Text headers, keyed by decoration ID. Lines and arrows carry no text and so no description.
+    for (int i = 0; i < td->decoration_count; i++) {
+        const DecorationElement *deco = td->decorations ? td->decorations[i] : nullptr;
+        if (!deco || deco->type != DECORATION_TEXT_HEADER) continue;
+        snprintf(lang_key, sizeof(lang_key), "decoration.%s", deco->id);
+        tracker_store_goal_description(lang_json, lang_key, 'd', deco->id, nullptr);
+    }
+
     if (!s_goal_descriptions.empty()) {
         log_message(LOG_INFO, "[TRACKER] Loaded %d goal description(s).\n", (int) s_goal_descriptions.size());
     }
@@ -12920,6 +12928,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                            text_color, elem->display_text);
                         if (t->is_visual_layout_editing && elem->pos.is_hidden_in_layout)
                             tracker_fade_vertices_since(draw_list, header_vtx, VLE_HIDDEN_ELEMENT_ALPHA);
+                        tracker_show_goal_description(t, header_min, header_max, 'd', elem->id);
                     }
 
                     // Visual layout dragging

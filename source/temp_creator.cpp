@@ -443,6 +443,10 @@ struct EditorDecorationElement {
     // Text header goal linking: linked items remain visible when searching for the header's display text
     std::vector<EditorCounterLinkedGoal> linked_goals;
 
+    // Optional free-text explanation shown as a tooltip on the tracker map, stored in the lang file
+    // under "decoration.<id>.desc" like a goal's. Text headers only.
+    std::string description;
+
     // What the template's OTHER language files say about this header (see EditorLanguageText).
     // Text headers only; the other decoration types have no display text.
     EditorLanguageTextRef language_text;
@@ -1320,6 +1324,7 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
         }
     }
     if (a.type == DECORATION_TEXT_HEADER) {
+        if (a.description != b.description) return true;
         if (tc_language_text_different(a.language_text, b.language_text)) return true;
         if (a.linked_goals.size() != b.linked_goals.size()) return true;
         for (size_t i = 0; i < a.linked_goals.size(); ++i) {
@@ -2653,6 +2658,7 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
                 }
             }
             new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
+            load_editor_lang_description(lang_json, lang_key, new_elem.description);
 
             // Parse linked goals for text headers
             cJSON *linked_json = cJSON_GetObjectItem(item_json, "linked_goals");
@@ -2913,7 +2919,9 @@ static void tc_for_each_lang_entry(TemplateRef &editor_data, Fn &&visit) {
         if (deco.type != DECORATION_TEXT_HEADER || deco.display_text[0] == '\0') continue;
         char deco_lang_key[256];
         snprintf(deco_lang_key, sizeof(deco_lang_key), "decoration.%s", deco.id);
-        visit(deco_lang_key, "", deco.display_text, nullptr, deco.language_text);
+        char deco_desc_key[576];
+        snprintf(deco_desc_key, sizeof(deco_desc_key), "%s.desc", deco_lang_key);
+        visit(deco_lang_key, deco_desc_key, deco.display_text, &deco.description, deco.language_text);
     }
 }
 
@@ -3785,6 +3793,7 @@ static std::set<std::string> tc_collect_other_layout_header_keys(const char *ver
                 if (!cJSON_IsString(type) || strcmp(type->valuestring, "text_header") != 0) continue;
                 if (!cJSON_IsString(id) || id->valuestring[0] == '\0') continue;
                 keys.insert(std::string("decoration.") + id->valuestring);
+                keys.insert(std::string("decoration.") + id->valuestring + ".desc");
             }
         }
         cJSON_Delete(layout_json);
@@ -4946,7 +4955,10 @@ static size_t tc_history_entry_bytes(const EditorTemplate &d) {
         bytes += goal.description.capacity();
     }
     bytes += d.decorations.capacity() * sizeof(EditorDecorationElement);
-    for (const auto &deco: d.decorations) bytes += linked_bytes(deco.linked_goals);
+    for (const auto &deco: d.decorations) {
+        bytes += linked_bytes(deco.linked_goals);
+        bytes += deco.description.capacity();
+    }
     return bytes;
 }
 
@@ -7502,6 +7514,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ind_hidden = ind_row1 = ind_pos = true;
                     break;
                 case SCOPE_MULTISTAGE_DETAILS:
+                case SCOPE_DECORATIONS:
                     ind_desc = true;
                     break;
                 default:
@@ -7551,7 +7564,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       ? "\n  desc          - goals with a description (own or on a stage)"
                                       : current_search_scope == SCOPE_MULTISTAGE_DETAILS
                                             ? "\n  desc          - stages with a description"
-                                            : "\n  desc          - goals with a description");
+                                            : current_search_scope == SCOPE_DECORATIONS
+                                                  ? "\n  desc          - text headers with a description"
+                                                  : "\n  desc          - goals with a description");
             }
             snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                      "\n\nPress Ctrl+F (Cmd+F on macOS) to focus this field.");
@@ -21394,7 +21409,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto deco_matches_search = [&](const EditorDecorationElement &d) {
                         return str_contains_insensitive(d.display_text, tc_search_buffer) ||
                                str_contains_insensitive(d.id, tc_search_buffer) ||
-                               str_contains_insensitive(deco_type_name(d.type), tc_search_buffer);
+                               str_contains_insensitive(deco_type_name(d.type), tc_search_buffer) ||
+                               (d.type == DECORATION_TEXT_HEADER &&
+                                description_matches_search(d.description, tc_search_buffer));
                     }; {
                         size_t count_top = 0;
                         if (!is_deco_search_active) {
@@ -21623,7 +21640,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Decorations have no Hidden/Row flags, so the row tag carries the element type
                         // instead, which is what actually distinguishes one decoration from another.
                         {
-                            EditorRowTag type_tag;
+                            EditorRowTag deco_tags[2];
+                            int deco_tag_count = 0;
+                            EditorRowTag &type_tag = deco_tags[deco_tag_count++];
                             if (deco.type == DECORATION_TEXT_HEADER)
                                 type_tag = {"txt", IM_COL32(150, 200, 255, 255), "Text header decoration"};
                             else if (deco.type == DECORATION_LINE)
@@ -21632,7 +21651,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 type_tag = {"arw", IM_COL32(255, 170, 120, 255), "Arrow decoration"};
                             else
                                 type_tag = {"?", IM_COL32(200, 200, 200, 255), "Unknown decoration type"};
-                            draw_editor_row_status_tags(&type_tag, 1);
+                            if (deco.type == DECORATION_TEXT_HEADER && !deco.description.empty())
+                                deco_tags[deco_tag_count++] = {
+                                    "desc", IM_COL32(215, 215, 120, 255),
+                                    "Has a description (shown when hovering the header on the tracker map)"
+                                };
+                            draw_editor_row_status_tags(deco_tags, deco_tag_count);
                         }
 
                         // Scroll to this item when clicked in visual layout
@@ -21842,6 +21866,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "of this template shares that entry, so a text header with the\n"
                                          "same ID in another layout shows this text as well.");
                                 ImGui::SetTooltip("%s", display_text_tooltip_buffer);
+                            }
+                            if (draw_editor_description_box("HeaderDesc", deco.description, "text header",
+                                                            "Shared by every layout of this template, like the\n"
+                                                            "display text: a text header with the same ID in\n"
+                                                            "another layout shows this description as well.")) {
+                                save_message_type = MSG_NONE;
                             }
 
                             ImGui::Separator();
@@ -27986,8 +28016,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 break;
                                             }
                                         }
-                                        add_target(std::string("decoration.") + d.id, std::string(),
-                                                   slot_of(dst));
+                                        std::string k = std::string("decoration.") + d.id;
+                                        add_target(k, k + ".desc", slot_of(dst));
                                     }
                                     break;
                                 case IFTS_TEMPLATE_CRITERIA: {
