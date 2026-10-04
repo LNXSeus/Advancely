@@ -813,13 +813,11 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
-					"target":	1,
-					"hide_progress":	false
+					"target":	1
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -828,7 +826,6 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_1.13.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -864,7 +861,6 @@
 					"icon":	"blocks/Obsidian_JE3_BE2.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"stat.pickup.minecraft.obsidian",
 							"parent_root":	"stat_complete_helper",
@@ -875,7 +871,6 @@
 					"icon":	"items/gold_ingot_1.0.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:husbandry/break_diamond_hoe",
 							"type":	"advancement"
@@ -888,7 +883,6 @@
 					"icon":	"items/lapis_lazuli_1.13.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"stat.pickup.minecraft.lapis_lazuli",
 							"parent_root":	"stat_complete_helper",
@@ -899,7 +893,6 @@
 					"icon":	"items/redstone_1.13.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:husbandry/break_diamond_hoe",
 							"type":	"advancement"
@@ -957,7 +950,6 @@
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.ghast_tear",
 			"target":	1,
-			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"stat.craft.minecraft.end_crystal",
 					"parent_root":	"stat_complete_helper",
@@ -974,7 +966,6 @@
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/summon_wither",
 							"type":	"advancement"
@@ -984,7 +975,6 @@
 					"icon":	"items/blaze_rod_1.0.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
 							"parent_root":	"hdwgh_summary",
@@ -999,7 +989,6 @@
 					"icon":	"items/nether_wart_1.0.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
 							"parent_root":	"hdwgh_summary",
@@ -1065,7 +1054,6 @@
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.skull",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1079,14 +1067,13 @@
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
 					"target":	1,
-					"hide_progress":	false
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
 					"icon":	"monsters/Wither_JE2_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.craft.minecraft.beacon",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"5",
@@ -1094,7 +1081,6 @@
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -1693,7 +1679,7 @@
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh_summary",
+					"root_name":	"hdwgh",
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
 				}]

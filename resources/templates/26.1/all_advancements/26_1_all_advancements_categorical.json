@@ -937,47 +937,47 @@
 			"in_3rd_row":	true,
 			"groups_enabled":	false,
 			"criteria":	{
-				"textures/entity/cat/jellie.png":	{
+				"minecraft:jellie":	{
 					"icon":	"cats/jellie.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/calico.png":	{
+				"minecraft:calico":	{
 					"icon":	"cats/calico.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/red.png":	{
+				"minecraft:red":	{
 					"icon":	"cats/red.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/black.png":	{
+				"minecraft:black":	{
 					"icon":	"cats/tuxedo.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/white.png":	{
+				"minecraft:white":	{
 					"icon":	"cats/white.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/ragdoll.png":	{
+				"minecraft:ragdoll":	{
 					"icon":	"cats/ragdoll.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/british_shorthair.png":	{
+				"minecraft:british_shorthair":	{
 					"icon":	"cats/british_shorthair.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/tabby.png":	{
+				"minecraft:tabby":	{
 					"icon":	"cats/tabby.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/persian.png":	{
+				"minecraft:persian":	{
 					"icon":	"cats/persian.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/siamese.png":	{
+				"minecraft:siamese":	{
 					"icon":	"cats/siamese.png",
 					"hidden":	true
 				},
-				"textures/entity/cat/all_black.png":	{
+				"minecraft:all_black":	{
 					"icon":	"cats/black.png",
 					"hidden":	true
 				}
@@ -1773,7 +1773,6 @@
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -1782,7 +1781,6 @@
 				"warden_setup":	{
 					"icon":	"blocks/Sculk_Shrieker_JE2_BE3_unoptimized.gif",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:deep_dark",
 							"parent_root":	"minecraft:adventure/adventuring_time",
@@ -1792,7 +1790,6 @@
 				"nautilus_transport":	{
 					"icon":	"animals/nautilus.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nautilus",
 							"parent_root":	"minecraft:husbandry/bred_all_animals",
@@ -1802,7 +1799,6 @@
 				"villager_transport":	{
 					"icon":	"items/emerald_1.20.2.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/trade_at_world_height",
 							"type":	"advancement"
@@ -1810,13 +1806,11 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_unoptimized.gif",
-					"target":	1,
-					"hide_progress":	false
+					"target":	1
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -1824,13 +1818,11 @@
 				},
 				"minecraft:used/minecraft:conduit":	{
 					"icon":	"blocks/Conduit_unoptimized.gif",
-					"target":	1,
-					"hide_progress":	false
+					"target":	1
 				},
 				"hero_of_the_village":	{
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/hero_of_the_village",
 							"type":	"advancement"
@@ -1839,7 +1831,6 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_25w14craftmine.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -2002,7 +1993,6 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:picked_up/minecraft:heavy_core",
 			"target":	1,
-			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/overoverkill"
 				}, {
@@ -2041,7 +2031,6 @@
 					"icon":	"items/trident_1.13.png",
 					"hidden":	true,
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/very_very_frightening",
 							"type":	"advancement"
@@ -2055,7 +2044,11 @@
 							"root_name":	"minecraft:crafted/minecraft:conduit",
 							"parent_root":	"stat_complete_helper",
 							"type":	"stat"
-						}]
+						}, {
+							"root_name":	"minecraft:nether/all_effects",
+							"type":	"advancement"
+						}],
+					"linked_goal_mode":	"or"
 				}
 			}
 		},
@@ -2065,7 +2058,6 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:fermented_spider_eye",
 			"target":	1,
-			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",
@@ -2078,7 +2070,6 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:suspicious_stew",
 			"target":	1,
-			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
 				}]
@@ -2113,7 +2104,6 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:spyglass",
 			"target":	1,
-			"hide_progress":	false,
 			"linked_goals":	[{
 					"root_name":	"minecraft:adventure/spyglass_at_parrot",
 					"type":	"advancement"
@@ -2219,7 +2209,6 @@
 				"minecraft:crafted/minecraft:conduit":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:used/minecraft:conduit",
 							"parent_root":	"hdwgh_summaryyyy",
@@ -2294,7 +2283,6 @@
 				"minecraft:picked_up/minecraft:wither_rose":	{
 					"icon":	"blocks/placeholder.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -2349,7 +2337,6 @@
 				"minecraft:crafted/minecraft:lightning_rod":	{
 					"icon":	"blocks/Lightning_Rod_(U)_JE3.png",
 					"target":	1,
-					"hide_progress":	false,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/lightning_rod_with_villager_no_fire",
 							"type":	"advancement"
@@ -2428,14 +2415,12 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:bee_nest",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -2492,7 +2477,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:tadpole_bucket",
 					"target":	1,
-					"hide_progress":	false
+					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
 					"icon":	"items/tadpole_bucket_1.20.2.png",
@@ -2528,7 +2513,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -2576,7 +2560,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:heavy_core",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
@@ -2584,7 +2567,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:mace",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"5",
@@ -2636,7 +2618,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -2644,7 +2625,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
 					"target":	1,
-					"hide_progress":	false,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"7",
@@ -3441,43 +3421,43 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/jellie.png",
+					"root_name":	"minecraft:jellie",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/calico.png",
+					"root_name":	"minecraft:calico",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/red.png",
+					"root_name":	"minecraft:red",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/black.png",
+					"root_name":	"minecraft:black",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/white.png",
+					"root_name":	"minecraft:white",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/ragdoll.png",
+					"root_name":	"minecraft:ragdoll",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/british_shorthair.png",
+					"root_name":	"minecraft:british_shorthair",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/tabby.png",
+					"root_name":	"minecraft:tabby",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/persian.png",
+					"root_name":	"minecraft:persian",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/siamese.png",
+					"root_name":	"minecraft:siamese",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
@@ -3704,7 +3684,7 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/all_black.png",
+					"root_name":	"minecraft:all_black",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
@@ -4236,15 +4216,15 @@
 					"root_name":	"minecraft:husbandry/obtain_netherite_hoe",
 					"type":	"advancement"
 				}, {
+					"root_name":	"enchanted_golden_apple",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
 					"root_name":	"pufferfish",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
 					"root_name":	"suspicious_stew",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
-					"type":	"advancement"
-				}, {
-					"root_name":	"enchanted_golden_apple",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
@@ -4260,7 +4240,15 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
+					"root_name":	"minecraft:nautilus",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
 					"root_name":	"minecraft:wither",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:magma_cube",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
 				}, {
@@ -4271,6 +4259,10 @@
 					"root_name":	"minecraft:guardian",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
+				}, {
+					"root_name":	"nautilus_transport",
+					"parent_root":	"hdwgh_summary",
+					"type":	"stat"
 				}, {
 					"root_name":	"villager_transport",
 					"parent_root":	"hdwgh_summary",
@@ -4304,14 +4296,6 @@
 				}, {
 					"root_name":	"frogs",
 					"type":	"multi_stage"
-				}, {
-					"root_name":	"minecraft:magma_cube",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"nautilus_transport",
-					"parent_root":	"hdwgh_summary",
-					"type":	"stat"
 				}]
 		}],
 	"run_completion":	{

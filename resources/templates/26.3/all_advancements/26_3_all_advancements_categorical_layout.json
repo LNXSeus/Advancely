@@ -1511,67 +1511,67 @@
 			"y":	345
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/jellie.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:jellie":	{
 		"icon_pos":	{
 			"x":	1145,
 			"y":	65
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/calico.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:calico":	{
 		"icon_pos":	{
 			"x":	1145,
 			"y":	105
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/red.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:red":	{
 		"icon_pos":	{
 			"x":	1145,
 			"y":	145
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/black.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:black":	{
 		"icon_pos":	{
 			"x":	1145,
 			"y":	185
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/white.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:white":	{
 		"icon_pos":	{
 			"x":	1145,
 			"y":	225
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/ragdoll.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:ragdoll":	{
 		"icon_pos":	{
 			"x":	1270,
 			"y":	65
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/british_shorthair.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:british_shorthair":	{
 		"icon_pos":	{
 			"x":	1270,
 			"y":	105
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/tabby.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:tabby":	{
 		"icon_pos":	{
 			"x":	1270,
 			"y":	145
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/persian.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:persian":	{
 		"icon_pos":	{
 			"x":	1270,
 			"y":	185
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/siamese.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:siamese":	{
 		"icon_pos":	{
 			"x":	1270,
 			"y":	225
 		}
 	},
-	"advancement.minecraft.husbandry.complete_catalogue.criteria.textures/entity/cat/all_black.png":	{
+	"advancement.minecraft.husbandry.complete_catalogue.criteria.minecraft:all_black":	{
 		"icon_pos":	{
 			"x":	2295,
 			"y":	430
@@ -3952,43 +3952,43 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/jellie.png",
+					"root_name":	"minecraft:jellie",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/calico.png",
+					"root_name":	"minecraft:calico",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/red.png",
+					"root_name":	"minecraft:red",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/black.png",
+					"root_name":	"minecraft:black",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/white.png",
+					"root_name":	"minecraft:white",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/ragdoll.png",
+					"root_name":	"minecraft:ragdoll",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/british_shorthair.png",
+					"root_name":	"minecraft:british_shorthair",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/tabby.png",
+					"root_name":	"minecraft:tabby",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/persian.png",
+					"root_name":	"minecraft:persian",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/siamese.png",
+					"root_name":	"minecraft:siamese",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
@@ -4184,7 +4184,7 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"textures/entity/cat/all_black.png",
+					"root_name":	"minecraft:all_black",
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
