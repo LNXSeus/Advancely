@@ -8276,7 +8276,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
             if (ImGui::IsItemHovered()) {
-                char debug_print_tooltip_buffer[1024];
+                char logs_location_line[256] = "";
+                if (get_logs_display_path()[0] != '\0') {
+                    snprintf(logs_location_line, sizeof(logs_location_line), "Both log files are located in %s\n",
+                             get_logs_display_path());
+                }
+                char debug_print_tooltip_buffer[1280];
                 snprintf(debug_print_tooltip_buffer, sizeof(debug_print_tooltip_buffer),
                          "This toggles printing a detailed progress report to the console after every file update.\n"
                          "Currently it also toggles an FPS counter for the overlay window and debug window for the tracker.\n\n"
@@ -8285,10 +8290,37 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "Progress on goals is only printed if the game sends an update.\n"
                          "General status messages and errors are always printed to the console and saved to advancely_log.txt\n"
                          "and advancely_overlay_log.txt for the overlay.\n"
+                         "%s"
                          "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
                          "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.\n"
-                         "Default: Off");
+                         "Default: Off", logs_location_line);
                 ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Open Log Folder")) {
+                char logs_path[MAX_PATH_LENGTH];
+                get_logs_dir_path(logs_path, sizeof(logs_path));
+#ifdef _WIN32
+                path_to_windows_native(logs_path);
+#endif
+                open_content(logs_path);
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char open_logs_tooltip_buffer[384];
+                if (get_logs_display_path()[0] != '\0') {
+                    snprintf(open_logs_tooltip_buffer, sizeof(open_logs_tooltip_buffer),
+                             "Opens the '%s' folder in your file explorer,\n"
+                             "where advancely_log.txt and advancely_overlay_log.txt are stored,\n"
+                             "as well as advancely_profile_log.txt when running with --profiler.",
+                             get_logs_display_path());
+                } else {
+                    snprintf(open_logs_tooltip_buffer, sizeof(open_logs_tooltip_buffer),
+                             "Opens the folder Advancely runs from in your file explorer,\n"
+                             "where advancely_log.txt and advancely_overlay_log.txt are stored,\n"
+                             "as well as advancely_profile_log.txt when running with --profiler.");
+                }
+                ImGui::SetTooltip("%s", open_logs_tooltip_buffer);
             }
 
             ImGui::EndTabItem();

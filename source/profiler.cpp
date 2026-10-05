@@ -8,6 +8,7 @@
 //
 
 #include "profiler.h"
+#include "main.h"
 
 #include <cstdio>
 #include <cstdarg>
@@ -105,7 +106,9 @@ void profiler_init(bool enabled, float report_interval_seconds) {
 
     if (!g_counter_mutex) g_counter_mutex = SDL_CreateMutex();
 
-    g_profile_file = fopen("advancely_profile_log.txt", "w");
+    char profile_path[MAX_PATH_LENGTH];
+    get_loose_file_path("advancely_profile_log.txt", profile_path, sizeof(profile_path));
+    g_profile_file = fopen(profile_path, "w");
 
     const time_t now = time(nullptr);
     char time_buf[64];

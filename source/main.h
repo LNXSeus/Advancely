@@ -75,6 +75,16 @@ const char *get_gui_display_path();
 
 const char *get_reference_files_display_path();
 
+// Friendly folder holding the log files, or "" when they sit in the working directory.
+const char *get_logs_display_path();
+
+// Absolute folder holding the log files, for opening it in the file explorer.
+void get_logs_dir_path(char *out, size_t out_size);
+
+// Logs and imgui.ini: inside the writable data directory when it is separate from the install
+// (Linux --use-home-dir, macOS), otherwise the working directory as before.
+void get_loose_file_path(const char *file_name, char *out, size_t out_size);
+
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO
 

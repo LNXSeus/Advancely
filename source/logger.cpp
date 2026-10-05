@@ -8,6 +8,7 @@
 //
 
 #include "logger.h"
+#include "main.h"
 #include "settings_utils.h" // Include the full header for the AppSettings definition
 #include "profiler.h" // For counting log calls per second while profiling
 #include <cstdio>
@@ -36,12 +37,14 @@ void log_init(bool is_overlay_process) {
         log_mutex = SDL_CreateMutex();
     }
 
-    const char *log_filename = is_overlay_process ? "advancely_overlay_log.txt" : "advancely_log.txt";
+    char log_filename[MAX_PATH_LENGTH];
+    get_loose_file_path(is_overlay_process ? "advancely_overlay_log.txt" : "advancely_log.txt",
+                        log_filename, sizeof(log_filename));
 
     // Open the log file in write mode to clear it on each startup
     log_file = fopen(log_filename, "w");
     if (log_file == nullptr) {
-        fprintf(stderr, "CRITICAL: Failed to open log file advancely_log.txt\n");
+        fprintf(stderr, "CRITICAL: Failed to open log file %s\n", log_filename);
         return;
     }
 

@@ -1277,6 +1277,31 @@ const char *get_reference_files_display_path() {
     return path;
 }
 
+const char *get_logs_display_path() {
+#if defined(__APPLE__) || defined(__linux__)
+    if (strcmp(get_resources_path(), get_application_dir()) != 0) return get_data_dir_display_base();
+#endif
+    return "";
+}
+
+void get_logs_dir_path(char *out, size_t out_size) {
+    if (strcmp(get_resources_path(), get_application_dir()) != 0) {
+        snprintf(out, out_size, "%s", get_resources_path());
+    } else if (GetCurrentDir(out, out_size) == nullptr) {
+        snprintf(out, out_size, ".");
+    }
+}
+
+void get_loose_file_path(const char *file_name, char *out, size_t out_size) {
+    const char *data = get_resources_path();
+    if (strcmp(data, get_application_dir()) == 0) {
+        snprintf(out, out_size, "%s", file_name);
+        return;
+    }
+    fs_ensure_directory_exists(data);
+    snprintf(out, out_size, "%s/%s", data, file_name);
+}
+
 // Builds the argument list for (re)launching the overlay child process, propagating the runtime
 // flags this process was started with. This is critical: the overlay resolves its data directory
 // from get_resources_path(), which on Linux depends on --use-home-dir, and its settings file from
@@ -2571,6 +2596,9 @@ int main(int argc, char *argv[]) {
         ImGuiIO &io = ImGui::GetIO();
         (void) io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        static char imgui_ini_path[MAX_PATH_LENGTH];
+        get_loose_file_path("imgui.ini", imgui_ini_path, sizeof(imgui_ini_path));
+        io.IniFilename = imgui_ini_path;
 
         // Ctrl+Tab selects the next goal in the template editor, so ImGui's own window switcher
         // must not claim the same combination and pop up over it.
@@ -2906,8 +2934,11 @@ int main(int argc, char *argv[]) {
                              "The usual cause is a second overlay window still being open, including one "
                              "started by hand with the --overlay flag, because only one overlay can run at "
                              "a time. Close any other overlay and press 'Apply' again.\n\n"
-                             "advancely_overlay_log.txt says why it exited.",
-                             overlay_exit_code);
+                             "advancely_overlay_log.txt%s%s%s says why it exited.",
+                             overlay_exit_code,
+                             get_logs_display_path()[0] != '\0' ? " (in " : "",
+                             get_logs_display_path(),
+                             get_logs_display_path()[0] != '\0' ? ")" : "");
                     external_overlay_warning = true;
                 }
 
