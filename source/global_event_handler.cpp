@@ -17,6 +17,7 @@
 #include "coop_net.h"
 
 #include "imgui_impl_sdl3.h"
+#include "imgui/imgui_internal.h" // ClearActiveID, to close a text box before a shortcut fires
 #include "logger.h"
 
 bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
@@ -163,6 +164,190 @@ static bool app_hotkey_is_held(const AppSettings *settings, AppHotkeyAction acti
     return key_state[scancode];
 }
 
+// A shortcut pressed while a text box was active: the box is closed at the start of the next frame
+// (hotkeys_after_new_frame) and the shortcut fires on the frame after that.
+enum TypingShortcutStage {
+    TYPING_SHORTCUT_NONE,
+    TYPING_SHORTCUT_CLOSE_INPUT,
+    TYPING_SHORTCUT_FIRE,
+};
+
+static TypingShortcutStage s_typing_shortcut_stage = TYPING_SHORTCUT_NONE;
+static SDL_Keycode s_typing_shortcut_key = SDLK_UNKNOWN;
+static Uint16 s_typing_shortcut_mods = HOTKEY_MOD_NONE;
+
+// Only Ctrl (Cmd on macOS) combinations, and none a text box uses itself: select all, clipboard,
+// undo/redo and the word-wise cursor keys. Alt is left out because Ctrl+Alt is AltGr on Windows,
+// which types characters such as @ on many layouts.
+static bool app_shortcut_safe_while_typing(SDL_Keycode key, Uint16 mods) {
+    if (!(mods & HOTKEY_MOD_CTRL) || (mods & HOTKEY_MOD_ALT)) return false;
+    switch (key) {
+        case SDLK_A:
+        case SDLK_C:
+        case SDLK_V:
+        case SDLK_X:
+        case SDLK_Z:
+        case SDLK_Y:
+        case SDLK_LEFT:
+        case SDLK_RIGHT:
+        case SDLK_UP:
+        case SDLK_DOWN:
+        case SDLK_HOME:
+        case SDLK_END:
+        case SDLK_BACKSPACE:
+        case SDLK_DELETE:
+        case SDLK_INSERT:
+        case SDLK_RETURN:
+        case SDLK_KP_ENTER:
+            return false;
+        default:
+            return true;
+    }
+}
+
+// Whether app_shortcut_key_pressed() has a binding for this key in the current context. Without it, an
+// unbound combination (or the hardcoded Ctrl+F) would close the text box for nothing.
+static bool app_shortcut_is_bound(const Tracker *t, const AppSettings *app_settings, SDL_Keycode key,
+                                  Uint16 app_mods) {
+    static const AppHotkeyAction always[] = {
+        APP_HOTKEY_TOGGLE_FULLSCREEN, APP_HOTKEY_TOGGLE_VISUAL_EDITING, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR,
+        APP_HOTKEY_TOGGLE_NOTES,
+    };
+    // Save, apply, revert, undo and redo act on the editor or the settings window, never on the notes.
+    static const AppHotkeyAction outside_notes[] = {
+        APP_HOTKEY_EDITOR_SAVE, APP_HOTKEY_EDITOR_UNDO, APP_HOTKEY_EDITOR_REDO,
+        APP_HOTKEY_SETTINGS_APPLY, APP_HOTKEY_SETTINGS_REVERT,
+    };
+    static const AppHotkeyAction editor_focused[] = {
+        APP_HOTKEY_EDITOR_NEXT_GOAL, APP_HOTKEY_EDITOR_PREV_GOAL,
+    };
+    static const AppHotkeyAction visual_editing[] = {
+        APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, APP_HOTKEY_TOGGLE_MANUAL_POS,
+        APP_HOTKEY_DELETE_SELECTION, APP_HOTKEY_COPY_SELECTION,
+    };
+    for (AppHotkeyAction action: always) {
+        if (app_hotkey_matches(app_settings, action, key, app_mods)) return true;
+    }
+    if (!t->is_notes_focused) {
+        for (AppHotkeyAction action: outside_notes) {
+            if (app_hotkey_matches(app_settings, action, key, app_mods)) return true;
+        }
+    }
+    if (t->is_temp_creator_focused) {
+        for (AppHotkeyAction action: editor_focused) {
+            if (app_hotkey_matches(app_settings, action, key, app_mods)) return true;
+        }
+    }
+    if (t->is_visual_layout_editing) {
+        for (AppHotkeyAction action: visual_editing) {
+            if (app_hotkey_matches(app_settings, action, key, app_mods)) return true;
+        }
+    }
+    return false;
+}
+
+void hotkeys_after_new_frame(void) {
+    if (s_typing_shortcut_stage != TYPING_SHORTCUT_CLOSE_INPUT) return;
+    // Cleared inside the frame, so the box still sees itself deactivated when it is drawn.
+    ImGui::ClearActiveID();
+    s_typing_shortcut_stage = TYPING_SHORTCUT_FIRE;
+}
+
+// Advancely's own shortcuts for one key press. Also called a frame late for a shortcut pressed while
+// a text box was active, once that box is closed.
+static void app_shortcut_key_pressed(Tracker *t, AppSettings *app_settings, SDL_Keycode key, Uint16 app_mods,
+                                     bool is_repeat) {
+    if (!is_repeat) {
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_SAVE, key, app_mods)) {
+            t->editor_save_pressed = true;
+        }
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_UNDO, key, app_mods)) {
+            t->editor_undo_pressed = true;
+        }
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_REDO, key, app_mods)) {
+            t->editor_redo_pressed = true;
+        }
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_APPLY, key, app_mods)) {
+            t->settings_apply_pressed = true;
+        }
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_REVERT, key, app_mods)) {
+            t->settings_revert_pressed = true;
+        }
+        // The new state is persisted by the ENTER/LEAVE_FULLSCREEN window events, which
+        // also catch the macOS green button and its Ctrl+Cmd+F menu shortcut.
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_FULLSCREEN, key, app_mods)) {
+            bool is_fullscreen = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_FULLSCREEN) != 0;
+            SDL_SetWindowFullscreen(t->window, !is_fullscreen);
+        }
+    }
+
+    // Editor list navigation repeats, so holding the key walks through the list. It belongs
+    // to the template editor alone, so unlike the others it is gated on its focus here.
+    if (t->is_temp_creator_focused) {
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_NEXT_GOAL, key, app_mods)) {
+            t->editor_next_goal_pressed = true;
+        }
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_PREV_GOAL, key, app_mods)) {
+            t->editor_prev_goal_pressed = true;
+        }
+    }
+
+    // Template editing is off limits during a co-op session, which is why the Settings button
+    // that opens the editor is disabled then. These two hotkeys open it as well, so they obey
+    // the same rule. Only opening is blocked: closing the editor or leaving the visual editor
+    // stays possible whatever the lobby is doing.
+    CoopNetState app_hotkey_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+    bool coop_session_active = (app_hotkey_net_state == COOP_NET_LISTENING ||
+                                app_hotkey_net_state == COOP_NET_CONNECTED ||
+                                app_hotkey_net_state == COOP_NET_CONNECTING);
+
+    if (!is_repeat) {
+        if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, key, app_mods)) {
+            if (!coop_session_active || t->is_visual_layout_editing) {
+                // A few frames of grace so the request survives the editor window opening.
+                t->toggle_visual_editing_request_ttl = 5;
+            }
+        } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, key, app_mods)) {
+            // Closing follows the same rule as the editor's close button, which is hidden
+            // while the visual editor runs or the template has unsaved changes. The hotkey
+            // must not be a way around a window that deliberately has no X.
+            bool editor_close_blocked = t->is_visual_layout_editing ||
+                                        t->template_editor_has_unsaved_changes;
+            if (t->temp_creator_window_open) {
+                if (!editor_close_blocked) t->temp_creator_window_open = false;
+            } else if (!coop_session_active) {
+                t->temp_creator_window_open = true;
+            }
+        } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_NOTES, key, app_mods)) {
+            t->notes_window_open = !t->notes_window_open;
+        }
+    }
+
+    // The movement keys themselves are not handled here: they are polled once per frame
+    // below, so several directions can be held at the same time.
+    // (View menu toggles are handled in their own block after this one, because they are
+    // the only shortcuts allowed to fire while the View menu itself is open.)
+    if (t->is_visual_layout_editing) {
+        if (!is_repeat) {
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, key, app_mods)) {
+                t->visual_toggle_layout_hidden_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, key, app_mods)) {
+                t->visual_toggle_goal_hidden_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_MANUAL_POS, key, app_mods)) {
+                t->visual_toggle_manual_pos_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_DELETE_SELECTION, key, app_mods)) {
+                t->visual_delete_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_COPY_SELECTION, key, app_mods)) {
+                t->visual_copy_pressed = true;
+            }
+        }
+    }
+}
+
 void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
@@ -179,6 +364,14 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         t->settings_revert_pressed = false;
         t->editor_next_goal_pressed = false;
         t->editor_prev_goal_pressed = false;
+    }
+
+    if (s_typing_shortcut_stage == TYPING_SHORTCUT_FIRE) {
+        s_typing_shortcut_stage = TYPING_SHORTCUT_NONE;
+        if (t && t->window && !ImGui::IsAnyItemActive() &&
+            !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+            app_shortcut_key_pressed(t, app_settings, s_typing_shortcut_key, s_typing_shortcut_mods, false);
+        }
     }
 
     while (SDL_PollEvent(&event)) {
@@ -330,102 +523,22 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         // moves anything.
         if (event.type == SDL_EVENT_KEY_DOWN && t && t->window &&
             event.key.windowID == SDL_GetWindowID(t->window) &&
-            !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+            !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
             // The keycode, not the scancode: these bindings follow the keycap, so Ctrl+Z stays on
             // the key labeled Z no matter the keyboard layout.
             SDL_Keycode key = event.key.key;
             Uint16 app_mods = hotkey_mods_from_sdl(event.key.mod);
 
-            // Save, apply, revert, undo and redo. Which window acts on them is decided where they
-            // are consumed, by the same focus and enabled checks the buttons themselves use.
-            if (event.key.repeat == 0) {
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_SAVE, key, app_mods)) {
-                    t->editor_save_pressed = true;
-                }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_UNDO, key, app_mods)) {
-                    t->editor_undo_pressed = true;
-                }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_REDO, key, app_mods)) {
-                    t->editor_redo_pressed = true;
-                }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_APPLY, key, app_mods)) {
-                    t->settings_apply_pressed = true;
-                }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_SETTINGS_REVERT, key, app_mods)) {
-                    t->settings_revert_pressed = true;
-                }
-                // The new state is persisted by the ENTER/LEAVE_FULLSCREEN window events, which
-                // also catch the macOS green button and its Ctrl+Cmd+F menu shortcut.
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_FULLSCREEN, key, app_mods)) {
-                    bool is_fullscreen = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_FULLSCREEN) != 0;
-                    SDL_SetWindowFullscreen(t->window, !is_fullscreen);
-                }
-            }
-
-            // Editor list navigation repeats, so holding the key walks through the list. It belongs
-            // to the template editor alone, so unlike the others it is gated on its focus here.
-            if (t->is_temp_creator_focused) {
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_NEXT_GOAL, key, app_mods)) {
-                    t->editor_next_goal_pressed = true;
-                }
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_EDITOR_PREV_GOAL, key, app_mods)) {
-                    t->editor_prev_goal_pressed = true;
-                }
-            }
-
-            // Template editing is off limits during a co-op session, which is why the Settings button
-            // that opens the editor is disabled then. These two hotkeys open it as well, so they obey
-            // the same rule. Only opening is blocked: closing the editor or leaving the visual editor
-            // stays possible whatever the lobby is doing.
-            CoopNetState app_hotkey_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
-            bool coop_session_active = (app_hotkey_net_state == COOP_NET_LISTENING ||
-                                        app_hotkey_net_state == COOP_NET_CONNECTED ||
-                                        app_hotkey_net_state == COOP_NET_CONNECTING);
-
-            if (event.key.repeat == 0) {
-                if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_VISUAL_EDITING, key, app_mods)) {
-                    if (!coop_session_active || t->is_visual_layout_editing) {
-                        // A few frames of grace so the request survives the editor window opening.
-                        t->toggle_visual_editing_request_ttl = 5;
-                    }
-                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_TEMPLATE_EDITOR, key, app_mods)) {
-                    // Closing follows the same rule as the editor's close button, which is hidden
-                    // while the visual editor runs or the template has unsaved changes. The hotkey
-                    // must not be a way around a window that deliberately has no X.
-                    bool editor_close_blocked = t->is_visual_layout_editing ||
-                                                t->template_editor_has_unsaved_changes;
-                    if (t->temp_creator_window_open) {
-                        if (!editor_close_blocked) t->temp_creator_window_open = false;
-                    } else if (!coop_session_active) {
-                        t->temp_creator_window_open = true;
-                    }
-                } else if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_NOTES, key, app_mods)) {
-                    t->notes_window_open = !t->notes_window_open;
-                }
-            }
-
-            // The movement keys themselves are not handled here: they are polled once per frame
-            // below, so several directions can be held at the same time.
-            // (View menu toggles are handled in their own block after this one, because they are
-            // the only shortcuts allowed to fire while the View menu itself is open.)
-            if (t->is_visual_layout_editing) {
-                if (event.key.repeat == 0) {
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, key, app_mods)) {
-                        t->visual_toggle_layout_hidden_pressed = true;
-                    }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, key, app_mods)) {
-                        t->visual_toggle_goal_hidden_pressed = true;
-                    }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_TOGGLE_MANUAL_POS, key, app_mods)) {
-                        t->visual_toggle_manual_pos_pressed = true;
-                    }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_DELETE_SELECTION, key, app_mods)) {
-                        t->visual_delete_pressed = true;
-                    }
-                    if (app_hotkey_matches(app_settings, APP_HOTKEY_COPY_SELECTION, key, app_mods)) {
-                        t->visual_copy_pressed = true;
-                    }
-                }
+            if (!ImGui::IsAnyItemActive()) {
+                app_shortcut_key_pressed(t, app_settings, key, app_mods, event.key.repeat != 0);
+            } else if (ImGui::GetIO().WantTextInput && event.key.repeat == 0 &&
+                       app_shortcut_safe_while_typing(key, app_mods) &&
+                       app_shortcut_is_bound(t, app_settings, key, app_mods)) {
+                // The text box closes first and the shortcut fires a frame later, so a box that
+                // only commits on deactivation (the editor's root name renames) is done by then.
+                s_typing_shortcut_key = key;
+                s_typing_shortcut_mods = app_mods;
+                s_typing_shortcut_stage = TYPING_SHORTCUT_CLOSE_INPUT;
             }
         }
 

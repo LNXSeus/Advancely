@@ -118,6 +118,7 @@ struct Tracker {
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused; // Flag to track if the template creator window has focus.
+    bool is_notes_focused; // Notes window has focus; its text box keeps Ctrl+S, which nothing there uses.
     bool is_visual_layout_editing; // Flag to enable drag-and-drop on the main map for manual goal placement
     GoalHidingMode pre_visual_edit_hiding_mode; // Goal hiding mode to restore when visual editing stops/cancels
     bool pre_visual_edit_use_manual_layout; // Manual Layout setting to restore when visual editing stops/cancels

@@ -4490,6 +4490,7 @@ int main(int argc, char *argv[]) {
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+            hotkeys_after_new_frame();
             PROFILE_END(imgui_newframe);
 
             // Load the welcome window

@@ -5372,6 +5372,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->selected_coop_ghost_idx = -1;
     t->selected_coop_ghost_uuid[0] = '\0';
     t->is_temp_creator_focused = false;
+    t->is_notes_focused = false;
     t->notes_widget_id_counter = 0;
 
     for (int i = 0; i < MAX_COOP_PLAYERS; i++) {
@@ -15221,6 +15222,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // --- Render Notes Window ---
 
+    t->is_notes_focused = false;
     if (t->notes_window_open) {
         // A static title with a hidden ID (##AdvancelyNotes) ensures the window's size
         // and position are always remembered by ImGui.
@@ -15229,6 +15231,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
         if (ImGui::Begin(notes_window_title, &t->notes_window_open)) {
+            t->is_notes_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
             // Display the dynamic context (world or template name) inside the window.
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f)); // Dim the context text
             if (settings->per_world_notes) {

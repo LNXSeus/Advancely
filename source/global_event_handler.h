@@ -70,6 +70,14 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
                                  const char *target_goal_root, int mod_action, int value = 0);
 
 /**
+ * @brief Closes the text box a Ctrl shortcut was pressed in, so the shortcut can fire next frame.
+ *
+ * Must be called right after ImGui::NewFrame(). A box that commits its edit when it is deactivated
+ * (the template editor's root name renames) is then done before the shortcut acts on it.
+ */
+void hotkeys_after_new_frame(void);
+
+/**
  * @brief Processes the global SDL event queue.
  *
  * This function polls for all pending SDL events for the current frame and dispatches
