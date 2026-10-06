@@ -12969,24 +12969,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 }
 
 
-// Helper struct to pass necessary data to the ImGui callback
-typedef struct {
-    Tracker *t;
-    const AppSettings *settings;
-} NotesCallbackData;
-
-// This is the callback function that ImGui will call on every edit of the notes window
-static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
-    // The 'UserData' field contains the pointer we passed to InputTextMultiline.
-    // We cast it back to our struct type to get access to our tracker and settings.
-    auto *callback_data = (NotesCallbackData *) data->UserData;
-
-    // The buffer has been edited, so we save the notes immediately.
-    tracker_save_notes(callback_data->t, callback_data->settings);
-
-    return 0;
-}
-
 
 /**
  * @brief Renders decoration elements (text headers, lines, arrows) on the tracker map.
@@ -15265,11 +15247,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             char widget_id[64];
             snprintf(widget_id, sizeof(widget_id), "##NotesEditor%d", t->notes_widget_id_counter);
 
-            // Prepare the data packet to pass to our callback function.
-            NotesCallbackData callback_data = {t, settings};
+            // Per-world notes without a world have no file to go to, so anything typed would be lost.
+            bool notes_without_world = settings->per_world_notes && t->notes_path[0] == '\0';
 
-            // The ImGuiInputTextFlags_CallbackEdit flag tells ImGui to call our function on every modification.
-            ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackEdit;
+            ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
+            if (notes_without_world) flags |= ImGuiInputTextFlags_ReadOnly;
 
             // ImGui reverts the InputText buffer to its focus-time content when the
             // user presses ESC, with no flag to disable it. Snapshot the buffer
@@ -15277,8 +15259,32 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             static char notes_pre_input_snapshot[sizeof(t->notes_buffer)];
             memcpy(notes_pre_input_snapshot, t->notes_buffer, sizeof(t->notes_buffer));
 
-            ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
-                                      editor_size, flags, NotesEditCallback, &callback_data);
+            // Saved once the call returns: only then does notes_buffer hold the edit. An edit callback
+            // runs on ImGui's internal copy first, so saving from there always lagged one edit behind.
+            if (ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer), editor_size, flags)) {
+                tracker_save_notes(t, settings);
+            }
+
+            if (notes_without_world) {
+                // InputTextMultiline has no hint of its own, so the hint is drawn into the empty box.
+                const char *notes_hint = "Load a world to write per-world notes.";
+                ImVec2 box_min = ImGui::GetItemRectMin();
+                ImVec2 box_max = ImGui::GetItemRectMax();
+                ImVec2 padding = ImGui::GetStyle().FramePadding;
+                if (t->notes_buffer[0] == '\0') {
+                    ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                                                        ImVec2(box_min.x + padding.x, box_min.y + padding.y),
+                                                        ImGui::GetColorU32(ImGuiCol_TextDisabled), notes_hint,
+                                                        nullptr, box_max.x - box_min.x - padding.x * 2.0f);
+                }
+                if (ImGui::IsItemHovered()) {
+                    char notes_hint_tooltip_buffer[256];
+                    snprintf(notes_hint_tooltip_buffer, sizeof(notes_hint_tooltip_buffer),
+                             "Per-World Notes are saved for each world, and no world is loaded yet.\n"
+                             "Load a world, or turn off Per-World Notes to write notes for the template.");
+                    ImGui::SetTooltip("%s", notes_hint_tooltip_buffer);
+                }
+            }
 
             if (ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Escape, false) &&
                 memcmp(notes_pre_input_snapshot, t->notes_buffer, sizeof(t->notes_buffer)) != 0) {
@@ -15330,6 +15336,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             float checkbox_width = ImGui::CalcTextSize(checkbox_label).x + ImGui::GetFrameHeightWithSpacing();
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - checkbox_width - ImGui::GetStyle().WindowPadding.x);
             if (ImGui::Checkbox(checkbox_label, &settings->notes_use_roboto_font)) {
+                // Only the font changes, so the full template reload the settings watcher would start
+                // (which reloads the notes from disk) has nothing to do.
+                SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
             }
             if (ImGui::IsItemHovered()) {
