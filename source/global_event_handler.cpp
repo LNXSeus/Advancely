@@ -20,7 +20,7 @@
 #include "logger.h"
 
 bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
-                                 const char *target_goal_root, int mod_action) {
+                                 const char *target_goal_root, int mod_action, int value) {
     if (!t || !app_settings || !target_goal_root || target_goal_root[0] == '\0') return false;
     if (!t->template_data || !t->template_data->custom_goals) return false;
 
@@ -65,11 +65,13 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
     // Block increment/decrement on infinite counters (goal == -1) once
     // the user has manually marked the goal complete. The toggle stays
     // independent of progress, but accidentally bumping a "completed"
-    // counter is unwanted noise
+    // counter is unwanted noise. Typing a value is deliberate, so it still goes through.
     if (target_goal->goal == -1 && target_goal->is_manually_completed &&
-        mod_action != COOP_MOD_TOGGLE) {
+        (mod_action == COOP_MOD_INCREMENT || mod_action == COOP_MOD_DECREMENT)) {
         return false;
     }
+    // Only counters carry a value to set; a plain checkbox goal has nothing to type.
+    if (mod_action == COOP_MOD_SET_VALUE && target_goal->goal == 0) return false;
 
     // Co-op Receiver: send modification to host (any-player mode, or self-view under host-only).
     if (rcv_in_lobby &&
@@ -78,6 +80,7 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
         snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", target_goal->root_name);
         mod.parent_root_name[0] = '\0';
         mod.action = mod_action;
+        mod.value = value;
         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", app_settings->local_player.uuid);
         coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
         // Optimistic in-memory mutation for instant feedback,
@@ -99,6 +102,7 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
         snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", target_goal->root_name);
         mod.parent_root_name[0] = '\0';
         mod.action = mod_action;
+        mod.value = value;
         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", app_settings->local_player.uuid);
         tracker_apply_mod_to_view(t, &mod);
         tracker_queue_host_mod(&mod);
@@ -116,7 +120,9 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
             target_goal->progress = target_goal->done ? 1 : 0;
         }
     } else {
-        if (mod_action == COOP_MOD_INCREMENT) {
+        if (mod_action == COOP_MOD_SET_VALUE) {
+            target_goal->progress = value;
+        } else if (mod_action == COOP_MOD_INCREMENT) {
             target_goal->progress++;
         } else {
             target_goal->progress--;

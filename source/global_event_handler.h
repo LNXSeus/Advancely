@@ -62,11 +62,12 @@ extern char g_latest_known_version[64];
  * @param t A pointer to the main tracker struct.
  * @param app_settings A pointer to the loaded application settings.
  * @param target_goal_root The root name of the custom goal to modify.
- * @param mod_action COOP_MOD_INCREMENT or COOP_MOD_DECREMENT.
+ * @param mod_action COOP_MOD_INCREMENT, COOP_MOD_DECREMENT, COOP_MOD_TOGGLE or COOP_MOD_SET_VALUE.
+ * @param value The counter value to store, only read for COOP_MOD_SET_VALUE.
  * @return true if the action was applied, false if a gate rejected it or the goal was not found.
  */
 bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
-                                 const char *target_goal_root, int mod_action);
+                                 const char *target_goal_root, int mod_action, int value = 0);
 
 /**
  * @brief Processes the global SDL event queue.

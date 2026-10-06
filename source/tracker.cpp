@@ -7491,6 +7491,8 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                     new_progress = prev_progress + 1;
                 } else if (mod->action == COOP_MOD_DECREMENT) {
                     new_progress = prev_progress - 1;
+                } else if (mod->action == COOP_MOD_SET_VALUE) {
+                    new_progress = mod->value;
                 }
 
                 cJSON *obj = cJSON_CreateObject();
@@ -7504,6 +7506,7 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                 int nv = cur;
                 if (mod->action == COOP_MOD_INCREMENT) nv = cur + 1;
                 else if (mod->action == COOP_MOD_DECREMENT) nv = cur - 1;
+                else if (mod->action == COOP_MOD_SET_VALUE) nv = mod->value;
                 cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
                 cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateNumber(nv));
             } else {
@@ -7709,6 +7712,11 @@ void tracker_apply_mod_to_view(Tracker *t, const CoopCustomGoalModMsg *mod) {
                 break;
             case COOP_MOD_DECREMENT:
                 it->progress--;
+                if (it->goal > 0) it->done = (it->progress >= it->goal);
+                break;
+            case COOP_MOD_SET_VALUE:
+                if (it->goal == 0) break;
+                it->progress = mod->value;
                 if (it->goal > 0) it->done = (it->progress >= it->goal);
                 break;
             default:
@@ -11172,6 +11180,111 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     current_y += row_max_height;
 }
 
+// Typing a custom goal counter's value: a click on the progress text only records the goal, the box
+// itself is drawn once per frame by render_custom_goal_value_popup().
+static char s_cg_value_edit_root[192] = "";
+static bool s_cg_value_edit_open_requested = false;
+static int s_cg_value_edit_value = 0;
+
+// Same gates as the counter hotkeys. In a co-op lobby the value also has to be your own: "All Players"
+// shows everyone's counts added up, so a typed number there has no single owner.
+static bool custom_goal_value_typable(const Tracker *t, const AppSettings *settings, const TrackableItem *item) {
+    if (!t || !settings || !item || item->goal == 0 || t->is_visual_layout_editing) return false;
+    if (!tracker_view_editable_by_self(t, settings)) return false;
+    if (settings->network_mode == NETWORK_SINGLEPLAYER) return true;
+    bool in_lobby = g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE;
+    return !in_lobby || tracker_view_is_own_uuid(t, settings);
+}
+
+static void custom_goal_value_click(Tracker *t, const AppSettings *settings, const TrackableItem *item,
+                                    ImVec2 rect_min, ImVec2 rect_size) {
+    if (t->map_interactions_blocked || !custom_goal_value_typable(t, settings, item)) return;
+    ImVec2 rect_max = ImVec2(rect_min.x + rect_size.x, rect_min.y + rect_size.y);
+    if (!ImGui::IsMouseHoveringRect(rect_min, rect_max)) return;
+    ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        char tooltip_buf[128];
+        snprintf(tooltip_buf, sizeof(tooltip_buf), "Click to type a new value.");
+        ImGui::SetTooltip("%s", tooltip_buf);
+    }
+
+    // A press that started elsewhere, or one that turned into a sweep, is not a click on the value.
+    ImVec2 press_pos = ImGui::GetIO().MouseClickedPos[ImGuiMouseButton_Left];
+    bool pressed_here = press_pos.x >= rect_min.x && press_pos.x <= rect_max.x &&
+                        press_pos.y >= rect_min.y && press_pos.y <= rect_max.y;
+    if (pressed_here && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+        !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
+        snprintf(s_cg_value_edit_root, sizeof(s_cg_value_edit_root), "%s", item->root_name);
+        s_cg_value_edit_value = item->progress;
+        s_cg_value_edit_open_requested = true;
+    }
+}
+
+static void render_custom_goal_value_popup(Tracker *t, AppSettings *settings) {
+    if (s_cg_value_edit_open_requested) {
+        ImGui::OpenPopup("custom_goal_value_popup");
+        s_cg_value_edit_open_requested = false;
+    }
+    if (!ImGui::BeginPopup("custom_goal_value_popup")) return;
+
+    TrackableItem *item = nullptr;
+    for (int i = 0; t->template_data && i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *cg = t->template_data->custom_goals[i];
+        if (cg && strcmp(cg->root_name, s_cg_value_edit_root) == 0) {
+            item = cg;
+            break;
+        }
+    }
+    // The goal can disappear (template reload) or become read-only (co-op view switch) while open.
+    if (!item || !custom_goal_value_typable(t, settings, item)) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+
+    if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
+        ImGui::SetWindowFontScale(settings->tracker_ui_font_size / t->tracker_font->LegacySize);
+    }
+
+    ImGui::TextUnformatted(item->display_name[0] != '\0' ? item->display_name : item->root_name);
+
+    if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    ImGui::SetNextItemWidth(ImGui::CalcTextSize("0000000000").x);
+    ImGui::InputInt("##cg_value", &s_cg_value_edit_value, 0, 0);
+    bool apply = ImGui::IsItemDeactivated() &&
+                 (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter));
+    if (item->goal > 0) {
+        ImGui::SameLine();
+        ImGui::Text("/ %d", item->goal);
+    }
+
+    if (ImGui::Button("Set")) apply = true;
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buf[128];
+        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                 "Set this goal's value to the number above.\n"
+                 "You can also press 'ENTER'.");
+        ImGui::SetTooltip("%s", tooltip_buf);
+    }
+    ImGui::SameLine();
+    bool cancel = ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buf[128];
+        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                 "Close without changing the value.\n"
+                 "You can also press 'ESCAPE'.");
+        ImGui::SetTooltip("%s", tooltip_buf);
+    }
+
+    if (apply) {
+        hotkey_apply_counter_action(t, settings, s_cg_value_edit_root, COOP_MOD_SET_VALUE, s_cg_value_edit_value);
+        ImGui::CloseCurrentPopup();
+    } else if (cancel) {
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+}
+
 /**
  * @brief Renders the Custom Goals section with interactive checkboxes.
  * Calculates and displays completion counters based on visibility settings.
@@ -11718,6 +11831,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                           cg_name_takes_line, item->icon_pos,
                                                           item->text_pos));
                         // --------------------------------------------
+
+                        custom_goal_value_click(t, settings, item, cg_prog_pos, cg_prog_screen_size);
                     }
                 }
             }
@@ -13764,6 +13879,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // Render decorations (text headers, lines, arrows) - only visible in manual layout mode
     render_decorations(t, settings);
+
+    render_custom_goal_value_popup(t, settings);
 
     // --- Visual Layout Multi-Select ---
     if (t->is_visual_layout_editing && settings->use_manual_layout) {

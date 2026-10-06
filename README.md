@@ -282,6 +282,11 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
               be reported when the other program reserved the key the same way. Programs that read
               the keyboard at a lower level, such as `Discord` or macro tools, produce no conflict
               message at all; Advancely simply takes priority over them while it runs.
+        * **Typing a Value**: Click a counter's progress text on the tracker map (e.g. `(3 / 10)`) to type its value
+          directly, then press `Enter` or `Set` to apply it (`Escape` or `Cancel` closes without changing anything).
+          This also works on infinite counters that are already marked complete. Goals with `Hide Progress` have no
+          value to click. In a co-op lobby, select your own name first: the `All Players` view adds everyone's counts
+          together, so a typed value there wouldn't belong to anyone.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize
