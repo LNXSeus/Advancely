@@ -299,4 +299,14 @@ bool preset_import_open(const char *preset_path, const char *preset_name, const 
  */
 bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRESET_PROGRESS_SECTION_COUNT]);
 
+/**
+ * @brief Logs every settings.json key that PRESET_KEY_LIST does not cover, as an error.
+ *
+ * Run under --test-mode so a newly added setting that was never registered is caught.
+ *
+ * @param settings The settings whose JSON form is checked.
+ * @return The number of unregistered keys, or -1 if the JSON could not be built.
+ */
+int preset_key_list_report_unlisted(const AppSettings *settings);
+
 #endif //SETTINGS_PRESET_IMPORT_H

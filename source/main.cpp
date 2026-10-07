@@ -55,6 +55,7 @@ extern "C" {
 #include "file_utils.h" // For fs_ensure_directory_exists when seeding the data directory
 #include "overlay.h"
 #include "settings.h"
+#include "settings_preset_import.h" // For the --test-mode PRESET_KEY_LIST check
 #include "global_event_handler.h"
 #include "global_hotkeys.h" // For OS-level hotkey registration
 #include "profiler.h" // For --profiler frame timing
@@ -2417,6 +2418,21 @@ int main(int argc, char *argv[]) {
             log_message(LOG_INFO, "[MAIN] Settings file was incomplete or missing, saving with default values.\n");
         }
         settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL); // Save complete settings back to the file
+    }
+
+    // --test-mode checks that every settings.json key is registered for the "Load Preset" popup. A
+    // missing one is logged and turns the exit code into a failure; a normal launch never runs this.
+    bool preset_key_list_incomplete = false;
+    if (is_test_mode) {
+        int unlisted = preset_key_list_report_unlisted(&app_settings);
+        if (unlisted != 0) {
+            preset_key_list_incomplete = true;
+            log_message(LOG_ERROR, "[TEST MODE] PRESET_KEY_LIST check FAILED (%d %s).\n", unlisted,
+                        unlisted == 1 ? "key" : "keys");
+        } else {
+            printf("[TEST MODE] PRESET_KEY_LIST check passed: every settings.json key is registered.\n");
+            fflush(stdout);
+        }
     }
 
     // Control welcome window visibility based on settings
@@ -4995,7 +5011,7 @@ int main(int argc, char *argv[]) {
         // logger, but it must not outlive either.
         instance_poller_stop();
         profiler_shutdown();
-        exit_status = EXIT_SUCCESS;
+        exit_status = preset_key_list_incomplete ? EXIT_FAILURE : EXIT_SUCCESS;
     }
 
     // Ensure the overlay process is terminated when the main app exits

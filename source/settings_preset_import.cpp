@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "file_utils.h"
+#include "logger.h"
 #include "tracker.h" // For str_contains_insensitive
 #include "imgui_internal.h" // For ImGuiItemFlags_MixedValue
 
@@ -336,20 +337,51 @@ static void add_row(const std::vector<std::string> &paths, const char *label, Pr
     s_rows.push_back(row);
 }
 
-// Keys the list does not know become their own row, so a setting nobody registered still shows up.
-static void add_unlisted_rows(const cJSON *preset_obj, const std::string &prefix,
-                              const std::unordered_set<std::string> &listed,
-                              const std::unordered_set<std::string> &listed_parents) {
-    for (const cJSON *c = preset_obj->child; c; c = c->next) {
+static void build_listed_sets(std::unordered_set<std::string> &listed,
+                              std::unordered_set<std::string> &listed_parents) {
+    for (const auto &def: PRESET_KEY_DEFS) {
+        for (const auto &p: split_paths(def.paths)) {
+            listed.insert(p);
+            for (size_t dot = p.find('.'); dot != std::string::npos; dot = p.find('.', dot + 1)) {
+                listed_parents.insert(p.substr(0, dot));
+            }
+        }
+    }
+}
+
+static void collect_unlisted(const cJSON *obj, const std::string &prefix,
+                             const std::unordered_set<std::string> &listed,
+                             const std::unordered_set<std::string> &listed_parents, std::vector<std::string> &out) {
+    for (const cJSON *c = obj->child; c; c = c->next) {
         if (!c->string) continue;
         std::string path = prefix.empty() ? std::string(c->string) : prefix + "." + c->string;
         if (listed.count(path)) continue;
         if (listed_parents.count(path) && cJSON_IsObject(c)) {
-            add_unlisted_rows(c, path, listed, listed_parents);
+            collect_unlisted(c, path, listed, listed_parents, out);
             continue;
         }
-        add_row({path}, path.c_str(), PRESET_GROUP_OTHER, 0, nullptr);
+        out.push_back(path);
     }
+}
+
+int preset_key_list_report_unlisted(const AppSettings *settings) {
+    cJSON *json = settings_to_json(settings);
+    if (!json) {
+        log_message(LOG_ERROR, "[PRESET KEYS] Could not build the settings JSON to check PRESET_KEY_LIST.\n");
+        return -1;
+    }
+    std::unordered_set<std::string> listed;
+    std::unordered_set<std::string> listed_parents;
+    build_listed_sets(listed, listed_parents);
+    std::vector<std::string> unlisted;
+    collect_unlisted(json, "", listed, listed_parents, unlisted);
+    cJSON_Delete(json);
+
+    for (const auto &path: unlisted) {
+        log_message(LOG_ERROR, "[PRESET KEYS] settings.json key '%s' is missing from PRESET_KEY_LIST "
+                    "(settings_preset_import.h).\n", path.c_str());
+    }
+    return (int) unlisted.size();
 }
 
 static void preset_import_release() {
@@ -378,14 +410,7 @@ bool preset_import_open(const char *preset_path, const char *preset_name, const 
 
     std::unordered_set<std::string> listed;
     std::unordered_set<std::string> listed_parents;
-    for (const auto &def: PRESET_KEY_DEFS) {
-        for (const auto &p: split_paths(def.paths)) {
-            listed.insert(p);
-            for (size_t dot = p.find('.'); dot != std::string::npos; dot = p.find('.', dot + 1)) {
-                listed_parents.insert(p.substr(0, dot));
-            }
-        }
-    }
+    build_listed_sets(listed, listed_parents);
 
     for (const auto &def: PRESET_KEY_DEFS) {
         if (def.flags & PRESET_KEY_SKIP) continue;
@@ -398,7 +423,10 @@ bool preset_import_open(const char *preset_path, const char *preset_name, const 
         }
         add_row(split_paths(def.paths), def.label, def.group, def.flags, def.value_names);
     }
-    add_unlisted_rows(s_preset_json, "", listed, listed_parents);
+    // Keys the list does not know become their own row, so a setting nobody registered still shows up.
+    std::vector<std::string> unlisted;
+    collect_unlisted(s_preset_json, "", listed, listed_parents, unlisted);
+    for (const auto &path: unlisted) add_row({path}, path.c_str(), PRESET_GROUP_OTHER, 0, nullptr);
 
     snprintf(s_title, sizeof(s_title), "Load Preset '%s'%s", preset_name, PRESET_IMPORT_POPUP_ID);
     s_only_changes = true;
