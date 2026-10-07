@@ -20904,6 +20904,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ctr_to_copy_idx >= 0 && ctr_to_copy_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_copy_idx];
+                        int actual_idx = (int) (ptr - &current_template_data.counter_goals[0]);
                         EditorCounterGoal copy = *ptr;
                         // Generate unique root name
                         char base_name[192];
@@ -20931,10 +20932,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy.icon_pos = {};
                         copy.text_pos = {};
                         copy.progress_pos = {};
-                        current_template_data.counter_goals.push_back(copy);
-                        selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
+                        current_template_data.counter_goals.insert(
+                            current_template_data.counter_goals.begin() + actual_idx + 1, copy);
+                        selected_counter_index = actual_idx + 1;
                         request_scroll_to_new_goal(copy.root_name);
-                        // The copy lands at the end, so nothing already ticked moved.
+                        std::set<int> shifted_cp;
+                        for (int idx: s_ctr_selection) shifted_cp.insert(idx > actual_idx ? idx + 1 : idx);
+                        s_ctr_selection = shifted_cp;
+                        if (s_ctr_last_clicked > actual_idx) s_ctr_last_clicked++;
                         save_message_type = MSG_NONE;
                     }
 
