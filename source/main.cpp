@@ -2144,6 +2144,13 @@ int main(int argc, char *argv[]) {
             float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            // Cap deltaTime so a stall (system sleep, window drag, debugger break) can't hand the timers
+            // a huge step: the social line would otherwise flip every frame until it caught up.
+            const float MAX_OVERLAY_DELTATIME = 0.25f;
+            if (deltaTime > MAX_OVERLAY_DELTATIME) {
+                deltaTime = MAX_OVERLAY_DELTATIME;
+            }
+
             // overlay_heapcheck("frame_start"); // TEMP DEBUG
 
             SDL_Event event;
