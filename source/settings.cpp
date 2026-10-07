@@ -46,6 +46,13 @@
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_scancode.h>
+#include "settings_search.h" // For the settings_tooltip helpers
+
+// Tooltips in this file must go through the settings_tooltip helpers (settings_search.h) so the
+// settings search can read them. Calling ImGui's tooltip functions directly is a compile error.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC poison SetTooltip BeginTooltip EndTooltip
+#endif
 
 // Build and set the template sync JSON payload on the co-op context.
 // Called when host starts and when settings are applied while hosting.
@@ -246,7 +253,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         if (!any_present) ImGui::TextDisabled("No goal types in this template.");
         ImGui::EndCombo();
     }
-    if (ImGui::IsItemHovered()) {
+    if (settings_tooltip_wanted()) {
         char tip[800];
         if (is_cycle)
             snprintf(tip, sizeof(tip),
@@ -270,7 +277,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                      "The totals count only goals that can actually pop: goals hidden in the template are\n"
                      "left out unless \"Show Hidden Goals\" is on, and a type with none left is not listed.\n"
                      "Shift+Click to range-select. Default: Simple Advancements.");
-        ImGui::SetTooltip("%s", tip);
+        settings_tooltip(tip);
     }
     // Select All / Deselect All for the type list (only affects the types actually shown).
     ImGui::SameLine();
@@ -481,7 +488,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                     render_row(kind, rows[r]);
             ImGui::EndCombo();
         }
-        if (ImGui::IsItemHovered()) {
+        if (settings_tooltip_wanted()) {
             char item_combo_tooltip_buffer[512];
             if (is_cycle)
                 snprintf(item_combo_tooltip_buffer, sizeof(item_combo_tooltip_buffer),
@@ -498,7 +505,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                          "left out unless \"Show Hidden Goals\" is on.\n"
                          "Shift+Click to range-select.\n"
                          "Up to %d individual goals can be added in total.", tip, MAX_COMPACT_CYCLE_ITEMS);
-            ImGui::SetTooltip("%s", item_combo_tooltip_buffer);
+            settings_tooltip(item_combo_tooltip_buffer);
         }
         // Select All / Deselect All for this category, to the right of the dropdown.
         ImGui::SameLine();
@@ -1573,7 +1580,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Text("Settings Presets");
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
+        if (settings_tooltip_wanted()) {
             char preset_help_buffer[768];
             snprintf(preset_help_buffer, sizeof(preset_help_buffer),
                      "Save and switch between full snapshots of your settings.\n"
@@ -1583,7 +1590,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "fills this window with them - click 'Apply Settings' afterwards to\n"
                      "actually use them.",
                      get_config_display_path());
-            ImGui::SetTooltip("%s", preset_help_buffer);
+            settings_tooltip(preset_help_buffer);
         }
 
         if (preset_lobby_locked) ImGui::BeginDisabled();
@@ -1659,7 +1666,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
         }
         if (create_disabled) ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
             char create_tooltip_buffer[768];
             if (has_unsaved_changes) {
                 snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
@@ -1672,7 +1679,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "The name cannot be 'settings' or match an existing preset.",
                          get_config_display_path());
             }
-            ImGui::SetTooltip("%s", create_tooltip_buffer);
+            settings_tooltip(create_tooltip_buffer);
         }
 
         ImGui::SameLine();
@@ -1684,13 +1691,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 #endif
             open_content(config_path);
         }
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
             char open_config_tooltip_buffer[256];
             snprintf(open_config_tooltip_buffer, sizeof(open_config_tooltip_buffer),
                      "Opens the '%s' folder in your file explorer,\n"
                      "where settings.json and your preset files are stored.",
                      get_config_display_path());
-            ImGui::SetTooltip("%s", open_config_tooltip_buffer);
+            settings_tooltip(open_config_tooltip_buffer);
         }
 
         if (preset_count > 0) {
@@ -1726,26 +1733,26 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     preset_status_is_error = true;
                 }
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char load_tooltip_buffer[768];
                 snprintf(load_tooltip_buffer, sizeof(load_tooltip_buffer),
                          "Pick which of the selected preset's settings to take over.\n"
                          "They fill this window, but nothing is applied yet - review the tabs, then\n"
                          "click 'Apply Settings' to use them (or 'Revert Changes' to discard them).");
-                ImGui::SetTooltip("%s", load_tooltip_buffer);
+                settings_tooltip(load_tooltip_buffer);
             }
 
             ImGui::SameLine();
             if (ImGui::Button("Remove Preset")) {
                 ImGui::OpenPopup("Delete Preset?");
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char remove_tooltip_buffer[512];
                 snprintf(remove_tooltip_buffer, sizeof(remove_tooltip_buffer),
                          "Permanently delete the selected preset file from %s/.\n"
                          "This does not affect your current settings.",
                          get_config_display_path());
-                ImGui::SetTooltip("%s", remove_tooltip_buffer);
+                settings_tooltip(remove_tooltip_buffer);
             }
             if (!have_selection) ImGui::EndDisabled();
 
@@ -1753,12 +1760,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
             ImGui::Text("(Official Presets)");
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char open_official_presets_tooltip_buffer[512];
                 snprintf(open_official_presets_tooltip_buffer, sizeof(open_official_presets_tooltip_buffer),
                          "Opens a table of officially added settings presets in your browser.\n"
                          "These presets get replaced through auto-updates.");
-                ImGui::SetTooltip("%s", open_official_presets_tooltip_buffer);
+                settings_tooltip(open_official_presets_tooltip_buffer);
             }
             if (ImGui::IsItemClicked()) {
                 open_content("https://github.com/LNXSeus/Advancely#Officially-Added-Settings-Presets");
@@ -1806,12 +1813,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buf[128];
                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                          "Permanently delete this preset file.\n"
                          "You can also press 'ENTER'.");
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
 
             ImGui::SameLine();
@@ -1820,12 +1827,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::Button("Cancel") || esc_pressed) {
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buf[128];
                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                          "Keep the preset.\n"
                          "You can also press 'ESCAPE'.");
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
 
             ImGui::EndPopup();
@@ -1883,13 +1890,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "    %s", message.c_str());
         }
         ImGui::EndGroup();
-        if (ImGui::IsItemHovered()) {
+        if (settings_tooltip_wanted()) {
             char hotkey_conflict_tooltip[512];
             snprintf(hotkey_conflict_tooltip, sizeof(hotkey_conflict_tooltip),
                      "Two bindings clash when the same key and modifiers can fire both at once.\n"
                      "Rebind either side in the Hotkeys tab, where the rows involved are marked\n"
                      "in red as well.");
-            ImGui::SetTooltip("%s", hotkey_conflict_tooltip);
+            settings_tooltip(hotkey_conflict_tooltip);
         }
         ImGui::Spacing();
         ImGui::Separator();
@@ -1907,7 +1914,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                    PATH_MODE_AUTO)) {
                 // Action to take when this specific button is clicked (optional)
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char default_saves_path_tooltip_buffer[1024];
                 snprintf(default_saves_path_tooltip_buffer, sizeof(default_saves_path_tooltip_buffer),
                          "Automatically finds the default Minecraft (-Launcher) saves path for your OS.\n"
@@ -1916,14 +1923,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "macOS: ~/Library/Application Support/minecraft/saves\n"
                          "This is Path Mode: %d\n"
                          "Default: Auto-Track Active Instance", PATH_MODE_AUTO);
-                ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
+                settings_tooltip(default_saves_path_tooltip_buffer);
             }
 
 
             if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode,
                                    PATH_MODE_INSTANCE)) {
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip[512];
                 snprintf(tooltip, sizeof(tooltip),
                          "DEFAULT: Automatically detect and track the active Minecraft instance\n"
@@ -1934,12 +1941,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "stops updating until an instance is running again.\n"
                          "This is Path Mode: %d\n"
                          "Default: Auto-Track Active Instance (this mode)", PATH_MODE_INSTANCE);
-                ImGui::SetTooltip("%s", tooltip);
+                settings_tooltip(tooltip);
             }
 
             if (ImGui::RadioButton("Track Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip[512];
                 snprintf(tooltip, sizeof(tooltip),
                          "Lock the tracker to one specific world folder.\n"
@@ -1947,7 +1954,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "regardless of which world you open next in Minecraft.\n"
                          "This is Path Mode: %d\n"
                          "Default: Auto-Track Active Instance", PATH_MODE_FIXED_WORLD);
-                ImGui::SetTooltip("%s", tooltip);
+                settings_tooltip(tooltip);
             }
 
             if (temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
@@ -1965,9 +1972,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         temp_settings.fixed_world_path[MAX_PATH_LENGTH - 1] = '\0';
                     }
                 }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Select the world folder inside your saves directory.\n"
-                        "e.g. /home/user/.minecraft/saves/MyWorld");
+                if (settings_tooltip_wanted()) {
+                    char tooltip[256];
+                    snprintf(tooltip, sizeof(tooltip), "Select the world folder inside your saves directory.\n"
+                             "e.g. /home/user/.minecraft/saves/MyWorld");
+                    settings_tooltip(tooltip);
                 }
                 if (show_invalid_manual_path_error && temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -1980,13 +1989,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::RadioButton("Track Custom Saves Folder", (int *) &temp_settings.path_mode, PATH_MODE_MANUAL)) {
                 // Action to take when this specific button is clicked (optional)
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip[512];
                 snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
                          "Useful for custom launchers or non-standard installations.\n"
                          "This is Path Mode: %d\n"
                          "Default: Auto-Track Active Instance", PATH_MODE_MANUAL);
-                ImGui::SetTooltip("%s", tooltip);
+                settings_tooltip(tooltip);
             }
 
             // Conditionally show the manual path input only when its radio button is selected
@@ -2001,9 +2010,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         temp_settings.manual_saves_path[MAX_PATH_LENGTH - 1] = '\0';
                     }
                 }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Select the path to your '.minecraft/saves' folder.\n"
-                        "You can also paste the path directly into the text field.");
+                if (settings_tooltip_wanted()) {
+                    char tooltip[256];
+                    snprintf(tooltip, sizeof(tooltip), "Select the path to your '.minecraft/saves' folder.\n"
+                             "You can also paste the path directly into the text field.");
+                    settings_tooltip(tooltip);
                 }
                 if (show_invalid_manual_path_error) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -2038,23 +2049,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (!is_saves_path_valid) {
                 ImGui::EndDisabled();
                 // Add a tooltip that only appears when hovering over the disabled button.
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                     char open_instance_folder_tooltip_buffer[1024];
                     snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
                              "A valid saves path must be active to use this feature.\nPlease apply a correct path first.");
-                    ImGui::SetTooltip(
-                        "%s", open_instance_folder_tooltip_buffer);
+                    settings_tooltip(open_instance_folder_tooltip_buffer);
                 }
             } else {
                 // This is the original tooltip for when the button is enabled.
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char open_instance_folder_tooltip_buffer[1024];
                     snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
                              "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
                              "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
                              "Useful for quickly switching between instances in custom launchers.");
-                    ImGui::SetTooltip(
-                        "%s", open_instance_folder_tooltip_buffer);
+                    settings_tooltip(open_instance_folder_tooltip_buffer);
                 }
             }
 
@@ -2073,7 +2082,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                                            ? "Template settings are locked while a lobby is active"
                                                            : "Controlled by Host";
             ImGui::Text("Template Settings");
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char template_settings_tooltip_buffer[1024];
                 snprintf(template_settings_tooltip_buffer, sizeof(template_settings_tooltip_buffer),
                          "Select the Version, Category, Optional Flag, and Language to use for the tracker.\n\n"
@@ -2084,8 +2093,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Use the 'Open Template Editor' button to build new templates,\n"
                          "edit existing ones, and manage their language files.",
                          get_templates_display_path());
-                ImGui::SetTooltip(
-                    "%s", template_settings_tooltip_buffer);
+                settings_tooltip(template_settings_tooltip_buffer);
             }
 
             ImGui::SameLine();
@@ -2093,12 +2101,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Text("(Official Templates)");
             ImGui::PopStyleColor();
 
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char open_official_templates_tooltip_buffer[1024];
                 snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
                          "Opens a table of officially added templates in your browser.\n"
                          "These templates/languages get replaced through auto-updates.");
-                ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
+                settings_tooltip(open_official_templates_tooltip_buffer);
             }
 
             if (ImGui::IsItemClicked()) {
@@ -2110,13 +2118,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Text("(Version Support)");
             ImGui::PopStyleColor();
 
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char open_official_templates_tooltip_buffer[1024];
                 snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
                          "Opens the version support page in your browser.\n"
                          "This page shows which versions are functionally equal.\n"
                          "for Advancely.");
-                ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
+                settings_tooltip(open_official_templates_tooltip_buffer);
             }
 
             if (ImGui::IsItemClicked()) {
@@ -2149,7 +2157,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     update_temp_display_category();
                 }
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char version_tooltip_buffer[1024];
                 if (template_editor_is_editing) {
                     snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "%s",
@@ -2168,7 +2176,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "Click on '(Version Support)' to see the version ranges that functionally equal.\n"
                              "Default: %s", DEFAULT_VERSION);
                 }
-                ImGui::SetTooltip("%s", version_tooltip_buffer);
+                settings_tooltip(version_tooltip_buffer);
             }
             if (version_disabled) ImGui::EndDisabled();
 
@@ -2188,7 +2196,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     temp_settings.display_version_str[sizeof(temp_settings.display_version_str) - 1] = '\0';
                 }
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char display_version_tooltip_buffer[1024];
                 snprintf(display_version_tooltip_buffer, sizeof(display_version_tooltip_buffer),
                          "Select the version to show on the tracker info bar and overlay.\n"
@@ -2198,7 +2206,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "So no need to copy the same template for each subversion.\n"
                          "By default, this matches the 'Template Version'.\n"
                          "Default: %s", DEFAULT_VERSION);
-                ImGui::SetTooltip("%s", display_version_tooltip_buffer);
+                settings_tooltip(display_version_tooltip_buffer);
             }
 
             // Coop state check - shared by StatsPerWorld and Hermes checkboxes
@@ -2218,7 +2226,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (spw_disabled) ImGui::BeginDisabled();
                 ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
                 if (spw_disabled) ImGui::EndDisabled();
-                if (ImGui::IsItemHovered(spw_disabled ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                if (settings_tooltip_wanted(spw_disabled ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char stats_per_world_tooltip_buffer[1024];
                     if (spw_is_receiver) {
                         snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
@@ -2238,7 +2246,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "progress, and achievements will indicate if they were completed on a previous world.\n"
                                  "Default: Enabled");
                     }
-                    ImGui::SetTooltip("%s", stats_per_world_tooltip_buffer);
+                    settings_tooltip(stats_per_world_tooltip_buffer);
                 }
             }
 
@@ -2247,8 +2255,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (hermes_net_active) ImGui::BeginDisabled();
             ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
             if (hermes_net_active) ImGui::EndDisabled();
-            if (ImGui::IsItemHovered(hermes_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                ImGui::BeginTooltip();
+            if (settings_tooltip_wanted(hermes_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                settings_rich_tooltip_begin();
                 ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
                 ImGui::TextUnformatted("Hermes Mod (by DuncanRuns, for Fabric)");
                 ImGui::Separator();
@@ -2303,7 +2311,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                        "Cannot change while a lobby is active.");
                 }
                 ImGui::PopTextWrapPos();
-                ImGui::EndTooltip();
+                settings_rich_tooltip_end();
             }
 
             // --- SCANNING & UI LOGIC ---
@@ -2452,7 +2460,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char category_tooltip_buffer[1024];
                 if (template_editor_is_editing) {
                     snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer), "%s",
@@ -2470,7 +2478,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "Enable the 'Manual Layout' checkbox to use them.\n"
                              "Default: %s", DEFAULT_CATEGORY);
                 }
-                ImGui::SetTooltip("%s", category_tooltip_buffer);
+                settings_tooltip(category_tooltip_buffer);
             }
             if (category_disabled) ImGui::EndDisabled();
 
@@ -2527,7 +2535,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char flag_tooltip_buffer[1024];
                 if (template_editor_is_editing) {
                     snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer), "%s",
@@ -2543,7 +2551,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                              "Enable the 'Manual Layout' checkbox to use them.\n"
                              "Default: %s", DEFAULT_OPTIONAL_FLAG + 1);
                 }
-                ImGui::SetTooltip("%s", flag_tooltip_buffer);
+                settings_tooltip(flag_tooltip_buffer);
             }
             if (flag_disabled) ImGui::EndDisabled();
 
@@ -2588,7 +2596,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             update_temp_display_category();
                         }
                     }
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char lang_tooltip_buffer[1024];
                         if (template_editor_is_editing) {
                             snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer), "%s",
@@ -2601,7 +2609,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                      "to pre-fill the 'Display Category' field below (unless it is locked).\n"
                                      "Default: Default (_lang.json)");
                         }
-                        ImGui::SetTooltip("%s", lang_tooltip_buffer);
+                        settings_tooltip(lang_tooltip_buffer);
                     }
                     if (template_editor_is_editing) ImGui::EndDisabled();
 
@@ -2633,7 +2641,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                 temp_settings.layout_flag[sizeof(temp_settings.layout_flag) - 1] = '\0';
                             }
                         }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char layout_tooltip_buffer[1024];
                             if (template_editor_is_editing) {
                                 snprintf(layout_tooltip_buffer, sizeof(layout_tooltip_buffer), "%s",
@@ -2647,7 +2655,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                          "if it has no separate layout file.\n"
                                          "Default: Default");
                             }
-                            ImGui::SetTooltip("%s", layout_tooltip_buffer);
+                            settings_tooltip(layout_tooltip_buffer);
                         }
                         if (template_editor_is_editing) ImGui::EndDisabled();
                     }
@@ -2666,7 +2674,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  sizeof(temp_settings.category_display_name));
                 if (display_name_disabled) ImGui::EndDisabled();
 
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                     char tooltip_buffer[768];
                     if (template_editor_is_editing) {
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "%s", template_editor_lock_tooltip);
@@ -2683,17 +2691,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                  "Default: auto-filled from the template/language (e.g. \"%s\")",
                                  DEFAULT_DISPLAY_CATEGORY);
                     }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
+                    settings_tooltip(tooltip_buffer);
                 }
 
                 ImGui::SameLine();
                 ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char lock_display_name_tooltip_buffer[256];
                     snprintf(lock_display_name_tooltip_buffer, sizeof(lock_display_name_tooltip_buffer),
                              "Prevent the Display Name from changing automatically when switching templates or languages.\n"
                              "Default: Off");
-                    ImGui::SetTooltip("%s", lock_display_name_tooltip_buffer);
+                    settings_tooltip(lock_display_name_tooltip_buffer);
                 }
             }
 
@@ -2719,12 +2727,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 #endif
                 open_content(templates_path); // Clean replacement
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char open_templates_folder_tooltip_buffer[1024];
                 snprintf(open_templates_folder_tooltip_buffer, sizeof(open_templates_folder_tooltip_buffer),
                          "Opens the '%s' folder in your file explorer.",
                          get_templates_display_path());
-                ImGui::SetTooltip("%s", open_templates_folder_tooltip_buffer);
+                settings_tooltip(open_templates_folder_tooltip_buffer);
             }
 
             bool coop_session_active = g_coop_ctx &&
@@ -2744,7 +2752,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     *p_temp_creator_open = true;
                 }
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char import_template_tooltip_buffer[512];
                 if (coop_session_active) {
                     snprintf(import_template_tooltip_buffer, sizeof(import_template_tooltip_buffer),
@@ -2753,7 +2761,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     snprintf(import_template_tooltip_buffer, sizeof(import_template_tooltip_buffer),
                              "Imports a template from a .zip file and opens the Template Editor to finish the import.");
                 }
-                ImGui::SetTooltip("%s", import_template_tooltip_buffer);
+                settings_tooltip(import_template_tooltip_buffer);
             }
             if (coop_session_active) ImGui::EndDisabled();
 
@@ -2764,7 +2772,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::Button("Open Template Editor")) {
                 *p_temp_creator_open = true; // Open the template creator window
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char open_template_creator_tooltip_buffer[1024];
                 if (coop_session_active) {
                     snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
@@ -2773,7 +2781,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
                              "Open the Template Editor to modify or build a new template, language or layout.");
                 }
-                ImGui::SetTooltip("%s", open_template_creator_tooltip_buffer);
+                settings_tooltip(open_template_creator_tooltip_buffer);
             }
             if (coop_session_active) ImGui::EndDisabled();
 
@@ -2785,12 +2793,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Text("Window & Behavior");
 
             ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char always_on_top_tooltip_buffer[1024];
                 snprintf(always_on_top_tooltip_buffer, sizeof(always_on_top_tooltip_buffer),
                          "Forces the tracker window to always display above any other window.\n"
                          "Default: %s", DEFAULT_TRACKER_ALWAYS_ON_TOP ? "On" : "Off");
-                ImGui::SetTooltip("%s", always_on_top_tooltip_buffer);
+                settings_tooltip(always_on_top_tooltip_buffer);
             }
 
             // This toggles the framerate of everything
@@ -2798,13 +2806,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.fps < 10.0f) temp_settings.fps = 10.0f;
                 if (temp_settings.fps > 540.0f) temp_settings.fps = 540.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tracker_fps_limit_tooltip_buffer[1024];
                 snprintf(tracker_fps_limit_tooltip_buffer, sizeof(tracker_fps_limit_tooltip_buffer),
                          "Limits the frames per second of the tracker window.\n"
                          "Higher values may result in higher CPU usage.\n"
                          "Default: %d FPS", DEFAULT_FPS);
-                ImGui::SetTooltip("%s", tracker_fps_limit_tooltip_buffer);
+                settings_tooltip(tracker_fps_limit_tooltip_buffer);
             }
 
             ImGui::Separator();
@@ -2819,7 +2827,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.lod_text_sub_threshold < 0.05f) temp_settings.lod_text_sub_threshold = 0.05f;
                 if (temp_settings.lod_text_sub_threshold > 10.0f) temp_settings.lod_text_sub_threshold = 10.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char lod_sub_tooltip[1024];
                 snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
                          "The zoom threshold below which sub-item text is hidden.\n"
@@ -2828,7 +2836,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          " - Names of Criteria, Sub-Stats, and Stages.\n"
                          " - Progress Text like '(5/10)'.\n"
                          "Default: %.3f", DEFAULT_LOD_TEXT_SUB_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_sub_tooltip);
+                settings_tooltip(lod_sub_tooltip);
             }
 
             if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f,
@@ -2837,7 +2845,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.lod_text_main_threshold < 0.05f) temp_settings.lod_text_main_threshold = 0.05f;
                 if (temp_settings.lod_text_main_threshold > 10.0f) temp_settings.lod_text_main_threshold = 10.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char lod_main_tooltip[1024];
                 snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
                          "The zoom threshold below which main item text and interactive elements are hidden.\n"
@@ -2846,7 +2854,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          " - Main Category Names (e.g., 'Monster Hunter').\n"
                          " - Checkboxes for manual completion (Parent and Sub-Stat checkboxes).\n"
                          "Default: %.3f", DEFAULT_LOD_TEXT_MAIN_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_main_tooltip);
+                settings_tooltip(lod_main_tooltip);
             }
 
             if (ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f,
@@ -2854,7 +2862,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.lod_icon_detail_threshold < 0.05f) temp_settings.lod_icon_detail_threshold = 0.05f;
                 if (temp_settings.lod_icon_detail_threshold > 10.0f) temp_settings.lod_icon_detail_threshold = 10.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char lod_icon_tooltip[1024];
                 snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
                          "The zoom threshold below which sub-item icons are simplified.\n"
@@ -2864,12 +2872,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
                          " - The scroll bar on the side of scrolling lists.\n"
                          "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
-                ImGui::SetTooltip("%s", lod_icon_tooltip);
+                settings_tooltip(lod_icon_tooltip);
             }
 
             // --- Cursor Reveal Settings ---
             ImGui::Checkbox("Reveal Checkboxes Near Cursor", &temp_settings.checkbox_reveal_enabled);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char cb_reveal_tooltip[512];
                 snprintf(cb_reveal_tooltip, sizeof(cb_reveal_tooltip),
                          "When enabled, manual-completion checkboxes only appear within a radius of the\n"
@@ -2877,7 +2885,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Completion is still shown by the goal background, so the checkbox is only an\n"
                          "input affordance. Useful for very large templates.\n"
                          "Default: %s", DEFAULT_CHECKBOX_REVEAL_ENABLED ? "On" : "Off");
-                ImGui::SetTooltip("%s", cb_reveal_tooltip);
+                settings_tooltip(cb_reveal_tooltip);
             }
 
             ImGui::BeginDisabled(!temp_settings.checkbox_reveal_enabled && !temp_settings.text_reveal_enabled);
@@ -2887,7 +2895,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.checkbox_reveal_radius > 1000.0f) temp_settings.checkbox_reveal_radius = 1000.0f;
             }
             ImGui::EndDisabled();
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char cb_radius_tooltip[512];
                 snprintf(cb_radius_tooltip, sizeof(cb_radius_tooltip),
                          "Radius around the cursor within which checkboxes (and text, if enabled) are\n"
@@ -2895,11 +2903,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "covers the same area regardless of how far you are zoomed in or out.\n"
                          "A faint ring shows the current radius while the mouse moves.\n"
                          "Default: %.0f px", DEFAULT_CHECKBOX_REVEAL_RADIUS);
-                ImGui::SetTooltip("%s", cb_radius_tooltip);
+                settings_tooltip(cb_radius_tooltip);
             }
 
             ImGui::Checkbox("Also Reveal Text Near Cursor", &temp_settings.text_reveal_enabled);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char text_reveal_tooltip[512];
                 snprintf(text_reveal_tooltip, sizeof(text_reveal_tooltip),
                          "When enabled, item names, progress text, and text headers also only appear\n"
@@ -2907,7 +2915,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Each text reveals once the cursor reaches its anchor point (the reference\n"
                          "point its coordinates use in the template editor), not its mid-point.\n"
                          "Default: %s", DEFAULT_TEXT_REVEAL_ENABLED ? "On" : "Off");
-                ImGui::SetTooltip("%s", text_reveal_tooltip);
+                settings_tooltip(text_reveal_tooltip);
             }
 
             // Slider for Scroll Threshold
@@ -2915,7 +2923,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.scrollable_list_threshold < 1) temp_settings.scrollable_list_threshold = 1;
                 if (temp_settings.scrollable_list_threshold > 2048) temp_settings.scrollable_list_threshold = 2048;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char scroll_tooltip[512];
                 snprintf(scroll_tooltip, sizeof(scroll_tooltip),
                          "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
@@ -2923,7 +2931,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "\n\nNote: Scrollable lists are automatically disabled for a specific goal\n"
                          "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates.\n"
                          "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
-                ImGui::SetTooltip("%s", scroll_tooltip);
+                settings_tooltip(scroll_tooltip);
             }
 
             // List Scroll Speed Slider
@@ -2933,17 +2941,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_list_scroll_speed > 1024.0f)
                     temp_settings.tracker_list_scroll_speed = 1024.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char speed_tooltip[256];
                 snprintf(speed_tooltip, sizeof(speed_tooltip),
                          "How many pixels the list scrolls per mouse wheel notch.\n"
                          "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
                          "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
-                ImGui::SetTooltip("%s", speed_tooltip);
+                settings_tooltip(speed_tooltip);
             }
 
             ImGui::Checkbox("Incomplete Sub-Goals First", &temp_settings.tracker_list_incomplete_first);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char incomplete_first_tooltip[768];
                 snprintf(incomplete_first_tooltip, sizeof(incomplete_first_tooltip),
                          "Criteria/sub-stats that are still missing float to the top of their goal's list\n"
@@ -2954,7 +2962,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "\nNote: This applies to every automatically laid out list, scrolling or not,\n"
                          "but never to a goal whose criteria/sub-stats use manual coordinates.\n"
                          "Default: %s", DEFAULT_TRACKER_LIST_INCOMPLETE_FIRST ? "On" : "Off");
-                ImGui::SetTooltip("%s", incomplete_first_tooltip);
+                settings_tooltip(incomplete_first_tooltip);
             }
 
             ImGui::Separator();
@@ -2964,14 +2972,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             // --- Section Order ---
             ImGui::SeparatorText("Section Order");
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char section_order_tooltip_buffer[256];
                 snprintf(section_order_tooltip_buffer, sizeof(section_order_tooltip_buffer),
                          "Drag and drop to reorder the sections in the main tracker window.\n"
                          "This doesn't affect the 'Manual Layout'.\n"
                          "Drop items between others to insert them at that position.\n"
                          "Default order: Counters, Advancements, Recipes, Unlocks, Stats, Custom, Multi-Stage");
-                ImGui::SetTooltip("%s", section_order_tooltip_buffer);
+                settings_tooltip(section_order_tooltip_buffer);
             }
 
 
@@ -3100,13 +3108,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_vertical_spacing < 0.0f) temp_settings.tracker_vertical_spacing = 0.0f;
                 if (temp_settings.tracker_vertical_spacing > 1024.0f) temp_settings.tracker_vertical_spacing = 1024.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[256];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjusts the vertical gap (in pixels) between rows of items in the tracker window\n"
                          "for all sections. Default: %.1f px",
                          DEFAULT_TRACKER_VERTICAL_SPACING);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // --- Criteria/Sub-Stat Vertical Spacing ---
@@ -3117,26 +3125,26 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_criteria_vertical_spacing > 1024.0f)
                     temp_settings.tracker_criteria_vertical_spacing = 1024.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[320];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adds extra vertical gap (in pixels) between the criteria/sub-stat rows listed\n"
                          "underneath a goal, including inside scrollable lists. Only affects rows that are\n"
                          "laid out automatically, not manually placed ones. Default: %.1f px",
                          DEFAULT_TRACKER_CRITERIA_VERTICAL_SPACING);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // --- Custom Tracker Section Width ---
             ImGui::SeparatorText("Custom Section Item Width");
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Enable and adjust the horizontal width (in pixels) for *each item* within a section.\n"
                          "This overrides the dynamic width calculation. WARNING: Small values will cause text to overlap.\n"
                          "Sections not available in the selected template version will be hidden.\n"
                          "Default: Off for every section (%.0fpx when enabled)", DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             ImGui::Indent();
@@ -3159,14 +3167,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (is_visible) {
                     snprintf(checkbox_label, sizeof(checkbox_label), "%s Width", label);
                     ImGui::Checkbox(checkbox_label, &temp_settings.tracker_section_custom_width_enabled[i]);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Check this to override the dynamic width calculation for items in the '%s' section.\n"
                                  "This allows you to set a fixed, uniform total width for all items in this row.\n"
                                  "Default: Off",
                                  label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (temp_settings.tracker_section_custom_width_enabled[i]) {
@@ -3182,13 +3190,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             if (temp_settings.tracker_section_custom_item_width[i] > 2048.0f)
                                 temp_settings.tracker_section_custom_item_width[i] = 2048.0f;
                         }
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Item width for %s. WARNING: Text may overlap if too small.\n"
                                      "The item icon is %dpx wide. Default: %.0fpx",
                                      label, 96, DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
                 }
@@ -3212,7 +3220,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     temp_settings.tracker_font_name[sizeof(temp_settings.tracker_font_name) - 1] = '\0';
                 }
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Select the font for the main tracker view.\n"
@@ -3222,7 +3230,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Only choose fonts within the %s directory.\n\n"
                          "A restart is required to properly apply changes.\n"
                          "Default: %s", get_fonts_display_path(), DEFAULT_TRACKER_FONT);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Tracker Font Size
@@ -3230,7 +3238,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_font_size < 8.0f) temp_settings.tracker_font_size = 8.0f;
                 if (temp_settings.tracker_font_size > 64.0f) temp_settings.tracker_font_size = 64.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for main goal names, the notes window,\n"
@@ -3240,7 +3248,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "3x or 32 pt at 1x). Every other combination blurs its edges.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_FONT_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Tracker Sub-Font Size
@@ -3249,7 +3257,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_sub_font_size < 8.0f) temp_settings.tracker_sub_font_size = 8.0f;
                 if (temp_settings.tracker_sub_font_size > 32.0f) temp_settings.tracker_sub_font_size = 32.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for sub-items like criteria,\n"
@@ -3259,7 +3267,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "trades a little sharpness for smaller sub-items.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_SUB_FONT_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Tracker UI-Font Size
@@ -3268,7 +3276,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_ui_font_size < 8.0f) temp_settings.tracker_ui_font_size = 8.0f;
                 if (temp_settings.tracker_ui_font_size > 64.0f) temp_settings.tracker_ui_font_size = 64.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for the top info bar and bottom control bar.\n"
@@ -3276,7 +3284,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "multiple of 16 pt is pixel-sharp.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_UI_FONT_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             static float tracker_bg[4];
@@ -3291,12 +3299,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     (Uint8) (tracker_bg[3] * 255)
                 };
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tracker_bg_tooltip_buffer[1024];
                 snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
                          "Configure the color of the tracker background.\n"
                          "Default: Dark theme (13, 17, 23)");
-                ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
+                settings_tooltip(tracker_bg_tooltip_buffer);
             }
 
             static float text_col[4];
@@ -3311,14 +3319,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     (Uint8) (text_col[3] * 255)
                 };
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tracker_bg_tooltip_buffer[1024];
                 snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
                          "Configure the text color of the tracker window.\n"
                          "This also affects the info window, the checkboxes and\n"
                          "the controls in the bottom right.\n"
                          "Default: White (255, 255, 255)");
-                ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
+                settings_tooltip(tracker_bg_tooltip_buffer);
             }
 
             if (font_settings_changed) {
@@ -3355,14 +3363,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         path_buffer[buffer_size - 1] = '\0';
                     }
                 }
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char tooltip_buffer[512];
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Select the background texture for %s items.\n"
                              "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
                              "Must be a .png or .gif file located inside the %s folder.\n"
                              "Default: %s", label, get_gui_display_path(), default_path);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
+                    settings_tooltip(tooltip_buffer);
                 }
             };
 
@@ -3403,7 +3411,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.adv_icon_size < ADV_ICON_MIN_SIZE) temp_settings.adv_icon_size = ADV_ICON_MIN_SIZE;
                 if (temp_settings.adv_icon_size > ADV_ICON_BG_SIZE) temp_settings.adv_icon_size = ADV_ICON_BG_SIZE;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Edge length of the icon inside the %.0fx%.0f background texture.\n"
@@ -3411,7 +3419,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Cannot exceed the background size.\n"
                          "Default: %.0f px.",
                          ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, DEFAULT_ADV_ICON_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Keep offsets within bounds after a size change (icon box must stay inside the background).
@@ -3425,14 +3433,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.adv_icon_offset_x < 0.0f) temp_settings.adv_icon_offset_x = 0.0f;
                 if (temp_settings.adv_icon_offset_x > icon_max_off) temp_settings.adv_icon_offset_x = icon_max_off;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Horizontal offset of the icon from the background's left edge.\n"
                          "The icon always stays inside the %.0fx%.0f background.\n"
                          "Range: 0 - %.0f px (depends on Icon Size). Default: %.0f px.",
                          ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, icon_max_off, DEFAULT_ADV_ICON_OFFSET_X);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Icon Y Position
@@ -3441,14 +3449,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.adv_icon_offset_y < 0.0f) temp_settings.adv_icon_offset_y = 0.0f;
                 if (temp_settings.adv_icon_offset_y > icon_max_off) temp_settings.adv_icon_offset_y = icon_max_off;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Vertical offset of the icon from the background's top edge.\n"
                          "The icon always stays inside the %.0fx%.0f background.\n"
                          "Range: 0 - %.0f px (depends on Icon Size). Default: %.0f px.",
                          ADV_ICON_BG_SIZE, ADV_ICON_BG_SIZE, icon_max_off, DEFAULT_ADV_ICON_OFFSET_Y);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             // Shared Icon Size (parent icon overlaid on a criterion/sub-stat icon)
@@ -3459,7 +3467,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.tracker_shared_icon_size > TRACKER_SUB_ICON_BOX_SIZE)
                     temp_settings.tracker_shared_icon_size = TRACKER_SUB_ICON_BOX_SIZE;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Size of the small parent icon drawn on a criterion/sub-stat whose icon is shared\n"
@@ -3468,18 +3476,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Set it to 0 to hide it.\n"
                          "Default: %.0f px.",
                          TRACKER_SUB_ICON_BOX_SIZE, TRACKER_SUB_ICON_BOX_SIZE, DEFAULT_TRACKER_SHARED_ICON_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             ImGui::Checkbox("Keep Redundant Shared Icons", &temp_settings.tracker_shared_icon_keep_redundant);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
                          "it is the same goal), the parent icon looks identical on both and tells nothing\n"
                          "apart, so it is dropped. Check this to draw it anyway.\n"
                          "Default: %s", DEFAULT_TRACKER_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
 
@@ -3499,7 +3507,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     temp_settings.ui_font_name[sizeof(temp_settings.ui_font_name) - 1] = '\0';
                 }
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Select the font for UI windows.\n"
@@ -3507,14 +3515,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Only choose fonts within the %s directory.\n\n"
                          "IMPORTANT: Requires restarting Advancely to apply.\n"
                          "Default: %s", get_fonts_display_path(), DEFAULT_UI_FONT);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
             // UI Font Size
             if (ImGui::DragFloat("Settings/UI Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt")) {
                 if (temp_settings.ui_font_size < 8.0f) temp_settings.ui_font_size = 8.0f;
                 if (temp_settings.ui_font_size > 64.0f) temp_settings.ui_font_size = 64.0f;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Adjust the font size for UI windows.\n"
@@ -3522,7 +3530,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Default: %.1f pt.\n\n"
                          "IMPORTANT: Requires restarting Advancely to apply.",
                          DEFAULT_UI_FONT_SIZE);
-                ImGui::SetTooltip("%s", tooltip_buffer);
+                settings_tooltip(tooltip_buffer);
             }
 
             if (font_settings_changed) {
@@ -3552,12 +3560,12 @@ temp_settings.field_name = { \
 (Uint8)(field_name##_arr[2] * 255), (Uint8)(field_name##_arr[3] * 255) \
 }; \
 } \
-if (ImGui::IsItemHovered()) { \
+if (settings_tooltip_wanted()) { \
 char tooltip_buffer[512]; \
 int _ttlen = snprintf(tooltip_buffer, sizeof(tooltip_buffer), tooltip_fmt, ##__VA_ARGS__); \
 if (_ttlen > 0 && _ttlen < (int)sizeof(tooltip_buffer)) \
 snprintf(tooltip_buffer + _ttlen, sizeof(tooltip_buffer) - _ttlen, "\nDefault: Default Dark Theme"); \
-ImGui::SetTooltip("%s", tooltip_buffer); \
+settings_tooltip(tooltip_buffer); \
 }
 
             UI_COLOR_PICKER("UI Text", ui_text_color,
@@ -3693,7 +3701,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.0f, 1.0f), " (use Game Capture)");
             enable_overlay_hovered = enable_overlay_hovered || ImGui::IsItemHovered();
 #endif
-            if (enable_overlay_hovered) {
+            if (settings_tooltip_wanted_if(enable_overlay_hovered)) {
                 char enable_overlay_tooltip_buffer[2048];
                 if (selected_version <= MC_VERSION_1_6_4) {
                     // Legacy
@@ -3758,7 +3766,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              overlay_process_tip
                     );
                 }
-                ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
+                settings_tooltip(enable_overlay_tooltip_buffer);
             }
             // Conditionally enable the remaining overlay settings
             if (temp_settings.enable_overlay) {
@@ -3766,13 +3774,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (temp_settings.overlay_fps < 10.0f) temp_settings.overlay_fps = 10.0f;
                     if (temp_settings.overlay_fps > 540.0f) temp_settings.overlay_fps = 540.0f;
                 }
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char overlay_fps_limit_tooltip_buffer[1024];
                     snprintf(overlay_fps_limit_tooltip_buffer, sizeof(overlay_fps_limit_tooltip_buffer),
                              "Limits the frames per second of the overlay window.\n"
                              "Higher values may result in higher GPU/CPU usage.\n"
                              "Default: %d FPS", DEFAULT_OVERLAY_FPS);
-                    ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
+                    settings_tooltip(overlay_fps_limit_tooltip_buffer);
                 }
 
                 ImGui::Separator();
@@ -3787,7 +3795,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
                 // For displaying the default mode
                 const char *overlay_mode_names[] = {"Scrolling Belt", "Page", "Compact"};
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char overlay_mode_belt_tooltip_buffer[1536];
                     snprintf(overlay_mode_belt_tooltip_buffer, sizeof(overlay_mode_belt_tooltip_buffer),
                              "Items continuously scroll across the overlay as a conveyor belt.\n"
@@ -3796,13 +3804,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "%s\n"
                              "Default: %s", overlay_advance_label, overlay_row_layout,
                              overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
-                    ImGui::SetTooltip("%s", overlay_mode_belt_tooltip_buffer);
+                    settings_tooltip(overlay_mode_belt_tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::RadioButton("Page", overlay_mode == OVERLAY_RENDER_MODE_PAGE)) {
                     overlay_mode = OVERLAY_RENDER_MODE_PAGE;
                 }
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char overlay_mode_page_tooltip_buffer[1536];
                     snprintf(overlay_mode_page_tooltip_buffer, sizeof(overlay_mode_page_tooltip_buffer),
                              "Items are shown statically, centered, fitting as many as the overlay width allows.\n"
@@ -3811,13 +3819,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "%s\n"
                              "Default: %s", overlay_advance_label, overlay_row_layout,
                              overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
-                    ImGui::SetTooltip("%s", overlay_mode_page_tooltip_buffer);
+                    settings_tooltip(overlay_mode_page_tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::RadioButton("Compact", overlay_mode == OVERLAY_RENDER_MODE_COMPACT)) {
                     overlay_mode = OVERLAY_RENDER_MODE_COMPACT;
                 }
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char overlay_mode_compact_tooltip_buffer[768];
                     snprintf(overlay_mode_compact_tooltip_buffer, sizeof(overlay_mode_compact_tooltip_buffer),
                              "A tall, compact counter panel that cycles through goal types,\n"
@@ -3828,7 +3836,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "'Using Hermes Mod (Live Tracking)' in the Paths & Templates tab.\n"
                              "Inspired by Zesskyo.\n"
                              "Default: %s", overlay_advance_label, overlay_mode_names[DEFAULT_OVERLAY_RENDER_MODE]);
-                    ImGui::SetTooltip("%s", overlay_mode_compact_tooltip_buffer);
+                    settings_tooltip(overlay_mode_compact_tooltip_buffer);
                 }
                 temp_settings.overlay_render_mode = (OverlayRenderMode) overlay_mode;
 
@@ -3837,7 +3845,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 // Applies to every render mode, so it lives here (outside the mode-specific sections).
                 ImGui::Checkbox("Show Hidden Goals", &temp_settings.overlay_show_hidden_goals);
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char show_hidden_tooltip_buffer[512];
                     snprintf(show_hidden_tooltip_buffer, sizeof(show_hidden_tooltip_buffer),
                              "Show goals that are marked hidden in the template anyway, in every overlay mode\n"
@@ -3847,7 +3855,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "optimized template shows fewer of them there until this is on. The Panel Content\n"
                              "counts are the real section totals and don't change with this.\n"
                              "Default: %s", DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS ? "On" : "Off");
-                    ImGui::SetTooltip("%s", show_hidden_tooltip_buffer);
+                    settings_tooltip(show_hidden_tooltip_buffer);
                 }
 
                 const TemplateData *row1_td = (t && t->template_data) ? t->template_data : nullptr;
@@ -3861,7 +3869,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 };
                 auto row1_off = [&]() -> bool { return row1_empty || row1_hidden(); };
                 auto row1_off_tooltip = [&]() -> bool {
-                    if (!row1_off() || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) return false;
+                    if (!row1_off() || !settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) return false;
                     char row1_off_tooltip_buffer[512];
                     if (row1_empty) {
                         snprintf(row1_off_tooltip_buffer, sizeof(row1_off_tooltip_buffer),
@@ -3875,7 +3883,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Disabled because Show Row 1 is off, so the overlay leaves\n"
                                  "Row 1 out and moves everything below it up.");
                     }
-                    ImGui::SetTooltip("%s", row1_off_tooltip_buffer);
+                    settings_tooltip(row1_off_tooltip_buffer);
                     return true;
                 };
 
@@ -3883,7 +3891,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // belt/page top bar, and the Compact mode's final time on the run-completed panel. So it
                 // lives here, outside the mode-specific sections, and stays reachable in every mode.
                 ImGui::Checkbox("Freeze Timer on Completion", &temp_settings.igt_freeze_on_completion);
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char igt_freeze_tooltip_buffer[512];
                     snprintf(igt_freeze_tooltip_buffer, sizeof(igt_freeze_tooltip_buffer),
                              "Freezes the IGT at the final time once the run is completed, in the\n"
@@ -3892,22 +3900,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "With the SpeedrunIGT mod every IGT is millisecond precise instead of\n"
                              "stepping in 50 ms game ticks.\n"
                              "Default: %s", DEFAULT_IGT_FREEZE_ON_COMPLETION ? "On" : "Off");
-                    ImGui::SetTooltip("%s", igt_freeze_tooltip_buffer);
+                    settings_tooltip(igt_freeze_tooltip_buffer);
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char igt_spacing_tooltip_buffer[256];
                     snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
                              "Adds a space between every number and its unit in the IGT\n"
                              "and Update Timer display.\n"
                              "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".\n"
                              "Default: Off");
-                    ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
+                    settings_tooltip(igt_spacing_tooltip_buffer);
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("IGT Always Show ms", &temp_settings.igt_always_show_ms);
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char igt_ms_tooltip_buffer[384];
                     snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
                              "Always shows milliseconds in the IGT display,\n"
@@ -3916,7 +3924,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Times from the stats file step in 50 ms game ticks; only times\n"
                              "read from the SpeedrunIGT mod are millisecond exact.\n"
                              "Default: Off");
-                    ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
+                    settings_tooltip(igt_ms_tooltip_buffer);
                 }
 
                 // Content & Behavior drives the belt/page top info bar and 3-row layout (text sections,
@@ -3928,38 +3936,38 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Text("Content & Behavior");
 
                     ImGui::Text("Overlay Text Sections:");
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_text_sections_tooltip_buffer[1024];
                         snprintf(overlay_text_sections_tooltip_buffer, sizeof(overlay_text_sections_tooltip_buffer),
                                  "Configure which sections of the overlay progress text to display.\n"
                                  "Hover over each checkbox for more info.\n"
                                  "The socials can't be removed.");
-                        ImGui::SetTooltip("%s", overlay_text_sections_tooltip_buffer);
+                        settings_tooltip(overlay_text_sections_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("World", &temp_settings.overlay_show_world);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_text_world_tooltip_buffer[1024];
                         snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
                                  "Shows the current world name.\n"
                                  "For Co-op receivers, this shows 'Syncing with <Host>'\n"
                                  "or 'Syncing for <Player>' depending on the player dropdown selection.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
+                        settings_tooltip(overlay_text_world_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_text_run_tooltip_buffer[1024];
                         snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
                                  "Shows the selected Template Version & Template Category.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
+                        settings_tooltip(overlay_text_run_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress);
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::BeginTooltip();
+                    if (settings_tooltip_wanted()) {
+                        settings_rich_tooltip_begin();
                         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
 
                         ImGui::TextUnformatted("Progress Breakdown");
@@ -3986,35 +3994,35 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::TextUnformatted("Default: On");
 
                         ImGui::PopTextWrapPos();
-                        ImGui::EndTooltip();
+                        settings_rich_tooltip_end();
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_text_igt_tooltip_buffer[1024];
                         snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
                                  "Shows the in-game time since the start of the run.\n"
                                  "It's read from the statistics file so it's in ticks\n"
                                  "and only updated when the game saves.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
+                        settings_tooltip(overlay_text_igt_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_text_timer_tooltip_buffer[1024];
                         snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
                                  "Shows the time since the last game file update.\n"
                                  "When Hermes is active this timer only represents the time\n"
                                  "since the last full game-save sync from disk.\n"
                                  "Default: Off");
-                        ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
+                        settings_tooltip(overlay_text_timer_tooltip_buffer);
                     }
 
                     ImGui::SetNextItemWidth(80.0f);
                     ImGui::InputText("Segment Separator", temp_settings.overlay_progress_separator,
                                      sizeof(temp_settings.overlay_progress_separator));
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char separator_tooltip_buffer[512];
                         snprintf(separator_tooltip_buffer, sizeof(separator_tooltip_buffer),
                                  "The character(s) drawn between segments anywhere a separator is shown:\n"
@@ -4024,13 +4032,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "the pipe glyph. Up to %zu characters.\n"
                                  "Default: \"|\"",
                                  sizeof(temp_settings.overlay_progress_separator) - 1);
-                        ImGui::SetTooltip("%s", separator_tooltip_buffer);
+                        settings_tooltip(separator_tooltip_buffer);
                     }
 
                     ImGui::BeginDisabled(row1_empty);
                     ImGui::Checkbox("Show Row 1", &temp_settings.overlay_show_row1);
                     ImGui::EndDisabled();
-                    if (!(row1_empty && row1_off_tooltip()) && ImGui::IsItemHovered()) {
+                    if (!(row1_empty && row1_off_tooltip()) && settings_tooltip_wanted()) {
                         char show_row1_tooltip_buffer[512];
                         snprintf(show_row1_tooltip_buffer, sizeof(show_row1_tooltip_buffer),
                                  "Shows Row 1 (%s criteria and sub-stat icons).\n"
@@ -4038,11 +4046,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "shrinking the overlay window to match.\n"
                                  "Default: %s", advancement_label_uppercase,
                                  DEFAULT_OVERLAY_SHOW_ROW1 ? "On" : "Off");
-                        ImGui::SetTooltip("%s", show_row1_tooltip_buffer);
+                        settings_tooltip(show_row1_tooltip_buffer);
                     }
 
                     ImGui::Checkbox("Show Completed Row 2 Goals", &temp_settings.overlay_row2_show_completed);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char show_completed_row_2_tooltip_buffer[1024];
                         snprintf(show_completed_row_2_tooltip_buffer, sizeof(show_completed_row_2_tooltip_buffer),
                                  "If checked, goals in Row 2 (%s, Unlocks, and any goals\n"
@@ -4050,11 +4058,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "This is independent of the main 'Goal Visibility' setting.\n"
                                  "Default: Off", advancements_label_plural_uppercase);
 
-                        ImGui::SetTooltip("%s", show_completed_row_2_tooltip_buffer);
+                        settings_tooltip(show_completed_row_2_tooltip_buffer);
                     }
 
                     ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char hide_completed_row_3_tooltip_buffer[1024];
                         snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
                                  "If checked, goals in Row 3 (Stats, Custom Goals,\n"
@@ -4065,7 +4073,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "'Show Completed Row 2 Goals' instead.\n"
                                  "Default: Off", advancements_label_plural_uppercase);
 
-                        ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
+                        settings_tooltip(hide_completed_row_3_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f,
@@ -4077,13 +4085,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_stat_cycle_speed > 60.0f)
                             temp_settings.overlay_stat_cycle_speed = 60.0f;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char substat_cycling_interval_tooltip_buffer[256];
                         snprintf(substat_cycling_interval_tooltip_buffer,
                                  sizeof(substat_cycling_interval_tooltip_buffer),
                                  "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n"
                                  "Default: %.1f s", DEFAULT_OVERLAY_STAT_CYCLE_SPEED);
-                        ImGui::SetTooltip("%s", substat_cycling_interval_tooltip_buffer);
+                        settings_tooltip(substat_cycling_interval_tooltip_buffer);
                     }
 
                     // A cleared goal plays either the crop or the fade, never both, so the crop
@@ -4098,7 +4106,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.overlay_clear_animation = 10.0f;
                     }
                     ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char clear_animation_tooltip_buffer[640];
                         if (temp_settings.overlay_clear_fade_enabled) {
                             snprintf(clear_animation_tooltip_buffer, sizeof(clear_animation_tooltip_buffer),
@@ -4111,7 +4119,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "0.0 is instant. Positive values clear the icon upwards, negative values clear it downwards.\n"
                                      "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_ANIMATION);
                         }
-                        ImGui::SetTooltip("%s", clear_animation_tooltip_buffer);
+                        settings_tooltip(clear_animation_tooltip_buffer);
                     }
 
                     // A fade needs real alpha to fade into, which only a transparent overlay has. On a
@@ -4120,7 +4128,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::BeginDisabled(!temp_settings.overlay_transparent);
                     ImGui::Checkbox("Fade Out", &temp_settings.overlay_clear_fade_enabled);
                     ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char clear_fade_tooltip_buffer[768];
                         if (temp_settings.overlay_transparent) {
                             snprintf(clear_fade_tooltip_buffer, sizeof(clear_fade_tooltip_buffer),
@@ -4139,7 +4147,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Background Color to unlock this again.\n"
                                      "Default: %s", DEFAULT_OVERLAY_CLEAR_FADE_ENABLED ? "On" : "Off");
                         }
-                        ImGui::SetTooltip("%s", clear_fade_tooltip_buffer);
+                        settings_tooltip(clear_fade_tooltip_buffer);
                     }
 
                     if (temp_settings.overlay_clear_fade_enabled) {
@@ -4155,13 +4163,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 temp_settings.overlay_clear_fade_time = COMPACT_STACK_FADE_TIME_MAX;
                         }
                         ImGui::EndDisabled();
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char clear_fade_time_tooltip_buffer[512];
                             snprintf(clear_fade_time_tooltip_buffer, sizeof(clear_fade_time_tooltip_buffer),
                                      "How long the fade-out takes. It replaces the Clear Animation above,\n"
                                      "so the goal is gone once the fade has finished.\n"
                                      "Default: %.2f s", DEFAULT_OVERLAY_CLEAR_FADE_TIME);
-                            ImGui::SetTooltip("%s", clear_fade_time_tooltip_buffer);
+                            settings_tooltip(clear_fade_time_tooltip_buffer);
                         }
                     }
 
@@ -4175,7 +4183,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_settle_time > OVERLAY_SETTLE_TIME_MAX)
                             temp_settings.overlay_settle_time = OVERLAY_SETTLE_TIME_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char settle_tooltip_buffer[512];
                         snprintf(settle_tooltip_buffer, sizeof(settle_tooltip_buffer),
                                  "How long the remaining goals take to slide over into the gap a cleared\n"
@@ -4183,7 +4191,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "A row held by its Auto-Freeze\n"
                                  "option, or a Page mode row once every remaining goal fits one page.\n"
                                  "Default: %.2f s", DEFAULT_OVERLAY_SETTLE_TIME);
-                        ImGui::SetTooltip("%s", settle_tooltip_buffer);
+                        settings_tooltip(settle_tooltip_buffer);
                     }
                 } // End of Content & Behavior (belt/page only; hidden in Compact mode)
 
@@ -4197,19 +4205,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_page_interval < 0.1f) temp_settings.overlay_page_interval = 0.1f;
                         if (temp_settings.overlay_page_interval > 120.0f) temp_settings.overlay_page_interval = 120.0f;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char page_interval_tooltip_buffer[512];
                         snprintf(page_interval_tooltip_buffer, sizeof(page_interval_tooltip_buffer),
                                  "How long each static page of items is shown before the overlay cuts\n"
                                  "to the next page. A page holds as many items as fit the overlay width.\n"
                                  "Pressing %s while the overlay window is focused cuts to the next page immediately.\n"
                                  "Default: %.1f s", overlay_advance_label, DEFAULT_OVERLAY_PAGE_INTERVAL);
-                        ImGui::SetTooltip("%s", page_interval_tooltip_buffer);
+                        settings_tooltip(page_interval_tooltip_buffer);
                     }
 
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Page Alignment", (int *) &temp_settings.overlay_page_align, "Left\0Center\0Right\0");
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char page_align_tooltip_buffer[640];
                         snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
                                  "While more items remain than fit one page, pages repeat so each is full\n"
@@ -4219,7 +4227,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "so items stay put as the page empties. Center centers the remaining items.\n"
                                  "Right pushes them to where a full page's right edge would be.\n"
                                  "Default: Left");
-                        ImGui::SetTooltip("%s", page_align_tooltip_buffer);
+                        settings_tooltip(page_align_tooltip_buffer);
                     }
                 }
 
@@ -4236,7 +4244,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Text("Row 1 Icons");
                     ImGui::BeginDisabled(row1_off());
                     ImGui::Checkbox("Show Row 1 Icons", &temp_settings.compact_show_row1_icons);
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char compact_show_icons_tooltip_buffer[512];
                         snprintf(compact_show_icons_tooltip_buffer, sizeof(compact_show_icons_tooltip_buffer),
                                  "Shows the first-row icons (advancement criteria and sub-stats) in a\n"
@@ -4244,7 +4252,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "the interval below. Icons align with the panel and respect hidden\n"
                                  "goals (including the 'Show Hidden Goals' override). Horizontal spacing\n"
                                  "is set by the Row 1 Icon Spacing control below.");
-                        ImGui::SetTooltip("%s", compact_show_icons_tooltip_buffer);
+                        settings_tooltip(compact_show_icons_tooltip_buffer);
                     }
 
                     if (temp_settings.compact_show_row1_icons) {
@@ -4255,13 +4263,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_icon_size > COMPACT_ROW1_ICON_SIZE_MAX)
                                 temp_settings.compact_row1_icon_size = COMPACT_ROW1_ICON_SIZE_MAX;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_icon_size_tooltip_buffer[384];
                             snprintf(compact_icon_size_tooltip_buffer, sizeof(compact_icon_size_tooltip_buffer),
                                      "Size in on-screen pixels of each icon in the strip above the panel.\n"
                                      "Defaults to the pop-out stack icon size so the two match.\n"
                                      "Default: %.0f px", DEFAULT_COMPACT_ROW1_ICON_SIZE);
-                            ImGui::SetTooltip("%s", compact_icon_size_tooltip_buffer);
+                            settings_tooltip(compact_icon_size_tooltip_buffer);
                         }
 
                         // The shared icon is drawn on top of the strip icon, so it can never be bigger
@@ -4277,7 +4285,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_shared_size > temp_settings.compact_row1_icon_size)
                                 temp_settings.compact_icon_shared_size = temp_settings.compact_row1_icon_size;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_icon_shared_tooltip_buffer[512];
                             snprintf(compact_icon_shared_tooltip_buffer, sizeof(compact_icon_shared_tooltip_buffer),
                                      "Size of the small parent icon overlaid on a shared criterion in the\n"
@@ -4286,7 +4294,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "lowering that lowers this with it.\n"
                                      "Default: %.0f", temp_settings.compact_row1_icon_size,
                                      DEFAULT_COMPACT_ICON_SHARED_SIZE);
-                            ImGui::SetTooltip("%s", compact_icon_shared_tooltip_buffer);
+                            settings_tooltip(compact_icon_shared_tooltip_buffer);
                         }
 
                         if (ImGui::DragFloat("Horizontal Icon Spacing##CompactRow1Icons",
@@ -4295,13 +4303,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_spacing > 7680.0f)
                                 temp_settings.compact_row1_spacing = 7680.0f;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_row1_spacing_tooltip_buffer[256];
                             snprintf(compact_row1_spacing_tooltip_buffer, sizeof(compact_row1_spacing_tooltip_buffer),
                                      "Adjusts the horizontal gap (in pixels) between icons in the\n"
                                      "strip above the panel.\n"
                                      "Default: %.0f px", DEFAULT_COMPACT_ROW1_SPACING);
-                            ImGui::SetTooltip("%s", compact_row1_spacing_tooltip_buffer);
+                            settings_tooltip(compact_row1_spacing_tooltip_buffer);
                         }
 
                         if (ImGui::DragFloat("Icon Gap Below", &temp_settings.compact_icon_row_gap, 0.5f,
@@ -4311,13 +4319,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_row_gap > COMPACT_ICON_ROW_GAP_MAX)
                                 temp_settings.compact_icon_row_gap = COMPACT_ICON_ROW_GAP_MAX;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_icon_gap_tooltip_buffer[384];
                             snprintf(compact_icon_gap_tooltip_buffer, sizeof(compact_icon_gap_tooltip_buffer),
                                      "Vertical space in on-screen pixels between the icon strip and the\n"
                                      "panel below it. The overlay window grows to fit the icons.\n"
                                      "Default: %.0f px", DEFAULT_COMPACT_ICON_ROW_GAP);
-                            ImGui::SetTooltip("%s", compact_icon_gap_tooltip_buffer);
+                            settings_tooltip(compact_icon_gap_tooltip_buffer);
                         }
 
                         if (ImGui::DragFloat("Icon Cycle Interval", &temp_settings.compact_icon_cycle_interval, 0.1f,
@@ -4328,14 +4336,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_icon_cycle_interval > COMPACT_ICON_CYCLE_INTERVAL_MAX)
                                 temp_settings.compact_icon_cycle_interval = COMPACT_ICON_CYCLE_INTERVAL_MAX;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_icon_cycle_tooltip_buffer[384];
                             snprintf(compact_icon_cycle_tooltip_buffer, sizeof(compact_icon_cycle_tooltip_buffer),
                                      "How long each page of icons stays before flipping to the next set.\n"
                                      "Independent of the panel's Cycle Interval, but %s still\n"
                                      "advances the icons and the panel together.\n"
                                      "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_ICON_CYCLE_INTERVAL);
-                            ImGui::SetTooltip("%s", compact_icon_cycle_tooltip_buffer);
+                            settings_tooltip(compact_icon_cycle_tooltip_buffer);
                         }
 
                         // A cleared icon plays either the crop or the fade, never both, so the crop
@@ -4350,7 +4358,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 temp_settings.compact_row1_clear_animation = 10.0f;
                         }
                         ImGui::EndDisabled();
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_clear_anim_tooltip_buffer[640];
                             if (temp_settings.compact_row1_fade_enabled) {
                                 snprintf(compact_clear_anim_tooltip_buffer, sizeof(compact_clear_anim_tooltip_buffer),
@@ -4365,7 +4373,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "the Belt/Page Clear Animation.\n"
                                          "Default: %.2f s", DEFAULT_COMPACT_ROW1_CLEAR_ANIMATION);
                             }
-                            ImGui::SetTooltip("%s", compact_clear_anim_tooltip_buffer);
+                            settings_tooltip(compact_clear_anim_tooltip_buffer);
                         }
 
                         // Same gate as the pop-out stack's fade: half-faded pixels only survive on a
@@ -4373,7 +4381,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::BeginDisabled(!temp_settings.overlay_transparent);
                         ImGui::Checkbox("Fade Out##CompactRow1Icons", &temp_settings.compact_row1_fade_enabled);
                         ImGui::EndDisabled();
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_row1_fade_tooltip_buffer[768];
                             if (temp_settings.overlay_transparent) {
                                 snprintf(compact_row1_fade_tooltip_buffer, sizeof(compact_row1_fade_tooltip_buffer),
@@ -4391,7 +4399,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Background Color to unlock this again.\n"
                                          "Default: %s", DEFAULT_COMPACT_ROW1_FADE_ENABLED ? "On" : "Off");
                             }
-                            ImGui::SetTooltip("%s", compact_row1_fade_tooltip_buffer);
+                            settings_tooltip(compact_row1_fade_tooltip_buffer);
                         }
 
                         if (temp_settings.compact_row1_fade_enabled) {
@@ -4407,14 +4415,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     temp_settings.compact_row1_fade_time = COMPACT_STACK_FADE_TIME_MAX;
                             }
                             ImGui::EndDisabled();
-                            if (!row1_off_tooltip() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (!row1_off_tooltip() && settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 char compact_row1_fade_time_tooltip_buffer[512];
                                 snprintf(compact_row1_fade_time_tooltip_buffer,
                                          sizeof(compact_row1_fade_time_tooltip_buffer),
                                          "How long the fade-out takes. It replaces the Clear Animation above,\n"
                                          "so the icon is gone once the fade has finished.\n"
                                          "Default: %.2f s", DEFAULT_COMPACT_ROW1_FADE_TIME);
-                                ImGui::SetTooltip("%s", compact_row1_fade_time_tooltip_buffer);
+                                settings_tooltip(compact_row1_fade_time_tooltip_buffer);
                             }
                         }
 
@@ -4428,14 +4436,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_row1_settle_time > OVERLAY_SETTLE_TIME_MAX)
                                 temp_settings.compact_row1_settle_time = OVERLAY_SETTLE_TIME_MAX;
                         }
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char compact_row1_settle_tooltip_buffer[512];
                             snprintf(compact_row1_settle_tooltip_buffer, sizeof(compact_row1_settle_tooltip_buffer),
                                      "How long the remaining icons take to slide over into the gap a cleared\n"
                                      "icon leaves behind, instead of jumping into place. 0.0 jumps.\n"
                                      "Only once every remaining icon fits one page.\n"
                                      "Default: %.2f s", DEFAULT_COMPACT_ROW1_SETTLE_TIME);
-                            ImGui::SetTooltip("%s", compact_row1_settle_tooltip_buffer);
+                            settings_tooltip(compact_row1_settle_tooltip_buffer);
                         }
                     }
                     ImGui::EndDisabled();
@@ -4455,27 +4463,27 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.compact_panel_path[sizeof(temp_settings.compact_panel_path) - 1] = '\0';
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_panel_tex_tooltip_buffer[512];
                         snprintf(compact_panel_tex_tooltip_buffer, sizeof(compact_panel_tex_tooltip_buffer),
                                  "The 9-slice panel texture drawn behind the counter.\n"
                                  "Use a small square texture; its border pixels repeat to fit any size.\n"
                                  "Must be a .png or .gif inside the %s folder.\n"
                                  "Default: %s", get_gui_display_path(), DEFAULT_COMPACT_PANEL_PATH);
-                        ImGui::SetTooltip("%s", compact_panel_tex_tooltip_buffer);
+                        settings_tooltip(compact_panel_tex_tooltip_buffer);
                     }
 
                     if (ImGui::DragInt("Panel Pixel Scale", &temp_settings.compact_panel_pixel_scale, 0.1f, 1, 16)) {
                         if (temp_settings.compact_panel_pixel_scale < 1) temp_settings.compact_panel_pixel_scale = 1;
                         if (temp_settings.compact_panel_pixel_scale > 16) temp_settings.compact_panel_pixel_scale = 16;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_panel_scale_tooltip_buffer[512];
                         snprintf(compact_panel_scale_tooltip_buffer, sizeof(compact_panel_scale_tooltip_buffer),
                                  "On-screen pixels drawn per source texture pixel, so the panel border\n"
                                  "matches the pixel size of the item backgrounds.\n"
                                  "Default: %d", DEFAULT_COMPACT_PANEL_PIXEL_SCALE);
-                        ImGui::SetTooltip("%s", compact_panel_scale_tooltip_buffer);
+                        settings_tooltip(compact_panel_scale_tooltip_buffer);
                     }
 
                     int compact_insets[4] = {
@@ -4492,7 +4500,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         temp_settings.compact_panel_inset_top = compact_insets[2];
                         temp_settings.compact_panel_inset_bottom = compact_insets[3];
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_panel_border_tooltip_buffer[768];
                         snprintf(compact_panel_border_tooltip_buffer, sizeof(compact_panel_border_tooltip_buffer),
                                  "Border thickness in the texture's OWN pixels, per edge (Left / Right / Top / Bottom).\n"
@@ -4502,7 +4510,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "grows to fit the text. Example: the default 5x5 panel uses 2, leaving a 1px center.\n"
                                  "Each of these pixels is then multiplied on screen by Panel Pixel Scale.\n"
                                  "Default: %d on every edge", DEFAULT_COMPACT_PANEL_INSET);
-                        ImGui::SetTooltip("%s", compact_panel_border_tooltip_buffer);
+                        settings_tooltip(compact_panel_border_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Panel Padding", &temp_settings.compact_panel_padding, 0.5f, 0.0f, 128.0f,
@@ -4510,18 +4518,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_panel_padding < 0.0f) temp_settings.compact_panel_padding = 0.0f;
                         if (temp_settings.compact_panel_padding > 128.0f) temp_settings.compact_panel_padding = 128.0f;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_panel_pad_tooltip_buffer[512];
                         snprintf(compact_panel_pad_tooltip_buffer, sizeof(compact_panel_pad_tooltip_buffer),
                                  "Space in on-screen pixels between the counter text and the panel border.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_PANEL_PADDING);
-                        ImGui::SetTooltip("%s", compact_panel_pad_tooltip_buffer);
+                        settings_tooltip(compact_panel_pad_tooltip_buffer);
                     }
 
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Panel Alignment", (int *) &temp_settings.compact_panel_align,
                                  "Left\0Center\0Right\0");
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         const char *compact_align_names[] = {"Left", "Center", "Right"};
                         char compact_panel_align_tooltip_buffer[640];
                         snprintf(compact_panel_align_tooltip_buffer, sizeof(compact_panel_align_tooltip_buffer),
@@ -4530,7 +4538,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "left-aligning the overlay in OBS), Center keeps it centered, Right keeps its\n"
                                  "right edge fixed. The pop-out stack below always left-aligns to the panel's left edge.\n"
                                  "Default: %s", compact_align_names[DEFAULT_COMPACT_PANEL_ALIGN]);
-                        ImGui::SetTooltip("%s", compact_panel_align_tooltip_buffer);
+                        settings_tooltip(compact_panel_align_tooltip_buffer);
                     }
 
                     ImGui::Separator();
@@ -4655,7 +4663,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     ImGui::Checkbox("Chain All Entries", &temp_settings.compact_chain_entries);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_chain_tooltip_buffer[640];
                         snprintf(compact_chain_tooltip_buffer, sizeof(compact_chain_tooltip_buffer),
                                  "Shows every selected entry on the panel at once instead of cycling\n"
@@ -4668,13 +4676,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "%d of that order).\n"
                                  "Default: %s", COMPACT_CHAIN_MAX_ENTRIES, COMPACT_CHAIN_MAX_ENTRIES,
                                  DEFAULT_COMPACT_CHAIN_ENTRIES ? "On" : "Off");
-                        ImGui::SetTooltip("%s", compact_chain_tooltip_buffer);
+                        settings_tooltip(compact_chain_tooltip_buffer);
                     }
                     if (temp_settings.compact_chain_entries) {
                         ImGui::SetNextItemWidth(80.0f);
                         ImGui::InputText("Chain Separator", temp_settings.compact_chain_separator,
                                          sizeof(temp_settings.compact_chain_separator));
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char compact_chain_sep_tooltip_buffer[512];
                             snprintf(compact_chain_sep_tooltip_buffer, sizeof(compact_chain_sep_tooltip_buffer),
                                      "The character(s) drawn between the chained entries on both panel\n"
@@ -4682,7 +4690,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Default: \"%s\"",
                                      sizeof(temp_settings.compact_chain_separator) - 1,
                                      DEFAULT_COMPACT_CHAIN_SEPARATOR);
-                            ImGui::SetTooltip("%s", compact_chain_sep_tooltip_buffer);
+                            settings_tooltip(compact_chain_sep_tooltip_buffer);
                         }
                     } else {
                         if (ImGui::DragFloat("Cycle Interval", &temp_settings.compact_cycle_interval, 0.1f,
@@ -4692,7 +4700,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.compact_cycle_interval > COMPACT_CYCLE_INTERVAL_MAX)
                                 temp_settings.compact_cycle_interval = COMPACT_CYCLE_INTERVAL_MAX;
                         }
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char compact_cycle_tooltip_buffer[512];
                             snprintf(compact_cycle_tooltip_buffer, sizeof(compact_cycle_tooltip_buffer),
                                      "How long each selected entry stays on the panel before the\n"
@@ -4700,11 +4708,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "panel is static. Press %s while the overlay window is focused\n"
                                      "to jump to the next goal, which also flips the Row 1 icons.\n"
                                      "Default: %.1f s", overlay_advance_label, DEFAULT_COMPACT_CYCLE_INTERVAL);
-                            ImGui::SetTooltip("%s", compact_cycle_tooltip_buffer);
+                            settings_tooltip(compact_cycle_tooltip_buffer);
                         }
 
                         ImGui::Checkbox("Show Goal Icon", &temp_settings.compact_panel_goal_icon);
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char compact_goal_icon_tooltip_buffer[512];
                             snprintf(compact_goal_icon_tooltip_buffer, sizeof(compact_goal_icon_tooltip_buffer),
                                      "While the panel shows an individual goal, its icon is drawn next to\n"
@@ -4712,20 +4720,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "for a Left or Center panel alignment and on the right for Right.\n"
                                      "Type counts and the progress text have no icon.\n"
                                      "Default: %s", DEFAULT_COMPACT_PANEL_GOAL_ICON ? "On" : "Off");
-                            ImGui::SetTooltip("%s", compact_goal_icon_tooltip_buffer);
+                            settings_tooltip(compact_goal_icon_tooltip_buffer);
                         }
                         if (temp_settings.compact_panel_goal_icon) {
                             ImGui::SetNextItemWidth(120.0f);
                             ImGui::Combo("Text Alignment", (int *) &temp_settings.compact_panel_text_align,
                                          "Left\0Center\0Right\0");
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 const char *compact_text_align_names[] = {"Left", "Center", "Right"};
                                 char compact_text_align_tooltip_buffer[512];
                                 snprintf(compact_text_align_tooltip_buffer, sizeof(compact_text_align_tooltip_buffer),
                                          "How both text lines (the label and the count) are aligned next to\n"
                                          "the goal icon. Entries without an icon always stay centered.\n"
                                          "Default: %s", compact_text_align_names[DEFAULT_COMPACT_PANEL_TEXT_ALIGN]);
-                                ImGui::SetTooltip("%s", compact_text_align_tooltip_buffer);
+                                settings_tooltip(compact_text_align_tooltip_buffer);
                             }
                         }
                     }
@@ -4851,7 +4859,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                                 ImGui::EndCombo();
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char compact_pop_progress_tooltip_buffer[700];
                                 snprintf(compact_pop_progress_tooltip_buffer,
                                          sizeof(compact_pop_progress_tooltip_buffer),
@@ -4864,7 +4872,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Default: %s", DEFAULT_COMPACT_STACK_POP_ON_PROGRESS
                                                             ? "all types pop on progress"
                                                             : "completion only");
-                                ImGui::SetTooltip("%s", compact_pop_progress_tooltip_buffer);
+                                settings_tooltip(compact_pop_progress_tooltip_buffer);
                             }
                             ImGui::SameLine();
                             if (ImGui::SmallButton("All##stackprogall"))
@@ -4879,7 +4887,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                     ImGui::Checkbox("Show Completion Markers",
                                     &temp_settings.compact_show_completion_markers);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_show_markers_tooltip_buffer[700];
                         snprintf(compact_show_markers_tooltip_buffer, sizeof(compact_show_markers_tooltip_buffer),
                                  "Show the [o]/[a]/[x] completion markers on manually- and auto-completable\n"
@@ -4887,7 +4895,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "on the pop-out stack: [o] not done, [a] auto-completed, [x] checked off by hand.\n"
                                  "Off also stops a bare completion from popping a line.\n"
                                  "Default: %s", DEFAULT_COMPACT_SHOW_COMPLETION_MARKERS ? "On" : "Off");
-                        ImGui::SetTooltip("%s", compact_show_markers_tooltip_buffer);
+                        settings_tooltip(compact_show_markers_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Stack Gap Below", &temp_settings.compact_stack_row_gap, 0.5f,
@@ -4897,13 +4905,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_row_gap > COMPACT_STACK_ROW_GAP_MAX)
                             temp_settings.compact_stack_row_gap = COMPACT_STACK_ROW_GAP_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_gap_tooltip_buffer[384];
                         snprintf(compact_stack_gap_tooltip_buffer, sizeof(compact_stack_gap_tooltip_buffer),
                                  "Vertical space in on-screen pixels between the panel and\n"
                                  "the pop-out stack below it.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_STACK_ROW_GAP);
-                        ImGui::SetTooltip("%s", compact_stack_gap_tooltip_buffer);
+                        settings_tooltip(compact_stack_gap_tooltip_buffer);
                     }
 
                     if (ImGui::DragInt("Max Stack Lines", &temp_settings.compact_stack_max_lines, 0.1f,
@@ -4913,7 +4921,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_max_lines > COMPACT_STACK_MAX_LINES_MAX)
                             temp_settings.compact_stack_max_lines = COMPACT_STACK_MAX_LINES_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_lines_tooltip_buffer[640];
                         snprintf(compact_stack_lines_tooltip_buffer, sizeof(compact_stack_lines_tooltip_buffer),
                                  "How many pop-out lines can show below the panel at once. A completed\n"
@@ -4921,7 +4929,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "uses 2 of these lines. The window reserves this much height below the\n"
                                  "panel; when the stack is full the oldest line leaves at the bottom.\n"
                                  "Default: %d", DEFAULT_COMPACT_STACK_MAX_LINES);
-                        ImGui::SetTooltip("%s", compact_stack_lines_tooltip_buffer);
+                        settings_tooltip(compact_stack_lines_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Hold Time", &temp_settings.compact_stack_hold_time, 0.1f,
@@ -4931,13 +4939,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_hold_time > COMPACT_STACK_HOLD_TIME_MAX)
                             temp_settings.compact_stack_hold_time = COMPACT_STACK_HOLD_TIME_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_hold_tooltip_buffer[512];
                         snprintf(compact_stack_hold_tooltip_buffer, sizeof(compact_stack_hold_tooltip_buffer),
                                  "How long a pop-out line stays before it leaves the stack.\n"
                                  "A fresh increment on a line already showing resets this timer.\n"
                                  "Default: %.1f s", DEFAULT_COMPACT_STACK_HOLD_TIME);
-                        ImGui::SetTooltip("%s", compact_stack_hold_tooltip_buffer);
+                        settings_tooltip(compact_stack_hold_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Animation Time", &temp_settings.compact_stack_rise_time, 0.01f,
@@ -4947,13 +4955,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_rise_time > COMPACT_STACK_RISE_TIME_MAX)
                             temp_settings.compact_stack_rise_time = COMPACT_STACK_RISE_TIME_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_rise_tooltip_buffer[512];
                         snprintf(compact_stack_rise_tooltip_buffer, sizeof(compact_stack_rise_tooltip_buffer),
                                  "How long a pop-out takes to slide out from under the panel into its\n"
                                  "place in the stack. 0 shows it instantly (no slide).\n"
                                  "Default: %.2f s", DEFAULT_COMPACT_STACK_RISE_TIME);
-                        ImGui::SetTooltip("%s", compact_stack_rise_tooltip_buffer);
+                        settings_tooltip(compact_stack_rise_tooltip_buffer);
                     }
 
                     // A fade needs real alpha to fade into, which only a transparent overlay has. On a
@@ -4962,7 +4970,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::BeginDisabled(!temp_settings.overlay_transparent);
                     ImGui::Checkbox("Fade Out", &temp_settings.compact_stack_fade_enabled);
                     ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char compact_stack_fade_tooltip_buffer[768];
                         if (temp_settings.overlay_transparent) {
                             snprintf(compact_stack_fade_tooltip_buffer, sizeof(compact_stack_fade_tooltip_buffer),
@@ -4979,7 +4987,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Background Color to unlock this again.\n"
                                      "Default: %s", DEFAULT_COMPACT_STACK_FADE_ENABLED ? "On" : "Off");
                         }
-                        ImGui::SetTooltip("%s", compact_stack_fade_tooltip_buffer);
+                        settings_tooltip(compact_stack_fade_tooltip_buffer);
                     }
 
                     if (temp_settings.compact_stack_fade_enabled) {
@@ -4994,14 +5002,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 temp_settings.compact_stack_fade_time = COMPACT_STACK_FADE_TIME_MAX;
                         }
                         ImGui::EndDisabled();
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char compact_stack_fade_time_tooltip_buffer[512];
                             snprintf(compact_stack_fade_time_tooltip_buffer,
                                      sizeof(compact_stack_fade_time_tooltip_buffer),
                                      "How long the fade-out takes. The Hold Time runs first, then the line\n"
                                      "fades for this long before it is gone.\n"
                                      "Default: %.2f s", DEFAULT_COMPACT_STACK_FADE_TIME);
-                            ImGui::SetTooltip("%s", compact_stack_fade_time_tooltip_buffer);
+                            settings_tooltip(compact_stack_fade_time_tooltip_buffer);
                         }
                     }
 
@@ -5012,12 +5020,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_pop_icon_size > COMPACT_POP_ICON_SIZE_MAX)
                             temp_settings.compact_pop_icon_size = COMPACT_POP_ICON_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_pop_icon_tooltip_buffer[512];
                         snprintf(compact_pop_icon_tooltip_buffer, sizeof(compact_pop_icon_tooltip_buffer),
                                  "On-screen size of the icon on each pop-out line (and the line height).\n"
                                  "Default: %.0f", DEFAULT_COMPACT_POP_ICON_SIZE);
-                        ImGui::SetTooltip("%s", compact_pop_icon_tooltip_buffer);
+                        settings_tooltip(compact_pop_icon_tooltip_buffer);
                     }
 
                     // The shared icon is drawn on top of the pop-out icon, so it can never be bigger than
@@ -5032,7 +5040,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_shared_icon_size > temp_settings.compact_pop_icon_size)
                             temp_settings.compact_stack_shared_icon_size = temp_settings.compact_pop_icon_size;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_shared_tooltip_buffer[512];
                         snprintf(compact_stack_shared_tooltip_buffer, sizeof(compact_stack_shared_tooltip_buffer),
                                  "Size of the small parent icon overlaid on a shared criterion's pop-out\n"
@@ -5041,13 +5049,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "and lowering that lowers this with it.\n"
                                  "Default: %.0f", temp_settings.compact_pop_icon_size,
                                  DEFAULT_COMPACT_STACK_SHARED_ICON_SIZE);
-                        ImGui::SetTooltip("%s", compact_stack_shared_tooltip_buffer);
+                        settings_tooltip(compact_stack_shared_tooltip_buffer);
                     }
 
                     // Same toggle as under Row 1 Shared Icon Size in Belt/Page; covers the strip and the stack.
                     ImGui::Checkbox("Keep Redundant Shared Icons##Compact",
                                     &temp_settings.overlay_shared_icon_keep_redundant);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_keep_shared_tooltip_buffer[512];
                         snprintf(compact_keep_shared_tooltip_buffer, sizeof(compact_keep_shared_tooltip_buffer),
                                  "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
@@ -5055,7 +5063,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "apart, so it is dropped from the icon strip and the pop-out stack.\n"
                                  "Check this to draw it anyway. Applies to every overlay mode.\n"
                                  "Default: %s", DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
-                        ImGui::SetTooltip("%s", compact_keep_shared_tooltip_buffer);
+                        settings_tooltip(compact_keep_shared_tooltip_buffer);
                     }
                 }
 
@@ -5072,7 +5080,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_scroll_speed < -25.0f) temp_settings.overlay_scroll_speed = -25.0f;
                         if (temp_settings.overlay_scroll_speed > 25.0f) temp_settings.overlay_scroll_speed = 25.0f;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_scroll_speed_tooltip_buffer[1024];
                         snprintf(overlay_scroll_speed_tooltip_buffer, sizeof(overlay_scroll_speed_tooltip_buffer),
                                  "A negative scroll speed animates from right-to-left\n"
@@ -5081,13 +5089,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "A value of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
                                  "Holding %s while the overlay window is focused speeds up the animation.\n"
                                  "Default: %.2f", overlay_advance_label, DEFAULT_OVERLAY_SCROLL_SPEED);
-                        ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
+                        settings_tooltip(overlay_scroll_speed_tooltip_buffer);
                     }
 
                     // --- Row 1 Custom Speed + Freeze ---
                     ImGui::BeginDisabled(row1_off());
                     ImGui::Checkbox("Row 1 Custom Speed", &temp_settings.overlay_row1_custom_scroll_speed_enabled);
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Give Row 1 (criteria and sub-stat icons) its own scroll speed,\n"
@@ -5095,7 +5103,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Negative scrolls right-to-left; 0.0 is static.\n"
                                  "Default: Off (custom value default %.2f).",
                                  DEFAULT_OVERLAY_SCROLL_SPEED);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row1_custom_scroll_speed_enabled) {
                         ImGui::SameLine();
@@ -5111,33 +5119,33 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     ImGui::Checkbox("Row 1 Auto-Freeze", &temp_settings.overlay_row1_freeze_enabled);
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "When Row 1's still-visible items fit within the overlay width, stop scrolling\n"
                                  "and show each item once, statically (measured with text width). Useful once only\n"
                                  "a few items remain so they no longer repeat across the row.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row1_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::Combo("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
                                      "Left\0Center\0Right\0");
-                        if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                        if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "How to align Row 1's frozen items within the overlay width.\n"
                                      "Default: Left");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
                     ImGui::EndDisabled();
 
                     // --- Row 2 Custom Speed + Freeze ---
                     ImGui::Checkbox("Row 2 Custom Speed", &temp_settings.overlay_row2_custom_scroll_speed_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Give Row 2 (%s, Unlocks, and items forced to Row 2) its own scroll speed,\n"
@@ -5145,7 +5153,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Negative scrolls right-to-left; 0.0 is static.\n"
                                  "Default: Off (custom value default %.2f).",
                                  advancements_label_plural_uppercase, DEFAULT_OVERLAY_SCROLL_SPEED);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row2_custom_scroll_speed_enabled) {
                         ImGui::SameLine();
@@ -5160,32 +5168,32 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     ImGui::Checkbox("Row 2 Auto-Freeze", &temp_settings.overlay_row2_freeze_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "When Row 2's still-visible items fit within the overlay width, stop scrolling\n"
                                  "and show each item once, statically (measured with text width). Useful once only\n"
                                  "a few items remain so they no longer repeat across the row.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row2_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::Combo("##row2_align", (int *) &temp_settings.overlay_row2_freeze_align,
                                      "Left\0Center\0Right\0");
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "How to align Row 2's frozen items within the overlay width.\n"
                                      "Default: Left");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
 
                     // --- Row 3 Custom Speed + Freeze ---
                     ImGui::Checkbox("Row 3 Custom Speed", &temp_settings.overlay_row3_custom_scroll_speed_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Give Row 3 (Stats, Goals, and items forced to Row 3) its own scroll speed,\n"
@@ -5193,7 +5201,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Negative scrolls right-to-left; 0.0 is static.\n"
                                  "Default: Off (custom value default %.2f).",
                                  DEFAULT_OVERLAY_SCROLL_SPEED);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row3_custom_scroll_speed_enabled) {
                         ImGui::SameLine();
@@ -5208,7 +5216,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
 
                     ImGui::Checkbox("Row 3 Auto-Freeze", &temp_settings.overlay_row3_freeze_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "When Row 3's still-visible items fit within the overlay width, stop scrolling\n"
@@ -5217,19 +5225,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Works best with 'Hide Completed Row 3 Goals' enabled, so the row actually\n"
                                  "clears out its completed goals and shrinks down to a static few.\n"
                                  "Default: On");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     if (temp_settings.overlay_row3_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::Combo("##row3_align", (int *) &temp_settings.overlay_row3_freeze_align,
                                      "Left\0Center\0Right\0");
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "How to align Row 3's frozen items within the overlay width.\n"
                                      "Default: Left");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
                 } // End of belt-only scrolling / freeze options (hidden in Page mode)
@@ -5254,21 +5262,21 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (overlay_width > 7680) overlay_width = 7680;
                         temp_settings.overlay_window.w = overlay_width;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_width_tooltip_buffer[1024];
                         snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
                                  "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
-                        ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
+                        settings_tooltip(overlay_width_tooltip_buffer);
                     }
 
                     ImGui::Text("Overlay Title Alignment:");
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_title_alignment_tooltip_buffer[1024];
                         snprintf(overlay_title_alignment_tooltip_buffer, sizeof(overlay_title_alignment_tooltip_buffer),
                                  "Adjusts the horizontal positioning of the progress text on the overlay.\n"
                                  "Default: Left");
 
-                        ImGui::SetTooltip("%s", overlay_title_alignment_tooltip_buffer);
+                        settings_tooltip(overlay_title_alignment_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     ImGui::RadioButton("Left", (int *) &temp_settings.overlay_progress_text_align,
@@ -5288,14 +5296,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_icon_size > OVERLAY_ROW1_ICON_SIZE_MAX)
                             temp_settings.overlay_row1_icon_size = OVERLAY_ROW1_ICON_SIZE_MAX;
                     }
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Size in pixels of each icon in the top row (Row 1) of the overlay.\n"
                                  "The rows below move down or up to make room.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW1_ICON_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f,
@@ -5303,7 +5311,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
                         if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
                     }
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Adjusts the horizontal gap (in pixels) between icons\n"
@@ -5312,7 +5320,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "depends on the length of the display text.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW1_SPACING);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     // Drawn on top of the row 1 icon, so it can never outgrow it.
@@ -5327,7 +5335,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row1_shared_icon_size > temp_settings.overlay_row1_icon_size)
                             temp_settings.overlay_row1_shared_icon_size = temp_settings.overlay_row1_icon_size;
                     }
-                    if (!row1_off_tooltip() && ImGui::IsItemHovered()) {
+                    if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Adjusts the size of the 'Parent Icon' overlay that appears when\n"
@@ -5335,13 +5343,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Set to 0 to disable the shared icon overlay entirely.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                     ImGui::EndDisabled();
 
                     // One toggle for every overlay shared icon; Compact mode shows it under its stack setting.
                     ImGui::Checkbox("Keep Redundant Shared Icons", &temp_settings.overlay_shared_icon_keep_redundant);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "When two criteria/sub-stats share an icon and their goals share an icon too (or\n"
@@ -5349,7 +5357,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "apart, so it is dropped. Check this to draw it anyway.\n"
                                  "Applies to every overlay mode.\n"
                                  "Default: %s", DEFAULT_OVERLAY_SHARED_ICON_KEEP_REDUNDANT ? "On" : "Off");
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Row 2 Background Size", &temp_settings.overlay_row2_bg_size, 1.0f,
@@ -5359,7 +5367,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row2_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
                             temp_settings.overlay_row2_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Size in pixels of the background texture behind each item in Row 2.\n"
@@ -5367,7 +5375,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "set under Tracker Visuals. Row 3 moves down or up to make room.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW_BG_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Row 3 Background Size", &temp_settings.overlay_row3_bg_size, 1.0f,
@@ -5377,7 +5385,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row3_bg_size > OVERLAY_ROW_BG_SIZE_MAX)
                             temp_settings.overlay_row3_bg_size = OVERLAY_ROW_BG_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Size in pixels of the background texture behind each item in Row 3.\n"
@@ -5385,12 +5393,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "set under Tracker Visuals. The overlay grows or shrinks to fit.\n"
                                  "Default: %.0f px",
                                  DEFAULT_OVERLAY_ROW_BG_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     // --- Custom Row 2 Spacing ---
                     ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Check this to override the dynamic width calculation for Row 2 items.\n"
@@ -5399,7 +5407,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "and any Stats/Goals forced to Row 2.\n"
                                  "Default: Off (%.0fpx when enabled)",
                                  advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (temp_settings.overlay_row2_custom_spacing_enabled) {
@@ -5417,7 +5425,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.overlay_row2_custom_spacing > 7680.0f)
                                 temp_settings.overlay_row2_custom_spacing = 7680.0f;
                         }
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
@@ -5425,13 +5433,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "It never goes below the Background Size (%.0fpx), so icons never overlap.\n"
                                      "Default: %.0fpx.",
                                      temp_settings.overlay_row2_bg_size, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
 
                     // --- Custom Row 3 Spacing ---
                     ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Check this to override the dynamic width calculation for Row 3 items.\n"
@@ -5440,7 +5448,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "and any %s/Unlocks forced to Row 3.\n"
                                  "Default: Off (%.0fpx when enabled)",
                                  advancements_label_plural_uppercase, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (temp_settings.overlay_row3_custom_spacing_enabled) {
@@ -5458,7 +5466,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (temp_settings.overlay_row3_custom_spacing > 7680.0f)
                                 temp_settings.overlay_row3_custom_spacing = 7680.0f;
                         }
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
@@ -5466,20 +5474,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "It never goes below the Background Size (%.0fpx), so icons never overlap.\n"
                                      "Default: %.0fpx.",
                                      temp_settings.overlay_row3_bg_size, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            settings_tooltip(tooltip_buffer);
                         }
                     }
 
                     // --- Custom Vertical Spacing (overlay row gaps) ---
                     ImGui::Checkbox("Custom Vertical Spacing",
                                     &temp_settings.overlay_custom_vertical_spacing_enabled);
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("%s",
-                                          "Adjust the vertical gaps between the overlay rows individually.\n"
-                                          "Each gap is added on top of the default, font-driven layout and\n"
-                                          "resizes the overlay window height to match.\n"
-                                          "When disabled, the overlay uses the stock spacing.\n"
-                                          "Default: off.");
+                    if (settings_tooltip_wanted()) {
+                        char tooltip[512];
+                        snprintf(tooltip, sizeof(tooltip),
+                                 "Adjust the vertical gaps between the overlay rows individually.\n"
+                                 "Each gap is added on top of the default, font-driven layout and\n"
+                                 "resizes the overlay window height to match.\n"
+                                 "When disabled, the overlay uses the stock spacing.\n"
+                                 "Default: off.");
+                        settings_tooltip(tooltip);
                     }
 
                     // Only reveal the individual gap controls when the feature is enabled,
@@ -5491,13 +5501,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (*value < OVERLAY_GAP_MIN) *value = OVERLAY_GAP_MIN;
                                 if (*value > OVERLAY_GAP_MAX) *value = OVERLAY_GAP_MAX;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char tooltip_buffer[512];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "%s\n"
                                          "Larger values add space and grow the overlay window height to match.\n"
                                          "Default: %.0f px.", desc, default_value);
-                                ImGui::SetTooltip("%s", tooltip_buffer);
+                                settings_tooltip(tooltip_buffer);
                             }
                         };
 
@@ -5536,14 +5546,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             temp_settings.overlay_font_name[sizeof(temp_settings.overlay_font_name) - 1] = '\0';
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[1024];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Select the font for the text in the separate stream overlay window.\n"
                                  "Only choose fonts within the %s directory.\n"
                                  "Changing the font may change the overlay window height.\n"
                                  "Default: %s", get_fonts_display_path(), DEFAULT_OVERLAY_FONT);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Top Text Size", &temp_settings.overlay_progress_font_size, 0.5f,
@@ -5553,13 +5563,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_progress_font_size > OVERLAY_FONT_SIZE_MAX)
                             temp_settings.overlay_progress_font_size = OVERLAY_FONT_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Font size for the top info bar (version, progress, IGT and socials).\n"
                                  "A larger size increases the overlay window height to fit the taller text.\n"
                                  "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Row Text Size", &temp_settings.overlay_row_font_size, 0.5f,
@@ -5569,13 +5579,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.overlay_row_font_size > OVERLAY_FONT_SIZE_MAX)
                             temp_settings.overlay_row_font_size = OVERLAY_FONT_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buffer[512];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Font size for the item text under rows 2 and 3 (name and progress).\n"
                                  "A larger size increases the overlay window height to fit the taller text.\n"
                                  "Default: %.0f px.", DEFAULT_OVERLAY_FONT_SIZE);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        settings_tooltip(tooltip_buffer);
                     }
                 } // End of belt/page font + text-size controls (hidden in Compact mode)
 
@@ -5593,13 +5603,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     '\0';
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_label_font_tooltip_buffer[512];
                         snprintf(compact_label_font_tooltip_buffer, sizeof(compact_label_font_tooltip_buffer),
                                  "Font for the goal-type label (e.g. 'Advancements:').\n"
                                  "Only choose fonts within the %s directory.\n"
                                  "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_LABEL_FONT);
-                        ImGui::SetTooltip("%s", compact_label_font_tooltip_buffer);
+                        settings_tooltip(compact_label_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Label Text Size", &temp_settings.compact_label_font_size, 0.5f,
                                          OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
@@ -5608,12 +5618,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_label_font_size > OVERLAY_FONT_SIZE_MAX)
                             temp_settings.compact_label_font_size = OVERLAY_FONT_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_label_size_tooltip_buffer[512];
                         snprintf(compact_label_size_tooltip_buffer, sizeof(compact_label_size_tooltip_buffer),
                                  "Point size of the goal-type label.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_LABEL_FONT_SIZE);
-                        ImGui::SetTooltip("%s", compact_label_size_tooltip_buffer);
+                        settings_tooltip(compact_label_size_tooltip_buffer);
                     }
 
                     ImGui::Text("Count Font: %s", temp_settings.compact_count_font_name);
@@ -5627,13 +5637,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     '\0';
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_count_font_tooltip_buffer[512];
                         snprintf(compact_count_font_tooltip_buffer, sizeof(compact_count_font_tooltip_buffer),
                                  "Font for the big progress count (e.g. '70/80').\n"
                                  "Only choose fonts within the %s directory.\n"
                                  "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_COUNT_FONT);
-                        ImGui::SetTooltip("%s", compact_count_font_tooltip_buffer);
+                        settings_tooltip(compact_count_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Count Text Size", &temp_settings.compact_count_font_size, 0.5f,
                                          OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
@@ -5642,12 +5652,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_count_font_size > OVERLAY_FONT_SIZE_MAX)
                             temp_settings.compact_count_font_size = OVERLAY_FONT_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_count_size_tooltip_buffer[512];
                         snprintf(compact_count_size_tooltip_buffer, sizeof(compact_count_size_tooltip_buffer),
                                  "Point size of the big progress count.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_COUNT_FONT_SIZE);
-                        ImGui::SetTooltip("%s", compact_count_size_tooltip_buffer);
+                        settings_tooltip(compact_count_size_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Line Spacing", &temp_settings.compact_panel_line_gap, 0.5f,
@@ -5657,13 +5667,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_panel_line_gap > COMPACT_PANEL_LINE_GAP_MAX)
                             temp_settings.compact_panel_line_gap = COMPACT_PANEL_LINE_GAP_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_line_gap_tooltip_buffer[512];
                         snprintf(compact_line_gap_tooltip_buffer, sizeof(compact_line_gap_tooltip_buffer),
                                  "Vertical spacing between the label line and the count line inside the panel.\n"
                                  "The panel background and window size grow to fit.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_PANEL_LINE_GAP);
-                        ImGui::SetTooltip("%s", compact_line_gap_tooltip_buffer);
+                        settings_tooltip(compact_line_gap_tooltip_buffer);
                     }
 
                     ImGui::Text("Stack Font: %s", temp_settings.compact_stack_font_name);
@@ -5677,13 +5687,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     '\0';
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_font_tooltip_buffer[512];
                         snprintf(compact_stack_font_tooltip_buffer, sizeof(compact_stack_font_tooltip_buffer),
                                  "Font for the pop-out goals stacked below the panel.\n"
                                  "Only choose fonts within the %s directory.\n"
                                  "Default: %s", get_fonts_display_path(), DEFAULT_COMPACT_STACK_FONT);
-                        ImGui::SetTooltip("%s", compact_stack_font_tooltip_buffer);
+                        settings_tooltip(compact_stack_font_tooltip_buffer);
                     }
                     if (ImGui::DragFloat("Stack Text Size", &temp_settings.compact_stack_font_size, 0.5f,
                                          OVERLAY_FONT_SIZE_MIN, OVERLAY_FONT_SIZE_MAX, "%.0f px")) {
@@ -5692,12 +5702,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         if (temp_settings.compact_stack_font_size > OVERLAY_FONT_SIZE_MAX)
                             temp_settings.compact_stack_font_size = OVERLAY_FONT_SIZE_MAX;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char compact_stack_size_tooltip_buffer[512];
                         snprintf(compact_stack_size_tooltip_buffer, sizeof(compact_stack_size_tooltip_buffer),
                                  "Point size of the pop-out stack text.\n"
                                  "Default: %.0f px", DEFAULT_COMPACT_STACK_FONT_SIZE);
-                        ImGui::SetTooltip("%s", compact_stack_size_tooltip_buffer);
+                        settings_tooltip(compact_stack_size_tooltip_buffer);
                     }
                 }
 
@@ -5717,7 +5727,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         };
                     }
                     ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char overlay_bg_tooltip_buffer[1024];
                         if (temp_settings.overlay_transparent) {
                             snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
@@ -5734,12 +5744,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Default: (%d, %d, %d)", DEFAULT_OVERLAY_BG_COLOR.r,
                                      DEFAULT_OVERLAY_BG_COLOR.g, DEFAULT_OVERLAY_BG_COLOR.b);
                         }
-                        ImGui::SetTooltip("%s", overlay_bg_tooltip_buffer);
+                        settings_tooltip(overlay_bg_tooltip_buffer);
                     }
 
                     ImGui::SameLine();
                     ImGui::Checkbox("Transparent", &temp_settings.overlay_transparent);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char overlay_transparent_tooltip_buffer[1024];
                         snprintf(overlay_transparent_tooltip_buffer, sizeof(overlay_transparent_tooltip_buffer),
                                  "Renders the overlay window with a transparent background instead of a\n"
@@ -5753,7 +5763,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Keep a compositor running, otherwise the background turns black.\n"
 #endif
                                  "Default: %s", DEFAULT_OVERLAY_TRANSPARENT ? "On" : "Off");
-                        ImGui::SetTooltip("%s", overlay_transparent_tooltip_buffer);
+                        settings_tooltip(overlay_transparent_tooltip_buffer);
                     }
                 }
 
@@ -5770,12 +5780,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             (Uint8) (overlay_text_col[2] * 255), (Uint8) (overlay_text_col[3] * 255)
                         };
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tracker_bg_tooltip_buffer[1024];
                         snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
                                  "Configure the text color of the overlay window.\n"
                                  "Default: White (255, 255, 255)");
-                        ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
+                        settings_tooltip(tracker_bg_tooltip_buffer);
                     }
                 }
             } // End of conditional overlay settings
@@ -5801,7 +5811,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             if (acc_net_active) ImGui::BeginDisabled();
             int acc_type = temp_settings.account_type;
             ImGui::RadioButton("Online##acc_type", &acc_type, ACCOUNT_ONLINE);
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+            if (settings_tooltip_wanted(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
                 if (acc_net_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -5813,11 +5823,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Your Minecraft skin face is shown next to you in Co-op views.\n"
                              "Default: Online");
                 }
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
             ImGui::SameLine();
             ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+            if (settings_tooltip_wanted(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[320];
                 if (acc_net_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -5829,7 +5839,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Offline accounts have no Mojang skin, so the Notch face is\n"
                              "shown next to you in Co-op views.");
                 }
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
             temp_settings.account_type = (AccountType) acc_type;
             if (acc_net_active) ImGui::EndDisabled();
@@ -5848,7 +5858,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::SetNextItemWidth(200.0f);
             ImGui::InputText("Username##account", temp_settings.local_player.username,
                              sizeof(temp_settings.local_player.username));
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char tooltip_buf[256];
                 if (acc_net_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -5863,7 +5873,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Capitalization does not matter. Hermes matches usernames case-insensitively.\n"
                              "Hermes checks BOTH username (lowercased) and UUID, so keep both accurate.");
                 }
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
             if (username_disabled) ImGui::EndDisabled();
 
@@ -5920,7 +5930,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 ImGui::InputTextWithHint("UUID##account_offline", "e.g. 069a79f4-44e9-4726-a5be-fca90e38aaf5",
                                          temp_settings.local_player.uuid,
                                          sizeof(temp_settings.local_player.uuid));
-                if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                if (settings_tooltip_wanted(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char tooltip_buf[256];
                     if (acc_net_active) {
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -5932,7 +5942,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Look in your world's stats or playerdata folder for a JSON file named\n"
                                  "with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
                     }
-                    ImGui::SetTooltip("%s", tooltip_buf);
+                    settings_tooltip(tooltip_buf);
                 }
                 if (temp_settings.local_player.uuid[0] != '\0') {
                     ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "UUID set");
@@ -5948,7 +5958,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::InputTextWithHint("Display Name##account", "Optional",
                                      temp_settings.local_player.display_name,
                                      sizeof(temp_settings.local_player.display_name));
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+            if (settings_tooltip_wanted(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
                 if (acc_net_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -5958,7 +5968,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Optional display name shown in the Co-op lobby.\n"
                              "Leave empty to use your username.");
                 }
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
             if (acc_net_active) ImGui::EndDisabled();
 
@@ -6028,11 +6038,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
             ImGui::Text("Co-op Documentation");
             ImGui::PopStyleColor();
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char coop_doc_tooltip_buf[128];
                 snprintf(coop_doc_tooltip_buf, sizeof(coop_doc_tooltip_buf),
                          "Opens the full Co-op setup guide in your browser.");
-                ImGui::SetTooltip("%s", coop_doc_tooltip_buf);
+                settings_tooltip(coop_doc_tooltip_buf);
             }
             if (ImGui::IsItemClicked()) {
                 open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
@@ -6052,7 +6062,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::BeginDisabled(net_is_active);
             ImGui::Checkbox("Enable Co-op", &temp_settings.coop_enabled);
             ImGui::EndDisabled();
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char tooltip_buf[320];
                 if (net_is_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -6064,7 +6074,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Toggle 'Host locally (LAN / VPN)' below to opt into direct hosting instead.\n"
                              "Default: Off");
                 }
-                ImGui::SetTooltip("%s", tooltip_buf);
+                settings_tooltip(tooltip_buf);
             }
             // If co-op was just unchecked while networking is active, stop it
             if (!temp_settings.coop_enabled && net_is_active && g_coop_ctx) {
@@ -6112,38 +6122,38 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (mode == NETWORK_SINGLEPLAYER) mode = NETWORK_HOST; // Default to host when first choosing
                     ImGui::RadioButton("Host", &mode, NETWORK_HOST);
                     if (net_is_active) {
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char tooltip_buf[256];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Cannot change role while a lobby is active.");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                            settings_tooltip(tooltip_buf);
                         }
                     } else {
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buf[256];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Host a co-op lobby.\n"
                                      "You read game files for all players and share a room code.\n"
                                      "Default: Singleplayer (co-op disabled)");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                            settings_tooltip(tooltip_buf);
                         }
                     }
                     ImGui::SameLine();
                     ImGui::RadioButton("Receiver", &mode, NETWORK_RECEIVER);
                     if (net_is_active) {
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char tooltip_buf[256];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Cannot change role while a lobby is active.");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                            settings_tooltip(tooltip_buf);
                         }
                     } else {
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char tooltip_buf[256];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Join a co-op lobby.\n"
                                      "Paste a room code from the host to connect.");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                            settings_tooltip(tooltip_buf);
                         }
                     }
                     temp_settings.network_mode = (NetworkMode) mode;
@@ -6163,7 +6173,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                                : COOP_TRANSPORT_RELAY;
                         }
                         ImGui::EndDisabled();
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char tt[384];
                             if (net_is_active) {
                                 snprintf(tt, sizeof(tt),
@@ -6175,7 +6185,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Use this if everyone is on the same network or VPN.\n"
                                          "Default: Off (Advancely server)");
                             }
-                            ImGui::SetTooltip("%s", tt);
+                            settings_tooltip(tt);
                         }
                     }
                     ImGui::Spacing();
@@ -6199,7 +6209,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::BeginDisabled(net_is_active);
                             ImGui::Checkbox("Auto-accept join requests", &temp_settings.coop_auto_accept);
                             ImGui::EndDisabled();
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 char aa_tip[320];
                                 if (net_is_active) {
                                     snprintf(aa_tip, sizeof(aa_tip),
@@ -6211,7 +6221,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Useful for trusted local groups.\n"
                                              "Default: Off");
                                 }
-                                ImGui::SetTooltip("%s", aa_tip);
+                                settings_tooltip(aa_tip);
                             }
                         }
                         ImGui::Spacing();
@@ -6222,7 +6232,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // so it applies on both transports and can be toggled live.
                         ImGui::Checkbox("Track disconnected / offline players (ghosts)",
                                         &temp_settings.coop_read_all_save_files);
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char ghost_tip[448];
                             snprintf(ghost_tip, sizeof(ghost_tip),
                                      "When enabled, the host keeps reading player files in the\n"
@@ -6232,7 +6242,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Only files touched within the last 7 days are picked up.\n"
                                      "Works on modern, mid, and hybrid versions (not legacy).\n"
                                      "Default: On");
-                            ImGui::SetTooltip("%s", ghost_tip);
+                            settings_tooltip(ghost_tip);
                         }
                         ImGui::TextDisabled(
                             "Note: Only players whose save files were touched within the last 7 days are counted as ghosts.");
@@ -6304,20 +6314,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip),
                                              ip_flags);
                             if (net_is_active) {
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Cannot change IP while a lobby is active.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             } else {
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tooltip_buf[512];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "The IP address Advancely binds to on this machine.\n"
                                              "Use your VPN/LAN IP (e.g. ZeroTier) or local network IP.\n"
                                              "This field is hidden to prevent accidental leaks on stream.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                             if (net_is_active) ImGui::EndDisabled();
@@ -6331,12 +6341,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::SmallButton("Reveal IP")) {
                                     ImGui::OpenPopup("Reveal IP?##coop");
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Show the IP address in plain text.\n"
                                              "WARNING: Do not reveal this while streaming or screen sharing.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                             if (ip_filled && !ip_valid) {
@@ -6354,14 +6364,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                      sizeof(temp_settings.host_public_ip),
                                                      pub_ip_flags);
                             if (net_is_active) {
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Cannot change Public IP while a lobby is active.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             } else {
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tooltip_buf[512];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Optional. Your public IP or domain for players connecting over the internet.\n"
@@ -6370,7 +6380,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Leave empty to use the bind IP for the room code (VPN/LAN).\n"
                                              "Accepts IPv4 addresses (e.g. 203.0.113.5) or domains (e.g. play.example.com).\n"
                                              "This field is hidden to prevent accidental leaks on stream.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                             if (net_is_active) ImGui::EndDisabled();
@@ -6384,12 +6394,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::SmallButton("Reveal Public IP")) {
                                     ImGui::OpenPopup("Reveal Public IP?##coop");
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Show the public IP address in plain text.\n"
                                              "WARNING: Do not reveal this while streaming or screen sharing.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                             if (pub_ip_filled && !pub_ip_valid) {
@@ -6405,19 +6415,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
                                              ImGuiInputTextFlags_CharsDecimal);
                             if (net_is_active) {
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Cannot change port while a lobby is active.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             } else {
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tooltip_buf[256];
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "The port the host listens on for direct (LAN / VPN) connections.\n"
                                              "Default: %s", DEFAULT_HOST_PORT);
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                             if (port_filled && !port_valid) {
@@ -6438,13 +6448,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                      sizeof(coop_relay_password_host),
                                                      relay_host_pw_flags);
                             if (net_is_active) ImGui::EndDisabled();
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tt[320];
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tt[384];
                                 snprintf(tt, sizeof(tt),
-                                         "Optional password for the room.\n"
+                                         "%sOptional password for the room.\n"
                                          "Hashed locally before being sent to the server.\n"
-                                         "Leave empty to allow anyone with the room code in.");
-                                ImGui::SetTooltip("%s", tt);
+                                         "Leave empty to allow anyone with the room code in.",
+                                         net_is_active ? "Cannot change the password while a lobby is active.\n\n" : "");
+                                settings_tooltip(tt);
                             }
                             // Reveal/Hide button — same warning popup pattern as Reveal IP.
                             ImGui::SameLine();
@@ -6456,24 +6467,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (ImGui::SmallButton("Reveal##relay_host_pw")) {
                                     ImGui::OpenPopup("Reveal Password?##coop_relay_host");
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "Show the password in plain text.\n"
                                              "WARNING: Do not reveal this while streaming or screen sharing.");
-                                    ImGui::SetTooltip("%s", tt);
+                                    settings_tooltip(tt);
                                 }
                             }
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Copy##relay_host_pw")) {
                                 SDL_SetClipboardText(coop_relay_password_host);
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char tt[256];
                                 snprintf(tt, sizeof(tt),
                                          "Copy the password to your clipboard.\n"
                                          "Share it privately with players joining your room.");
-                                ImGui::SetTooltip("%s", tt);
+                                settings_tooltip(tt);
                             }
                         }
 
@@ -6497,20 +6508,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 "%s: Completed if any player completes it, tracking the player with the most criteria.",
                                 advancements_label_plural_uppercase);
                             ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Each stage can be advanced by any player. The furthest stage across all players is used.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             ImGui::BulletText("Counters: Derived automatically from linked goals.");
                             if (selected_version == MC_VERSION_25W14CRAFTMINE) {
                                 ImGui::BulletText("Unlocks (25w14craftmine): Every player must obtain it (AND).");
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Unlocks are per-player in craftmine.\n"
                                              "An unlock only counts as complete when all players have obtained it.\n"
                                              "Use the player dropdown to see each player's individual unlocks.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                             }
                         }
@@ -6529,7 +6540,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             int stat_merge = temp_settings.coop_stat_merge;
                             ImGui::PushID("coop_stat_merge");
                             ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6538,11 +6549,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Use whichever player has the highest value for each stat. "
                                              "In the All Players view, their face is shown next to the sub-stat checkbox.\n"
                                              "Default: Cumulative (Sum)");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             ImGui::SameLine();
                             ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6550,7 +6561,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Sum stat values across all players.\n"
                                              "Default: Cumulative (Sum)");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
                             ImGui::PopID();
@@ -6561,7 +6572,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             int stat_cb = temp_settings.coop_stat_checkbox;
                             ImGui::PushID("coop_stat_cb");
                             ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6569,11 +6580,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Only the host can manually check off stats.\n"
                                              "Default: Any Player");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             ImGui::SameLine();
                             ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6581,7 +6592,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Any player can manually check off stats.\n"
                                              "Default: Any Player");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
                             ImGui::PopID();
@@ -6592,7 +6603,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             int custom_mode = temp_settings.coop_custom_goal_mode;
                             ImGui::PushID("coop_custom");
                             ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6600,11 +6611,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Only the host can modify custom goals and checkboxes.\n"
                                              "Default: Any Player");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             ImGui::SameLine();
                             ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 if (merge_locked)
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Goal merging rules are locked while a lobby is active");
@@ -6612,7 +6623,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Any player can modify custom goals and checkboxes.\n"
                                              "Default: Any Player");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
                             ImGui::PopID();
@@ -6631,13 +6642,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             char tooltip_buf[320];
                             bool show_faces = temp_settings.coop_show_contributor_faces;
                             ImGui::Checkbox("Show Contributor Faces", &show_faces);
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Show Minecraft skin faces next to goals in the All Players view to\n"
                                          "indicate which player contributed. Local visual preference; not shared\n"
                                          "with other lobby members.\n"
                                          "Default: On");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             temp_settings.coop_show_contributor_faces = show_faces;
 
@@ -6648,30 +6659,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 int corner = temp_settings.coop_face_corner;
                                 ImGui::PushID("coop_face_corner");
                                 ImGui::RadioButton("Top-Right", &corner, COOP_FACE_CORNER_TOP_RIGHT);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the top-right corner of advancements,\n"
                                              "simple stats, and counter custom goals.\n"
                                              "Default: Bottom-Right");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                                 ImGui::SameLine();
                                 ImGui::RadioButton("Bottom-Left", &corner, COOP_FACE_CORNER_BOTTOM_LEFT);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the bottom-left corner of advancements,\n"
                                              "simple stats, and counter custom goals.\n"
                                              "Default: Bottom-Right");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                                 ImGui::SameLine();
                                 ImGui::RadioButton("Bottom-Right", &corner, COOP_FACE_CORNER_BOTTOM_RIGHT);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Render the contributor face in the bottom-right corner of advancements,\n"
                                              "simple stats, and counter custom goals.\n"
                                              "Default: Bottom-Right");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                    settings_tooltip(tooltip_buf);
                                 }
                                 temp_settings.coop_face_corner = (CoopFaceCorner) corner;
                                 ImGui::PopID();
@@ -6682,14 +6693,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     if (temp_settings.coop_face_size < 16.0f) temp_settings.coop_face_size = 16.0f;
                                     if (temp_settings.coop_face_size > 48.0f) temp_settings.coop_face_size = 48.0f;
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char face_size_tooltip[1024];
                                     snprintf(face_size_tooltip, sizeof(face_size_tooltip),
                                              "Logical pixel size of the contributor face on main goals (advancements,\n"
                                              "simple stats, counter custom goals).\n"
                                              "Sub-stat and checkbox faces use a fixed size that matches the checkbox.\n"
                                              "Default: %.0f px", DEFAULT_COOP_FACE_SIZE);
-                                    ImGui::SetTooltip("%s", face_size_tooltip);
+                                    settings_tooltip(face_size_tooltip);
                                 }
 
                                 // Face LOD threshold (matches the other LOD sliders in Visuals)
@@ -6701,7 +6712,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     if (temp_settings.coop_face_lod_threshold > 10.0f)
                                         temp_settings.coop_face_lod_threshold = 10.0f;
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char lod_face_tooltip[1024];
                                     snprintf(lod_face_tooltip, sizeof(lod_face_tooltip),
                                              "The zoom threshold below which non-checkbox contributor faces are hidden.\n"
@@ -6711,7 +6722,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              " - Sub-stat highest-value faces.\n"
                                              "Faces drawn behind manual-completion checkboxes follow the checkbox LOD instead.\n"
                                              "Default: %.3f", DEFAULT_COOP_FACE_LOD_THRESHOLD);
-                                    ImGui::SetTooltip("%s", lod_face_tooltip);
+                                    settings_tooltip(lod_face_tooltip);
                                 }
                             } // end if (show_faces)
                         }
@@ -6733,7 +6744,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (temp_settings.compact_coop_panel_face_size > COMPACT_COOP_PANEL_FACE_SIZE_MAX)
                                     temp_settings.compact_coop_panel_face_size = COMPACT_COOP_PANEL_FACE_SIZE_MAX;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char compact_coop_face_tooltip_buffer[512];
                                 snprintf(compact_coop_face_tooltip_buffer, sizeof(compact_coop_face_tooltip_buffer),
                                          "Compact overlay only: the selected player's face, pinned at the panel's\n"
@@ -6741,7 +6752,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "of All Players. 0 hides it. In the All Players view each pop-out line shows\n"
                                          "its own contributor face instead (needs Show Contributor Faces on, above).\n"
                                          "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_SIZE);
-                                ImGui::SetTooltip("%s", compact_coop_face_tooltip_buffer);
+                                settings_tooltip(compact_coop_face_tooltip_buffer);
                             }
 
                             if (ImGui::DragFloat("Panel Face Offset X", &temp_settings.compact_coop_panel_face_offset_x,
@@ -6752,14 +6763,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (temp_settings.compact_coop_panel_face_offset_x > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
                                     temp_settings.compact_coop_panel_face_offset_x = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char compact_coop_face_x_tooltip_buffer[512];
                                 snprintf(compact_coop_face_x_tooltip_buffer, sizeof(compact_coop_face_x_tooltip_buffer),
                                          "Horizontal inset of the pinned face from the panel's right edge (pixels).\n"
                                          "Higher moves it further inside; negative overhangs the edge. The face is\n"
                                          "always kept fully inside the overlay window.\n"
                                          "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_X);
-                                ImGui::SetTooltip("%s", compact_coop_face_x_tooltip_buffer);
+                                settings_tooltip(compact_coop_face_x_tooltip_buffer);
                             }
 
                             if (ImGui::DragFloat("Panel Face Offset Y", &temp_settings.compact_coop_panel_face_offset_y,
@@ -6770,14 +6781,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (temp_settings.compact_coop_panel_face_offset_y > COMPACT_COOP_PANEL_FACE_OFFSET_MAX)
                                     temp_settings.compact_coop_panel_face_offset_y = COMPACT_COOP_PANEL_FACE_OFFSET_MAX;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char compact_coop_face_y_tooltip_buffer[512];
                                 snprintf(compact_coop_face_y_tooltip_buffer, sizeof(compact_coop_face_y_tooltip_buffer),
                                          "Vertical inset of the pinned face from the panel's bottom edge (pixels).\n"
                                          "Higher moves it further inside; negative overhangs the edge. The face is\n"
                                          "always kept fully inside the overlay window.\n"
                                          "Default: %.0f", DEFAULT_COMPACT_COOP_PANEL_FACE_OFFSET_Y);
-                                ImGui::SetTooltip("%s", compact_coop_face_y_tooltip_buffer);
+                                settings_tooltip(compact_coop_face_y_tooltip_buffer);
                             }
 
                             // Per-line contributor face shown on each pop-out stack line in the All Players view.
@@ -6788,7 +6799,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (temp_settings.compact_stack_face_size > COMPACT_STACK_FACE_SIZE_MAX)
                                     temp_settings.compact_stack_face_size = COMPACT_STACK_FACE_SIZE_MAX;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char compact_stack_face_tooltip_buffer[512];
                                 snprintf(compact_stack_face_tooltip_buffer, sizeof(compact_stack_face_tooltip_buffer),
                                          "Compact overlay only: the size of the contributor face that rides each\n"
@@ -6796,7 +6807,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "on, above). Independent of the pop-out icon size; a line reserves room for\n"
                                          "the face only when it credits a single player.\n"
                                          "Default: %.0f", DEFAULT_COMPACT_STACK_FACE_SIZE);
-                                ImGui::SetTooltip("%s", compact_stack_face_tooltip_buffer);
+                                settings_tooltip(compact_stack_face_tooltip_buffer);
                             }
                         }
 
@@ -6867,7 +6878,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     }
                                 }
                             }
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
+                            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
                                 char tooltip_buf[256] = "";
                                 if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
@@ -6898,7 +6909,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Close the Template Editor before starting a lobby.");
                                 }
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                             if (!can_start) ImGui::EndDisabled();
                         }
@@ -6924,7 +6935,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     SDL_SetClipboardText(coop_room_code_buf);
                                 }
                             }
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char tooltip_buf[512];
                                 if (!transport_direct) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -6936,7 +6947,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Share this code privately with players on the same VPN/LAN.\n"
                                              "They can paste it in the Receiver tab to send a join request.");
                                 }
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                                settings_tooltip(tooltip_buf);
                             }
                         }
 
@@ -6989,12 +7000,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                          ImGuiInputTextFlags_CharsUppercase);
                                 trim_room_code(coop_relay_room_code_recv, sizeof(coop_relay_room_code_recv));
                                 
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "6-character code shared by the host.\n"
                                              "Get it from whoever is hosting the room.");
-                                    ImGui::SetTooltip("%s", tt);
+                                    settings_tooltip(tt);
                                 }
 
                                 size_t rc_len = strlen(coop_relay_room_code_recv);
@@ -7019,12 +7030,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                          coop_relay_password_recv,
                                                          sizeof(coop_relay_password_recv),
                                                          relay_recv_pw_flags);
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "Password set by the host (if any).\n"
                                              "Hashed locally before sending to the server.");
-                                    ImGui::SetTooltip("%s", tt);
+                                    settings_tooltip(tt);
                                 }
                                 ImGui::SameLine();
                                 if (coop_relay_password_recv_revealed) {
@@ -7035,23 +7046,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     if (ImGui::SmallButton("Reveal##relay_recv_pw")) {
                                         ImGui::OpenPopup("Reveal Password?##coop_relay_recv");
                                     }
-                                    if (ImGui::IsItemHovered()) {
+                                    if (settings_tooltip_wanted()) {
                                         char tt[256];
                                         snprintf(tt, sizeof(tt),
                                                  "Show the password in plain text.\n"
                                                  "WARNING: Do not reveal this while streaming or screen sharing.");
-                                        ImGui::SetTooltip("%s", tt);
+                                        settings_tooltip(tt);
                                     }
                                 }
                                 ImGui::SameLine();
                                 if (ImGui::SmallButton("Copy##relay_recv_pw")) {
                                     SDL_SetClipboardText(coop_relay_password_recv);
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                if (settings_tooltip_wanted()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "Copy the password to your clipboard.");
-                                    ImGui::SetTooltip("%s", tt);
+                                    settings_tooltip(tt);
                                 }
 
                                 if (!can_join_relay) ImGui::BeginDisabled();
@@ -7068,7 +7079,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                                 if (!can_join_relay) {
                                     ImGui::EndDisabled();
-                                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                         char tt[256];
                                         if (join_editor_open)
                                             snprintf(tt, sizeof(tt),
@@ -7084,7 +7095,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                         else
                                             snprintf(tt, sizeof(tt),
                                                      "Enter a room code first.");
-                                        ImGui::SetTooltip("%s", tt);
+                                        settings_tooltip(tt);
                                     }
                                 }
                             } else {
@@ -7122,7 +7133,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                                 if (!can_join) {
                                     ImGui::EndDisabled();
-                                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                         char tooltip_buf[256];
                                         if (join_editor_open) {
                                             snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -7131,15 +7142,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                                      "Apply settings before joining a lobby.");
                                         }
-                                        ImGui::SetTooltip("%s", tooltip_buf);
+                                        settings_tooltip(tooltip_buf);
                                     }
                                 } else {
-                                    if (ImGui::IsItemHovered()) {
+                                    if (settings_tooltip_wanted()) {
                                         char tooltip_buf[256];
                                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                                  "Paste the room code shared by the host.\n"
                                                  "This sends a join request that the host must accept.");
-                                        ImGui::SetTooltip("%s", tooltip_buf);
+                                        settings_tooltip(tooltip_buf);
                                     }
                                 }
                             }
@@ -7345,7 +7356,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      "Assign a complex %s to one player; The Merged 'All Players' view then tracks only them for it.",
                                      advancement_label_lowercase);
                             ImGui::TextDisabled("%s", assign_desc);
-                            if (ImGui::IsItemHovered()) {
+                            if (settings_tooltip_wanted()) {
                                 char tip[512];
                                 snprintf(tip, sizeof(tip),
                                          "When an %s is assigned, the merged All Players view uses only the\n"
@@ -7354,7 +7365,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "will not complete even if another player did more. This trades opportunistic\n"
                                          "merging for predictable ownership when dividing work.",
                                          advancement_label_lowercase, advancement_label_lowercase);
-                                ImGui::SetTooltip("%s", tip);
+                                settings_tooltip(tip);
                             }
                             ImGui::Spacing();
 
@@ -7488,12 +7499,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         coop_ip_revealed = true;
                         ImGui::CloseCurrentPopup();
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buf[128];
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Show the IP address in the text field.\n"
                                  "You can also press 'ENTER'.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                        settings_tooltip(tooltip_buf);
                     }
 
                     ImGui::SameLine();
@@ -7502,12 +7513,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::Button("Cancel") || esc_pressed) {
                         ImGui::CloseCurrentPopup();
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buf[128];
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Keep the IP address hidden.\n"
                                  "You can also press 'ESCAPE'.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                        settings_tooltip(tooltip_buf);
                     }
 
                     ImGui::EndPopup();
@@ -7572,12 +7583,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         coop_public_ip_revealed = true;
                         ImGui::CloseCurrentPopup();
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buf[128];
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Show the public IP address in the text field.\n"
                                  "You can also press 'ENTER'.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                        settings_tooltip(tooltip_buf);
                     }
 
                     ImGui::SameLine();
@@ -7586,12 +7597,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (ImGui::Button("Cancel") || esc_pressed) {
                         ImGui::CloseCurrentPopup();
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char tooltip_buf[128];
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Keep the public IP address hidden.\n"
                                  "You can also press 'ESCAPE'.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                        settings_tooltip(tooltip_buf);
                     }
 
                     ImGui::EndPopup();
@@ -7720,7 +7731,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             if (!custom_counters.empty() || !custom_toggles.empty()) {
                 ImGui::Text("Hotkey Settings for Custom Goals");
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
                     char hotkey_settings_tooltip_buffer[1024];
                     snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
                              "IMPORTANT: Hotkeys are remembered between templates.\n\n"
@@ -7732,14 +7743,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Without 'Global', a hotkey only works when tabbed into the tracker.\n"
                              "Maximum of %d hotkeys are supported.",
                              MAX_HOTKEYS);
-                    ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
+                    settings_tooltip(hotkey_settings_tooltip_buffer);
                 }
 
                 // How 'Global' behaves depends entirely on the OS, so the explanation is written
                 // per-platform rather than describing three systems at once.
                 ImGui::SameLine();
                 ImGui::TextDisabled("(?)");
-                if (ImGui::IsItemHovered()) {
+                if (settings_tooltip_wanted()) {
 #ifdef _WIN32
                     const char *global_os_name = "Windows";
                     const char *global_os_help =
@@ -7777,7 +7788,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char global_support_buffer[1024];
                     snprintf(global_support_buffer, sizeof(global_support_buffer),
                              "How 'Global' works on %s:\n\n%s", global_os_name, global_os_help);
-                    ImGui::SetTooltip("%s", global_support_buffer);
+                    settings_tooltip(global_support_buffer);
                 }
 
                 // One row per custom goal. Counters show the decrement and increment slots, plain
@@ -7845,12 +7856,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         render_slot_button(HOTKEY_SLOT_INCREMENT, "Incr.", "inc");
                     } else {
                         render_slot_button(HOTKEY_SLOT_TOGGLE, "Toggle", "tog");
-                        if (ImGui::IsItemHovered()) {
+                        if (settings_tooltip_wanted()) {
                             char toggle_tooltip_buffer[512];
                             snprintf(toggle_tooltip_buffer, sizeof(toggle_tooltip_buffer),
                                      "This goal has a target value of 0, so it is a plain checkbox.\n"
                                      "The key ticks it on and off, exactly like clicking it on the map.");
-                            ImGui::SetTooltip("%s", toggle_tooltip_buffer);
+                            settings_tooltip(toggle_tooltip_buffer);
                         }
                     }
 
@@ -7863,7 +7874,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ensure_binding();
                         if (binding) binding->is_global = row_is_global;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char global_tooltip_buffer[1024];
                         snprintf(global_tooltip_buffer, sizeof(global_tooltip_buffer),
                                  "Off: the hotkey only fires while the Advancely tracker window is focused.\n"
@@ -7874,7 +7885,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "in chat or a text field. F13 to F24 are the exception, since no keyboard has those\n"
                                  "physically and macro pads are the only thing that sends them.\n\n"
                                  "Default: %s", DEFAULT_HOTKEY_IS_GLOBAL ? "On" : "Off");
-                        ImGui::SetTooltip("%s", global_tooltip_buffer);
+                        settings_tooltip(global_tooltip_buffer);
                     }
 
                     // Explain exactly which slot is at fault rather than a generic complaint.
@@ -8040,7 +8051,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             }
 
             ImGui::Text("Advancely Hotkeys");
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char app_hotkey_tooltip_buffer[1024];
                 snprintf(app_hotkey_tooltip_buffer, sizeof(app_hotkey_tooltip_buffer),
                          "Shortcuts for Advancely itself, grouped by the window they belong to.\n\n"
@@ -8053,7 +8064,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "every keyboard layout. The counter hotkeys above bind the physical key instead.\n\n"
                          "Two shortcuts may share a key as long as they belong to windows or modes\n"
                          "that are never active at the same time.");
-                ImGui::SetTooltip("%s", app_hotkey_tooltip_buffer);
+                settings_tooltip(app_hotkey_tooltip_buffer);
             }
 
             ImGui::SameLine();
@@ -8061,12 +8072,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 app_hotkeys_set_defaults(&temp_settings);
                 capturing_app_action = -1;
             }
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char reset_all_app_tooltip[256];
                 snprintf(reset_all_app_tooltip, sizeof(reset_all_app_tooltip),
                          "Puts every shortcut in this list back to its default key.\n"
                          "Custom counter hotkeys are not affected.");
-                ImGui::SetTooltip("%s", reset_all_app_tooltip);
+                settings_tooltip(reset_all_app_tooltip);
             }
 
             // A shortcut clashes with another binding only when both can fire at the same moment,
@@ -8104,11 +8115,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     current_group = def->group;
                     ImGui::Spacing();
                     group_open = ImGui::CollapsingHeader(APP_HOTKEY_GROUP_NAMES[current_group]);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char group_tooltip[1024];
                         snprintf(group_tooltip, sizeof(group_tooltip), "%s",
                                  APP_HOTKEY_GROUP_TOOLTIPS[current_group]);
-                        ImGui::SetTooltip("%s", group_tooltip);
+                        settings_tooltip(group_tooltip);
                     }
                 }
 
@@ -8117,10 +8128,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // collect_hotkey_conflicts() looks at the bindings rather than at what is drawn.
                 if (group_open) {
                     ImGui::Text("%s", def->label);
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         char row_tooltip[1024];
                         snprintf(row_tooltip, sizeof(row_tooltip), "%s", def->description);
-                        ImGui::SetTooltip("%s", row_tooltip);
+                        settings_tooltip(row_tooltip);
                     }
 
                     ImGui::SameLine(300.0f);
@@ -8155,7 +8166,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         hk->key[sizeof(hk->key) - 1] = '\0';
                         hk->mods = def->default_mods;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (settings_tooltip_wanted()) {
                         AppHotkey default_hk = {};
                         strncpy(default_hk.key, def->default_key, sizeof(default_hk.key) - 1);
                         default_hk.mods = def->default_mods;
@@ -8163,7 +8174,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         app_hotkey_display_label(&default_hk, default_label, sizeof(default_label));
                         char reset_tooltip[192];
                         snprintf(reset_tooltip, sizeof(reset_tooltip), "Back to the default: %s", default_label);
-                        ImGui::SetTooltip("%s", reset_tooltip);
+                        settings_tooltip(reset_tooltip);
                     }
                 }
 
@@ -8248,7 +8259,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::Text("System");
 
             ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char auto_update_tooltip_buffer[1024];
                 int auto_update_len = snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
                                                "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
@@ -8267,7 +8278,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 #else
                 (void) auto_update_len;
 #endif
-                ImGui::SetTooltip("%s", auto_update_tooltip_buffer);
+                settings_tooltip(auto_update_tooltip_buffer);
             }
 
             ImGui::Separator();
@@ -8275,7 +8286,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::Text("Developer");
 
             ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
-            if (ImGui::IsItemHovered()) {
+            if (settings_tooltip_wanted()) {
                 char logs_location_line[256] = "";
                 if (get_logs_display_path()[0] != '\0') {
                     snprintf(logs_location_line, sizeof(logs_location_line), "Both log files are located in %s\n",
@@ -8294,7 +8305,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
                          "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.\n"
                          "Default: Off", logs_location_line);
-                ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
+                settings_tooltip(debug_print_tooltip_buffer);
             }
 
             ImGui::SameLine();
@@ -8306,7 +8317,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 #endif
                 open_content(logs_path);
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char open_logs_tooltip_buffer[384];
                 if (get_logs_display_path()[0] != '\0') {
                     snprintf(open_logs_tooltip_buffer, sizeof(open_logs_tooltip_buffer),
@@ -8320,7 +8331,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "where advancely_log.txt and advancely_overlay_log.txt are stored,\n"
                              "as well as advancely_profile_log.txt when running with --profiler.");
                 }
-                ImGui::SetTooltip("%s", open_logs_tooltip_buffer);
+                settings_tooltip(open_logs_tooltip_buffer);
             }
 
             ImGui::EndTabItem();
@@ -8351,12 +8362,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         }
     }
     ImGui::EndChild();
-    if (ImGui::IsItemHovered()) {
+    if (settings_tooltip_wanted()) {
         char supporter_tip_buf[256];
         snprintf(supporter_tip_buf, sizeof(supporter_tip_buf),
                  "Donate at streamlabs.com/lnxseus/tip and mention\n"
                  "\"Advancely\" to get your name listed here permanently!");
-        ImGui::SetTooltip("%s", supporter_tip_buf);
+        settings_tooltip(supporter_tip_buf);
     }
     ImGui::Spacing();
 
@@ -8501,7 +8512,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     }
 
     // Hover text for the apply button
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char apply_button_tooltip_buffer[1024];
         if (visual_editing) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
@@ -8539,7 +8550,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                      "which might lead to OBS not capturing the overlay anymore.\n"
                      "It will fail to apply if any warnings are shown.");
         }
-        ImGui::SetTooltip("%s", apply_button_tooltip_buffer);
+        settings_tooltip(apply_button_tooltip_buffer);
     }
 
     // If there are unsaved changes, display the indicator
@@ -8555,12 +8566,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             coop_public_ip_revealed = false;
             coop_room_code_error[0] = '\0';
         }
-        if (ImGui::IsItemHovered()) {
+        if (settings_tooltip_wanted()) {
             char revert_button_tooltip_buffer[1024];
             snprintf(revert_button_tooltip_buffer, sizeof(revert_button_tooltip_buffer),
                      "Revert any changes made within the settings window since the last save.\n"
                      "(Ctrl+Z / Cmd+Z)");
-            ImGui::SetTooltip("%s", revert_button_tooltip_buffer);
+            settings_tooltip(revert_button_tooltip_buffer);
         }
     }
 
@@ -8609,14 +8620,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         temp_settings.goal_hiding_mode = current_hiding_mode;
         temp_settings.invert_hiding_mode = current_invert_hiding;
     }
-    if (ImGui::IsItemHovered()) {
+    if (settings_tooltip_wanted()) {
         char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Resets all settings (besides window size/position & hotkeys) in this window to their\n"
                  "default values. This does not modify your template files.\n\n"
                  "Hover over any individual setting to see the default value it will be reset to.\n"
                  "The full default set also lives in %s/settings.json.", get_reference_files_display_path());
-        ImGui::SetTooltip("%s", tooltip_buffer);
+        settings_tooltip(tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -8660,7 +8671,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         }
     }
     // Hover text for the restart button
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+    if (settings_tooltip_wanted(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char restart_button_tooltip_buffer[1024];
         if (visual_editing) {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
@@ -8687,7 +8698,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                      "Saves all current settings and restarts the application.\n"
                      "This is required to apply changes to fonts within the tracker window.");
         }
-        ImGui::SetTooltip("%s", restart_button_tooltip_buffer);
+        settings_tooltip(restart_button_tooltip_buffer);
     }
     if (apply_disabled) ImGui::EndDisabled();
 #endif // _WIN32: Restart Advancely button (Linux/macOS restart manually)
@@ -8698,7 +8709,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         open_content("https://streamlabs.com/lnxseus/tip");
     }
 
-    if (ImGui::IsItemHovered()) {
+    if (settings_tooltip_wanted()) {
         char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Support the development of Advancely! <3\n\n"
@@ -8706,7 +8717,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "donation message to be immortalized on the overlay's\n"
                  "supporter showcase after a completed run and receive a\n"
                  "special role on discord!");
-        ImGui::SetTooltip("%s", tooltip_buffer);
+        settings_tooltip(tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -8714,14 +8725,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     if (ImGui::Button("Report Issue")) {
         open_content("https://discord.gg/TyNgXDz");
     }
-    if (ImGui::IsItemHovered()) {
+    if (settings_tooltip_wanted()) {
         char report_tooltip[512];
         snprintf(report_tooltip, sizeof(report_tooltip),
                  "Opens the official Advancely Discord.\n\n"
                  "There's a channel dedicated to the Advancely tracker where\n"
                  "issues, feedback, and criticism are welcome. It's the most\n"
                  "direct way to be in touch with LNXS.");
-        ImGui::SetTooltip("%s", report_tooltip);
+        settings_tooltip(report_tooltip);
     }
 
     if (roboto_font) {
