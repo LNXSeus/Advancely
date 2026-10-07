@@ -5372,6 +5372,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->selected_coop_ghost_idx = -1;
     t->selected_coop_ghost_uuid[0] = '\0';
     t->is_temp_creator_focused = false;
+    t->is_settings_focused = false;
     t->is_notes_focused = false;
     t->notes_widget_id_counter = 0;
 

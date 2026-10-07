@@ -1334,10 +1334,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- State management for window open/close ---
     // Detect the transition from closed to opened state.
     const bool just_opened = *p_open && !was_open_last_frame;
+    const bool just_closed = !*p_open && was_open_last_frame;
 
     was_open_last_frame = *p_open;
 
-    if (!*p_open) return;
+    // While closed, the window is still laid out hidden for a few frames to build the settings search
+    // index, so opening it doesn't have to wait for that.
+    static bool editing_buffers_initialized = false;
+    bool index_starting = false;
+    if (just_closed) settings_search_on_close();
+    const bool index_in_background = !*p_open &&
+                                     settings_search_background_frame("Advancely Settings", &index_starting);
+
+    if (!*p_open) {
+        if (t) t->is_settings_focused = false;
+        if (!index_in_background) return;
+    }
 
     // Helper Lmbda to auto-fill display category
     auto update_temp_display_category = [&]() {
@@ -1396,9 +1408,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // If the window was just opened (i.e., it was closed last frame but is open now),
     // we copy the current live settings into our temporary editing struct.
+    if (index_starting && !editing_buffers_initialized) {
+        memcpy(&temp_settings, app_settings, sizeof(AppSettings));
+        memcpy(&saved_settings, app_settings, sizeof(AppSettings));
+        editing_buffers_initialized = true;
+    }
+
     if (just_opened) {
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
         memcpy(&saved_settings, app_settings, sizeof(AppSettings));
+        editing_buffers_initialized = true;
         presets_need_rescan = true; // Refresh the preset list every time the window opens
         new_preset_name[0] = '\0';
         preset_status_msg[0] = '\0';
@@ -1479,12 +1498,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.1f), ImGuiCond_Always);
     }
 
-    // The settings search indexes every tab while the window opens (hidden for those few frames)
     if (just_opened) settings_search_on_open();
     settings_search_prepare_window("Advancely Settings");
 
     // Window title
-    ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+    ImGuiWindowFlags settings_window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize;
+    if (index_in_background) settings_window_flags |= ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    ImGui::Begin("Advancely Settings", index_in_background ? nullptr : p_open, settings_window_flags);
+    if (t) t->is_settings_focused = !index_in_background &&
+                                    ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
@@ -1494,7 +1516,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
 
     // Communicate settings unsaved state to tracker for quit confirmation popup
-    if (t) t->settings_has_unsaved_changes = has_unsaved_changes;
+    if (t && !index_in_background) t->settings_has_unsaved_changes = has_unsaved_changes;
 
     // Revert Changes (Ctrl+Z / Cmd+Z by default, rebindable in the Hotkeys tab)
     if (t && t->settings_revert_pressed && has_unsaved_changes &&
@@ -1561,6 +1583,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
 
     settings_search_bar();
+    ImGui::Separator();
     ImGui::Spacing();
 
     // --- Settings Presets (always visible above the tabs) ---
@@ -7843,7 +7866,17 @@ settings_tooltip(tooltip_buffer); \
                             snprintf(btn_label, sizeof(btn_label),
                                      "%s##%s_%s", label.c_str(), id_prefix, goal->root_name);
                         }
-                        if (ImGui::Button(btn_label, ImVec2(170, 0))) {
+                        bool slot_clicked = ImGui::Button(btn_label, ImVec2(170, 0));
+                        // Lets the settings search find this goal by its bound key
+                        char keyword[192] = "";
+                        const char *slot_key = binding ? hotkey_binding_slot_key(binding, slot) : nullptr;
+                        if (!capturing_here && slot_key && slot_key[0] != '\0' && strcmp(slot_key, "None") != 0) {
+                            std::string key_text = display_label_for_key(slot_key,
+                                                                         hotkey_binding_slot_mods(binding, slot));
+                            snprintf(keyword, sizeof(keyword), "%s key: %s", caption, key_text.c_str());
+                        }
+                        settings_search_keyword(goal->display_name, keyword);
+                        if (slot_clicked) {
                             // Arm capture for this slot.
                             strncpy(capturing_target_goal, goal->root_name,
                                     sizeof(capturing_target_goal) - 1);
@@ -8121,7 +8154,8 @@ settings_tooltip(tooltip_buffer); \
                 if (def->group != current_group) {
                     current_group = def->group;
                     ImGui::Spacing();
-                    group_open = ImGui::CollapsingHeader(APP_HOTKEY_GROUP_NAMES[current_group]);
+                    group_open = ImGui::CollapsingHeader(APP_HOTKEY_GROUP_NAMES[current_group]) ||
+                                 settings_search_indexing();
                     if (settings_tooltip_wanted()) {
                         char group_tooltip[1024];
                         snprintf(group_tooltip, sizeof(group_tooltip), "%s",
@@ -8151,7 +8185,16 @@ settings_tooltip(tooltip_buffer); \
                         app_hotkey_display_label(hk, key_label, sizeof(key_label));
                         snprintf(app_btn_label, sizeof(app_btn_label), "%s##app_hk_%d", key_label, action);
                     }
-                    if (ImGui::Button(app_btn_label, ImVec2(170, 0))) {
+                    bool app_btn_clicked = ImGui::Button(app_btn_label, ImVec2(170, 0));
+                    // Lets the settings search find this shortcut by its bound key
+                    char keyword[128] = "";
+                    if (capturing_app_action != action && app_slot_bound(hk->key)) {
+                        char key_label[96];
+                        app_hotkey_display_label(hk, key_label, sizeof(key_label));
+                        snprintf(keyword, sizeof(keyword), "Key: %s", key_label);
+                    }
+                    settings_search_keyword(def->label, keyword);
+                    if (app_btn_clicked) {
                         capturing_app_action = action;
                         capturing_slot = -1;
                         capturing_target_goal[0] = '\0';

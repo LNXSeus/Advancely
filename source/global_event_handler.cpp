@@ -455,8 +455,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
             if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F && !ImGui::IsPopupOpen(
                     nullptr, ImGuiPopupFlags_AnyPopup) && t) {
-                // TRACKER SEARCH BOX -> only if the template creator is not focused
-                if (!t->is_temp_creator_focused) {
+                // TRACKER SEARCH BOX -> only if the template creator and settings are not focused
+                if (!t->is_temp_creator_focused && !t->is_settings_focused) {
                     // if the user is currently typing in another text box (like the settings or notes).
                     t->focus_search_box_requested = true;
                 }

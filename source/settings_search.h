@@ -47,13 +47,41 @@ bool settings_rich_tooltip_begin();
  */
 void settings_rich_tooltip_end();
 
+/**
+ * @brief Makes the last widget findable by a value it shows (e.g. a hotkey's bound key), listed under
+ * the setting it belongs to. Only does anything while the search index is being built.
+ * @param owner_label The name of the setting the result is listed under.
+ * @param keyword The searchable text, shown under the result when it matches (e.g. "Key: F11").
+ */
+void settings_search_keyword(const char *owner_label, const char *keyword);
+
 // The search index is built by showing every settings tab once while the settings window is hidden,
-// reading the label and tooltip of each widget on the way. That happens right when the window opens.
+// reading the label and tooltip of each widget on the way. That happens while the window is closed
+// (at startup and after every close), so opening it stays instant.
 
 /**
- * @brief Starts building the search index. Call on the frame the settings window opens.
+ * @brief Call on the frame the settings window opens. Only builds the index (window hidden) when
+ * there is none yet.
  */
 void settings_search_on_open();
+
+/**
+ * @brief Call on the frame the settings window closes. The index is rebuilt in the background.
+ */
+void settings_search_on_close();
+
+/**
+ * @brief Call every frame while the settings window is closed.
+ * @param window_name The exact name passed to ImGui::Begin().
+ * @param starting Set to true on the first frame of a background build.
+ * @return true when the closed window has to be laid out hidden this frame to build the index.
+ */
+bool settings_search_background_frame(const char *window_name, bool *starting);
+
+/**
+ * @brief True while a tab is being read for the index. Collapsed sections should draw their contents.
+ */
+bool settings_search_indexing();
 
 /**
  * @brief Hides the settings window while the index is being built. Call right before its ImGui::Begin().

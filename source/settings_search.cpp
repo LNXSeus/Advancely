@@ -18,8 +18,8 @@
 
 #include "imgui/imgui_internal.h"
 
-// How the index is built: when the settings window opens it stays hidden (but still lays out its
-// widgets) while every tab is shown for one frame. During those frames:
+// How the index is built: while the settings window is closed (at startup and after every close) it
+// is laid out hidden for a few frames, showing every tab for one frame. During those frames:
 //  - ImGui's test-engine hooks report the label of every labeled widget (IMGUI_ENABLE_TEST_ENGINE is
 //    set in CMakeLists.txt; the hooks only run while TestEngineHookItems is on),
 //  - ImGui's text logging records what each tab draws, which names the widgets the hooks don't
@@ -32,11 +32,13 @@
 #define SEARCH_BAR_WIDTH 300.0f
 #define SEARCH_DROPDOWN_MIN_WIDTH 480.0f
 #define SEARCH_DROPDOWN_MAX_HEIGHT 420.0f
+#define SEARCH_TOOLTIP_WRAP_EMS 45.0f
 
 struct SearchEntry {
     std::string tab;
     std::string label;
     std::string tooltip;
+    std::string keywords; // extra searchable lines, like a hotkey's bound key
     ImGuiID id;
     ImVec2 rel_min; // item rect relative to the settings window's content (for jumping to it)
     ImVec2 rel_max;
@@ -62,6 +64,7 @@ enum IndexPhase {
 };
 
 static IndexPhase s_phase = INDEX_IDLE;
+static bool s_index_stale = true;
 static int s_index_frames = 0;
 static bool s_retry_allowed = false;
 static bool s_retry_pending = false;
@@ -283,7 +286,17 @@ static void finish_index() {
                 break;
             }
         }
-        if (!duplicate) s_index.push_back(entry);
+        if (!duplicate) {
+            s_index.push_back(entry);
+        } else if (!entry.keywords.empty()) {
+            for (auto &kept: s_index) {
+                if (kept.tab == entry.tab && kept.label == entry.label && kept.tooltip == entry.tooltip) {
+                    if (!kept.keywords.empty()) kept.keywords += '\n';
+                    kept.keywords += entry.keywords;
+                    break;
+                }
+            }
+        }
     }
     // A labeled widget without a tooltip is dropped when the same name already has one in that tab.
     std::vector<std::string> named_with_tooltip;
@@ -291,7 +304,7 @@ static void finish_index() {
         if (!entry.tooltip.empty()) named_with_tooltip.push_back(entry.tab + '\n' + entry.label);
     }
     s_index.erase(std::remove_if(s_index.begin(), s_index.end(), [&](const SearchEntry &entry) {
-        return entry.tooltip.empty() &&
+        return entry.tooltip.empty() && entry.keywords.empty() &&
                std::find(named_with_tooltip.begin(), named_with_tooltip.end(), entry.tab + '\n' + entry.label) !=
                named_with_tooltip.end();
     }), s_index.end());
@@ -324,9 +337,38 @@ static void start_index() {
 }
 
 void settings_search_on_open() {
+    if (s_phase != INDEX_IDLE) {
+        // Opened during a background build: the window stays hidden until it's done, then takes focus.
+        ImGui::SetNextWindowFocus();
+        return;
+    }
+    if (!s_index.empty()) return;
     s_retry_allowed = true;
     s_retry_pending = false;
     start_index();
+}
+
+void settings_search_on_close() {
+    s_index_stale = true;
+}
+
+bool settings_search_background_frame(const char *window_name, bool *starting) {
+    *starting = false;
+    if (s_phase != INDEX_IDLE) return true;
+    if (!s_index_stale) return false;
+    // Waits one frame after a close, so focus has left the window before it is laid out hidden again.
+    ImGuiWindow *window = ImGui::FindWindowByName(window_name);
+    if (window && window->WasActive) return false;
+    s_index_stale = false;
+    s_retry_allowed = true;
+    s_retry_pending = false;
+    start_index();
+    *starting = true;
+    return true;
+}
+
+bool settings_search_indexing() {
+    return !s_capture_tab.empty();
 }
 
 void settings_search_prepare_window(const char *window_name) {
@@ -458,6 +500,34 @@ void settings_rich_tooltip_end() {
     record_tooltip(s_rich_item, rich_text_from_log(log_since(s_rich_log_offset)));
 }
 
+void settings_search_keyword(const char *owner_label, const char *keyword) {
+    if (s_capture_tab.empty() || !owner_label || !keyword) return;
+    // The widget's own result (e.g. a key button labeled "F11") is replaced by the owner's.
+    const ImGuiID item_id = GImGui->LastItemData.ID;
+    if (item_id != 0) {
+        s_building.erase(std::remove_if(s_building.begin(), s_building.end(), [&](const SearchEntry &entry) {
+            return entry.tab == s_capture_tab && entry.id == item_id;
+        }), s_building.end());
+    }
+    if (keyword[0] == '\0') return;
+    const std::string owner = trim(owner_label);
+    for (auto it = s_building.rbegin(); it != s_building.rend(); ++it) {
+        if (it->tab != s_capture_tab) break;
+        if (it->label == owner) {
+            if (!it->keywords.empty()) it->keywords += '\n';
+            it->keywords += keyword;
+            return;
+        }
+    }
+    SearchEntry entry;
+    entry.tab = s_capture_tab;
+    entry.label = owner;
+    entry.keywords = keyword;
+    entry.id = item_id;
+    rect_relative_to_root(GImGui->LastItemData.Rect, &entry.rel_min, &entry.rel_max);
+    if (!entry.label.empty()) s_building.push_back(entry);
+}
+
 // ---------------------------------------------------------------------------------------------------
 // ImGui test-engine hooks (declared in imgui_internal.h under IMGUI_ENABLE_TEST_ENGINE)
 // ---------------------------------------------------------------------------------------------------
@@ -519,12 +589,14 @@ static std::vector<int> find_results(const std::vector<std::string> &words) {
         std::string label = to_lower(entry.label);
         std::string tooltip = to_lower(entry.tooltip);
         std::string tab = to_lower(entry.tab);
+        std::string keywords = to_lower(entry.keywords);
         bool all = true;
         bool all_in_label = true;
         for (const auto &word: words) {
             bool in_label = label.find(word) != std::string::npos;
             if (!in_label) all_in_label = false;
-            if (!in_label && tooltip.find(word) == std::string::npos && tab.find(word) == std::string::npos) {
+            if (!in_label && tooltip.find(word) == std::string::npos && tab.find(word) == std::string::npos &&
+                keywords.find(word) == std::string::npos) {
                 all = false;
                 break;
             }
@@ -536,8 +608,20 @@ static std::vector<int> find_results(const std::vector<std::string> &words) {
     return name_hits;
 }
 
-// The tooltip line to show under a result: the first one containing a search word, else the first.
+// The line to show under a result: a matching keyword line, else the first tooltip line containing a
+// search word, else the first tooltip line.
 static std::string snippet_for(const SearchEntry &entry, const std::vector<std::string> &words) {
+    size_t kw_start = 0;
+    while (kw_start < entry.keywords.size()) {
+        size_t nl = entry.keywords.find('\n', kw_start);
+        std::string line = entry.keywords.substr(kw_start, nl == std::string::npos ? std::string::npos : nl - kw_start);
+        std::string lower = to_lower(line);
+        for (const auto &word: words) {
+            if (lower.find(word) != std::string::npos) return line;
+        }
+        if (nl == std::string::npos) break;
+        kw_start = nl + 1;
+    }
     if (entry.tooltip.empty()) return "";
     size_t start = 0;
     while (start <= entry.tooltip.size()) {
@@ -545,7 +629,12 @@ static std::string snippet_for(const SearchEntry &entry, const std::vector<std::
         std::string line = entry.tooltip.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
         std::string lower = to_lower(line);
         for (const auto &word: words) {
-            if (lower.find(word) != std::string::npos) return trim(line);
+            size_t hit = lower.find(word);
+            if (hit == std::string::npos) continue;
+            // Starts at the sentence holding the match, so it isn't cut off before the match.
+            size_t sentence = lower.rfind(". ", hit);
+            if (sentence == std::string::npos) return trim(line);
+            return "..." + trim(line.substr(sentence + 2));
         }
         if (nl == std::string::npos) break;
         start = nl + 1;
@@ -608,7 +697,12 @@ static void draw_dropdown(const ImVec2 &pos, float width, bool input_active, boo
         }
         if (ImGui::IsItemHovered()) {
             if (ImGui::GetIO().MouseDelta.x != 0.0f || ImGui::GetIO().MouseDelta.y != 0.0f) s_highlight = r;
-            if (!entry.tooltip.empty()) ImGui::SetTooltip("%s", entry.tooltip.c_str());
+            if (!entry.tooltip.empty() && ImGui::BeginTooltip()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * SEARCH_TOOLTIP_WRAP_EMS);
+                ImGui::TextUnformatted(entry.tooltip.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
         }
         if (r == s_highlight && s_scroll_to_highlight) {
             ImGui::SetScrollHereY(0.5f);
@@ -643,12 +737,35 @@ static void draw_dropdown(const ImVec2 &pos, float width, bool input_active, boo
 }
 
 void settings_search_bar() {
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive() &&
+    const ImGuiIO &io = ImGui::GetIO();
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
         !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) &&
-        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
-        ImGui::IsKeyPressed(ImGuiKey_F)) {
+        (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_F, false)) {
         s_focus_query = true;
     }
+
+    // Right-aligned, with the clear button on its left (its space is kept so the bar doesn't move).
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float clear_w = ImGui::CalcTextSize("X").x + style.FramePadding.x * 2.0f;
+    const float total_w = clear_w + style.ItemSpacing.x + SEARCH_BAR_WIDTH;
+    const float avail = ImGui::GetContentRegionAvail().x;
+    if (avail > total_w) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total_w);
+
+    if (s_query[0] != '\0') {
+        if (ImGui::Button("X##ClearSettingsSearch")) {
+            s_query[0] = '\0';
+            s_highlight = 0;
+            s_focus_query = true;
+        }
+        if (ImGui::IsItemHovered()) {
+            char clear_tooltip[64];
+            snprintf(clear_tooltip, sizeof(clear_tooltip), "Clear Search");
+            ImGui::SetTooltip("%s", clear_tooltip);
+        }
+    } else {
+        ImGui::Dummy(ImVec2(clear_w, ImGui::GetFrameHeight()));
+    }
+    ImGui::SameLine();
 
     ImGui::SetNextItemWidth(SEARCH_BAR_WIDTH);
     if (s_focus_query) {
@@ -664,32 +781,29 @@ void settings_search_bar() {
     }
     const bool input_active = ImGui::IsItemActive();
     if (ImGui::IsItemActivated()) s_dropdown_suppressed = false;
+    // The arrow keys pick results instead of moving keyboard navigation to the next field.
+    if (input_active) GImGui->ActiveIdUsingNavDirMask |= (1 << ImGuiDir_Up) | (1 << ImGuiDir_Down);
     if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[512];
+        char tooltip_buffer[768];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Search every setting by its name, its tooltip or its tab (case-insensitive).\n"
                  "Several words must all match. Use the arrow keys and ENTER, or click a result,\n"
                  "to go to its tab.\n"
-                 "Press Ctrl+F or Cmd+F to focus.");
+                 "Press Ctrl+F or Cmd+F to focus.\n\n"
+                 "Settings that only show up while another setting is turned on are found\n"
+                 "after closing and reopening the settings window with that setting on.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     const ImVec2 input_min = ImGui::GetItemRectMin();
     const ImVec2 input_max = ImGui::GetItemRectMax();
 
-    if (s_query[0] != '\0') {
-        ImGui::SameLine();
-        if (ImGui::Button("X##ClearSettingsSearch")) {
-            s_query[0] = '\0';
-            s_highlight = 0;
-            s_focus_query = true;
-        }
-    }
-
     const bool show = s_query[0] != '\0' && !s_dropdown_suppressed && s_phase == INDEX_IDLE &&
                       (input_active || enter_pressed || s_dropdown_hovered);
     if (show) {
+        // Grows to the left, so its right edge lines up with the search bar.
         const float width = std::max(SEARCH_DROPDOWN_MIN_WIDTH, input_max.x - input_min.x);
-        draw_dropdown(ImVec2(input_min.x, input_max.y + 2.0f), width, input_active, enter_pressed);
+        const float x = std::max(input_max.x - width, ImGui::GetWindowPos().x);
+        draw_dropdown(ImVec2(x, input_max.y + 2.0f), width, input_active, enter_pressed);
     } else {
         s_dropdown_hovered = false;
     }
