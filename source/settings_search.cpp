@@ -33,6 +33,9 @@
 #define SEARCH_DROPDOWN_MIN_WIDTH 480.0f
 #define SEARCH_DROPDOWN_MAX_HEIGHT 420.0f
 #define SEARCH_TOOLTIP_WRAP_EMS 45.0f
+#define SEARCH_JUMP_MAX_FRAMES 10
+#define SEARCH_JUMP_SCROLL_FRAMES 2 // the window resizes to the new tab, so the scroll is repeated once
+#define SEARCH_FLASH_SECONDS 1.5f
 
 struct SearchEntry {
     std::string tab;
@@ -40,8 +43,10 @@ struct SearchEntry {
     std::string tooltip;
     std::string keywords; // extra searchable lines, like a hotkey's bound key
     ImGuiID id;
-    ImVec2 rel_min; // item rect relative to the settings window's content (for jumping to it)
+    ImVec2 rel_min; // rect to highlight, relative to the settings window's content
     ImVec2 rel_max;
+    ImVec2 anchor; // where the widget with `id` started; the rect moves along with it
+    ImGuiID section = 0; // the collapsing header it sits under, opened when jumping to it
 };
 
 struct ItemRef {
@@ -86,6 +91,7 @@ static ImGuiID s_info_id = 0;
 static std::string s_info_label;
 static ImRect s_info_rect;
 static bool s_use_info_item = false;
+static ImGuiID s_capture_section = 0;
 static bool s_in_rich = false;
 static ItemRef s_rich_item;
 static int s_rich_log_offset = 0;
@@ -96,6 +102,18 @@ static bool s_dropdown_suppressed = false;
 static bool s_dropdown_hovered = false;
 static int s_highlight = 0;
 static bool s_scroll_to_highlight = false;
+
+static bool s_jump_active = false;
+static SearchEntry s_jump;
+static int s_jump_frames = 0;
+static int s_jump_scrolls = 0;
+static bool s_jump_watching = false;
+static bool s_jump_found = false;
+static ImRect s_jump_rect;
+static std::string s_flash_tab;
+static ImVec2 s_flash_min; // relative to the settings window's content
+static ImVec2 s_flash_max;
+static double s_flash_start = -1.0;
 
 // ---------------------------------------------------------------------------------------------------
 // Text helpers
@@ -240,6 +258,8 @@ static void record_tooltip(const ItemRef &item, const std::string &text) {
     entry.id = item.id;
     entry.rel_min = item.rel_min;
     entry.rel_max = item.rel_max;
+    entry.anchor = item.rel_min;
+    entry.section = s_capture_section;
     if (!entry.label.empty()) s_building.push_back(entry);
 }
 
@@ -253,6 +273,7 @@ static void begin_tab_capture(const char *label) {
     s_info_rect = ImRect();
     s_use_info_item = false;
     s_item_log_offset = 0;
+    s_capture_section = 0;
     s_capture_logging = false;
     if (!g.LogEnabled) {
         // Logging also opens collapsed tree nodes for the frame, so collapsed sections get indexed.
@@ -367,8 +388,80 @@ bool settings_search_background_frame(const char *window_name, bool *starting) {
     return true;
 }
 
-bool settings_search_indexing() {
-    return !s_capture_tab.empty();
+bool settings_search_collapsing_header(const char *label) {
+    const ImGuiID id = ImGui::GetID(label);
+    if (s_jump_active && s_jump.section == id) ImGui::SetNextItemOpen(true);
+    // The header itself belongs to no section, the widgets after it do.
+    s_capture_section = 0;
+    const bool open = ImGui::CollapsingHeader(label);
+    if (s_capture_tab.empty()) return open;
+    // Logging doesn't open collapsing headers, so the contents are drawn regardless while indexing.
+    s_capture_section = id;
+    return true;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Jumping to a chosen result
+// ---------------------------------------------------------------------------------------------------
+
+static void end_jump_watch() {
+    if (!s_jump_watching) return;
+    s_jump_watching = false;
+    if (s_capture_tab.empty()) GImGui->TestEngineHookItems = false;
+}
+
+// Scrolls the settings window to the chosen setting once its tab is open, then starts the flash.
+static void update_jump(const std::string &open_tab) {
+    if (!s_jump_active) return;
+    s_jump_frames++;
+    if (open_tab != s_jump.tab) {
+        if (s_jump_frames > SEARCH_JUMP_MAX_FRAMES) s_jump_active = false;
+        return;
+    }
+    ImGuiWindow *window = GImGui->CurrentWindow->RootWindow;
+    const ImVec2 origin(window->Pos.x - window->Scroll.x, window->Pos.y - window->Scroll.y);
+    ImVec2 shift(0.0f, 0.0f);
+    if (s_jump_found) {
+        // The layout can differ from when the index was built, so follow where the widget is now.
+        shift = ImVec2(s_jump_rect.Min.x - origin.x - s_jump.anchor.x, s_jump_rect.Min.y - origin.y - s_jump.anchor.y);
+    } else if (s_jump.id != 0) {
+        // The widget isn't drawn right now (e.g. its parent setting is off): only the tab is switched.
+        s_jump_active = false;
+        return;
+    }
+    s_jump_found = false;
+    const ImRect target(origin.x + s_jump.rel_min.x + shift.x, origin.y + s_jump.rel_min.y + shift.y,
+                        origin.x + s_jump.rel_max.x + shift.x, origin.y + s_jump.rel_max.y + shift.y);
+    ImGui::ScrollToRectEx(window, target, ImGuiScrollFlags_KeepVisibleEdgeX | ImGuiScrollFlags_AlwaysCenterY);
+
+    s_flash_tab = s_jump.tab;
+    s_flash_min = ImVec2(target.Min.x - origin.x, target.Min.y - origin.y);
+    s_flash_max = ImVec2(target.Max.x - origin.x, target.Max.y - origin.y);
+    s_flash_start = ImGui::GetTime();
+    if (++s_jump_scrolls >= SEARCH_JUMP_SCROLL_FRAMES) s_jump_active = false;
+}
+
+// A frame around the chosen setting that holds briefly, then fades out.
+static void draw_flash(const std::string &open_tab) {
+    if (s_flash_start < 0.0) return;
+    const float elapsed = (float) (ImGui::GetTime() - s_flash_start);
+    if (open_tab != s_flash_tab || elapsed >= SEARCH_FLASH_SECONDS) {
+        s_flash_start = -1.0;
+        return;
+    }
+    const float hold = SEARCH_FLASH_SECONDS / 3.0f;
+    const float alpha = elapsed < hold ? 1.0f : 1.0f - (elapsed - hold) / (SEARCH_FLASH_SECONDS - hold);
+
+    ImGuiWindow *window = GImGui->CurrentWindow->RootWindow;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const ImVec2 origin(window->Pos.x - window->Scroll.x, window->Pos.y - window->Scroll.y);
+    const ImVec2 min(origin.x + s_flash_min.x - style.FramePadding.x, origin.y + s_flash_min.y - style.FramePadding.y);
+    const ImVec2 max(origin.x + s_flash_max.x + style.FramePadding.x, origin.y + s_flash_max.y + style.FramePadding.y);
+    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_NavCursor);
+    color.w = 0.25f * alpha;
+    window->DrawList->AddRectFilled(min, max, ImGui::GetColorU32(color), style.FrameRounding);
+    color.w = alpha;
+    window->DrawList->AddRect(min, max, ImGui::GetColorU32(color), style.FrameRounding, 0, 2.0f);
 }
 
 void settings_search_prepare_window(const char *window_name) {
@@ -381,6 +474,7 @@ void settings_search_prepare_window(const char *window_name) {
 
 bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
     end_tab_capture();
+    end_jump_watch();
     bool open = ImGui::BeginTabItem(label, nullptr, flags);
 
     ImGuiTabBar *bar = GImGui->CurrentTabBar;
@@ -404,12 +498,19 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
             std::find(s_indexed_tabs.begin(), s_indexed_tabs.end(), label) == s_indexed_tabs.end()) {
             begin_tab_capture(label);
         }
+        if (s_jump_active && s_jump.id != 0 && s_jump.tab == label && s_capture_tab.empty()) {
+            // The ItemAdd hook reports where the chosen widget is drawn this frame.
+            s_jump_watching = true;
+            s_jump_found = false;
+            GImGui->TestEngineHookItems = true;
+        }
     }
     return open;
 }
 
 void settings_search_tabs_end() {
     end_tab_capture();
+    end_jump_watch();
     const std::string open_tab = s_open_tab;
     s_open_tab.clear();
 
@@ -447,6 +548,10 @@ void settings_search_tabs_end() {
                 finish_index();
             }
             break;
+    }
+    if (s_phase == INDEX_IDLE) {
+        update_jump(open_tab);
+        draw_flash(open_tab);
     }
     queue_tab_selection();
 }
@@ -509,22 +614,36 @@ void settings_search_keyword(const char *owner_label, const char *keyword) {
             return entry.tab == s_capture_tab && entry.id == item_id;
         }), s_building.end());
     }
-    if (keyword[0] == '\0') return;
+    ImVec2 item_min, item_max;
+    rect_relative_to_root(GImGui->LastItemData.Rect, &item_min, &item_max);
     const std::string owner = trim(owner_label);
     for (auto it = s_building.rbegin(); it != s_building.rend(); ++it) {
         if (it->tab != s_capture_tab) break;
         if (it->label == owner) {
-            if (!it->keywords.empty()) it->keywords += '\n';
-            it->keywords += keyword;
+            if (keyword[0] != '\0') {
+                if (!it->keywords.empty()) it->keywords += '\n';
+                it->keywords += keyword;
+            }
+            if (it->id == 0 && item_id != 0) {
+                // A plain-text name: the jump follows this widget and highlights both.
+                it->id = item_id;
+                it->anchor = item_min;
+                it->rel_min = ImVec2(std::min(it->rel_min.x, item_min.x), std::min(it->rel_min.y, item_min.y));
+                it->rel_max = ImVec2(std::max(it->rel_max.x, item_max.x), std::max(it->rel_max.y, item_max.y));
+            }
             return;
         }
     }
+    if (keyword[0] == '\0') return;
     SearchEntry entry;
     entry.tab = s_capture_tab;
     entry.label = owner;
     entry.keywords = keyword;
     entry.id = item_id;
-    rect_relative_to_root(GImGui->LastItemData.Rect, &entry.rel_min, &entry.rel_max);
+    entry.rel_min = item_min;
+    entry.rel_max = item_max;
+    entry.anchor = item_min;
+    entry.section = s_capture_section;
     if (!entry.label.empty()) s_building.push_back(entry);
 }
 
@@ -533,8 +652,13 @@ void settings_search_keyword(const char *owner_label, const char *keyword) {
 // ---------------------------------------------------------------------------------------------------
 
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext *ctx, ImGuiID id, const ImRect &, const ImGuiLastItemData *) {
-    if (!s_capture_logging || id == 0) return;
-    s_item_log_offset = ctx->LogBuffer.size();
+    if (id == 0) return;
+    if (s_jump_watching && id == s_jump.id) {
+        // LastItemData.Rect is what the index stored too (the rect passed in is the nav rect).
+        s_jump_found = true;
+        s_jump_rect = ctx->LastItemData.Rect;
+    }
+    if (s_capture_logging) s_item_log_offset = ctx->LogBuffer.size();
 }
 
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext *ctx, ImGuiID id, const char *label, ImGuiItemStatusFlags) {
@@ -552,6 +676,8 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext *ctx, ImGuiID id, const char *lab
     entry.label = text;
     entry.id = id;
     rect_relative_to_root(s_info_rect, &entry.rel_min, &entry.rel_max);
+    entry.anchor = entry.rel_min;
+    entry.section = s_capture_section;
     s_building.push_back(entry);
 }
 
@@ -645,6 +771,11 @@ static std::string snippet_for(const SearchEntry &entry, const std::vector<std::
 static void choose_result(const SearchEntry &entry) {
     s_select_tab = entry.tab;
     queue_tab_selection();
+    s_jump = entry;
+    s_jump_active = true;
+    s_jump_frames = 0;
+    s_jump_scrolls = 0;
+    s_jump_found = false;
     s_dropdown_suppressed = true;
     ImGui::ClearActiveID();
 }
@@ -681,7 +812,10 @@ static void draw_dropdown(const ImVec2 &pos, float width, bool input_active, boo
                                    ImGuiWindowFlags_NoCollapse;
     ImGui::Begin("##SettingsSearchResults", nullptr, flags);
     ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-    s_dropdown_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+    // A result held down with the mouse is the active item, which would otherwise count as not hovered
+    // and close the dropdown before the click is released.
+    s_dropdown_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows |
+                                                ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 
     int chosen = -1;
     if (shown == 0) {
@@ -788,7 +922,7 @@ void settings_search_bar() {
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Search every setting by its name, its tooltip or its tab (case-insensitive).\n"
                  "Several words must all match. Use the arrow keys and ENTER, or click a result,\n"
-                 "to go to its tab.\n"
+                 "to jump to it.\n"
                  "Press Ctrl+F or Cmd+F to focus.\n\n"
                  "Settings that only show up while another setting is turned on are found\n"
                  "after closing and reopening the settings window with that setting on.");

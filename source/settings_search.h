@@ -49,9 +49,11 @@ void settings_rich_tooltip_end();
 
 /**
  * @brief Makes the last widget findable by a value it shows (e.g. a hotkey's bound key), listed under
- * the setting it belongs to. Only does anything while the search index is being built.
+ * the setting it belongs to. Only does anything while the search index is being built. Call it even
+ * with an empty keyword: the widget still replaces its own result and gives a plain-text owner a
+ * position to jump to.
  * @param owner_label The name of the setting the result is listed under.
- * @param keyword The searchable text, shown under the result when it matches (e.g. "Key: F11").
+ * @param keyword The searchable text, shown under the result when it matches (e.g. "Key: F11"), or "".
  */
 void settings_search_keyword(const char *owner_label, const char *keyword);
 
@@ -79,9 +81,12 @@ void settings_search_on_close();
 bool settings_search_background_frame(const char *window_name, bool *starting);
 
 /**
- * @brief True while a tab is being read for the index. Collapsed sections should draw their contents.
+ * @brief Replaces ImGui::CollapsingHeader() in the settings window. Its contents are indexed even while
+ * it is collapsed, and it opens when a search result inside it is chosen.
+ * @param label The header label.
+ * @return true when its contents should be drawn.
  */
-bool settings_search_indexing();
+bool settings_search_collapsing_header(const char *label);
 
 /**
  * @brief Hides the settings window while the index is being built. Call right before its ImGui::Begin().

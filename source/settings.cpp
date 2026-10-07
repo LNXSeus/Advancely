@@ -8154,8 +8154,7 @@ settings_tooltip(tooltip_buffer); \
                 if (def->group != current_group) {
                     current_group = def->group;
                     ImGui::Spacing();
-                    group_open = ImGui::CollapsingHeader(APP_HOTKEY_GROUP_NAMES[current_group]) ||
-                                 settings_search_indexing();
+                    group_open = settings_search_collapsing_header(APP_HOTKEY_GROUP_NAMES[current_group]);
                     if (settings_tooltip_wanted()) {
                         char group_tooltip[1024];
                         snprintf(group_tooltip, sizeof(group_tooltip), "%s",
