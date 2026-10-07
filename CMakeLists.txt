@@ -125,6 +125,8 @@ else ()
     add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
 endif ()
 
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE IMGUI_ENABLE_TEST_ENGINE)
+
 # This command targets a specific source file and sets its properties ONLY FOR GCC
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set_source_files_properties(

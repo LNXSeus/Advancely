@@ -1479,6 +1479,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.1f), ImGuiCond_Always);
     }
 
+    // The settings search indexes every tab while the window opens (hidden for those few frames)
+    if (just_opened) settings_search_on_open();
+    settings_search_prepare_window("Advancely Settings");
+
     // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
@@ -1555,6 +1559,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Adv/Ach
     const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
+
+    settings_search_bar();
+    ImGui::Spacing();
 
     // --- Settings Presets (always visible above the tabs) ---
     // Presets are full snapshots of settings.json stored next to it in resources/config/.
@@ -1905,7 +1912,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // SETTINGS TABS START
     if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None)) {
-        if (ImGui::BeginTabItem("Paths & Templates")) {
+        if (settings_search_tab_begin("Paths & Templates")) {
             // Path Settings
             ImGui::Text("Path Settings");
 
@@ -2789,7 +2796,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndTabItem();
         } // End of Paths and Templates Tab
 
-        if (ImGui::BeginTabItem("Tracker Visuals")) {
+        if (settings_search_tab_begin("Tracker Visuals")) {
             ImGui::Text("Window & Behavior");
 
             ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
@@ -3494,7 +3501,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndTabItem();
         } // End of Tracker Visuals Tab
 
-        if (ImGui::BeginTabItem("UI Visuals")) {
+        if (settings_search_tab_begin("UI Visuals")) {
             ImGui::Text("UI Fonts");
 
             // --- Settings/UI Font ---
@@ -3630,7 +3637,7 @@ settings_tooltip(tooltip_buffer); \
             ImGui::EndTabItem();
         } // End of UI Visuals Tab
 
-        if (ImGui::BeginTabItem("Overlay")) {
+        if (settings_search_tab_begin("Overlay")) {
             // The overlay's advance/speed-up key is rebindable, so every tooltip that mentions it
             // shows whatever it is currently bound to instead of a hardcoded "SPACE".
             char overlay_advance_label[96];
@@ -5796,7 +5803,7 @@ settings_tooltip(tooltip_buffer); \
         ImGuiTabItemFlags account_tab_flags = ImGuiTabItemFlags_None;
         if (force_open_reason && *force_open_reason == FORCE_OPEN_ACCOUNT_SETUP && just_opened)
             account_tab_flags = ImGuiTabItemFlags_SetSelected;
-        if (ImGui::BeginTabItem("Account", nullptr, account_tab_flags)) {
+        if (settings_search_tab_begin("Account", account_tab_flags)) {
             CoopNetState acc_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
             bool acc_net_active = (acc_net_state == COOP_NET_LISTENING || acc_net_state == COOP_NET_CONNECTED
                                    || acc_net_state == COOP_NET_CONNECTING);
@@ -6029,7 +6036,7 @@ settings_tooltip(tooltip_buffer); \
             ImGui::EndTabItem();
         }
 
-        if (ImGui::BeginTabItem("Co-op")) {
+        if (settings_search_tab_begin("Co-op")) {
             // Co-op tab uses function-scoped statics: coop_identity_status_msg,
             // coop_identity_status_is_error, coop_room_code_buf, coop_room_code_error, coop_ip_revealed
 
@@ -7612,7 +7619,7 @@ settings_tooltip(tooltip_buffer); \
             ImGui::EndTabItem();
         } // End of Co-op Tab
 
-        if (ImGui::BeginTabItem("Hotkeys")) {
+        if (settings_search_tab_begin("Hotkeys")) {
             // The three conflict flags are owned by collect_hotkey_conflicts() above the tab bar,
             // which runs every frame. The rows below only mark themselves; they no longer decide
             // whether Apply is blocked, so a clash behind a collapsed header still counts.
@@ -8255,7 +8262,7 @@ settings_tooltip(tooltip_buffer); \
             ImGui::EndTabItem();
         } // End of Hotkeys Tab
 
-        if (ImGui::BeginTabItem("System & Debug")) {
+        if (settings_search_tab_begin("System & Debug")) {
             ImGui::Text("System");
 
             ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
@@ -8339,6 +8346,7 @@ settings_tooltip(tooltip_buffer); \
 
         ImGui::EndTabBar();
     } // Ending of Settings Tabs
+    settings_search_tabs_end();
 
     // --- Supporters box (always visible regardless of active tab) ---
     ImGui::Separator();

@@ -47,4 +47,37 @@ bool settings_rich_tooltip_begin();
  */
 void settings_rich_tooltip_end();
 
+// The search index is built by showing every settings tab once while the settings window is hidden,
+// reading the label and tooltip of each widget on the way. That happens right when the window opens.
+
+/**
+ * @brief Starts building the search index. Call on the frame the settings window opens.
+ */
+void settings_search_on_open();
+
+/**
+ * @brief Hides the settings window while the index is being built. Call right before its ImGui::Begin().
+ * @param window_name The exact name passed to ImGui::Begin().
+ */
+void settings_search_prepare_window(const char *window_name);
+
+/**
+ * @brief Replaces ImGui::BeginTabItem() for a tab of the settings window.
+ * @param label The tab label.
+ * @param flags The same flags ImGui::BeginTabItem() takes.
+ * @return true when the tab is open, exactly like ImGui::BeginTabItem().
+ */
+bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags = 0);
+
+/**
+ * @brief Call once per frame after the settings tab bar, whether or not it was drawn.
+ */
+void settings_search_tabs_end();
+
+/**
+ * @brief Draws the search bar and, below it, the dropdown of matching settings. Call inside the
+ * settings window.
+ */
+void settings_search_bar();
+
 #endif //SETTINGS_SEARCH_H
