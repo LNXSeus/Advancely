@@ -18,7 +18,7 @@
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the **[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing ([Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules)). That same paragraph A.8.14 also allows reading the **[SpeedrunIGT Mod](https://github.com/RedLime/SpeedRunIGT)**'s `speedrunigt/record.json`, which Advancely uses to display a millisecond-exact final time.
+## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the **[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing ([Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules)). Reading the **[SpeedrunIGT Mod](https://github.com/RedLime/SpeedRunIGT)**'s `speedrunigt/record.json` is also explicitly allowed ([Minecraft Speedrunning rules (A.8.14.a)](https://www.minecraftspeedrunning.com/public-resources/rules)), which Advancely uses to display a millisecond-exact final time.
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
@@ -166,21 +166,6 @@ import, create, copy, and modify any template directly within Advancely.
 * **Decorations:** Add visual elements to your manual layout that aren't tied to game data. **Text Headers** display
   custom text using the tracker font, **Lines** connect or separate areas with configurable thickness and opacity,
   and **Arrows** visually link goals together with customizable arrowheads, bend points, and goal-linked opacity.
-* **Criteria Grouping:** Collapse multiple criteria of one advancement into a single progress unit. Enable the
-  per-advancement `Groups` checkbox (next to `Row 3` in the Template Editor) to expose the grouping UI for that
-  advancement, then assign criteria a shared `Group` ID (per-criterion `Add to group` button next to the field, or
-  tick the row checkboxes and use `Add selection to group` to bulk-assign with auto-naming). Each group is then
-  shown as a single criterion on the tracker map, the overlay rows and the compact stack, using the name and icon
-  of its first member, and any one member completing in-game marks that group done. Useful for
-  advancement packs where multiple ways to satisfy a single objective each appear as separate criteria. For example,
-  the **Ultimate Enchanter** advancement from the
-  [Blaze and Caves](https://modrinth.com/datapack/blazeandcaves-advancements-pack) datapack has 256 criteria split
-  into 128 groups (each enchantment paired with its enchanted-book counterpart) so the tracker shows `X / 128`
-  instead of `X / 256`. The `Groups` checkbox is auto-enabled on load whenever any criterion already has a group
-  written in the template (backwards compatibility); unchecking it makes the tracker ignore every group string on
-  that advancement (without deleting them) and the criteria list reverts to looking and counting exactly like a
-  pre-grouping template. The `Groups` flag itself, along with each `Group` ID (only when grouping is active), is
-  part of the coop template hash so host and receivers must agree on the grouping.
 
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.
@@ -194,159 +179,37 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
 <summary><strong>View All Core Features</strong></summary>
 <br>
 
-* **Automatic Instance Tracking** *(default)*: Advancely automatically detects which Minecraft instance you
-  are actively playing and tracks it, even if multiple instances are open at once. This is the default
-  path detection mode. It works with **Prism Launcher**, **MultiMC**, and similar launchers. Find out
-  more [here](#the-settings-window-esc).
-* **Fixed World Mode**: Lock the tracker to one specific world folder. Unlike the default mode which always
-  follows your most recently played world, Fixed World Mode keeps the tracker focused on a single chosen world
-  regardless of which world you open next. Useful for long-form playthroughs, modded runs, or setups where
-  you want the tracker to stay on a specific save. Configure it in Settings by selecting **"Fixed World"** and
-  browsing to the world folder.
-* **Hermes Mod Live Tracking**: When the [Hermes mod](https://github.com/DuncanRuns/Hermes) is installed,
-  Advancely can read its encrypted `play.log.enc` in real-time, updating stats and advancements as they happen
-  rather than waiting for the game to save. Enable this in Settings under **"Using Hermes Mod (Live Tracking)"**.
-  The update timer in the info bar and overlay changes from `Upd:` to `Synced:` when Hermes is active, indicating
-  the last full disk sync rather than the last live event. All values self-correct on every normal game save.
-  Compatible ultimately with all Fabric versions. Stat and advancement/achievement changes are applied instantly; the
-  game files remain the authoritative source of truth. Hermes events carry no in-game time, so a run that completes
-  live between saves is frozen at the IGT of the previous save; the next save (the pause that ends the run) corrects
-  the final time to the real one, and it stays put from there.
-* **SpeedrunIGT Accurate IGT**: When the [SpeedrunIGT mod](https://github.com/RedLime/SpeedRunIGT) is installed, the
-  world folder contains a `speedrunigt/record.json`. Paragraph A.8.14 of the
-  [Minecraft Speedrunning rules](https://www.minecraftspeedrunning.com/public-resources/rules) permits reading that file
-  for this purpose, so Advancely improves its IGT display with it: it simply reads the `final_igt` field whenever the
-  file updates, which is on every game save and when the run completes according to SpeedrunIGT. That value then
-  replaces the play time from the stats file everywhere an IGT is shown - the tracker window title and info bar, the
-  debug print output and every overlay mode, live as well as on the frozen final time. The benefit is precision: the
-  stats file only counts whole game ticks, so its time is rounded to 50 ms, while `final_igt` is exact to the
-  millisecond. When the mod's timer stops on a run your template counts as complete too, the record says so with
-  `"is_completed": true`, and that `final_igt` is then held as the final time straight away, with no need to wait for
-  the next game save (which would already report a play time past the end of the run). The mod's timer can of course
-  stop before the tracked template is complete, if its category isn't the
-  one you track: its `final_igt` then stops moving, and Advancely notices this on the first game save that advances the
-  play time without the record moving with it, switching back to the stats file from there - including freezing on that
-  time when your run completes. Should `record.json` start moving again, or should you switch worlds, the mod's time is
-  used again right away. Without the mod nothing changes: the tick-based play time is used exactly as before.
-* **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
-  `Middle-Click`, zoom with the `Mouse Wheel` or the `Zoom` slider in the `View` menu, and lock the camera or the layout
-  in place from that same menu.
-* **Scrollable Lists**: Goals containing large numbers of sub-items (like "All Animals Bred" or complex stats) are
-  automatically converted into scrollable lists to save screen space.
-* **Comprehensive Real-Time Tracking**: Advancely operates in real-time by watching your singleplayer save files for
-  changes. It can monitor a wide range of data types, including:
-    * **Advancements & Recipes**: Tracks completion status and individual criteria for any advancement or recipe from
-      vanilla, mods, or datapacks.
-    * **Statistics**: Monitors any in-game statistic (e.g., blocks mined, distance flown) against a target value.
-      Supports nested "sub-stats" under a single category and allows for manual completion overrides via an in-app
-      checkbox. Stats and sub-stats can also be auto-completed by linking them to other goals (advancements, unlocks,
-      counters, etc.) with an `AND` (all must be completed) or `OR` (at least one) mode.
-    * **Unlocks**: Fully tracks the unique "unlocks" progression system of the `25w14craftmine` snapshot.
+* **Automatic Instance Tracking** *(default)*: Advancely detects which Minecraft instance you are actively playing and
+  tracks it, even with several instances open. Works with **Prism Launcher**, **MultiMC**, and similar launchers.
+* **Hermes Mod Live Tracking**: With the [Hermes mod](https://github.com/DuncanRuns/Hermes) installed, stats and
+  advancements update instantly instead of waiting for the game to save.
+* **SpeedrunIGT Accurate IGT**: With the [SpeedrunIGT mod](https://github.com/RedLime/SpeedRunIGT) installed, the IGT is
+  exact to the millisecond instead of rounded to the game tick.
+* **Comprehensive Real-Time Tracking**: Advancements, recipes, criteria, statistics (including nested sub-stats) and
+  `25w14craftmine` unlocks, from vanilla, mods or datapacks.
+* **Interactive Map View**: Pan, zoom and lock the tracker map. Goals with many sub-items become scrollable lists.
 * **Advanced Goal Types**:
-    * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures
-      visited), you can create manual checklist goals or counters with target values. You may link other goals to these
-      custom goals with an `AND` (all must be completed) or `OR` (at least one) mode to have them auto-complete. All progress is saved
-      automatically into `settings.json`. _Switching templates will thus ERASE the progress of these custom goals._
-        * **Hotkeys**: Use configurable hotkeys to increment or decrement your custom counters. Up to 32 hotkeys are
-          supported. Each row in the **Hotkeys** settings tab
-          shows the goal name followed by the `Decr.` and `Incr.` slots. Click a slot's button and press any key to
-          bind it; press `Escape`, `Backspace`, or `Delete` during capture to clear the binding back to `None`. Hold
-          `Ctrl`, `Alt`, or `Shift` while pressing the key to bind a combination; modifiers must then match exactly
-          when you press the hotkey, so a bare `E` and an `Alt+E` can sit on two different goals. `Ctrl+F` cannot be
-          bound at all, since Advancely reserves it for the search box. The
-          captured key respects your keyboard layout (e.g. on a German `QWERTZ` keyboard the key labeled `Y` will
-          bind correctly even though the underlying scancode is `Z`). For custom goals with a target value of `-1`
-          (infinite counters), the increment/decrement hotkeys are automatically blocked once the goal's checkbox is
-          manually marked complete; the running counter and the completion checkbox are independent so toggling the
-          checkbox no longer resets your progress.
-            * **Global**: Each row has a `Global` checkbox. Left off (the default), the hotkey only fires while the
-              Advancely tracker window is focused, any key may be used, and other programs keep receiving that key
-              normally. Switched on, the operating system reserves the key for Advancely so it fires while you are
-              playing Minecraft. Because a global hotkey is taken away from every other program, `Ctrl` or `Alt`
-              (`Cmd` or `Option` on macOS) is strongly recommended. Such a binding is still allowed and never
-              blocks `Apply Settings`, but the row shows an amber warning: a single key is riskier than a
-              combination, since no other program receives it while Advancely runs and the goal also changes while
-              you type in chat or any text field. Adding only `Shift` gets its own warning, because other programs
-              read `Shift` plus a key as nothing more than a capital letter, so the binding keeps firing whenever
-              you type one. Keys `F13` through `F24` never warn, as no physical keyboard has
-              them and macro pads are the only thing that sends them. A row is handed to the operating system when
-              you click `Apply Settings`. The Visual Layout Editor's own shortcuts are never affected, since goal
-              hotkeys do nothing while it is open, so its plain `W`/`A`/`S`/`D` stay free for `Global` goal
-              hotkeys too.
-              Global hotkeys work on Windows and macOS, and on Linux under X11 (including a game
-              running through `XWayland`). A Wayland session provides no way for an application to
-              reserve a shortcut, so on a Wayland desktop a `Global` row falls back to firing only
-              while Advancely is focused and the `Hotkeys` tab says so on that row. The same applies
-              when another program already owns a combination: that row reports it and keeps working
-              as a window-focused hotkey instead of silently doing nothing. Such a conflict can only
-              be reported when the other program reserved the key the same way. Programs that read
-              the keyboard at a lower level, such as `Discord` or macro tools, produce no conflict
-              message at all; Advancely simply takes priority over them while it runs.
-        * **Typing a Value**: Click a counter's progress text on the tracker map (e.g. `(3 / 10)`) to type its value
-          directly, then press `Enter` or `Set` to apply it (`Escape` or `Cancel` closes without changing anything).
-          This also works on infinite counters that are already marked complete. Goals with `Hide Progress` have no
-          value to click. In a co-op lobby, select your own name first: the `All Players` view adds everyone's counts
-          together, so a typed value there wouldn't belong to anyone.
-    * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
-      you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
-      biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize
-      progression.
-    * **Counters**: Track how many of a selected set of goals are completed. Link any combination of advancements,
-      criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages to a counter. It displays a main
-      icon, a display name, and progress text (e.g., "3/10"). The background texture changes based on progress: default
-      at zero, half-done for partial progress, and done when all linked goals are completed. Searching for a counter's
-      display name also shows its exact linked goals in the search results.
-* **Manual Layout Mode**: Break free from the automatic grid and position every goal exactly where you want it. When
-  enabled, each item's position (and all decorations) are stored in a **separate `_layout` file** that sits next to
-  the template, just like its `_lang` language files. Because the layout lives outside the template's core `.json`,
-  a custom layout survives official template updates and a single template can carry several alternative layouts.
-  Use the built-in **Visual Layout Editor** to drag items directly on the tracker map, or set coordinates
-  numerically in the Template Editor. Templates with layout data are marked with **(has layout)** in the settings
-  dropdowns so you can easily find them, and a `Layout` dropdown in the settings lets you pick which layout file to
-  apply (or `Default` for the template's `_layout.json`). Each position (icon, text, progress) can be individually
-  hidden using per-position `Hide` checkboxes in the Template Editor, giving you fine-grained control over what
-  appears on your layout.
-* **Decorations**: Add purely visual elements to your manual layout. **Text Headers** render custom text using the
-  tracker's font and size, perfect for labeling sections of your map. Text headers can also have **Linked Goals** (any
-  combination of goals and counters) so that searching for the header's text keeps all linked items visible, allowing
-  you to categorize your search. **Lines** draw between two endpoints with configurable thickness and opacity, using
-  the tracker's text color. **Arrows** draw a path from a tail through optional bend points to an arrowhead tip, and
-  can be linked to a **Start Goal** and **End Goal** to change opacity based on completion state, ideal for all
-  achievement runs, where the completion order matters.
-* **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
-  total visible items for that section, respecting both the current Goal Visibility setting and any active search
-  filter.
-    * **Format**:
-        * Sections with sub-items (Advancements/Recipes with criteria, Statistics with sub-stats, Multi-Stage Goals)
-          show counts for both main items and sub-items.
-        * Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show counts for main items only.
-
-
-* **Per-Template Run Completion**: Each template decides when a run counts as completed, in the Template Editor's
-  `Run Completion` tab. Require whole goal types (`All Advancements`, `All Stats`, `All Custom Goals`, ...) and/or
-  individually picked goals of any type; everything picked has to be done, and with nothing picked the whole template
-  has to be completed (100%). Optionally end the run earlier at a goal count (e.g. Half%) and/or an overall progress
-  percentage. When the criterion is reached the run is marked complete, the IGT timer freezes, and the overlay jumps
-  to the **RUN COMPLETED!** screen showing the supporters. The picked goals also become the `X/Y` counter in the
-  tracker title, info bar and overlay progress text, with a per-language `Counter Label` (e.g. `Blocks Placed: 12/40`
-  instead of `Adv: 12/80`).
-* **Powerful In-App Template Editor**: You don't need to manually edit files. The built-in editor allows you to create,
-  copy, and modify any template. You can instantly build a new template by importing advancements, stats, and unlocks
-  directly from your world save. Find more information [here](https://github.com/LNXSeus/Advancely#The-Template-Editor).
-* **Customizable Stream Overlay**: An animated overlay is available to show your progress to viewers. Pick one of three
-  render modes - `Scrolling Belt` (the classic scrolling conveyor), `Page` (static pages that cut like a book), or
-  `Compact` (a tall, narrow counter panel with goals popping out beneath it) - and customize its scroll speed, font,
-  colors, FPS, if the 3rd row remains visible and which information is displayed. The overlay window can also be truly
-  transparent via the `Transparent` checkbox next to `Overlay Background Color`, so **no color key filter is needed** in
-  your streaming software. Find more
+    * **Custom Goals & Counters**: Manual checklist goals or counters for anything that can't be tracked
+      automatically. Change them with hotkeys (window-focused or global while you play) or by clicking the progress
+      text to type a value. _Their progress is saved in `settings.json`, so switching templates ERASES it._
+    * **Multi-Stage Goals**: Chain stats, unlocks, criteria and advancements into one goal completed in sequence, with
+      a unique icon per stage.
+    * **Counters**: Count how many of a chosen set of goals are completed.
+    * **Linked Goals**: Stats and custom goals can auto-complete when other goals are done (`AND` / `OR`).
+* **Manual Layout Mode & Decorations**: Place every goal exactly where you want with the **Visual Layout Editor**, and
+  add text headers, lines and arrows. Layouts live in separate `_layout` files, so they survive official template
+  updates.
+* **Per-Template Run Completion**: Each template decides when a run counts as complete (e.g. all advancements, picked
+  goals, or a Half% goal count), which freezes the IGT and shows the **RUN COMPLETED!** screen on the overlay.
+* **Powerful In-App Template Editor**: Create, copy and modify templates without touching files, and import goals
+  straight from your world save. Find more information [here](https://github.com/LNXSeus/Advancely#The-Template-Editor).
+* **Customizable Stream Overlay**: Three render modes (`Scrolling Belt`, `Page`, `Compact`), and an optional truly
+  transparent background so **no color key filter is needed**. Find more
   information [here](https://github.com/LNXSeus/Advancely#The-Stream-Overlay).
-* **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and
-  advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla
-  `minecraft:` namespace.
-* **Extensive Version Support**: Advancely is built to work with over 100 Minecraft versions, from 1.0 to 1.21.9+ and
-  beyond, including all April Fool's snapshots.
-* **Automatic Updates**: The tracker automatically checks for new versions on startup and will prompt you to download
-  and install them, ensuring you're always up-to-date.
+* **Full Mod & Datapack Support**: Any namespace works (e.g., `conquest:`, `blazeandcave:`), not just `minecraft:`.
+* **Extensive Version Support**: Over 100 Minecraft versions, from 1.0 to 26.x and beyond, including all April Fool's
+  snapshots.
+* **Automatic Updates**: Advancely checks for new versions on startup and can install them for you.
 
 </details>
 
@@ -659,130 +522,37 @@ the [settings window](#the-settings-window-esc).
 
 ### Navigating the Map
 
-You can manipulate the view using several intuitive controls:
-
-* **View Menu**: The `View` button in the bottom-right corner opens everything that decides how the map is drawn: the
-  `Zoom` slider, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Selection Rectangle`, `Manual Layout` and the goal
-  visibility dropdown. Keeping them in one menu leaves the bar over the map to the search box and the `Notes`
-  checkbox. `Lock Camera`, `Lock Layout`, `Selection Rectangle` and `Manual Layout` also have shortcuts (`Shift+C`,
-  `Space`, `Shift+S` and `Shift+M` by default), and using one opens the menu so you can see the checkbox that changed. A menu opened that way fades out after five seconds, unless
-  you move the mouse onto it.
-* **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
-* **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
-  For an exact level, use the `Zoom` slider in the `View` menu, which spans the same range as the wheel. Drag it for a
-  rough value, or `Ctrl+Click` (`Cmd+Click` on macOS) to type one with up to three decimal places. The wheel keeps the
-  point under your cursor in place, the slider keeps the center of the window in place. The default `Minecraft.ttf` is
-  a pixel font drawn on a 16 pt grid, so its text is only pixel-sharp when zoom times font size is a whole multiple of
-  16: type exactly `1`, `2` or `3` into the slider with the default `16 pt` font and the edges stop blurring.
-* **Scroll Lists**: When hovering over a goal with many sub-items, the `Mouse Wheel` will scroll the list contents
-  instead of zooming the map. You can also left-click and drag the scrollbar.
-* **Selection Rectangle**: Hold `Left-Click` on empty map and drag a rectangle over manual completion checkboxes
-  (custom goals, stats and sub-stats) to tick them all at once. The rectangle takes a majority vote, the same way
-  `Bulk Actions` does in the Templeate Editor: sweep mostly unticked boxes and they all get ticked, sweep mostly
-  ticked ones and they all get unticked. The rectangle is green when it will tick and red when it will untick, and
-  every box that is about to change is outlined. Dragging towards a window edge pans the map, so the rectangle can
-  reach goals that are off screen. Boxes you are not allowed to edit (co-op read-only views) are never touched.
-  The `Selection Rectangle` checkbox in the `View` menu (`Shift+S` by default) turns the gesture off entirely; the
-  setting is remembered across restarts. It is locked while the Visual Layout Editor runs, which has its own
-  selection rectangle that this toggle does not affect.
-* **Lock Camera**: The `Lock Camera` checkbox in the `View` menu (`Shift+C` by default) makes the map ignore wheel zooming and
-  drag panning, so a view you have set up cannot be nudged out of place by accident. The `Zoom` slider and
-  `Reset Camera` still work, since those are deliberate actions.
-* **Lock Layout**: The `Lock Layout` checkbox in the `View` menu (`Space` by default) locks the grid layout.
-  This prevents goals from rearranging when you resize
-  the window, giving you precise control over how many items appear in each row. It is about the automatic grid, so in
-  `Auto Layout` it applies to the whole map, while in `Manual Layout` it only affects the goals that have no position of
-  their own, the ones pushed into the grid to the right of everything you placed by hand.
-* **Reset Camera**: Click the `Reset Camera` button in the `View` menu to instantly reset the pan and zoom to
-  their default positions. It also unlocks the layout, while a locked camera stays locked.
-* **Goal Visibility Dropdown**: A dropdown in the `View` menu (below `Manual Layout`) lets you switch the goal
-  visibility mode on the fly. It exposes all eight combinations of the four modes and the invert flag in one list:
-  `Hide All Completed`, `Hide All Incomplete (Inv.)`, `Hide Template-Hidden Only` (the default),
-  `Hide Template-Hidden (Inv.)`, `Show All`, `Show All (Inv.)`, `Show Only Incomplete`, and
-  `Show Only Completed`. Changing it saves immediately and applies
-  instantly **without restarting the overlay**. See [The Tracker Window](#the-tracker-window) - open the **Controls & Features** dropdown and scroll
-  to **Section Completion Counters** for exactly how each mode affects what is shown and counted.
+* **View Menu**: The `View` button in the bottom-right corner holds everything that decides how the map is drawn:
+  `Zoom`, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Selection Rectangle`, `Manual Layout`, and the goal visibility
+  dropdown. `Lock Camera`, `Lock Layout`, `Selection Rectangle`, and `Manual Layout` also have shortcuts (`Shift+C`,
+  `Space`, `Shift+S`, and `Shift+M` by default).
+* **Pan & Zoom**: Hold `Right-Click` or `Middle-Click` and drag to pan, and use the `Mouse Wheel` to zoom. For an
+  exact zoom level, use the `Zoom` slider in the `View` menu.
+* **Scroll Lists**: Hovering over a goal with many sub-items makes the `Mouse Wheel` scroll the list instead of
+  zooming the map.
+* **Selection Rectangle**: Hold `Left-Click` on empty map and drag over manual completion checkboxes to tick them all
+  at once. It takes a majority vote: sweep mostly unticked boxes and they all get ticked, sweep mostly ticked ones and
+  they all get unticked.
+* **Lock Camera**: Stops wheel zooming and drag panning, so your view can't be nudged out of place by accident.
+* **Lock Layout**: Stops the automatic grid from rearranging goals when you resize the window.
+* **Reset Camera**: Resets pan and zoom, and unlocks the layout.
 
 ### Searching & Filtering
 
-To quickly find a specific goal, press `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box in the bottom-right
-corner. The filter is case-insensitive and intelligently searches across different goal types. Using the search filter
-also dynamically updates the completion counters in the section headers. Pressing the `X` button to clear any search
-box (here or anywhere in the template editor's search menus) automatically re-focuses it so you can keep typing.
+Press `Ctrl+F` (`Cmd+F` on macOS) to focus the search box in the bottom-right corner. The search is case-insensitive
+and also updates the section completion counters. If only a criterion or sub-stat matches, it is shown on its own under
+its parent. Searching for a counter's or text header's name also shows the goals linked to it, and goal descriptions
+are searched too.
 
-* **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match
-  the search term. If only a sub-item matches, it will be the only one shown under its parent. Criterion matches also
-  include the criterion's `Group` ID, so typing a group name (e.g. `enchanter_05`) surfaces every criterion in that
-  group under its parent advancement.
-* **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
-* **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search
-  term.
-* **Counters**: Shows the counter if its name matches. Additionally, all goals linked to a matching counter are shown
-  as exact matches; linking to an advancement shows only the advancement itself (not its criteria), and linking to a
-  specific criterion shows only that criterion under its parent.
-* **Text Headers**: Searching for a text header's display text shows all goals and counters directly linked to that
-  header. Like counters, this uses exact matching and is one layer deep so a linked counter will show up, but the
-  counter's own linked goals will not.
-* **Descriptions**: A goal's description is searched too, and matching one shows the goal on its own, without expanding
-  its criteria or sub-stats. For a multi-stage goal the tracker searches the goal's own description and that of its
-  currently active stage, the same ones its hover tooltip can show. The template editor searches every stage.
-
-You can also filter by the status indicators shown as colored tags in the template editor by typing one of these
-keywords (the term must match exactly):
-
-* `recipe`/`rcp`: recipe advancements.
-* `complex`/`cmplx`: complex advancements, recipes, or achievements (1.7.2 to 1.11.2), meaning ones that have criteria.
-* `hidden`: goals flagged as Hidden.
-* `row1`/`r1`: criteria and sub-stats, which sit on the 1st overlay row. The sub-stats of a multi-stat tagged `noR1`
-  are excluded, since that flag keeps them off the 1st row entirely, as are the single sub-stats of simple stats.
-* `row2`/`r2`: every goal that lands on the 2nd overlay row, whether it sits there by default (advancements, unlocks)
-  or was forced there. When an advancement matches a row keyword it is shown on its own, without expanding its Row 1
-  criteria.
-* `row3`/`r3`: every goal on the 3rd overlay row, by default (stats, custom goals, multi-stage goals, counters) or
-  forced there.
-* `multi`/`multistat`/`multi-stat`: multi-stat categories, meaning stats that track several sub-stats.
-* `nor1`/`no-r1`/`norow1`: multi-stats whose sub-stats are kept out of the 1st overlay row.
-* `pos`/`position`/`manual`: goals with custom manual-layout coordinates.
-* `desc`: goals with a description. Only main goals carry one, so criteria and sub-stats never match. A multi-stage goal
-  counts if it or any of its stages has one (in the tracker: its own or its active stage's), and under the editor's
-  `MS Goal Details` scope `desc` filters the stages themselves.
-
-Unlike the row keywords, which show a matching goal on its own, `complex`, `multi` and `nor1` expand each matching goal
-in the tracker with all of its criteria or sub-stats, since these keywords are about the sub-items themselves.
-
-These keywords work in both the tracker search and the template editor's search, and are listed in the tooltip of each
-search box. In the editor, that tooltip lists only the keywords that apply to the goal type currently selected in the
-scope dropdown, so `complex` only shows up under the `Advancements` scope and `multi` and `nor1` only under the `Stats`
-scope.
+Keywords such as `row1`, `row2`, `row3`, `hidden`, `complex`, `multi`, `pos`, and `desc` filter by goal properties.
+They work in both the tracker and the template editor, and the full list is in each search box's tooltip.
 
 ### Section Completion Counters
 
-Each section header (the separator drawn above each section in the automatic layout, e.g., "Advancements",
-"Statistics") displays dynamic counters reflecting the completion status based on the currently visible items. This is
-how the tracker shows, at a glance, the number of completed advancements (or stats, unlocks, etc.) versus the total for
-that section. These counters respect both the current goal visibility mode (set via the **Goal Visibility Dropdown** in
-the `View` menu) and any active search filter. The section header counters are shown in the automatic layout; they
-do not appear in manual layout mode.
-
-**Format:**
-
-* Sections with sub-items (Advancements/Recipes with criteria, Statistics with sub-stats, Multi-Stage Goals) show:
-  `(Completed Main / Total Main - Completed Sub / Total Sub)`
-* Sections without sub-items (Unlocks, Custom Goals, Counters, simple Statistics) show: `(Completed Main / Total Main)`
-
-**How Goal Visibility Affects Counters:**
-
-* **Hide All Completed**: Since only incomplete items are shown, the counters display only the **total number of
-  remaining
-  items** (e.g., `(Remaining Main - Remaining Sub)` or `(Remaining Main)`).
-* **Hide Template-Hidden Only**: Counts show **completed vs. total** for all items not marked as hidden in the
-  template (
-  e.g., `(Completed Main / Total Main)`).
-* **Show All**: Counts show completed vs. total for every single item defined in the template for that section,
-  including hidden ones (e.g., `(Completed Main / Total Main)`).
-* **Show Only Incomplete**: Like `Hide All Completed`, the counters display only the **total number of remaining
-  items**, but template-hidden items are counted too since they stay visible while incomplete. Inverted
-  (`Show Only Completed`), they display the total number of **completed** items instead.
+Each section header in the automatic layout shows how many of its visible items are completed, as
+`(Completed Main / Total Main - Completed Sub / Total Sub)` for sections with criteria or sub-stats, or
+`(Completed Main / Total Main)` otherwise. The counters follow the current goal visibility mode and search filter.
+The visibility dropdown's tooltip explains what each mode shows and counts.
 
 **Hiding in Manual Layout vs. Automatic Layout:**
 
@@ -791,58 +561,14 @@ Advancely has two separate hiding systems that target different layout modes:
 * **`Hidden` checkbox** (per goal, in the Template Editor): Controls visibility on the **automatic layout** and the
   **stream overlay**. This checkbox is completely ignored when using the manual layout.
 * **Per-position `Hide` checkboxes** (per icon/text/progress position, in the Template Editor): Controls visibility
-  on the **manual layout** only. Each position (icon, text, progress) can be hidden independently. These checkboxes
-  only take effect in `Hide All Completed` and `Hide Template-Hidden Only` modes; `Show All` ignores them, and
-  `Show Only Incomplete` only applies them to the side it filters out (completed goals, or incomplete ones when
-  inverted).
-
-In `Hide All Completed` mode, completed goals fully disappear from the manual layout. In `Hide Template-Hidden Only`
-mode, completed goals are greyed out but remain visible.
-
-**Invert Hiding Mode:**
-
-The inverted variants in the **Goal Visibility Dropdown** (`Hide All Incomplete (Inv.)`,
-`Hide Template-Hidden (Inv.)`, `Show All (Inv.)`, `Show Only Completed`) flip the completion behaviour of
-whichever base mode is selected:
-
-* **`Hide All Completed`** (warning): hides every goal that is **not yet completed** instead of the completed ones
-  (template-hidden goals stay hidden). Your tracker starts almost completely empty and goals appear as you complete
-  them. Section counters still show remaining/total as usual.
-* **`Hide Template-Hidden Only`**: shows everything (template-hidden goals stay hidden), but **incomplete** goals are
-  greyed out and lower transparency instead of completed ones. Goals snap to full transparency once completed.
-* **`Show All`**: same inverted greying as above, and template-hidden goals are revealed too, including in the manual
-  layout.
-* **`Show Only Incomplete`**: becomes `Show Only Completed`, showing only the goals you have already finished
-  (template-hidden and layout-hidden ones included) and hiding everything still open. Handy as a trophy view or for
-  checking what a run has produced so far.
-
-**Show Only Incomplete:**
-
-`Show Only Incomplete` sits at the bottom of the **Goal Visibility Dropdown**. It hides completed goals and shows
-**every** incomplete goal, including ones marked `Hidden` in the template and positions marked `Hide` in the manual
-layout. Use it when you want a pure "what's left to do" view without having to un-hide anything in the template first.
-Unlike `Hide All Completed`, hidden goals are not filtered out here, that is the whole point of the mode.
+  on the **manual layout** only. Each position (icon, text, progress) can be hidden independently.
 
 ### The Player Dropdown (Co-op)
 
-When a co-op lobby is active (either as Host or Receiver), the tracker shows a **Player Dropdown** with entries for
-`All Players` and every individual player in the roster. Each player entry is shown with their Minecraft skin face
-(offline accounts fall back to Notch). Switching to an individual player shows that player's raw
-progress (as if you were looking at their singleplayer tracker), and edits to checkboxes/custom goals in that view
-only affect that player. The `All Players` view applies the configured merge rules instead. The `RUN COMPLETED!`
-banner and frozen timer are tracked per view. See [The Player Dropdown](#the-player-dropdown) for the full
+In an active co-op lobby, the tracker shows a **Player Dropdown** with `All Players` (progress merged by the lobby's
+rules) and every individual player (their own raw progress). Players whose save files are in the world but who aren't
+in the lobby are listed as ghosts under `Not in lobby`. See [The Player Dropdown](#the-player-dropdown) for the full
 behavior.
-
-**Ghost players (Host only).** When the Host has `Track disconnected / offline players (ghosts)` enabled (doesn't work for legacy versions), any player
-whose save files are present in the world but who is not in the live lobby is shown in the dropdown beneath a faint
-`Not in lobby` separator. These cover two cases: a player who disconnected mid-run, and a player who never joined via
-Advancely at all (the Host is the single source of truth, reading their files directly from disk). Ghosts contribute
-to the combined `All Players` progress exactly like connected players, are fully selectable for an individual view,
-and have their usernames/skins resolved via Mojang. They only exist while a lobby is actively hosted, and only for
-files touched within the last 7 days. If a ghost later connects for real, they are promoted to a normal lobby member
-automatically (same UUID). Ghost identities and per-ghost progress are broadcast to receivers, so a receiver's
-dropdown lists and selects ghosts exactly like the host's. As with any other player you aren't, an individual ghost
-view is read-only - its checkboxes and custom goals can't be edited.
 
 ### The Info Bar
 
@@ -852,8 +578,7 @@ A transparent info bar at the top of the window provides a live summary of your 
 * **Run Details**: The Minecraft version, template category, and optional flag you have selected.
 * **Progress**: The main advancement/achievement counter and the overall completion percentage, which includes every
   single sub-task from all categories (recipes, criteria, stats, etc.).
-* **IGT**: The total in-game time for the current world, read directly from the stats file (or, with the SpeedrunIGT
-  mod installed, from that world's `speedrunigt/record.json` for millisecond precision).
+* **IGT**: The total in-game time for the current world (millisecond-exact with the SpeedrunIGT mod).
 * **Update Timer**: A timer showing how long it has been since the game last saved its files.
 
 ### The Notes Window
@@ -911,7 +636,8 @@ real-time display that you can easily add to your stream layout.
 
 > **Alternative to steps 4-6:** Check `Transparent` next to the `Overlay Background Color` setting to make the overlay
 > window itself transparent, so no color key filter is needed. On Windows, enable `Allow Transparency` on the
-> `Game Capture` source. On Linux, a compositor has to be running, otherwise the background turns black.
+> `Game Capture` source. On Linux, a compositor has to be running, otherwise the background turns black. A transparent
+> overlay also unlocks the `Fade Out` options, so cleared goals fade away instead of being cropped.
 
 > **Important for Streamers:** Applying a change to an overlay-related setting will restart the overlay window (other
 > changes, such as tracker visuals, hotkeys, or co-op, leave it running). If it does restart, you may need to re-select
@@ -919,133 +645,32 @@ real-time display that you can easily add to your stream layout.
 
 ### Overlay Layout Explained
 
-In `Scrolling Belt` and `Page` mode the overlay is organized into three horizontally scrolling rows, each dedicated to
-different types of goals:
+In `Scrolling Belt` and `Page` mode the overlay has three rows:
 
-* **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for
-  advancements/recipes and the sub-stats for complex stat goals. A multi-stat category can be kept out of this row with
-  the Template Editor's `Hide Sub-Stats from Row 1` checkbox, in which case only the category itself is shown, still
-  cycling through its sub-stats as its sub-text. Untick `Show Row 1` to leave this row out entirely; Rows 2 and 3 then
-  move up and the window shrinks to match, the same as for a template without any Row 1 icons.
-* **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks. **It can
-  also include Stats, Custom Goals, Multi-Stage Goals, and Counters if forced via the Template Editor.** Items in this
-  row always hide when completed.
-* **Row 3 (Bottom)**: This row is the standard location for all other goal types, including statistics, custom goals,
-  multi-stage goals, and counters. **It can also include Advancements, Recipes, and Unlocks if forced via the Template
-  Editor's `Row 3` checkbox.**
+* **Row 1 (Top)**: Icons of the smallest sub-tasks: advancement criteria and the sub-stats of multi-stat goals.
+* **Row 2 (Middle)**: Main goals such as advancements, recipes, and unlocks.
+* **Row 3 (Bottom)**: Statistics, custom goals, multi-stage goals, and counters.
 
-When a goal is completed it never snaps the row into a new position. Instead it leaves a gap where it was, and that gap
-quietly scrolls off-screen while the remaining items keep flowing, so the rows stay perfectly smooth no matter how fast
-goals are completed. If only a few goals are left the row repeats across the screen, so a single completion can briefly
-leave more than one gap before they fill back in.
+The Template Editor can move goals between Row 2 and Row 3, and keep a multi-stat's sub-stats out of Row 1.
 
-`Compact` mode (inspired by [Zesskyo](https://www.youtube.com/@ZesskyoMC)) drops the three rows entirely for a tall,
-narrow column:
-
-* **The counter panel (top)**: One big "label over count" block on a 9-slice background, e.g. `Advancements:` over
-  `7/80`. It cycles through whichever goal types and individual goals you pick, and pressing `SPACE` while the overlay
-  window is focused cuts to the next entry. The progress text the other modes show in their top bar (the run
-  completion counter, e.g. `Adv:` over `12/80`, and the percentage, `Prog:` over `45.32%`) can be added as entries
-  too. Tick `Chain All Entries` to show every entry at once instead of cycling, labels chained on the top line and
-  counts on the bottom (`Adv: - Prog:` over `12/80 - 45.32%`), joined by a configurable `Chain Separator`; the chain
-  holds at most 32 entries. Goals you can tick off yourself are prefixed with `[x]` (checked off
-  manually), `[a]` (completed automatically, by a linked goal or by reaching the target), or `[o]` (not done).
-* **The pop-out stack (below)**: As goals progress or complete they slide out from under the panel and stack beneath
-  it, newest on top pushing the older ones down, each holding for a set time before it leaves. A completed criterion or
-  sub-stat pops as a 2-line group (its parent advancement/category, then the criterion itself).
-* **The promo line**: Takes the stack's first slot whenever no goal is popping. It only scrolls if it is too long for
-  the window, in which case it bounces between its two ends.
-* **On run completion**: The panel freezes on `RUN COMPLETED!` over the final IGT (honoring the `Timer Unit Spacing`
-  and `Timer Always Show ms` options), the promo pins to the top of the stack, and the supporters stack in below it,
-  one popping in every 0.5-8 seconds with their own emote.
-
-The panel is sized to the widest entry it will ever show and the window auto-fits its content, so neither changes size
-during a run and both can be cropped and aligned once in OBS. Nothing in this mode ever fades - every motion is a slide
-or a crop - so color keying stays clean.
+`Compact` mode (inspired by [Zesskyo](https://www.youtube.com/@ZesskyoMC)) replaces the rows with a tall, narrow
+column: a counter panel on top cycles through the goal types and goals you pick (`SPACE` on the focused overlay skips
+to the next one), and progressing or completed goals pop out into a stack beneath it. Goals you can tick off yourself
+are marked `[x]` (checked off manually), `[a]` (completed automatically), or `[o]` (not done).
 
 ### Customization
 
-Nearly every aspect of the overlay can be tailored to your liking from the settings window:
+Nearly everything about the overlay can be adjusted in the settings window:
 
-* **Speed & Direction**: Adjust the `Overlay Scroll Speed`. A positive value scrolls left-to-right, while a negative
-  value scrolls right-to-left. A value of 0 makes the items static. Each row can override the global value: tick
-  `Custom Row 1/2/3 Scroll Speed` to give that row its own speed and direction.
-* **Auto-Freeze**: Tick `Row 1/2/3 Auto-Freeze` (on by default) to stop a row scrolling once its remaining items fit
-  inside the overlay width, showing each item once. A dropdown then sets whether those frozen items are `Left`,
-  `Center`, or `Right` aligned.
-* **Overlay Mode**: Pick `Scrolling Belt` (the classic scrolling conveyor), `Page` (a static, centered page of items
-  that cuts to the next page like a book), or `Compact` (a tall, narrow counter panel with goals popping out beneath
-  it). `Page` mode reveals its own `Page Switch Interval` and `Page Alignment` options. While more items remain than
-  fit one page, pages repeat so each is full (no empty space); once every remaining item fits a single page they stop
-  repeating and clear away as they complete, aligned per `Page Alignment`. `Compact` replaces the three-row layout
-  entirely, so the belt/page-only sections are hidden and the Compact settings appear instead.
-* **Compact Mode**: The `Row 1 Icons` section at the top can show the first-row icons (advancement criteria and
-  sub-stats, minus any multi-stat category set to `Hide Sub-Stats from Row 1`) in a strip above the panel. Tick `Show
-  Row 1 Icons` to enable it, then set the `Icon Size`, `Shared Icon
-  Size` (the small parent icon overlaid on a shared criterion, dropped when it would be identical on another sharer unless
-  `Keep Redundant Shared Icons` is on), `Horizontal Icon Spacing` (horizontal gap between the
-  strip icons), `Icon Gap Below` (space between the strip and the panel), `Icon Cycle Interval` (how fast the strip
-  flips, with `Space` advancing the strip and the panel together), and `Clear Animation (s)` (how long a completed icon takes to crop away, `0` = instant, sign = direction;
-  independent of the Belt/Page one). Its own `Fade Out` below that fades a completed icon out instead of cropping it,
-  with the value next to it setting how long the fade takes; an icon plays either the crop or the fade, never both, so
-  ticking `Fade Out` disables the `Clear Animation (s)` above it, and like the pop-out stack's `Fade Out` it needs the
-  `Transparent` overlay background. The strip fits as many icons as the panel is wide and
-  follows the `Panel Alignment`; it respects hidden goals (honoring `Show Hidden Goals`). Like Page mode, it repeats to
-  fill while more icons remain than fit, then clears them as they complete once they all fit. Below that, customize the
-  panel's `Panel Texture` (any `.png` or `.gif` in the `gui` folder), its 9-slice
-  `Panel Border`, `Panel Pixel Scale`, `Panel Padding`, and `Panel Alignment`. Setting `Panel Alignment` to `Right`
-  also mirrors the pop-out stack (and the promo/showcase line beneath it), so each line reads text, then player face,
-  then icon (icon flush to the panel's right edge) with its completion marker on the text's right side. `Panel Content` picks which goal types
-  and individual goals cycle on the panel and how fast (`Cycle Interval`); the `Main Goal Types` dropdown also lists the
-  `Progress Text` entries (the run completion counter and the overall percentage), and `Chain All Entries` shows
-  everything at once (up to 32 entries) with a `Chain Separator` in place of the cycle. `Stack Content` independently picks what may
-  pop out below it, whether each type pops on every increment or only on completion (`Pop On Progress`), and how the
-  stack behaves (`Show Completion Markers`, `Max Stack Lines`, `Hold Time`, `Animation Time`, `Fade Out`, `Pop Icon Size`,
-  `Shared Icon Size`, `Keep Redundant Shared Icons`). `Fade Out` fades a line out when it leaves the stack instead of removing it instantly, with the
-  value next to it setting how long the fade takes; it needs the `Transparent` overlay background and stays disabled without
-  it, because over a solid background a half-faded pixel blends with the background color and a color key filter leaves
-  it behind as a ghost. `Show Completion Markers` toggles the `[o]`/`[a]`/`[x]` markers (not done / auto-completed /
-  checked off by hand) on manually- and auto-completable goals, on both the panel count line and the stack; turning it
-  off also stops a bare completion from popping a line, while value changes still pop when `Pop On Progress` is on. The
-  label, the count, and the stack each get their own font and text size. In co-op, the `Compact Overlay Player Face` controls
-  (`Panel Face Size`, `Panel Face Offset X`, `Panel Face Offset Y`) in the `Co-op` tab size and position the pinned
-  player face; see **Co-op in Compact mode** below.
-* **Text Sizes**: Set the `Top Text Size` (top info bar) and `Row Text Size` (row 2 and 3 item text) independently. A
-  larger size increases the overlay window height to fit the taller text.
-* **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed
-  up the animation by holding `SPACE` while the overlay window is focused.
-* **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
-  overlay cycles through displaying each sub-stat. **Note:** Sub-stats marked as "Hidden" in the template will be
-  skipped during this cycle.
-* **Clear Animation**: Set the `Clear Animation (s)` to give cleared goals a short crop-away animation instead of
-  vanishing instantly (handy on colorkeyed overlays where fading is not possible). `0` is instant, positive values
-  crop the icon upwards over that many seconds, and negative values crop it downwards. Tick `Fade Out` below it to
-  fade cleared goals out instead, with the value next to it setting how long the fade takes; a goal plays either the
-  crop or the fade, never both, so turning `Fade Out` on disables the `Clear Animation (s)` above. It applies to all
-  three rows and, like the Compact pop-out stack's `Fade Out`, needs the `Transparent` overlay background and stays
-  disabled without it, because over a solid background a half-faded pixel blends with the background color and a color
-  key filter leaves it behind as a ghost.
-* **Settle Animation**: Set the `Settle Animation (s)` below `Fade Out` to slide the remaining goals over into the gap
-  a cleared goal leaves behind instead of jumping them into place (`0` jumps). The slide eases in and out and only runs
-  on a row that stands still: a row held by its `Auto-Freeze`, or a `Page` mode row once every remaining goal fits one
-  page. Compact mode's `Row 1 Icons` section has its own `Settle Animation (s)` for the icon strip.
-* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide unless forced to
-  Row 3), and toggle the visibility of each section of the
-  top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
-* **Show Hidden Goals**: Available in every mode. Off by default, so goals marked `Hidden` in the template stay out of
-  the overlay. Tick it to show them anyway; in `Compact` mode they then also become selectable in the dropdowns and are
-  counted in the `Stack Content` totals.
-* **Segment Separator**: Configure the character drawn between segments anywhere a separator is shown (the overlay's
-  top bar, the tracker info bar, the tracker info window's title bar, and the OS window title). Defaults to `|`.
-  Replace it (up to 8 characters) with whatever your tracker/overlay font supports if the pipe glyph is missing.
-* **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
-* **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
-  within that row or be fully fixed. When two items within the first row share the same texture (based on hashing) their
-  parent icon will be overlaid to distinguish them further. The `size` of this overlaid icon can also be configured.
-* **Vertical Spacing**: Enable `Custom Vertical Spacing` to individually tune the vertical gaps between the rows
-  (`Top Bar -> Row 1 Gap`, `Row 1 -> Row 2 Gap`, `Row 2 -> Row 3 Gap`, and `Row 3 -> Bottom Gap`). Each gap adds on top
-  of the default, font-driven layout and grows the overlay window height to match. It defaults to off with every gap at
-  `0`, leaving the stock spacing unchanged.
+* **Modes & Movement**: Render mode, scroll speed and direction, per-row speeds, and auto-freezing a row once its
+  remaining items fit. Hold `SPACE` on the focused overlay to temporarily speed up the animation.
+* **Sizes & Spacing**: Window width, text sizes, icon and background sizes, and horizontal and vertical spacing.
+* **Animations**: How cleared goals crop or fade away, and how the remaining ones slide into the gap.
+* **Content**: Which top bar segments are shown, whether completed or template-hidden goals stay visible, and, in
+  `Compact` mode, what the panel cycles through and what pops out into the stack.
+
+Every setting is explained in its tooltip, and the settings search (`Ctrl+F` / `Cmd+F`) finds any of them by name or
+tooltip text.
 
 </details>
 
@@ -1088,499 +713,89 @@ the `Open Template Editor` button.
 
 ### Template Management
 
-From the main editor view, you can manage entire template packages. **Create New Template** and **Edit Template** are
-their own buttons, while the copy, rename, delete, import and export actions are grouped under the **`Template...`**
-dropdown to keep the button row tidy:
+**Create New Template** and **Edit Template** have their own buttons; copy, rename, delete, import, and export sit in
+the **`Template...`** dropdown.
 
-* **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a
-  `Category Name` and an `Optional Flag`. A template's identity is the `Category Name` **and** `Optional Flag`
-  **individually**, not the two strung together: each template lives in its own `Category Name` folder, so
-  (`category: all_advancements`, `flag: _x`) and (`category: all_advancements_x`, `flag:` *empty*) are **two different
-  templates** that happily coexist even though their names read the same. In the **Existing Templates** list the
-  `Optional Flag` is shown in a dimmed colour, and its leading underscore even fainter, so you can always tell which
-  is which. You don't need to type that underscore: when you create, copy, rename, or import a template, the
-  `Add underscore` checkbox under the `Optional Flag` field (ticked by default) puts it in for you (`custom` becomes
-  `_custom`), so the file names come out exactly as before. Untick it to attach the flag directly to the category
-  name instead (`test` + `1` becomes `test1`); hovering the checkbox shows the resulting file name. For the same
-  reason the `Copy Template`, `Rename Template` and `Import Template` fields are pre-filled without the underscore,
-  with the checkbox set to match the source template, and the settings `Optional Flag` dropdown lists the flags
-  without it too. A template is only treated as already existing when its `Category Name` **and** `Optional Flag`
-  both match. In that case, instead
-  of a hard error, a **`Replace Existing Template?`** confirmation appears, warning you that continuing permanently
-  deletes the existing
-  template and **all** of its associated files (language, layout, `notes` and global-stats `snapshot`). Choose
-  **`Replace`** to overwrite it with the new empty template, or **`Cancel`** to keep the existing one and pick a
-  different name. Replacing the template that is currently in use reloads the tracker onto the new empty template.
-* **Copy Template**: Duplicates an existing template, including all its language **and layout files**. This is the
-  perfect starting point for creating a variation of a complex template. Note that a copy does **not** carry over your
-  `notes` (or the global-stats `snapshot` on legacy versions); use **Rename Template** if you want to keep those.
-* **Rename Template**: Changes a template's `version`, `category` and/or `Optional Flag` in place. Unlike a copy, this
-  **moves** the template and **all** of its associated files, so your language, layout, `notes` **and** (on legacy
-  versions) the global-stats `snapshot` files are kept intact. If you rename the template that is currently in use, the
-  tracker automatically follows the rename.
+* **Template identity**: A template is identified by its `Category Name` **and** `Optional Flag` separately, not the
+  two strung together. (`all_advancements` + `_x`) and (`all_advancements_x` + no flag) are two different templates.
+* **Copy vs. Rename**: A copy takes the language and layout files with it, but not your `notes`. Rename moves the
+  template with **all** of its files, notes included, and the tracker follows it if it is in use.
+* **Replacing & Deleting**: Creating, copying, renaming, or importing onto an existing template asks before replacing
+  it. Replacing or deleting a template permanently removes **all** of its files (language, layout, and notes).
+* **Import & Export**: Templates are shared as `.zip` files, e.g. on the
+  [Official Advancely Discord](https://discord.gg/TyNgXDz). Tick `Bundle icon files` when exporting a template that
+  uses custom icons, so the recipient gets everything in one file.
 
-  Both **Copy Template** and **Rename Template** use the same replace-instead-of-error behaviour as creating a new
-  template: if the destination `version`, `Category Name` **and** `Optional Flag` all match an existing template, the
-  same **`Replace Existing Template?`** confirmation appears. Choosing **`Replace`** permanently deletes the destination
-  template and **all** of its associated files (language, layout, `notes` and global-stats `snapshot`) before the copy or
-  rename overwrites it, and reloads the tracker if it was using that template.
-* **Delete Template**: Permanently removes a template and all of its associated language, layout, **and notes files**.
-  A template that is currently in use can also be deleted; the tracker simply falls back to the default template.
-* **Import Template**: Imports a full template package from a `.zip` file. Exported zips embed their exact version,
-  category, and flag, so the import fields are pre-filled correctly (important for COOP) without guessing from the filename (older zips fall
-  back to filename parsing). An `Exported as` line shows the zip's original identity so you can spot any accidental
-  edits to the pre-fill before importing; for older zips without embedded metadata it shows `unknown`, since the
-  category/flag split was only guessed from the filename and may be wrong. You can still confirm or change the version, category, and flag before the
-  files are added. Both the flag field and the `Exported as` line show the flag without its leading underscore, and
-  the `Add underscore` checkbox is pre-set to match the zip, so leaving both as they are imports under the zip's exact
-  original flag and COOP identities keep matching. If the zip contains bundled icon files, an **Import bundled icon
-  files** checkbox will appear and enabling it extracts those icons directly into your `icons` folder so
-  they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
-  Importing uses the same replace-instead-of-error behaviour as creating, copying and renaming: if the chosen `version`,
-  `Category Name` **and** `Optional Flag` all match an existing template, the **`Replace Existing Template?`**
-  confirmation appears. Choosing **`Replace`** permanently deletes the existing template and **all** of its associated
-  files (language, layout, `notes` and global-stats `snapshot`) before the import overwrites it, and reloads the tracker
-  if it was using that template. The `Import Template` button in the settings (`ESC`), next to `Open Template Folder`,
-  starts this import right away and opens the Template Editor once a `.zip` is chosen (cancelling the file dialog opens
-  nothing). Like `Open Template Editor`, it is disabled during a Co-op session.
-* **Export Template**: Packages the selected template and all its language **and layout files** into a single `.zip`
-  file, perfect for
-  sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz). Clicking the button opens a
-  small confirmation popup where you can optionally enable **Bundle icon files** before confirming and this copies all
-  icon files referenced by the template into an `icons/` folder inside the zip. This is strictly a **copy** operation and
-  your local `icons` folder is never modified or deleted. Recommended whenever your template uses custom
-  icons not included with a standard Advancely install, so recipients get everything they need in a single file.
+### Language & Layout Files
 
-### Language File Management
+Each template can have several language files (`_lang`) and several layout files (`_layout`), managed with the
+buttons next to their dropdowns. Manual positions and decorations live in the layout files, so a custom layout
+survives official template updates.
 
-Each template can have multiple language files for localization. The editor allows you to manage these for any selected
-template:
-
-* **Create Language**: Creates a new, blank language file. Display names will initially default to their internal root
-  names.
-* **Copy Language**: Duplicates an existing language file to a new one, preserving all translations.
-* **Delete Language**: Removes a specific language file (you cannot delete the default `_lang.json`).
-* **Import/Export Language**: Import a single `.json` language file from an external source or open the folder
-  containing the selected language file to export it.
-
-### Layout File Management
-
-Manual layout positions and decorations no longer live inside the core template `.json`; they sit in their own
-`_layout` files next to the language files (the default is `_layout.json`, named variants are `_layout_<flag>.json`).
-This mirrors the language system exactly, so the same `(has layout)` marker, settings `Layout` dropdown, and editor
-management buttons apply. A template can carry several layouts, and a custom layout you build on an official template
-survives that template's automatic updates.
-
-Text headers are the one part of a layout whose content lives in the language files: a header's display text is stored
-there as `decoration.<id>`, and all layouts of a template share the same language files. The header texts of **every**
-layout are kept in the language files, so saving while one layout is loaded never removes another layout's header
-text. This also means that text headers with the **same ID** in different layouts share **one** display text: editing
-it in one layout changes it in all of them. To give a layout its own text (for example its own credits), give that
-header an ID no other layout uses.
-
-* **Create Layout**: Creates a new, blank layout file (no positions or decorations). Build it up afterward with the
-  **Visual Layout Editor**.
-* **Copy Layout**: Duplicates an existing layout file to a new flag. Copying the `Default` when the template has no
-  separate layout file yet produces a blank layout.
-* **Delete Layout**: Removes a specific layout file (you cannot delete the default `_layout.json`). The layout that is
-  currently in use **can** be deleted; the tracker then falls back to the default layout.
-* **Import/Export Layout**: Import a single `_layout` `.json` file from an external source under a new flag (the editor
-  refuses files that aren't layout files), or open the folder containing the selected layout file to export it.
+Text header texts are the exception: they are stored in the **language** files, which all layouts of a template share.
+Text headers with the **same ID** in different layouts therefore share one text. Give a header an ID no other layout
+uses to give that layout its own text.
 
 ### Editing a Template
 
-Opening a template reveals a tabbed interface where you can define every goal. Every tab uses the same split
-layout: the list sits on the left, and selecting an entry opens its fields in the details pane on the right. Each
-list has a `Show Display Names` checkbox to toggle between display names and root names (IDs for decorations).
+Every tab lists its goals on the left and opens the selected one's fields on the right. Every field and checkbox is
+explained in its tooltip, so this only covers what isn't obvious at first glance.
 
 > **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any
 > GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option,
 > and exporting the result.
 
-* **Sorting & Reordering**: You can easily rearrange any goals, categories, criteria, or stages. Click the small badge
-  next to an item to assign it a sequential sort order. Once you've numbered the items you want to move, click the
-  `Sort` button to instantly reorder them, or use `Reset Order` to clear your selections. Combine the search feature
-  with the badge sorting for efficient template creation! You can also drag any row by its handle to move it to a new
-  position; if the dragged row is part of a bulk selection, the whole selection moves together preserving its relative
-  order.
-* **Status Indicators**: In the goal lists that show only a name (parent advancements, parent stats, unlocks, custom
-  goals, multi-stage goals, and counters), small colored tags on the right edge of each row summarize how the goal behaves without opening its
-  detail pane: `rcp` (recipe, advancements only), `cmplx` (has criteria, advancements only), `H` (hidden from the
-  overlay and automatic tracker layout),
-  `R2`/`R3` (forced to the 2nd/3rd overlay row), `multi` (multi-stat category, stats only), `noR1` (sub-stats kept out
-  of the 1st overlay row, multi-stats only), `pos` (has custom manual-layout coordinates), and `desc` (has a
-  description, on a multi-stage goal also when only one of its stages has one). The tags appear in the same order as
-  the matching checkboxes in the detail pane, with `desc` last. Hover the tags for a tooltip describing the active ones.
-  Decorations have none of those flags, so their rows carry a type tag instead: `txt` (text header), `line`, or `arw`
-  (arrow), plus `desc` for a text header with a description. The full type name (`Text Header`, `Line`, `Arrow`) is also matched by the editor's search box.
-* **Bulk Selection**: Every list and detail pane in the editor (parent advancements, criteria, parent stats, sub-stats,
-  multi-stage goals, stages, unlocks, custom goals, counters, decorations) has a small checkbox on each row for
-  selecting multiple entries at once. `Shift+Click` extends or clears a range. While anything is selected, a
-  right-aligned `Bulk Actions...` button appears next to a `Deselect all` button. Every menu starts with `Select All`
-  (select every row in that list) followed by
-  `Invert Selection` (select every row in that list that is not currently selected, and deselect the rest), which are
-  available in all tabs since they are independent of the goal type. The dropdown then groups every action that
-  runs across the whole selection: `Set Icon...` (apply the same icon path to every selected row), `Toggle Hidden`
-  (flip the Hidden flag, majority-rule for the target state), `Layout Coordinates...`, and `Delete Selected...` (with
-  confirmation). Beyond `Toggle Hidden`, each menu also exposes the other boolean toggles available for that goal type
-  (all majority-rule like `Toggle Hidden`): advancements add `Toggle Is Recipe` (modern versions only) and `Toggle Row
-  3`; stats add `Toggle Row 2`, `Toggle Multi-Stat Category` (which converts each selected stat, keeping only
-  the first sub-stat when switching back to simple), and `Toggle Hide Sub-Stats from Row 1` (which skips simple stats in
-  the selection); sub-stats add `Toggle Hide Progress` (which skips sub-stats without a target value); unlocks add
-  `Toggle Row 3`; custom goals and counters add `Toggle
-  Row 2`; multi-stage goals add `Toggle Row 2` and `Toggle Per-Stage Icons`. For advancement criteria the menu also
-  gets `Add selection to group` / `Ungroup selection` when groups
-  are enabled. The row count next to each list shows a ` · N selected` suffix while a selection is active. Stages only
-  expose `Set Icon...` when `Use Per-Stage Icons` is enabled on the parent goal; decorations have no icon or hidden
-  field so their menu only shows `Delete Selected...`. Ticks in a detail pane (criteria, sub-stats, stages) are kept
-  per parent goal, so opening another advancement, stat or multi-stage goal and coming back finds them again. Ticking
-  and clearing checkboxes is undoable with `Ctrl+Z`.
-  * `Layout Coordinates...` opens a sub-popup that mirrors the per-goal `Layout Coordinates` collapsible header
-    (`Icon Pos.` and `Text Pos.`, plus `Progress Pos.` for stats, sub-stats, multi-stage goals, and counters; for
-    advancements `Progress Pos.` appears only when at least one selected advancement has criteria, and applies to
-    those complex advancements only). Simple advancements without criteria still occupy their grid slot (left empty)
-    so the applied progress text stays aligned with Icon Pos. and Text Pos. instead of shifting forward. Each
-    coordinate exposes the usual `X` / `Y` base values, an `Anchor`, an `is_set` / `Hide` pair, and an optional `+X`
-    / `+Y` stride next to each base. The stride distributes values across the selection in template/list order. The
-    `Fill order` dropdown at the top of the popup picks the walking direction: `Left to right, then next row` (the
-    default) or `Top to bottom, then next column`. The neighbouring field is `Rows` in the horizontal order and
-    `Columns` in the vertical one and is the number of rows (or columns) the selection gets spread over: `0` lays
-    items out linearly (`item N` gets `base + N * stride` on both axes, useful for rows, columns, and diagonals),
-    while `1` or higher makes a grid with exactly that many rows (or columns), each holding
-    `ceil(count / Rows)` (or `ceil(count / Columns)`) items. Horizontal: `X` uses `N mod PerRow`, `Y` uses
-    `N div PerRow`; vertical: `Y` uses `N mod PerColumn`, `X` uses `N div PerColumn`. The fill order is shared by
-    every section and every bulk layout popup. Each section has its own
-    `Apply ... to selected` button so you can tune Icon Pos. without touching Text Pos. (or vice versa). The Apply
-    button is also field-aware: it only writes the buckets (`Enable`, `Hide`, `Position` (X/Y/stride/columns/fill
-    order), or `Anchor`) you actually changed since opening
-    the popup, leaving the rest untouched on each selected goal, and its label updates to show what will be applied
-    (for example `Apply Text Pos. (Hide)`). Change nothing, or change all four buckets, and it applies everything
-    (labelled `(Everything)`), which is also how you stamp the default values onto a selection. Available wherever the goal type has at least one
-    `ManualPos` field; stages and decorations are excluded (stages have no `ManualPos`; decoration shapes have
-    type-specific endpoint geometry that doesn't bulk-stride cleanly). Enabling a position without changing `X` / `Y`
-    seeds each selected goal with the spot it currently occupies on the tracker.
-* **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and
-the **stream overlay**. Separately, when a goal has manual positions set (for use with Manual Layout mode), each
-position (icon, text, progress) gains its own `Hide` checkbox that controls visibility on the **manual layout**
-only. This lets you, for example, hide a goal's progress text in the manual layout while still showing it on the
-overlay. For sub-items (criteria and sub-stats), a position with its own coordinates is independent: its `Hide`
-checkbox is the only thing that hides it, so it stays visible even when the parent goal is hidden. A sub-item
-position without its own coordinates belongs to the parent and inherits the parent's hidden state. Ticking a position
-for the first time starts it at the spot the element currently occupies on the tracker (when you are editing the
-active template), so enabling manual positioning never teleports the element.
-* **Empty Display Names**: Leaving a `Display Name` empty frees its spot: the progress text below it (for a sub-stat,
-  the value next to it) moves into the name's place on the tracker and the overlay, and the empty name has no drag
-  handle in the `Visual Layout Editor`. In the manual layout this only happens while the progress text has no position
-  of its own, and ticking the name's `Hide` checkbox does the same, so hiding a name never hides its progress text. The
-  progress text then sits at the name's default spot by the icon, even if the name itself was moved. The criteria and
-  sub-stat list under an advancement or stat stays where it is.
-* **Hide Progress**: When a stat, sub-stat, custom goal or stat stage has a `Target Value` above `0`, a
-  `Hide Progress` checkbox (off by default) appears below it. It leaves the progress value (e.g. `(3/10)`) out
-  everywhere the goal shows: the tracker, the overlay, the compact overlay and any multi-stage stage mirroring it. The
-  goal still completes when its target is reached. Infinite counters (`-1`) have no target, so they always show their
-  value.
-* **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
-  in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
-  `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
-  move it to the percentage progress calculation instead.
-    * **Row 3 Toggle**: You can check the `Row 3` box to force an advancement or recipe to appear in the bottom row of
-      the overlay instead of the middle row.
-* **Statistics**: Track any in-game statistic.
-    * **Simple Stats**: A single goal with a `Target` value (e.g., track "Blocks Mined" until a goal of 10,000 is
-      reached).
-    * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and
-      target, and will cycle on the stream overlay.
-    * **Hide Sub-Stats from Row 1**: Only shown once a stat is a `Multi-Stat Category`. Ticking it keeps that category's
-      sub-stats out of the overlay's first row in every render mode (`Scrolling Belt`, `Page`, and the `Compact` mode's
-      `Row 1 Icons` strip). The category itself is unaffected: it still shows in its own row and still cycles through
-      its sub-stats as the sub-text there. Advancement criteria are never affected by this. If no criterion or sub-stat
-      is left to show in the first row (all hidden or kept out this way), the overlay leaves that row out and moves
-      everything below it up, and the `Row 1` settings are disabled.
-    * **Auto-Complete via Linked Goals**: Both stat categories and individual sub-stats support automatic completion
-      through linked goals. Use the `Select Goals` button to pick any combination of advancements, criteria, stats,
-      sub-stats, unlocks, custom goals, or multi-stage goal stages. Choose between `AND` mode (all selected goals must
-      be completed) or `OR` mode (at least one selected goal must be completed) using the dropdown next to the goal
-      list. When the condition is met, the stat is automatically marked as done — in addition to natural progress-based
-      completion and manual checkbox overrides. A goal can never be linked to itself, and goals linking back to each
-      other in a loop never complete each other.
-    * **Row 2 Toggle**: You can check the "Row 2" box to force a stat category to appear in the middle row of the
-      overlay instead of the bottom row.
-* **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like
-  `minecraft:exploration`.
-    * **Row 3 Toggle**: You can check the `Row 3` box to force an unlock to appear in the bottom row of the overlay
-      instead of the middle row.
-* **Custom Goals**: Create goals for things that can't be automatically tracked (you may add linked goals similar to stats). The "Target Goal" value
-  defines its behavior:
-    * `0`: A simple on/off toggle (manual checklist item).
-    * `>0`: A progress-based counter that completes when the target is reached.
-    * `-1`: An infinite counter with no completion state.
-    * **Row 2 Toggle**: You can check the "Row 2" box to force a custom goal to appear in the middle row of the overlay.
-* **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of
-  `Stages`. You can toggle **Per-Stage Icons** to assign a specific image to every individual step. Each stage is a
-  smaller goal that must be completed in order. A newly created goal already comes with one editable stage plus the
-  mandatory `Final` stage, so you can start filling it in right away. A stage's `Type` determines its trigger:
-    * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
-      `stats` folder). A `Target Value` above `0` completes the stage when the stat reaches it. A `Target Value` of `-1`
-      makes it an infinite counter that never completes on its own, so it must be completed by a linked goal or the
-      `Auto-complete if next stage is completed` checkbox instead. A `Target Value` of `0` is not allowed and is flagged
-      as an error on save. `Start counting when stage is reached` makes the `Target Value` mean "this much *more*"
-      rather than a total the stat must reach: whatever it already stood at doesn't count. A stage you haven't reached
-      yet reports `0` rather than its real value, so a stat that is already high can never complete a later stage
-      before the goal gets to it. In co-op each player starts at `0` when they reach the stage and the stage shows
-      what the lobby has gained since, so a player joining midway brings nothing with them. Where each player started
-      is kept per world in `settings.json`, so it survives restarting Advancely and leaving the world and coming back
-      (reaching that same stage in the other world replaces it). Because such a stage only counts as complete while
-      that is known, it is worth also ticking `Auto-complete if next stage is completed` on it.
-    * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
-    * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
-      biome for "Adventuring Time").
-    * **Unlock**: Triggers when a specific player unlock is obtained (read from the `unlocks` folder).
-    * **Mirror Another Goal**: Tick `Mirror another goal` on any non-final stage and pick one goal with
-      `Select Goal` instead of giving the stage a trigger of its own. The stage completes exactly when that goal
-      does, and whatever value that goal shows is appended right after the stage's display text on the tracker and the
-      overlay alike, while the goal's own name stays on the first
-      line as always. Anything in the template can be mirrored: an advancement or one of its criteria, a stat
-      or sub-stat, an unlock, a custom goal, a counter, another multi-stage goal or one of its stages. Goals
-      with no value of their own (criteria, unlocks, simple toggles) just show the display text. The goal being
-      edited is greyed out in the popup, since a stage can't mirror its own goal. A mirror counts as a linked
-      goal. Chains of linked goals fail beyond a depth of 32, and goals linking back to each other in a loop never
-      complete each other.
-    * **Auto-Complete via Linked Goals**: Every non-final stage also supports automatic completion through linked goals.
-      Use the `Select Goals` button to pick any combination of advancements, criteria, stats, sub-stats, unlocks, custom
-      goals, or multi-stage goal stages, and choose `AND` mode (all selected goals must be completed) or `OR` mode (at
-      least one) using the dropdown next to the goal list. When the condition is met, the stage advances automatically in
-      addition to its natural trigger. Chains of linked goals fail beyond a depth of 32, and goals linking back to each
-      other in a loop never complete each other.
-    * **Auto-Complete if Next Stage is Completed**: Each non-final stage has an `Auto-complete if next stage is completed`
-      checkbox. When enabled, the stage is also considered complete once the following stage is complete (on top of its
-      own trigger and any linked goals). This chains backward, so a completed later stage pulls every earlier opted-in
-      stage forward. Useful when an earlier stage's trigger isn't reliably detectable but a later milestone is.
-      The checkbox is not shown on the stage directly before the `Final` stage, since the `Final` stage is never
-      completed on its own and there would be nothing to inherit. It disappears automatically if you drag a stage
-      into that slot, and an already-ticked setting is remembered (and saved) while hidden, so moving the stage back
-      out restores it.
-    * **Final**: The mandatory last stage that completes the entire multi-stage goal.
-    * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
-      overlay.
-* **Counters**: Track how many goals from a selected set are completed. Each counter has a `Root Name`, `Display Name`,
-  and `Icon Path`. Use the **Select Goals** button to open a multi-select popup where you can pick any combination of
-  advancements, criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages. Hold **Shift** and click
-  to select a range. The goal being edited is greyed out in the popup, since a goal can never be linked to itself.
-  Goals linking back to each other in a loop never complete each other, so such a counter can never reach its total.
-  The counter displays progress as "(completed / total)" and uses the default, half-done, and done
-  background textures based on progress. Only full completion (all linked goals done) contributes to the overall progress
-  percentage.
-    * **Row 2 Toggle**: You can check the "Row 2" box to force a counter to appear in the middle row of the overlay.
+* **Custom Goal Targets**: `0` is a simple checkbox, `>0` a counter that completes at the target, and `-1` an infinite
+  counter.
+* **Multi-Stage Goals**: Each stage triggers on a stat, advancement, criterion, or unlock, or **mirrors** any other goal
+  in the template and shows its value. `Start counting when stage is reached` makes a stat stage count only what is
+  gained after the goal gets to it. `Auto-complete if next stage is completed` helps with stages that are hard to
+  detect.
+* **Linked Goals**: Stats, sub-stats, custom goals, stages, and counters can link to other goals and complete once
+  all (`AND`) or any (`OR`) of them are done.
+* **Overlay Rows**: `Row 2` / `Row 3` checkboxes move a goal between the overlay's middle and bottom rows.
+* **Hiding**: `Hidden` affects the automatic layout and the overlay. Each manual position has its own `Hide` checkbox
+  for the manual layout. An empty `Display Name` hands its spot to the progress text.
+* **List Tools**: Number items with the small badges and press `Sort` (or drag a row by its handle) to reorder. The
+  colored tags on each row summarize a goal's flags. Row checkboxes allow bulk selection, and `Bulk Actions...` then
+  applies icons, toggles, deletion, or layout coordinates to the whole selection. `Ctrl+Z` / `Ctrl+Y` undo and redo.
 
-### Decorations Tab
+### Decorations & Run Completion
 
-The **Decorations** tab in the Template Editor allows you to add visual elements to your manual layout that are not
-tied to any game data. These elements are only visible when "Manual Layout" mode is enabled.
-
-Click the `Add...` button above the list and pick the element you want: `...Text Header`, `...Line`, or `...Arrow`.
-The new decoration is appended to the list and selected right away, so its fields open in the details pane on the
-right. Each row is tagged with its type (`txt`, `line`, `arw`) so you can tell them apart at a glance.
-
-* **Text Headers**: Display custom text on the tracker map using the main tracker font and font size. Useful for
-  labeling different sections or areas of your layout. Each text header has a position that can be set numerically
-  or dragged in the Visual Layout Editor. Its display text is stored in the language files under its ID, which all
-  layouts of the template share, so a header with the same ID in another layout shows the same text (see
-  [Layout File Management](#layout-file-management)). Like a goal, a text header can have an optional `Description`,
-  shown as a tooltip when hovering the header on the tracker map and shared across layouts the same way.
-* **Lines**: Draw a line between two endpoints on the map. Lines use the tracker's text color and have configurable
-  **Thickness** and **Opacity** sliders. Each endpoint can be dragged independently in the Visual Layout Editor, or
-  you can drag the line's midpoint marker to move the entire line at once.
-* **Arrows**: Draw a directional path from a **Tail** to an arrowhead **Tip**, optionally passing through up to 16
-  **Bend** points. Arrows use the tracker's text color and have configurable **Thickness** and **Arrowhead Size**.
-  All points (tail, bends, tip) can be dragged independently in the Visual Layout Editor, or use the midpoint marker
-  to move the entire arrow at once. Arrows support **Goal Linking**:
-    * **Start Goal**: Select any goal, sub-goal, or multi-stage goal stage from the template. Before this goal is
-      completed the arrow renders at its **Opacity Before** value (default: faded). Once completed, the arrow
-      transitions to **Opacity After** (default: fully opaque).
-    * **End Goal**: When this goal is completed and the goal visibility mode is set to "Hide All Completed" or
-      "Show Only Incomplete", the arrow is hidden entirely.
-    * Use the **Select Goal** popup (with search via `Ctrl+F` / `Cmd+F`) to pick goals from any tab in the template.
-
-### Run Completion Tab
-
-The **Run Completion** tab decides when a run of this template counts as completed (IGT freeze and the overlay's
-**RUN COMPLETED!** screen). It is saved into the template itself (`run_completion` section), so it travels with it.
-
-* **Required Goals**: The `Goal Types` dropdown requires whole types (`All Advancements`, `All Recipes`, `All Stats`,
-  `All Unlocks`, `All Custom Goals`, `All Multi-Stage Goals`, `All Counters`); only types the template has are
-  listed. Below it, one dropdown per type picks individual goals (shown with their icon and display name; hidden goals
-  count too). Everything picked has to be done. `Everything` (nothing picked) means the whole template, the default.
-  Use `Shift+Click` to range-select and `All` / `None` per dropdown. A goal dropdown is greyed out while its whole
-  type is already required.
-* **Targets**: `Complete at goal count` ends the run once that many of the required goals are done (e.g. 40 of 80
-  advancements for Half%). `Complete at progress percentage` is only available with `Everything`, since the overall
-  percentage covers the whole template; with both targets on, `Require both targets (AND)` picks AND or OR.
-* **Progress Counter**: The required goals replace the advancement/achievement counter in the tracker title, the info
-  bar and the overlay progress text (Scrolling Belt and Page modes), and the overall percentage is left out there
-  because it says nothing about the picked goals. `Counter Label` names it (e.g. `Blocks Placed`), stored per
-  language as `run_completion.label` in the language file; leave it empty for the automatic name (`Adv`, `Stats`,
-  `Goals`, ...). With `Everything` the plain counter and percentage stay as they are.
+* **Decorations** are only visible in manual layout: **Text Headers** (with an optional hover description), **Lines**,
+  and **Arrows**. An arrow can link a `Start Goal` (it fades in once that goal is done) and an `End Goal` (it hides once
+  that goal is done, when completed goals are hidden).
+* **Run Completion** decides when a run of this template counts as complete: whole goal types, picked goals, a goal
+  count (e.g. Half%), or a percentage. The picked goals also replace the progress counter, with an optional per-language
+  `Counter Label`.
 
 ### Visual Layout Editor
 
-The **Visual Layout Editor** is the fastest way to build a manual layout. It lets you drag-and-drop items directly on
-the live tracker map instead of typing coordinates by hand.
+The **Visual Layout Editor** button in the top-right of the Template Editor lets you drag goals directly on the live
+tracker map. It only works on the template that is currently applied in the settings.
 
-* **Activation**: Click the **"Visual Layout Editor"** button in the top-right corner of the Template Editor. The
-  button is only available when the template you are editing is also the one currently applied in Settings. Activating
-  the editor automatically enables "Manual Layout" mode and sets "Goal Visibility" to "Show All". Unsaved template
-  changes are shown on the map as they are, without being written to disk.
-* **Incomplete Map**: While the editor is active, every goal on the map shows as incomplete, so completed goals don't
-  look different from the rest while you place them. The overlay keeps showing your real progress, and the map gets it
-  back when you stop editing.
-* **Hidden Elements**: Elements that would be hidden outside the editor stay on the map, drawn see-through: anything
-  with its manual layout `Hide` checkbox ticked, and goals with the `Hidden` checkbox that have no manual position of
-  their own. Criteria and sub-stats without their own position fade along with a fully hidden parent. Toggling either
-  checkbox (or pressing `V` / `H`) updates the map right away, before saving.
-* **Dragging**: Left-click and drag any goal icon, text label, progress text, decoration, or criterion to reposition
-  it. A crosshair appears at the item's anchor point while dragging, and a tooltip shows the current coordinates.
-* **Hotkeys**: With one or more items selected, the arrow keys nudge the selection by one pixel and `WASD` moves it by
-  ten (holding a key repeats). `V` and `H` toggle the selection's manual layout and overlay visibility, `P` toggles
-  whether it has manual positions of its own, `Delete` removes
-  the selected goals and decorations from the template, and `Ctrl+C` duplicates them with their coordinates. Right-click
-  any element to show it in the Template Editor without changing the selection. All of these keys are rebindable, see
+* While it runs, every goal shows as incomplete and normally hidden elements are drawn see-through, so you can place
+  everything. The overlay keeps showing your real progress.
+* Drag to move, drag on empty space for a selection rectangle, and `Ctrl+Click` (`Cmd+Click`) to add or remove items.
+  Arrow keys nudge by one pixel, `WASD` by ten; all of its keys are listed and rebindable in
   [Advancely Hotkeys](#advancely-hotkeys).
-* **Coop face in `Text Pos.`**: For criteria and sub-stats, the contributor player face is part of the text's
-  bounding box. Left/center anchors keep the face on the left of the text; right anchors flip it to the right edge,
-  so the face never collides with the criterion icon.
-* **Multi-Select**: Click and drag on empty space to draw a **selection rectangle**. All items whose center falls
-  inside the rectangle are selected and highlighted. You can then drag any selected item to move the entire group
-  together. Hold `Ctrl` (`Cmd` on macOS) and click individual items to add or remove them from the selection without
-  clearing it. `Ctrl`+drag on empty space draws a selection rectangle that adds to the existing selection. Click on
-  empty space without `Ctrl` to deselect. Clicking an already-selected item (without dragging it) removes just that
-  item from the selection.
-* **Automatic sub-goals stay automatic when moving a group**: Goal elements follow a hierarchy (icon, then text, then
-  progress text; for criteria, the icon then its display name). When you move a multi-selection that includes a parent
-  element, any still-automatic child of that parent is left automatic (it keeps following the parent procedurally)
-  instead of being stamped with explicit coordinates. Children that you have already positioned manually still move
-  with the group. To give a child its own position, move it on its own (or with a selection that doesn't include its
-  parent).
-* **Linking from a Selection**: Keep a selection active, then in the Template Editor open any goal or decoration that
-  supports linked goals (counter, stat category, sub-stat, custom goal, multi-stage stage, or text header) and click
-  the `Add Selected` button next to `Select Goals` to append the selected goals as linked goals (in template order,
-  skipping duplicates and never linking a goal to itself). For arrows, use the `Use Selected` button next to `Select`,
-  which works only when exactly one goal is selected. Selecting the icon, text, and progress text of the same goal
-  still counts as one goal. The selection clears after adding, and the button is disabled with an explanatory tooltip
-  when the selection is invalid. A `Remove All` button clears every linked goal at once.
-* **Saving**: Changes made in the Visual Layout Editor are synced back to the Template Editor in real-time. Click
-  **"Stop Visual Editing"** when finished, then click **"Save"** in the Template Editor to persist your layout to
-  disk.
-* **Restrictions**: While the Visual Layout Editor is active, applying settings and switching templates are disabled
-  to prevent reloads. Custom Goal Hotkeys are also disabled. The `Manual Layout` checkbox is locked on, since the
-  editor requires it to stay enabled.
+* Moving a parent together with its still-automatic children leaves those children automatic, so they keep following
+  the parent.
+* With items selected, `Add Selected` next to `Select Goals` adds them as linked goals of the goal you're editing.
+* Click **Stop Visual Editing** when done, then **Save** in the Template Editor to write the layout to disk.
 
 ### Importing from Game Files or Other Templates
 
-Every main tab in the editor has an `Import...` button. Clicking it opens a small dropdown with one or two source
-options:
+Every tab's `Import...` button can pull goals `...from player file` (advancements, stats, and unlocks of one of your
+world saves) or `...from other template` (a `.zip` or a template's main `.json`). Icons are copied along, and the
+criteria, sub-stat, and stage lists have their own `Import...` buttons for finer picks.
 
-- `...from player file` (Advancements/Achievements, Stats, Unlocks tabs): pick a player data file (`.json` or
-  `.dat`) from one of your world saves. A popup lists every advancement, stat or unlock present in that file,
-  and you tick what to add. Existing root names are detected and refused so you can't double-import.
-- `...from other template` (all seven tabs: Advancements/Achievements, Stats, Unlocks, Custom Goals, Counters,
-  Multi-Stage Goals, Decorations): pick either a zipped Advancely template (`.zip`, the same format the editor
-  exports) **or** a raw, unzipped template (the main `.json` file, e.g. one straight out of
-  `templates`). Both behave identically; with a `.json` the editor reads its sibling `_lang*.json`
-  files from the same folder. A popup lists every item of that tab's type from the source template, you tick what
-  to merge, and `Confirm Import` appends the selected items into the current template. Referenced icons (`icon`
-  paths on advancements, criteria, stats, sub-stats, unlocks, custom goals, counters and multi-stage goal stages)
-  are copied into your `icons` folder automatically, skipping any file that already exists. For a zip these come
-  from its `icons/` directory; for a raw template they come from an `icons/` folder next to the `.json` if present
-  (when importing from a template already installed locally, the icons are shared already so nothing is copied).
-  Duplicate root names (or decoration ids) are detected up-front and the import is refused,
-  exactly like the player-file flow. A `Language` dropdown at the top picks which language file from the source
-  template provides the display names for the items you import, and (for position/decoration scopes) a `Layout`
-  dropdown next to it picks which of the source's `_layout` files supplies the manual positions and decoration
-  geometry; selections are kept when you change either one. When the template you are editing has more than one
-  language and the source template contains **all** of those same languages, the `Language` dropdown is replaced by
-  an `Import languages` checklist that is auto-ticked for every language your template already has. Confirming then
-  fills the Display Names for all ticked languages at once (e.g. import a goal and immediately get its `Default`,
-  `ger` and `zh_cn` names), so you don't have to re-import once per language. It never creates new language files:
-  the choices are strictly the languages your template already has. The language you're currently editing is always
-  included (its checkbox is locked on) and is written the moment you `Save` like any other edit; the other languages
-  are merged into their existing `_lang` files on that same `Save` (and discarded if you `Revert` first, or taken
-back along with the import itself by `Undo`). Any
-  translation the source happens to be missing is simply left blank. If the languages don't line up (the source is
-  missing one of yours, or your template has just a single language), it falls back to the single `Language` dropdown
-  and imports into the language selected in the editor. Any
-  `linked_goals` / arrow endpoints / multi-stage `parent_advancement` refs that won't resolve after the import
-  (and aren't covered by other ticked items) are surfaced as a yellow warning above `Confirm Import`; the links
-  are kept as-is so you can fix them by importing the missing goals afterward. The popup supports `Ctrl+F` /
-  `Cmd+F` to focus the search, Shift+Click to toggle a checkbox range, and shows a clear message when the
-  source template has nothing of that type. The search matches both the root name/id and the display name,
-  where the display name comes from the `Language` file selected above (so a name search only finds what that
-  language actually provides).
-  A `Layout positions` checkbox decides whether the source's manual layout positions (icon / text / progress
-  for items, or `pos` / `pos2` / bends for decorations) get carried over or are reset so the target template's
-  auto-layout takes over. Entries whose root name format is wrong for the current Minecraft version are
-  flagged as a warning: they stay selectable (and are highlighted with a tooltip explaining the mismatch)
-  so you can still import them on purpose, but the highlight makes it clear the data may not resolve on
-  the template's version. The format check requires
-  `:` on `1.13+`, forbids `:` on `1.7-1.11`, and accepts only numeric IDs on `1.6.4` and below. `1.12 - 1.12.2`
-  is hybrid: advancement / criteria root names need `:`, but stat (and stat-typed stage) root names must not
-  contain `:` because that range still uses the mid-era flat stats format. In every mid-era stat case
-  (`1.7 - 1.12.2`) sub-stat root names must also start with `stat.` so legacy `achievement.` strings can't be
-  smuggled in as stats. Stat category keys themselves are not format-checked; only their sub-stats are. Container
-  entries (complex stat categories with sub-stats and entire multi-stage goals) are flagged the same way when
-  any of their children would themselves fail the check, including stages with a type not supported in
-  this version.
-
-The same dropdown is also available **inside** the per-item editors when picking from another template makes
-sense at a finer grain:
-
-- The `Import...` button next to an advancement's criteria offers `...from player file` (existing) and
-  `...from other template`. The template option opens the same popup with a Combo at the top to pick a
-  source advancement; ticking criteria below merges them into the advancement you're editing.
-- The `Import...` button next to a complex stat's sub-stats works the same way, with the Combo picking
-  the source stat and the children being its sub-stats.
-- The `Import...` button on a multi-stage goal's stages list offers `...from other template` only.
-  The Combo picks the source multi-stage goal; ticked stages are inserted just before this goal's final
-  stage. Final stages from the source are hidden in the list entirely, and any stage whose type is not
-  valid for the current Minecraft version (for example a `Criterion` stage on a legacy template, or an
-  `Unlock` stage outside the `25w14craftmine` snapshot) is flagged with a warning highlight and tooltip,
-  while staying selectable so you can still import it on purpose. Stage icons
-  are extracted automatically too.
-
-In all three, the source Combo is **pre-selected** to the entry whose ID matches the goal you are editing (if the
-source template has one), so you don't have to hunt for it; it falls back to the first entry when there is no match.
-A `Select new` button (next to `Select all` / `Clear all`) ticks only the source children this target does not
-already have, so you can pull just the ones you are missing. It respects the current search filter.
-
-#### Template update helpers (advancement and achievement import)
-
-When upgrading a large template across Minecraft versions (or downgrading to an older one), the `Select...` dropdown
-in the import popup offers per-purpose helpers. Each opens a nested modal that previews changes; every preview has
-its own search bar (focus with `Ctrl+F` / `Cmd+F`). Nothing is written to the template until you press
-`Confirm Import`, and every change lands as a normal unsaved editor edit you can discard like any other.
-
-- `...all visible`: bulk-select every entry currently visible in the import list (respects the search bar and the
-  `Include Crit.` checkbox).
-- `...new advancements` / `...new achievements`: preview entries present in the imported file but missing from the
-  template, then confirm to pre-tick them in the main list. Recipes are hidden by default on `1.12+`; toggle
-  `Show recipes` inside the preview to include them.
-- `...advancement renames` / `...achievement renames` (`1.7+`): for every template entry whose root name is missing
-  from the imported file, propose rename candidates from the import side. Modern (`1.12+`) matches by basename
-  (everything after the final `/`) and additionally by `>=80%` criteria overlap on the smaller side; mid-era
-  (`1.7 - 1.11`) matches by criteria overlap only. Stage the picks you want, then `Confirm Import` rewrites the
-  template root names and retargets every arrow, counter, custom and stat link that referred to the old name.
-- `...stale advancements` / `...stale achievements`: list template entries whose post-rename name is missing from
-  the imported file. Pick what to delete; `Confirm Import` removes them and scrubs every link that referred to the
-  deleted name. Useful when downgrading to an older version that lacks those entries.
-- `...criteria differences` (`1.7+`): for every entry present on both sides whose criteria sets differ, list new
-  criteria (`[+]`) and stale ones (`[-]`). Pick what to stage on each row, then `Confirm Import` adds the new
-  criteria (with placeholder display/icon) and removes the stale ones with link scrubbing. The search bar has
-  a `Crit. Search` toggle that flips its scope between parent and criterion names. Also available inside
-  the per-advancement criteria import popup, scoped to that single entry.
-
-Staged changes show up in a panel at the top of the import popup with a per-row `Revert` button. The right-aligned
-counter on the bottom row reflects them too, for example `Selected: 5 Adv (3 Ren, -2 Stale), 12 Crit (+8/-2)`. To
-prevent double-applying, advancements that are already targeted by a staged rename or criteria change are greyed
-out in the main import list with a tooltip explaining why.
+* If the source template has all of your template's languages, every language's display names are imported at once.
+* Root names that don't match the template's Minecraft version are highlighted with a warning.
+* **Template update helpers**: For upgrading (or downgrading) a big template to another Minecraft version, the
+  advancement import's `Select...` dropdown can find **new**, **renamed**, and **stale** advancements and **changed
+  criteria**. Renames and deletions also update every link that pointed at the old name. Nothing changes until
+  `Confirm Import`, and it can all be undone or discarded.
 
 ### The Help Button
 
