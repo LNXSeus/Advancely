@@ -1830,8 +1830,95 @@
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns":	{
 		"icon_pos":	{
+			"x":	-2317,
+			"y":	-457,
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
+		},
+		"progress_pos":	{
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
 			"x":	1765,
 			"y":	944
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	953
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	980
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	989
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1016
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1025
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1052
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1061
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1088
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1097
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1124
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1133
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1160
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1169
+		}
+	},
+	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim":	{
+		"icon_pos":	{
+			"x":	1765,
+			"y":	1196
+		},
+		"text_pos":	{
+			"x":	1801,
+			"y":	1205
 		}
 	},
 	"advancement.minecraft.adventure.craft_decorated_pot_using_only_sherds":	{
