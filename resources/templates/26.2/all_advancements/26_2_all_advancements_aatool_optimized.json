@@ -1435,7 +1435,7 @@
 			"target":	-1,
 			"linked_goals":	[{
 					"root_name":	"ms_goal:beacon",
-					"stage_id":	"5"
+					"stage_id":	"4"
 				}]
 		},
 		"stat:debris_picked_up":	{
@@ -1550,40 +1550,33 @@
 					"target":	3
 				}, {
 					"stage_id":	"2",
-					"icon":	"monsters/Wither_Skeleton_JE4_BE3.png",
-					"type":	"stat",
-					"root_name":	"minecraft:killed/minecraft:wither_skeleton",
-					"target":	-1,
-					"complete_with_next":	true
-				}, {
-					"stage_id":	"3",
 					"icon":	"monsters/wither.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/summon_wither",
 					"target":	1
 				}, {
-					"stage_id":	"4",
+					"stage_id":	"3",
 					"icon":	"items/nether_star_1.20.2.png",
 					"type":	"criterion",
 					"parent_advancement":	"minecraft:adventure/kill_all_mobs",
 					"root_name":	"minecraft:wither",
 					"target":	0
 				}, {
-					"stage_id":	"5",
+					"stage_id":	"4",
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
 					"target":	1,
 					"hide_progress":	true
 				}, {
-					"stage_id":	"6",
+					"stage_id":	"5",
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
 					"target":	1,
 					"hide_progress":	true
 				}, {
-					"stage_id":	"7",
+					"stage_id":	"6",
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/create_full_beacon",
