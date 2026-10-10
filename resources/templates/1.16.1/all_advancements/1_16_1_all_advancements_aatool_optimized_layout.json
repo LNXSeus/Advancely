@@ -2505,6 +2505,14 @@
 				"y":	632
 			}
 		}, {
+			"id":	"aatool_overlay",
+			"type":	"text_header",
+			"pos":	{
+				"x":	0,
+				"y":	-6,
+				"anchor":	6
+			}
+		}, {
 			"id":	"credits_zesskyo",
 			"type":	"text_header",
 			"pos":	{

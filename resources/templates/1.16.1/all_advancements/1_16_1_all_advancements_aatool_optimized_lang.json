@@ -265,6 +265,8 @@
 	"multi_stage_goal.ms_goal:bees.stage.2":	"Harvest Honey",
 	"multi_stage_goal.ms_goal:bees.stage.3":	"Get 'Sticky'",
 	"multi_stage_goal.ms_goal:bees.stage.final":	"Done!",
+	"decoration.aatool_overlay":	"Hover here to set up the overlay like AATool",
+	"decoration.aatool_overlay.desc":	"Quick way: In the Settings window, click \"Load Preset\" and pick\n\"1.16.1 AATool\". It applies the sizing settings below in one go.\n\nManual way: Change these settings (everything else stays default, Ctrl/Cmd + F in the settings window to search):\n\nOverlay Width: 1620 (default 1440)\nRow Text Size: 20 (default 24)\nRow 1 Icon Spacing: 12 (default 8)\nRow 2 Background Size: 72 (default 96)\nRow 3 Background Size: 72 (default 96)\nCustom Row 2 Spacing: On, Row 2 Item Width 136\nCustom Row 3 Spacing: On, Row 3 Item Width 136\n\nNo more color keying (optional):\nCheck \"Transparent\" next to the Overlay Background Color. The overlay\nthen has a real transparent background, so OBS needs no color key filter.\nThis also unlocks \"Fade Out\", next to the Clear Animation setting, so\ncompleted goals fade away smoothly instead of being cropped.\n\nHow to capture it in OBS:\n- Windows: Use a \"Game Capture\" and enable \"Allow Transparency\" on it.\n- macOS: Use a \"Window Capture\" source.\n- Linux: Keep a compositor running.",
 	"decoration.credits_zesskyo":	"Template by Zesskyo",
 	"decoration.credits_kittymmeow":	"Template by kittymmeow"
 }
