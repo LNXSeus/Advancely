@@ -1135,6 +1135,29 @@ static void collect_hotkey_conflicts(const AppSettings &settings, const Tracker 
     }
 }
 
+// Must list the bottom row of settings_render_gui() exactly, as it sets the settings window width.
+static float settings_bottom_row_width(bool has_unsaved_changes, bool show_applied_message,
+                                       bool show_defaults_applied_message) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    float width = 0.0f;
+    int item_count = 0;
+    auto add_item = [&](const char *label, bool is_button) {
+        width += ImGui::CalcTextSize(label).x + (is_button ? style.FramePadding.x * 2.0f : 0.0f);
+        item_count++;
+    };
+    add_item("Apply Settings", true);
+    if (has_unsaved_changes) add_item("Revert Changes", true);
+    if (show_applied_message) add_item("Settings Applied!", false);
+    if (show_defaults_applied_message) add_item("Defaults Applied!", false);
+    add_item("Reset To Defaults", true);
+#ifdef _WIN32
+    add_item("Restart Advancely", true);
+#endif
+    add_item("Support Advancely!", true);
+    add_item("Report Issue", true);
+    return width + style.ItemSpacing.x * (float) (item_count - 1);
+}
+
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          ForceOpenReason *force_open_reason, bool *p_temp_creator_open) {
     // This static variable tracks the open state from the previous frame
@@ -1514,6 +1537,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Unsaved changes
     bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
+    const bool applied_message_shown = show_applied_message;
+    const bool defaults_message_shown = show_defaults_applied_message;
 
     // Communicate settings unsaved state to tracker for quit confirmation popup
     if (t && !index_in_background) t->settings_has_unsaved_changes = has_unsaved_changes;
@@ -8627,13 +8652,13 @@ settings_tooltip(tooltip_buffer); \
 
 
     // Show the confirmation message if settings were applied
-    if (show_applied_message) {
+    if (applied_message_shown) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Settings Applied!");
     }
 
     // Show the confirmation message if settings were reset
-    if (show_defaults_applied_message) {
+    if (defaults_message_shown) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Defaults Applied!");
     }
@@ -8784,6 +8809,10 @@ settings_tooltip(tooltip_buffer); \
                  "direct way to be in touch with LNXS.");
         settings_tooltip(report_tooltip);
     }
+
+    settings_search_set_bottom_row_width(settings_bottom_row_width(
+        are_settings_different(&temp_settings, &saved_settings), show_applied_message,
+        show_defaults_applied_message));
 
     if (roboto_font) {
         ImGui::PopFont();

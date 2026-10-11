@@ -82,6 +82,8 @@ static std::vector<TabRef> s_tabs;
 static ImGuiID s_tab_bar_id = 0;
 static std::string s_open_tab; // the tab whose contents were drawn this frame
 static std::string s_select_tab; // tab to switch to after this frame's tab bar
+static float s_tabs_width = 0.0f;
+static float s_bottom_row_width = 0.0f;
 
 static std::string s_capture_tab;
 static ImGuiWindow *s_capture_root = nullptr;
@@ -465,8 +467,13 @@ static void draw_flash(const std::string &open_tab) {
 }
 
 void settings_search_prepare_window(const char *window_name) {
-    if (s_phase == INDEX_IDLE) return;
     ImGuiWindow *window = ImGui::FindWindowByName(window_name);
+    if (window && s_bottom_row_width > 0.0f) {
+        const float width = std::max(s_tabs_width, s_bottom_row_width) + window->WindowPadding.x * 2.0f +
+                            window->ScrollbarSizes.x;
+        ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, FLT_MAX));
+    }
+    if (s_phase == INDEX_IDLE) return;
     // Begin() counts this down by one before using it, so 2 keeps the window hidden for this frame
     // while its widgets are still laid out.
     if (window) window->HiddenFramesCannotSkipItems = 2;
@@ -480,6 +487,7 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
     ImGuiTabBar *bar = GImGui->CurrentTabBar;
     if (bar && bar->LastTabItemIdx >= 0 && bar->LastTabItemIdx < bar->Tabs.Size) {
         s_tab_bar_id = bar->ID;
+        s_tabs_width = bar->WidthAllTabsIdeal;
         ImGuiID tab_id = bar->Tabs[bar->LastTabItemIdx].ID;
         bool known = false;
         for (auto &tab: s_tabs) {
@@ -506,6 +514,10 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
         }
     }
     return open;
+}
+
+void settings_search_set_bottom_row_width(float width) {
+    s_bottom_row_width = width;
 }
 
 void settings_search_tabs_end() {

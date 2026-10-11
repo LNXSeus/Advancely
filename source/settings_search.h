@@ -89,7 +89,8 @@ bool settings_search_background_frame(const char *window_name, bool *starting);
 bool settings_search_collapsing_header(const char *label);
 
 /**
- * @brief Hides the settings window while the index is being built. Call right before its ImGui::Begin().
+ * @brief Hides the settings window while the index is being built, and keeps its width at whichever is
+ * wider, the tabs or the bottom row. Call right before its ImGui::Begin().
  * @param window_name The exact name passed to ImGui::Begin().
  */
 void settings_search_prepare_window(const char *window_name);
@@ -106,6 +107,13 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags = 0);
  * @brief Call once per frame after the settings tab bar, whether or not it was drawn.
  */
 void settings_search_tabs_end();
+
+/**
+ * @brief Sets the width the settings window's bottom row will have next frame. It, or the tabs' width
+ * if wider, becomes the window width. Call once per frame inside the settings window.
+ * @param width The bottom row width in pixels, without window padding.
+ */
+void settings_search_set_bottom_row_width(float width);
 
 /**
  * @brief Draws the search bar and, below it, the dropdown of matching settings. Call inside the
