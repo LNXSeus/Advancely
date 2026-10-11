@@ -1234,6 +1234,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static int preset_selected = -1;
     static bool presets_need_rescan = true;
     static char new_preset_name[SETTING_PRESET_NAME_LEN] = "";
+    static char preset_replace_name[SETTING_PRESET_NAME_LEN] = ""; // existing preset awaiting the replace popup
     static char preset_status_msg[256] = "";
     static bool preset_status_is_error = false;
     // Path of a preset loaded but not yet applied. Non-empty means its progress
@@ -1632,6 +1633,30 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             out[i] = '\0';
         };
 
+        // Copy the entire current settings.json verbatim into the preset file.
+        auto write_preset = [](const char *file_name, bool replacing) {
+            cJSON *root = cJSON_from_file(get_settings_file_path());
+            if (!root) {
+                snprintf(preset_status_msg, sizeof(preset_status_msg),
+                         "Could not read settings.json to create the preset.");
+                preset_status_is_error = true;
+                return;
+            }
+            char preset_path[MAX_PATH_LENGTH];
+            snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(), file_name);
+            if (cJSON_write_to_file_atomic(preset_path, root)) {
+                snprintf(preset_status_msg, sizeof(preset_status_msg),
+                         replacing ? "Replaced preset '%s'." : "Created preset '%s'.", file_name);
+                preset_status_is_error = false;
+                new_preset_name[0] = '\0';
+                presets_need_rescan = true;
+            } else {
+                snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to write the preset file.");
+                preset_status_is_error = true;
+            }
+            cJSON_Delete(root);
+        };
+
         ImGui::Text("Settings Presets");
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
@@ -1654,17 +1679,31 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::InputTextWithHint("##new_preset_name", "New preset name", new_preset_name, sizeof(new_preset_name));
         ImGui::SameLine();
 
+        char name[SETTING_PRESET_NAME_LEN];
+        strncpy(name, new_preset_name, sizeof(name) - 1);
+        name[sizeof(name) - 1] = '\0';
+        char *start = name;
+        while (*start == ' ' || *start == '\t') start++;
+        size_t end = strlen(start);
+        while (end > 0 && (start[end - 1] == ' ' || start[end - 1] == '\t')) start[--end] = '\0';
+
+        int existing_preset = -1;
+        if (start[0] != '\0') {
+            char lower[SETTING_PRESET_NAME_LEN];
+            name_to_lower(start, lower, sizeof(lower));
+            for (int i = 0; i < preset_count; ++i) {
+                char existing_lower[SETTING_PRESET_NAME_LEN];
+                name_to_lower(preset_names[i], existing_lower, sizeof(existing_lower));
+                if (strcmp(lower, existing_lower) == 0) {
+                    existing_preset = i;
+                    break;
+                }
+            }
+        }
+
         bool create_disabled = has_unsaved_changes;
         if (create_disabled) ImGui::BeginDisabled();
         if (ImGui::Button("Create Preset")) {
-            char name[SETTING_PRESET_NAME_LEN];
-            strncpy(name, new_preset_name, sizeof(name) - 1);
-            name[sizeof(name) - 1] = '\0';
-            char *start = name;
-            while (*start == ' ' || *start == '\t') start++;
-            size_t end = strlen(start);
-            while (end > 0 && (start[end - 1] == ' ' || start[end - 1] == '\t')) start[--end] = '\0';
-
             bool ok = true;
             if (start[0] == '\0') {
                 snprintf(preset_status_msg, sizeof(preset_status_msg), "Enter a name for the preset.");
@@ -1686,38 +1725,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     preset_status_is_error = true;
                     ok = false;
                 }
-                for (int i = 0; ok && i < preset_count; ++i) {
-                    char existing_lower[SETTING_PRESET_NAME_LEN];
-                    name_to_lower(preset_names[i], existing_lower, sizeof(existing_lower));
-                    if (strcmp(lower, existing_lower) == 0) {
-                        snprintf(preset_status_msg, sizeof(preset_status_msg),
-                                 "A preset named '%s' already exists.", preset_names[i]);
-                        preset_status_is_error = true;
-                        ok = false;
-                    }
-                }
             }
-            if (ok) {
-                // Copy the entire current settings.json verbatim into the new preset file.
-                cJSON *root = cJSON_from_file(get_settings_file_path());
-                if (!root) {
-                    snprintf(preset_status_msg, sizeof(preset_status_msg),
-                             "Could not read settings.json to create the preset.");
-                    preset_status_is_error = true;
-                } else {
-                    char preset_path[MAX_PATH_LENGTH];
-                    snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(), start);
-                    if (cJSON_write_to_file_atomic(preset_path, root)) {
-                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Created preset '%s'.", start);
-                        preset_status_is_error = false;
-                        new_preset_name[0] = '\0';
-                        presets_need_rescan = true;
-                    } else {
-                        snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to write the preset file.");
-                        preset_status_is_error = true;
-                    }
-                    cJSON_Delete(root);
-                }
+            if (ok && existing_preset >= 0) {
+                strncpy(preset_replace_name, preset_names[existing_preset], sizeof(preset_replace_name) - 1);
+                preset_replace_name[sizeof(preset_replace_name) - 1] = '\0';
+                ImGui::OpenPopup("Replace Existing Preset?");
+            } else if (ok) {
+                write_preset(start, false);
             }
         }
         if (create_disabled) ImGui::EndDisabled();
@@ -1731,7 +1745,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             } else {
                 snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
                          "Save the current settings as a new preset file in %s/.\n"
-                         "The name cannot be 'settings' or match an existing preset.",
+                         "The name cannot be 'settings'. Using an existing preset's name\n"
+                         "asks to replace that preset with the current settings.",
                          get_config_display_path());
             }
             settings_tooltip(create_tooltip_buffer);
@@ -1893,6 +1908,53 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndPopup();
         }
 
+        ImVec2 replace_popup_center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(replace_popup_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("Replace Existing Preset?", nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+            char replace_prompt_buffer[256];
+            snprintf(replace_prompt_buffer, sizeof(replace_prompt_buffer),
+                     "A preset named '%s' already exists.", preset_replace_name);
+            ImGui::Text("%s", replace_prompt_buffer);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                               "Replacing it permanently overwrites that preset with the current settings.\n"
+                               "This cannot be undone.");
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::Button("Replace", ImVec2(120, 0)) ||
+                (!ImGui::IsWindowAppearing() &&
+                 (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)))) {
+                write_preset(preset_replace_name, true);
+                preset_replace_name[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            if (settings_tooltip_wanted()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Overwrite the existing preset with the current settings.\n"
+                         "You can also press 'ENTER'.");
+                settings_tooltip(tooltip_buf);
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                preset_replace_name[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            if (settings_tooltip_wanted()) {
+                char tooltip_buf[128];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Keep the existing preset.\n"
+                         "You can also press 'ESCAPE'.");
+                settings_tooltip(tooltip_buf);
+            }
+
+            ImGui::EndPopup();
+        }
+
         bool progress_picked[PRESET_PROGRESS_SECTION_COUNT] = {};
         if (preset_import_render(&temp_settings, progress_picked)) {
             // Force the template list to rescan so the tabs refresh in place.
@@ -1917,6 +1979,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                       ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
                                       : ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
             ImGui::TextColored(status_color, "%s", preset_status_msg);
+        }
+
+        if (existing_preset >= 0 && new_preset_name[0] != '\0') {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
+            ImGui::TextWrapped("A preset named '%s' already exists. Creating it asks to replace it.",
+                               preset_names[existing_preset]);
+            ImGui::PopStyleColor();
         }
 
         if (preset_lobby_locked) {
