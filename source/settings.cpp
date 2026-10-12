@@ -3892,6 +3892,20 @@ settings_tooltip(tooltip_buffer); \
                 }
                 settings_tooltip(enable_overlay_tooltip_buffer);
             }
+            if (temp_settings.enable_overlay && app_settings->enable_overlay) {
+                ImGui::SameLine();
+                if (ImGui::Button("Restart Overlay")) {
+                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                }
+                if (settings_tooltip_wanted()) {
+                    char restart_overlay_tooltip_buffer[512];
+                    snprintf(restart_overlay_tooltip_buffer, sizeof(restart_overlay_tooltip_buffer),
+                             "Closes the overlay window and opens it again with the applied settings.\n"
+                             "Unapplied changes are not used.\n"
+                             "You may need to reselect it in your streaming software (e.g., OBS).");
+                    settings_tooltip(restart_overlay_tooltip_buffer);
+                }
+            }
             // Conditionally enable the remaining overlay settings
             if (temp_settings.enable_overlay) {
                 if (ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f")) {
