@@ -6156,23 +6156,24 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     ImGui::TextWrapped("Shown as: %s", shown);
 }
 
-static const char *const SELECTED_ONLY_LABEL = "Selected only";
+static const char *const SELECTED_ONLY_LABEL = "Selected";
 
 static float selected_only_checkbox_width() {
     return ImGui::CalcTextSize(SELECTED_ONLY_LABEL).x + ImGui::GetFrameHeightWithSpacing();
 }
 
 // Falls back to the next line when the block would overlap the items already on this one.
-static void same_line_right_aligned(float block_width, bool has_left_items) {
+static float same_line_right_aligned(float block_width, bool has_left_items) {
     const ImGuiStyle &style = ImGui::GetStyle();
     float start = ImGui::GetWindowWidth() - block_width - style.WindowPadding.x;
     if (!has_left_items) {
         ImGui::SameLine(start);
-        return;
+        return block_width;
     }
     float left_end = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + style.ItemSpacing.x;
     if (start >= left_end) ImGui::SameLine(start);
     else ImGui::SetCursorPosX(fmaxf(start, style.WindowPadding.x));
+    return left_end - style.WindowPadding.x + block_width;
 }
 
 static void selected_only_checkbox(const char *id, bool *selected_only) {
@@ -25183,7 +25184,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
                                            search_scope_checkbox_width + (ImGui::GetStyle().ItemSpacing.x * 3);
 
-        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        const float header_min_width = same_line_right_aligned(right_controls_width,
+                                                               current_import_mode == BATCH_IMPORT);
         selected_only_checkbox("import_advancements", &import_selected_only);
         ImGui::SameLine();
 
@@ -25427,7 +25429,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (importable_advancements.empty()) {
             ImGui::Text("No advancements found in the selected file.");
         } else {
-            ImGui::BeginChild("ImporterScrollingRegion", ImVec2(600, 400), true);
+            ImGui::BeginChild("ImporterScrollingRegion", ImVec2(fmaxf(600.0f, header_min_width), 400), true);
             for (size_t i = 0; i < filtered_advancements.size(); ++i) {
                 auto &adv = *filtered_advancements[i];
                 ImGui::PushID(adv.root_name.c_str());
@@ -26284,7 +26286,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const float clear_button_width = ImGui::GetFrameHeight();
         const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
                                            ImGui::GetStyle().ItemSpacing.x * 2;
-        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        const float header_min_width = same_line_right_aligned(right_controls_width,
+                                                               current_import_mode == BATCH_IMPORT);
         selected_only_checkbox("import_stats", &import_selected_only);
         ImGui::SameLine();
         if (import_search_buffer[0] != '\0') {
@@ -26328,7 +26331,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Text("No parsable stats found in the selected file.");
             }
         } else {
-            ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(600, 400), true);
+            ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(fmaxf(600.0f, header_min_width), 400), true);
             for (size_t i = 0; i < filtered_stats.size(); ++i) {
                 auto &stat = *filtered_stats[i];
                 ImGui::PushID(&stat); // Add unique ID scope for each widget
@@ -26614,7 +26617,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const float clear_button_width = ImGui::GetFrameHeight();
         const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
                                            ImGui::GetStyle().ItemSpacing.x * 2;
-        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        const float header_min_width = same_line_right_aligned(right_controls_width,
+                                                               current_import_mode == BATCH_IMPORT);
         selected_only_checkbox("import_unlocks", &import_selected_only);
         ImGui::SameLine();
         if (import_search_buffer[0] != '\0') {
@@ -26645,7 +26649,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (importable_unlocks.empty()) {
             ImGui::Text("No parsable unlocks found in the selected file.");
         } else {
-            ImGui::BeginChild("UnlocksImporterScrollingRegion", ImVec2(600, 400), true);
+            ImGui::BeginChild("UnlocksImporterScrollingRegion", ImVec2(fmaxf(600.0f, header_min_width), 400), true);
             for (size_t i = 0; i < filtered_unlocks.size(); ++i) {
                 auto &unlock = *filtered_unlocks[i];
                 ImGui::PushID(&unlock);
@@ -27455,7 +27459,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             const float tpl_clear_width = ImGui::GetFrameHeight();
             const float tpl_right_block = selected_only_checkbox_width() + tpl_search_width + tpl_clear_width +
                                           ImGui::GetStyle().ItemSpacing.x * 2;
-            same_line_right_aligned(tpl_right_block, true);
+            const float header_min_width = same_line_right_aligned(tpl_right_block, true);
             selected_only_checkbox("template_import", &s_template_import_selected_only);
             ImGui::SameLine();
             if (s_template_import_search[0] != '\0') {
@@ -27483,7 +27487,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::Separator();
 
-            ImGui::BeginChild("##template_import_scroll", ImVec2(620.0f, 360.0f), true);
+            ImGui::BeginChild("##template_import_scroll", ImVec2(fmaxf(620.0f, header_min_width), 360.0f), true);
             for (int i = 0; i < item_count; i++) {
                 if (!template_import_visible(i)) continue;
                 char row_label[384];
@@ -27716,7 +27720,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                       "links are kept as-is; you can fix them by importing the missing\n"
                                       "goals afterward, or by removing the dangling links manually.");
                 }
-                ImGui::BeginChild("##tpl_import_warns", ImVec2(620.0f, 80.0f), true);
+                ImGui::BeginChild("##tpl_import_warns", ImVec2(fmaxf(620.0f, header_min_width), 80.0f), true);
                 for (const auto &w: unresolved_links) ImGui::BulletText("%s", w.c_str());
                 ImGui::EndChild();
             }
@@ -28478,7 +28482,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const float clear_button_width_gs = ImGui::GetFrameHeight();
         const float right_controls_width_gs = selected_only_checkbox_width() + search_bar_width_gs +
                                               clear_button_width_gs + ImGui::GetStyle().ItemSpacing.x * 2;
-        same_line_right_aligned(right_controls_width_gs, true);
+        const float header_min_width = same_line_right_aligned(right_controls_width_gs, true);
         selected_only_checkbox("goal_selector", &goal_selector_selected_only);
         ImGui::SameLine();
 
@@ -28511,7 +28515,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Separator();
 
         // --- Scrollable goal list ---
-        ImGui::BeginChild("GoalSelectorScrollingRegion", ImVec2(500, 400), true);
+        ImGui::BeginChild("GoalSelectorScrollingRegion", ImVec2(fmaxf(500.0f, header_min_width), 400), true);
 
         // Helper lambda to check if an item matches the search filter
         auto matches_search = [&](const char *root_name, const char *display_name, const char *type_name) -> bool {
