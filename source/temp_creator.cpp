@@ -6093,6 +6093,40 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     ImGui::TextWrapped("Shown as: %s", shown);
 }
 
+static const char *const SELECTED_ONLY_LABEL = "Selected only";
+
+static float selected_only_checkbox_width() {
+    return ImGui::CalcTextSize(SELECTED_ONLY_LABEL).x + ImGui::GetFrameHeightWithSpacing();
+}
+
+// Falls back to the next line when the block would overlap the items already on this one.
+static void same_line_right_aligned(float block_width, bool has_left_items) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    float start = ImGui::GetWindowWidth() - block_width - style.WindowPadding.x;
+    if (!has_left_items) {
+        ImGui::SameLine(start);
+        return;
+    }
+    float left_end = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + style.ItemSpacing.x;
+    if (start >= left_end) ImGui::SameLine(start);
+    else ImGui::SetCursorPosX(fmaxf(start, style.WindowPadding.x));
+}
+
+static void selected_only_checkbox(const char *id, bool *selected_only) {
+    char label[96];
+    snprintf(label, sizeof(label), "%s##selected_only_%s", SELECTED_ONLY_LABEL, id);
+    ImGui::Checkbox(label, selected_only);
+    if (ImGui::IsItemHovered()) {
+        char tip[320];
+        snprintf(tip, sizeof(tip),
+                 "CHECKED: list only the entries that are currently selected, to review them\n"
+                 "before confirming. Unticking an entry removes it from the list.\n"
+                 "UNCHECKED: list every entry.\n"
+                 "Works together with the search bar. Default: unchecked.");
+        ImGui::SetTooltip("%s", tip);
+    }
+}
+
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
 const char *temp_creator_pick_import_zip(void) {
@@ -6380,6 +6414,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_search_buffer[256] = "";
     static bool import_select_criteria = false;
     static bool import_search_criteria_only = false;
+    static bool import_selected_only = false;
     static int last_clicked_adv_index = -1;
     [[maybe_unused]] static int last_clicked_crit_index = -1;
     [[maybe_unused]] static ImportableAdvancement *last_clicked_crit_parent = nullptr;
@@ -6433,6 +6468,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int s_template_import_last_clicked = -1;
     static bool s_template_import_focus_search = false;
     static bool s_template_import_keep_positions = false;
+    static bool s_template_import_selected_only = false;
     static EditorTrackableCategory *s_template_import_target_adv = nullptr;
     static EditorTrackableCategory *s_template_import_target_stat = nullptr;
     static EditorMultiStageGoal *s_template_import_target_ms = nullptr;
@@ -6584,6 +6620,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         s_template_import_selected.clear();
         s_template_import_last_clicked = -1;
         s_template_import_focus_search = true;
+        s_template_import_selected_only = false;
         s_template_import_parent_index = -1;
         s_show_template_import_popup = true;
     };
@@ -6643,6 +6680,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_goal_selector_popup = false;
     static bool focus_goal_selector_search = false;
     static char goal_selector_search_buffer[256] = "";
+    static bool goal_selector_selected_only = false;
     static GoalSelectorTarget goal_selector_target = GOAL_SELECT_START;
     static int goal_selector_deco_index = -1; // Index of the decoration being edited
     static char goal_selector_selected_root[192] = "";
@@ -23490,6 +23528,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // rendered this frame. Used to gate the outer popup's Enter/Escape shortcuts so the
         // inner popup's identical shortcuts don't cascade out to the parent.
         bool inner_helper_active_this_frame = false;
+        if (ImGui::IsWindowAppearing()) import_selected_only = false;
 
         // Hotkey logic for search bar. Skip when a nested helper popup is open so the
         // hotkey lands in the inner popup's search bar instead of the outer one's.
@@ -23544,6 +23583,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (auto &adv: importable_advancements) {
                     filtered_advancements.push_back(&adv);
                 }
+            }
+            if (import_selected_only) {
+                filtered_advancements.erase(
+                    std::remove_if(filtered_advancements.begin(), filtered_advancements.end(),
+                                   [](const ImportableAdvancement *adv) {
+                                       if (adv->is_selected) return false;
+                                       for (const auto &crit: adv->criteria)
+                                           if (crit.is_selected) return false;
+                                       return true;
+                                   }),
+                    filtered_advancements.end());
             }
         }
 
@@ -23603,6 +23653,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static int s_new_advs_last_clicked = -1;
             static char s_new_advs_search[256] = "";
             static bool s_new_advs_focus_search = false;
+            static bool s_new_advs_selected_only = false;
 
             static bool s_open_rename_popup = false;
             static std::vector<RenameRow> s_rename_rows;
@@ -23611,6 +23662,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static bool s_rename_needs_recompute = true;
             static char s_rename_search[256] = "";
             static bool s_rename_focus_search = false;
+            static bool s_rename_selected_only = false;
 
             static bool s_open_criteria_popup = false;
             static std::vector<CriteriaDeltaRow> s_criteria_rows;
@@ -23621,6 +23673,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static char s_criteria_search[256] = "";
             static bool s_criteria_focus_search = false;
             static bool s_criteria_search_crits_only = false;
+            static bool s_criteria_selected_only = false;
 
             static bool s_open_stale_popup = false;
             static std::vector<int> s_stale_indices;
@@ -23630,6 +23683,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             static int s_stale_last_clicked = -1;
             static char s_stale_search[256] = "";
             static bool s_stale_focus_search = false;
+            static bool s_stale_selected_only = false;
 
             if (ImGui::BeginPopup("import_select_dropdown")) {
                 if (ImGui::Selectable("...all visible")) {
@@ -23641,6 +23695,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool parent_matched =
                                     str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
                             for (auto &crit: adv_ptr->criteria) {
+                                if (import_selected_only && !crit.is_selected) continue;
                                 if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
                                         crit.root_name.c_str(), import_search_buffer)) {
                                     crit.is_selected = true;
@@ -23787,6 +23842,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_new_advs_last_clicked = -1;
                 s_new_advs_search[0] = '\0';
                 s_new_advs_focus_search = true;
+                s_new_advs_selected_only = false;
                 ImGui::OpenPopup(new_advs_popup_title);
                 s_open_new_advs_popup = false;
             }
@@ -23830,6 +23886,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (i >= s_new_adv_indices.size()) return false;
                     int idx = s_new_adv_indices[i];
                     if (idx < 0 || idx >= (int) importable_advancements.size()) return false;
+                    if (s_new_advs_selected_only && !s_new_adv_local_selected[i]) return false;
                     if (s_new_advs_search[0] == '\0') return true;
                     return str_contains_insensitive(importable_advancements[idx].root_name.c_str(), s_new_advs_search);
                 };
@@ -23860,6 +23917,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", show_recipes_tooltip_buffer);
                     }
                 }
+                ImGui::SameLine();
+                selected_only_checkbox("new_advs", &s_new_advs_selected_only);
 
                 if (ImGui::SmallButton("Select all##new_advs_list")) {
                     for (size_t i = 0; i < s_new_adv_local_selected.size(); i++) {
@@ -23995,6 +24054,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_rename_needs_recompute = true;
                 s_rename_search[0] = '\0';
                 s_rename_focus_search = true;
+                s_rename_selected_only = false;
                 ImGui::OpenPopup(rename_popup_title);
                 s_open_rename_popup = false;
             }
@@ -24051,6 +24111,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (row.template_index < 0 ||
                         row.template_index >= (int) current_template_data.advancements.size())
                         return false;
+                    if (s_rename_selected_only && (i >= s_rename_row_selection.size() || s_rename_row_selection[i] < 0))
+                        return false;
                     if (s_rename_search[0] == '\0') return true;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     if (str_contains_insensitive(tmpl_adv.root_name, s_rename_search)) return true;
@@ -24090,6 +24152,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tip);
                     }
                 }
+                ImGui::SameLine();
+                selected_only_checkbox("rename", &s_rename_selected_only);
 
                 if (ImGui::SmallButton("Pick best for all##rename_list")) {
                     for (size_t i = 0; i < s_rename_rows.size(); i++) {
@@ -24307,6 +24371,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_stale_last_clicked = -1;
                 s_stale_search[0] = '\0';
                 s_stale_focus_search = true;
+                s_stale_selected_only = false;
                 ImGui::OpenPopup(stale_popup_title);
                 s_open_stale_popup = false;
             }
@@ -24374,11 +24439,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tip);
                     }
                 }
+                ImGui::SameLine();
+                selected_only_checkbox("stale", &s_stale_selected_only);
 
                 auto stale_visible = [&](size_t k) -> bool {
                     if (k >= s_stale_indices.size()) return false;
                     int idx = s_stale_indices[k];
                     if (idx < 0 || idx >= (int) current_template_data.advancements.size()) return false;
+                    if (s_stale_selected_only && (k >= s_stale_selected.size() || !s_stale_selected[k])) return false;
                     if (s_stale_search[0] == '\0') return true;
                     const auto &a = current_template_data.advancements[idx];
                     std::string post_rename = a.root_name;
@@ -24578,6 +24646,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 s_criteria_needs_recompute = true;
                 s_criteria_search[0] = '\0';
                 s_criteria_focus_search = true;
+                s_criteria_selected_only = false;
                 ImGui::OpenPopup(criteria_popup_title);
                 s_open_criteria_popup = false;
             }
@@ -24670,6 +24739,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 auto criteria_delta_visible = [&](const auto &d) -> bool {
+                    if (s_criteria_selected_only && !d.is_selected) return false;
                     if (s_criteria_search[0] == '\0' || !s_criteria_search_crits_only) return true;
                     return str_contains_insensitive(d.root_name.c_str(), s_criteria_search);
                 };
@@ -24677,6 +24747,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (row.template_index < 0 ||
                         row.template_index >= (int) current_template_data.advancements.size())
                         return false;
+                    if (s_criteria_selected_only) {
+                        bool any_shown = false;
+                        for (const auto &d: row.deltas) {
+                            if (criteria_delta_visible(d)) {
+                                any_shown = true;
+                                break;
+                            }
+                        }
+                        if (!any_shown) return false;
+                    }
                     if (s_criteria_search[0] == '\0') return true;
                     const auto &tmpl_adv = current_template_data.advancements[row.template_index];
                     std::string shadow_root = tmpl_adv.root_name;
@@ -24720,6 +24800,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tip);
                     }
                 }
+                ImGui::SameLine();
+                selected_only_checkbox("criteria", &s_criteria_selected_only);
 
                 if (ImGui::SmallButton("Select all##criteria_list")) {
                     for (auto &row: s_criteria_rows) {
@@ -25026,9 +25108,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         } // End of batch import
 
-        // Store the cursor position after drawing the left-aligned controls
-        float left_controls_end_x = ImGui::GetCursorPosX();
-
         // --- Right-aligned Controls ---
         const float search_bar_width = 200.0f;
         const float clear_button_width = ImGui::GetFrameHeight();
@@ -25038,17 +25117,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          ImGui::GetFrameHeightWithSpacing())
                                                       : 0.0f;
 
-        const float right_controls_width = search_bar_width + clear_button_width + search_scope_checkbox_width + (
-                                               ImGui::GetStyle().ItemSpacing.x * 2);
+        const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
+                                           search_scope_checkbox_width + (ImGui::GetStyle().ItemSpacing.x * 3);
 
-        // --- Position and render right-aligned controls ---
-        float right_controls_start_x = ImGui::GetWindowWidth() - right_controls_width -
-                                       ImGui::GetStyle().WindowPadding.x;
-
-        // Only move to the same line if there is enough space to avoid overlap
-        if (right_controls_start_x > left_controls_end_x) {
-            ImGui::SameLine(right_controls_start_x);
-        }
+        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        selected_only_checkbox("import_advancements", &import_selected_only);
+        ImGui::SameLine();
 
         // Add the new checkbox for search scope
         if (creator_selected_version > MC_VERSION_1_6_4) {
@@ -25387,6 +25461,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 crit.root_name.c_str(), import_search_buffer)) {
                             continue;
                         }
+                        if (import_selected_only && !crit.is_selected) continue;
 
                         // Determine if the criterion checkbox should be disabled
                         bool crit_staged_for_add = false;
@@ -26059,10 +26134,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             focus_import_search = true;
         }
 
+        if (ImGui::IsWindowAppearing()) import_selected_only = false;
+
         // --- Create a filtered list of stats to display and operate on ---
         std::vector<ImportableStat *> filtered_stats;
         if (import_search_buffer[0] != '\0') {
             for (auto &stat: importable_stats) {
+                if (import_selected_only && !stat.is_selected) continue;
                 if (str_contains_insensitive(stat.root_name.c_str(), import_search_buffer)) {
                     filtered_stats.push_back(&stat);
                 }
@@ -26070,6 +26148,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else {
             // If no search, all stats are "filtered"
             for (auto &stat: importable_stats) {
+                if (import_selected_only && !stat.is_selected) continue;
                 filtered_stats.push_back(&stat);
             }
         }
@@ -26140,8 +26219,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Right-aligned Controls ---
         const float search_bar_width = 250.0f;
         const float clear_button_width = ImGui::GetFrameHeight();
-        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
-        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+        const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
+                                           ImGui::GetStyle().ItemSpacing.x * 2;
+        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        selected_only_checkbox("import_stats", &import_selected_only);
+        ImGui::SameLine();
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportStatsSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
@@ -26407,16 +26489,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             focus_import_search = true;
         }
 
+        if (ImGui::IsWindowAppearing()) import_selected_only = false;
+
         // --- Create a filtered list of unlocks to display and operate on ---
         std::vector<ImportableUnlock *> filtered_unlocks;
         if (import_search_buffer[0] != '\0') {
             for (auto &unlock: importable_unlocks) {
+                if (import_selected_only && !unlock.is_selected) continue;
                 if (str_contains_insensitive(unlock.root_name.c_str(), import_search_buffer)) {
                     filtered_unlocks.push_back(&unlock);
                 }
             }
         } else {
             for (auto &unlock: importable_unlocks) {
+                if (import_selected_only && !unlock.is_selected) continue;
                 filtered_unlocks.push_back(&unlock);
             }
         }
@@ -26463,8 +26549,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Right-aligned Controls ---
         const float search_bar_width = 250.0f;
         const float clear_button_width = ImGui::GetFrameHeight();
-        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
-        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+        const float right_controls_width = selected_only_checkbox_width() + search_bar_width + clear_button_width +
+                                           ImGui::GetStyle().ItemSpacing.x * 2;
+        same_line_right_aligned(right_controls_width, current_import_mode == BATCH_IMPORT);
+        selected_only_checkbox("import_unlocks", &import_selected_only);
+        ImGui::SameLine();
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportUnlocksSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
@@ -27185,6 +27274,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             auto template_import_visible = [&](int i) -> bool {
                 if (entry_is_final_stage(i)) return false;
+                if (s_template_import_selected_only &&
+                    (i < 0 || i >= (int) s_template_import_selected.size() || !s_template_import_selected[i]))
+                    return false;
                 if (s_template_import_search[0] == '\0') return true;
                 char row_label[384];
                 label_at(i, row_label, sizeof(row_label));
@@ -27298,8 +27390,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             const float tpl_search_width = 200.0f;
             const float tpl_clear_width = ImGui::GetFrameHeight();
-            const float tpl_right_block = tpl_search_width + tpl_clear_width + ImGui::GetStyle().ItemSpacing.x;
-            ImGui::SameLine(ImGui::GetWindowWidth() - tpl_right_block - ImGui::GetStyle().WindowPadding.x);
+            const float tpl_right_block = selected_only_checkbox_width() + tpl_search_width + tpl_clear_width +
+                                          ImGui::GetStyle().ItemSpacing.x * 2;
+            same_line_right_aligned(tpl_right_block, true);
+            selected_only_checkbox("template_import", &s_template_import_selected_only);
+            ImGui::SameLine();
             if (s_template_import_search[0] != '\0') {
                 if (ImGui::Button("X##template_import_clear", ImVec2(tpl_clear_width, 0))) {
                     s_template_import_search[0] = '\0';
@@ -28248,6 +28343,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::OpenPopup("###SelectGoalPopup");
     }
     if (ImGui::BeginPopupModal(goal_selector_popup_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::IsWindowAppearing()) goal_selector_selected_only = false;
         // Ctrl/Cmd+F to focus search
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -28314,23 +28410,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::Text("Selecting: %s", target_label);
         }
 
-        // Store the cursor position after drawing the left-aligned controls
-        float left_controls_end_gs = ImGui::GetCursorPosX();
-
         // --- Right-aligned Controls ---
         const float search_bar_width_gs = 200.0f;
         const float clear_button_width_gs = ImGui::GetFrameHeight();
-        const float right_controls_width_gs = search_bar_width_gs + clear_button_width_gs +
-                                              ImGui::GetStyle().ItemSpacing.x;
-
-        // --- Position and render right-aligned controls ---
-        float right_controls_start_gs = ImGui::GetWindowWidth() - right_controls_width_gs -
-                                        ImGui::GetStyle().WindowPadding.x;
-
-        // Only move to the same line if there is enough space to avoid overlap
-        if (right_controls_start_gs > left_controls_end_gs) {
-            ImGui::SameLine(right_controls_start_gs);
-        }
+        const float right_controls_width_gs = selected_only_checkbox_width() + search_bar_width_gs +
+                                              clear_button_width_gs + ImGui::GetStyle().ItemSpacing.x * 2;
+        same_line_right_aligned(right_controls_width_gs, true);
+        selected_only_checkbox("goal_selector", &goal_selector_selected_only);
+        ImGui::SameLine();
 
         if (goal_selector_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearGoalSearch", ImVec2(clear_button_width_gs, 0))) {
@@ -28492,80 +28579,109 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         };
 
-        // Build flat index of all visible goals for shift-click range selection
+        // Every visible row in display order. A shift-click range indexes into this list by position, so
+        // the rows are rendered straight from it.
+        enum GoalSection { GS_ADVANCEMENTS, GS_STATS, GS_UNLOCKS, GS_CUSTOM, GS_MULTI_STAGE, GS_COUNTERS };
+        static const char *const goal_section_titles[] = {
+            "-- Advancements --", "-- Stats --", "-- Unlocks --", "-- Custom Goals --", "-- Multi-Stage Goals --",
+            "-- Counters --"
+        };
         struct FlatGoalEntry {
             const char *root_name;
             const char *stage_id;
             const char *parent_root;
             LinkedGoalType type;
+            GoalSection section;
+            bool indent;
+            std::string label;
         };
         std::vector<FlatGoalEntry> flat_goal_list;
 
-        // A simple (single-value) stat is one row: the category itself, with no sub-stat rows under
-        // it. Both the flat list and the rendering below ask this one lambda, because a shift-click
-        // range indexes into the flat list by the position the rendering assigned, so a row that
-        // exists in one and not the other shifts every entry after it onto the wrong goal.
+        auto row_shown = [&](bool search_ok, const char *root_name, const char *stage_id, const char *parent_root,
+                             LinkedGoalType type) -> bool {
+            if (!search_ok) return false;
+            return !goal_selector_selected_only || is_goal_selected(root_name, stage_id, parent_root, type);
+        };
+
+        // A simple (single-value) stat is one row: the category itself, with no sub-stat rows under it.
         auto stat_shows_sub_rows = [](const EditorTrackableCategory &stat) { return !stat.is_simple_stat; };
 
-        // Pre-build flat list (must match the rendering order exactly)
-        // Advancements
+        char row_label[384];
         for (const auto &adv: current_template_data.advancements) {
             bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
-            bool any_child = false;
-            for (const auto &crit: adv.criteria)
-                if (matches_search(crit.root_name, crit.display_name, "Criterion")) any_child = true;
-            if (!parent_match && !any_child) continue;
-            if (parent_match) flat_goal_list.push_back({adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT});
+            if (row_shown(parent_match, adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT)) {
+                snprintf(row_label, sizeof(row_label), "%s##adv_%s", adv.root_name, adv.root_name);
+                flat_goal_list.push_back({
+                    adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT, GS_ADVANCEMENTS, false, row_label
+                });
+            }
             for (const auto &crit: adv.criteria) {
-                if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
-                flat_goal_list.push_back({crit.root_name, nullptr, adv.root_name, LINK_TYPE_ADVANCEMENT});
+                bool match = parent_match || matches_search(crit.root_name, crit.display_name, "Criterion");
+                if (!row_shown(match, crit.root_name, nullptr, adv.root_name, LINK_TYPE_ADVANCEMENT)) continue;
+                snprintf(row_label, sizeof(row_label), "%s##crit_%s_%s", crit.root_name, adv.root_name,
+                         crit.root_name);
+                flat_goal_list.push_back({
+                    crit.root_name, nullptr, adv.root_name, LINK_TYPE_ADVANCEMENT, GS_ADVANCEMENTS, true, row_label
+                });
             }
         }
-        // Stats
         for (const auto &stat: current_template_data.stats) {
             bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
-            bool any_child = false;
-            if (stat_shows_sub_rows(stat)) {
-                for (const auto &sub: stat.criteria)
-                    if (matches_search(sub.root_name, sub.display_name, "Sub-Stat")) any_child = true;
+            if (row_shown(parent_match, stat.root_name, nullptr, nullptr, LINK_TYPE_STAT)) {
+                snprintf(row_label, sizeof(row_label), "%s##stat_%s", stat.root_name, stat.root_name);
+                flat_goal_list.push_back({stat.root_name, nullptr, nullptr, LINK_TYPE_STAT, GS_STATS, false, row_label});
             }
-            if (!parent_match && !any_child) continue;
-            if (parent_match) flat_goal_list.push_back({stat.root_name, nullptr, nullptr, LINK_TYPE_STAT});
-            if (stat_shows_sub_rows(stat)) {
-                for (const auto &sub: stat.criteria) {
-                    if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
-                    flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT});
-                }
+            if (!stat_shows_sub_rows(stat)) continue;
+            for (const auto &sub: stat.criteria) {
+                bool match = parent_match || matches_search(sub.root_name, sub.display_name, "Sub-Stat");
+                if (!row_shown(match, sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT)) continue;
+                snprintf(row_label, sizeof(row_label), "%s##sub_%s_%s", sub.root_name, stat.root_name, sub.root_name);
+                flat_goal_list.push_back({
+                    sub.root_name, nullptr, stat.root_name, LINK_TYPE_STAT, GS_STATS, true, row_label
+                });
             }
         }
-        // Unlocks
         for (const auto &unlock: current_template_data.unlocks) {
-            if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
-            flat_goal_list.push_back({unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK});
+            bool match = matches_search(unlock.root_name, unlock.display_name, "Unlock");
+            if (!row_shown(match, unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK)) continue;
+            snprintf(row_label, sizeof(row_label), "%s##unlock_%s", unlock.root_name, unlock.root_name);
+            flat_goal_list.push_back({
+                unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK, GS_UNLOCKS, false, row_label
+            });
         }
-        // Custom Goals
         for (const auto &cg: current_template_data.custom_goals) {
-            if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
-            flat_goal_list.push_back({cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM});
+            bool match = matches_search(cg.root_name, cg.display_name, "Custom Goal");
+            if (!row_shown(match, cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM)) continue;
+            snprintf(row_label, sizeof(row_label), "%s##custom_%s", cg.root_name, cg.root_name);
+            flat_goal_list.push_back({cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM, GS_CUSTOM, false, row_label});
         }
-        // Multi-Stage Goals (skip final stage — it doesn't get completed, so linking against it is invalid)
+        // The final stage is skipped: it never gets completed, so linking against it is invalid.
         for (const auto &msg: current_template_data.multi_stage_goals) {
             bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
-            bool any_stage = false;
-            for (size_t si = 0; si + 1 < msg.stages.size(); si++)
-                if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage")) any_stage = true;
-            if (!parent_match && !any_stage) continue;
-            if (parent_match) flat_goal_list.push_back({msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE});
+            if (row_shown(parent_match, msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE)) {
+                snprintf(row_label, sizeof(row_label), "%s##ms_%s", msg.root_name, msg.root_name);
+                flat_goal_list.push_back({
+                    msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE, GS_MULTI_STAGE, false, row_label
+                });
+            }
             for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
                 const auto &stage = msg.stages[si];
-                if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
-                flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr, LINK_TYPE_MULTI_STAGE});
+                bool match = parent_match || matches_search(stage.root_name, stage.display_text, "Stage");
+                if (!row_shown(match, msg.root_name, stage.stage_id, nullptr, LINK_TYPE_MULTI_STAGE)) continue;
+                snprintf(row_label, sizeof(row_label), "[%s] %s##stage_%s_%s", stage.stage_id, stage.display_text,
+                         msg.root_name, stage.stage_id);
+                flat_goal_list.push_back({
+                    msg.root_name, stage.stage_id, nullptr, LINK_TYPE_MULTI_STAGE, GS_MULTI_STAGE, true, row_label
+                });
             }
         }
-        // Counters
         for (const auto &counter: current_template_data.counter_goals) {
-            if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
-            flat_goal_list.push_back({counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER});
+            bool match = matches_search(counter.root_name, counter.display_name, "Counter");
+            if (!row_shown(match, counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER)) continue;
+            snprintf(row_label, sizeof(row_label), "%s##counter_%s", counter.root_name, counter.root_name);
+            flat_goal_list.push_back({
+                counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER, GS_COUNTERS, false, row_label
+            });
         }
 
         int current_flat_index = 0; // Tracks position in flat list during rendering
@@ -28604,204 +28720,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (indent) ImGui::Unindent();
         };
 
-        // Advancements
-        {
-            bool has_visible = false;
-            for (const auto &adv: current_template_data.advancements) {
-                bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
-                bool any_child_match = false;
-                for (const auto &crit: adv.criteria) {
-                    if (matches_search(crit.root_name, crit.display_name, "Criterion"))
-                        any_child_match = true;
-                }
-                if (parent_match || any_child_match) {
-                    has_visible = true;
-                    break;
-                }
+        int last_section = -1;
+        for (const auto &row: flat_goal_list) {
+            if ((int) row.section != last_section) {
+                ImGui::TextDisabled("%s", goal_section_titles[row.section]);
+                last_section = (int) row.section;
             }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Advancements --");
-                for (const auto &adv: current_template_data.advancements) {
-                    bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
-                    bool any_child_match = false;
-                    for (const auto &crit: adv.criteria) {
-                        if (matches_search(crit.root_name, crit.display_name, "Criterion"))
-                            any_child_match = true;
-                    }
-                    if (!parent_match && !any_child_match) continue;
-
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##adv_%s", adv.root_name, adv.root_name);
-                    if (parent_match)
-                        render_goal_checkbox(label, adv.root_name, nullptr, nullptr, LINK_TYPE_ADVANCEMENT, false);
-
-                    for (const auto &crit: adv.criteria) {
-                        if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
-                        char crit_label[384];
-                        snprintf(crit_label, sizeof(crit_label), "%s##crit_%s_%s", crit.root_name, adv.root_name,
-                                 crit.root_name);
-                        render_goal_checkbox(crit_label, crit.root_name, nullptr, adv.root_name,
-                                             LINK_TYPE_ADVANCEMENT, true);
-                    }
-                }
-            }
+            render_goal_checkbox(row.label.c_str(), row.root_name, row.stage_id, row.parent_root, row.type,
+                                 row.indent);
         }
-
-        // Stats
-        {
-            bool has_visible = false;
-            for (const auto &stat: current_template_data.stats) {
-                bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
-                bool any_child_match = false;
-                if (stat_shows_sub_rows(stat)) {
-                    for (const auto &sub: stat.criteria) {
-                        if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
-                            any_child_match = true;
-                    }
-                }
-                if (parent_match || any_child_match) {
-                    has_visible = true;
-                    break;
-                }
-            }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Stats --");
-                for (const auto &stat: current_template_data.stats) {
-                    bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
-                    bool any_child_match = false;
-                    if (stat_shows_sub_rows(stat)) {
-                        for (const auto &sub: stat.criteria) {
-                            if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
-                                any_child_match = true;
-                        }
-                    }
-                    if (!parent_match && !any_child_match) continue;
-
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##stat_%s", stat.root_name, stat.root_name);
-                    if (parent_match)
-                        render_goal_checkbox(label, stat.root_name, nullptr, nullptr, LINK_TYPE_STAT, false);
-
-                    // Only show sub-stats for complex (multi-stat) categories
-                    if (stat_shows_sub_rows(stat)) {
-                        for (const auto &sub: stat.criteria) {
-                            if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
-                            char sub_label[384];
-                            snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name,
-                                     sub.root_name);
-                            render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name,
-                                                 LINK_TYPE_STAT, true);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Unlocks
-        {
-            bool has_visible = false;
-            for (const auto &unlock: current_template_data.unlocks) {
-                if (matches_search(unlock.root_name, unlock.display_name, "Unlock")) {
-                    has_visible = true;
-                    break;
-                }
-            }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Unlocks --");
-                for (const auto &unlock: current_template_data.unlocks) {
-                    if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##unlock_%s", unlock.root_name, unlock.root_name);
-                    render_goal_checkbox(label, unlock.root_name, nullptr, nullptr, LINK_TYPE_UNLOCK, false);
-                }
-            }
-        }
-
-        // Custom Goals
-        {
-            bool has_visible = false;
-            for (const auto &cg: current_template_data.custom_goals) {
-                if (matches_search(cg.root_name, cg.display_name, "Custom Goal")) {
-                    has_visible = true;
-                    break;
-                }
-            }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Custom Goals --");
-                for (const auto &cg: current_template_data.custom_goals) {
-                    if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##custom_%s", cg.root_name, cg.root_name);
-                    render_goal_checkbox(label, cg.root_name, nullptr, nullptr, LINK_TYPE_CUSTOM, false);
-                }
-            }
-        }
-
-        // Multi-Stage Goals (with individual stages, skip final stage — it doesn't get completed)
-        {
-            bool has_visible = false;
-            for (const auto &msg: current_template_data.multi_stage_goals) {
-                if (matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal")) {
-                    has_visible = true;
-                    break;
-                }
-                for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
-                    if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage")) {
-                        has_visible = true;
-                        break;
-                    }
-                }
-                if (has_visible) break;
-            }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Multi-Stage Goals --");
-                for (const auto &msg: current_template_data.multi_stage_goals) {
-                    bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
-                    bool any_stage_match = false;
-                    for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
-                        if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage"))
-                            any_stage_match = true;
-                    }
-                    if (!parent_match && !any_stage_match) continue;
-
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##ms_%s", msg.root_name, msg.root_name);
-                    if (parent_match)
-                        render_goal_checkbox(label, msg.root_name, nullptr, nullptr, LINK_TYPE_MULTI_STAGE, false);
-
-                    for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
-                        const auto &stage = msg.stages[si];
-                        if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
-                        char stage_label[384];
-                        snprintf(stage_label, sizeof(stage_label), "[%s] %s##stage_%s_%s",
-                                 stage.stage_id, stage.display_text, msg.root_name, stage.stage_id);
-                        render_goal_checkbox(stage_label, msg.root_name, stage.stage_id, nullptr,
-                                             LINK_TYPE_MULTI_STAGE, true);
-                    }
-                }
-            }
-        }
-
-        // Counters
-        {
-            bool has_visible = false;
-            for (const auto &counter: current_template_data.counter_goals) {
-                if (matches_search(counter.root_name, counter.display_name, "Counter")) {
-                    has_visible = true;
-                    break;
-                }
-            }
-            if (has_visible) {
-                ImGui::TextDisabled("-- Counters --");
-                for (const auto &counter: current_template_data.counter_goals) {
-                    if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
-                    char label[384];
-                    snprintf(label, sizeof(label), "%s##counter_%s", counter.root_name, counter.root_name);
-                    render_goal_checkbox(label, counter.root_name, nullptr, nullptr, LINK_TYPE_COUNTER, false);
-                }
-            }
-        }
-
         ImGui::EndChild();
 
         // --- Bottom Controls ---
