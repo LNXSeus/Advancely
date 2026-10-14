@@ -499,6 +499,14 @@ static bool tc_run_completion_goal_exists(const EditorTemplate &data, const RunC
         case RC_GOAL_COUNTER:
             for (const auto &c: data.counter_goals) if (strcmp(c.root_name, ref.root_name) == 0) return true;
             return false;
+        case RC_GOAL_ADVANCEMENT_CRITERIA:
+            for (const auto &a: data.advancements)
+                if (!a.criteria.empty() && strcmp(a.root_name, ref.root_name) == 0) return true;
+            return false;
+        case RC_GOAL_STAT_SUB_STATS:
+            for (const auto &s: data.stats)
+                if (!s.is_simple_stat && strcmp(s.root_name, ref.root_name) == 0) return true;
+            return false;
         default:
             return false;
     }
@@ -5713,6 +5721,18 @@ static bool tc_stat_counts_as_goal(const EditorTrackableCategory &s, MC_Version 
     return !(version <= MC_VERSION_1_6_4 && s.is_simple_stat && s.criteria.size() == 1 && s.criteria[0].goal == 0);
 }
 
+// The tracker's criteria progress total: with groups on, a group counts as one criterion.
+static int tc_criteria_progress_total(const EditorTrackableCategory &advancement) {
+    if (!advancement.groups_enabled) return (int) advancement.criteria.size();
+    std::set<std::string> groups;
+    int ungrouped = 0;
+    for (const auto &crit: advancement.criteria) {
+        if (crit.group[0] == '\0') ungrouped++;
+        else groups.insert(crit.group);
+    }
+    return ungrouped + (int) groups.size();
+}
+
 // The "Run Completion" editor tab: which goals a run has to finish (whole types and/or individual
 // goals, an empty pick meaning the whole template), the optional count / percentage targets, and the
 // per-language label of the counter the tracker title, info bar and overlay progress text show.
@@ -5751,6 +5771,17 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     for (const auto &c: data.custom_goals) tally(RC_TYPE_CUSTOM, RC_GOAL_CUSTOM, c.root_name);
     for (const auto &g: data.multi_stage_goals) tally(RC_TYPE_MULTISTAGE, RC_GOAL_MULTISTAGE, g.root_name);
     for (const auto &c: data.counter_goals) tally(RC_TYPE_COUNTERS, RC_GOAL_COUNTER, c.root_name);
+    // Picked criteria / sub-stats each join the required set, the goal they belong to does not.
+    auto tally_parts = [&](RunCompletionGoalKind kind, const char *root, int part_total, int mask_bit) {
+        if (part_total <= 0 || !picked(kind, root)) return;
+        required_total += part_total;
+        required_mask |= mask_bit;
+    };
+    for (const auto &a: data.advancements)
+        tally_parts(RC_GOAL_ADVANCEMENT_CRITERIA, a.root_name, tc_criteria_progress_total(a), RC_MASK_CRITERIA);
+    for (const auto &s: data.stats)
+        if (!s.is_simple_stat)
+            tally_parts(RC_GOAL_STAT_SUB_STATS, s.root_name, (int) s.criteria.size(), RC_MASK_SUB_STATS);
 
     bool any_type = false;
     for (int i = 0; i < RC_TYPE_COUNT; i++) if (rc.types[i]) any_type = true;
@@ -5772,10 +5803,11 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     // Shift+Click range anchors: one for the type list, one per individual-goal dropdown (row index of
     // the last plain click; -1 = none yet).
     static int s_rc_type_anchor = -1;
-    static int s_rc_anchor[RC_TYPE_COUNT];
+    enum { RC_SLOT_ADV_CRITERIA = RC_TYPE_COUNT, RC_SLOT_RECIPE_CRITERIA, RC_SLOT_SUB_STATS, RC_SLOT_COUNT };
+    static int s_rc_anchor[RC_SLOT_COUNT];
     static bool s_rc_anchor_init = false;
     if (!s_rc_anchor_init) {
-        for (int i = 0; i < RC_TYPE_COUNT; i++) s_rc_anchor[i] = -1;
+        for (int i = 0; i < RC_SLOT_COUNT; i++) s_rc_anchor[i] = -1;
         s_rc_anchor_init = true;
     }
 
@@ -5880,17 +5912,20 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
         const char *icon;
     };
     std::vector<RcRow> rows;
-    auto goal_combo = [&](RunCompletionType type, RunCompletionGoalKind kind, const char *label, const char *tip) {
+    // `slot` is the dropdown's own anchor and ID; `covering_type` the whole type that already requires
+    // every goal listed here (-1 for criteria and sub-stats, which no type covers).
+    auto goal_combo = [&](int slot, int covering_type, RunCompletionGoalKind kind, const char *label,
+                          const char *tip) {
         if (rows.empty()) return;
         int selected = 0;
         for (const auto &row: rows) if (goal_index(kind, row.root) >= 0) selected++;
         char preview[48];
         snprintf(preview, sizeof(preview), "%d selected", selected);
         char combo_id[96];
-        snprintf(combo_id, sizeof(combo_id), "%s##rc_goals_%d", label, (int) type);
+        snprintf(combo_id, sizeof(combo_id), "%s##rc_goals_%d", label, slot);
         // With the whole type checked above every one of these goals is required already, so the
         // picks here change nothing until the type is unchecked again; they are kept, just greyed out.
-        const bool type_checked = rc.types[type];
+        const bool type_checked = covering_type >= 0 && rc.types[covering_type];
         if (type_checked) ImGui::BeginDisabled();
         ImGui::SetNextItemWidth(260.0f);
         if (ImGui::BeginCombo(combo_id, preview)) {
@@ -5908,7 +5943,7 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
                     goal_icon(row.icon, &tex, &anim);
                     if (goal_icon_selectable(row.root, text, on, tex, anim)) {
                         bool new_state = !on;
-                        int &anchor = s_rc_anchor[type];
+                        int &anchor = s_rc_anchor[slot];
                         if (ImGui::GetIO().KeyShift && anchor >= 0 && anchor < (int) rows.size() && anchor != r) {
                             int lo = anchor < r ? anchor : r;
                             int hi = anchor < r ? r : anchor;
@@ -5935,8 +5970,8 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
         }
         ImGui::SameLine();
         char all_id[48], none_id[48];
-        snprintf(all_id, sizeof(all_id), "All##rc_goals_%d_all", (int) type);
-        snprintf(none_id, sizeof(none_id), "None##rc_goals_%d_none", (int) type);
+        snprintf(all_id, sizeof(all_id), "All##rc_goals_%d_all", slot);
+        snprintf(none_id, sizeof(none_id), "None##rc_goals_%d_none", slot);
         if (ImGui::SmallButton(all_id)) for (const auto &row: rows) goal_set(kind, row.root, true);
         ImGui::SameLine();
         if (ImGui::SmallButton(none_id)) for (const auto &row: rows) goal_set(kind, row.root, false);
@@ -5946,33 +5981,60 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     rows.clear();
     for (const auto &a: data.advancements)
         if (!a.is_recipe) rows.push_back({a.root_name, a.display_name, a.icon_path});
-    goal_combo(RC_TYPE_ADVANCEMENTS, RC_GOAL_ADVANCEMENT, adv_word,
+    goal_combo(RC_TYPE_ADVANCEMENTS, RC_TYPE_ADVANCEMENTS, RC_GOAL_ADVANCEMENT, adv_word,
                modern
                    ? "Specific advancements the run has to complete. Recipes have their own dropdown."
                    : "Specific achievements the run has to complete.");
+    char criteria_label[48], criteria_tip[512];
+    snprintf(criteria_label, sizeof(criteria_label), "%s Criteria", modern ? "Advancement" : "Achievement");
+    snprintf(criteria_tip, sizeof(criteria_tip),
+             "Complex %s whose criteria each count as one required goal, e.g. every food of\n"
+             "'A Balanced Diet' for a counter like 'Foods Eaten: 12/40'. Grouped criteria count\n"
+             "once per group, like on the tracker. The %s itself is only required when it is\n"
+             "also picked above.", modern ? "advancements" : "achievements",
+             modern ? "advancement" : "achievement");
+    rows.clear();
+    for (const auto &a: data.advancements)
+        if (!a.is_recipe && !a.criteria.empty()) rows.push_back({a.root_name, a.display_name, a.icon_path});
+    goal_combo(RC_SLOT_ADV_CRITERIA, -1, RC_GOAL_ADVANCEMENT_CRITERIA, criteria_label, criteria_tip);
     rows.clear();
     for (const auto &a: data.advancements)
         if (a.is_recipe) rows.push_back({a.root_name, a.display_name, a.icon_path});
-    goal_combo(RC_TYPE_RECIPES, RC_GOAL_ADVANCEMENT, "Recipes", "Specific recipes the run has to unlock.");
+    goal_combo(RC_TYPE_RECIPES, RC_TYPE_RECIPES, RC_GOAL_ADVANCEMENT, "Recipes",
+               "Specific recipes the run has to unlock.");
+    rows.clear();
+    for (const auto &a: data.advancements)
+        if (a.is_recipe && !a.criteria.empty()) rows.push_back({a.root_name, a.display_name, a.icon_path});
+    goal_combo(RC_SLOT_RECIPE_CRITERIA, -1, RC_GOAL_ADVANCEMENT_CRITERIA, "Recipe Criteria",
+               "Complex recipes whose criteria each count as one required goal. Grouped criteria\n"
+               "count once per group, like on the tracker. The recipe itself is only required when\n"
+               "it is also picked above.");
     rows.clear();
     for (const auto &s: data.stats)
         if (tc_stat_counts_as_goal(s, version)) rows.push_back({s.root_name, s.display_name, s.icon_path});
-    goal_combo(RC_TYPE_STATS, RC_GOAL_STAT, "Stats",
+    goal_combo(RC_TYPE_STATS, RC_TYPE_STATS, RC_GOAL_STAT, "Stats",
                "Specific stats the run has to complete. A multi-stat counts once all of its sub-stats\n"
                "are done; an open-ended stat (no target) never completes.");
     rows.clear();
+    for (const auto &s: data.stats)
+        if (!s.is_simple_stat) rows.push_back({s.root_name, s.display_name, s.icon_path});
+    goal_combo(RC_SLOT_SUB_STATS, -1, RC_GOAL_STAT_SUB_STATS, "Multi-Stat Sub-Stats",
+               "Multi-stats whose sub-stats each count as one required goal, e.g. 'Mobs Killed: 8/20'.\n"
+               "The multi-stat itself is only required when it is also picked under Stats.");
+    rows.clear();
     for (const auto &u: data.unlocks) rows.push_back({u.root_name, u.display_name, u.icon_path});
-    goal_combo(RC_TYPE_UNLOCKS, RC_GOAL_UNLOCK, "Unlocks", "Specific unlocks the run has to get.");
+    goal_combo(RC_TYPE_UNLOCKS, RC_TYPE_UNLOCKS, RC_GOAL_UNLOCK, "Unlocks", "Specific unlocks the run has to get.");
     rows.clear();
     for (const auto &c: data.custom_goals) rows.push_back({c.root_name, c.display_name, c.icon_path});
-    goal_combo(RC_TYPE_CUSTOM, RC_GOAL_CUSTOM, "Custom Goals", "Specific custom goals the run has to complete.");
+    goal_combo(RC_TYPE_CUSTOM, RC_TYPE_CUSTOM, RC_GOAL_CUSTOM, "Custom Goals",
+               "Specific custom goals the run has to complete.");
     rows.clear();
     for (const auto &g: data.multi_stage_goals) rows.push_back({g.root_name, g.display_name, g.icon_path});
-    goal_combo(RC_TYPE_MULTISTAGE, RC_GOAL_MULTISTAGE, "Multi-Stage Goals",
+    goal_combo(RC_TYPE_MULTISTAGE, RC_TYPE_MULTISTAGE, RC_GOAL_MULTISTAGE, "Multi-Stage Goals",
                "Specific multi-stage goals the run has to bring to their final stage.");
     rows.clear();
     for (const auto &c: data.counter_goals) rows.push_back({c.root_name, c.display_name, c.icon_path});
-    goal_combo(RC_TYPE_COUNTERS, RC_GOAL_COUNTER, "Counters",
+    goal_combo(RC_TYPE_COUNTERS, RC_TYPE_COUNTERS, RC_GOAL_COUNTER, "Counters",
                "Specific counters the run has to complete (all of their linked goals done).");
 
     if (everything_total == 0) ImGui::TextDisabled("This template has no goals yet.");
@@ -6066,7 +6128,8 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     ImGui::Spacing();
     ImGui::SeparatorText("Progress Counter");
     ImGui::TextWrapped("The 'X/Y' counter in the tracker title, the info bar and the overlay progress text "
-        "(Scrolling Belt and Page modes). It counts the required goals picked above and replaces the "
+        "(Scrolling Belt and Page modes). It counts the required goals picked above, each picked criterion "
+        "or sub-stat as one, and replaces the "
         "%s counter; the overall progress percentage is left out then, as it covers the whole template. "
         "With 'Everything' the plain %s counter and the percentage stay.",
         modern ? "advancement" : "achievement", modern ? "advancement" : "achievement");

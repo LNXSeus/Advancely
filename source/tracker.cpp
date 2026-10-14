@@ -4531,11 +4531,19 @@ static void tracker_compute_completion_counts(TemplateData *td, MC_Version versi
         mask |= 1 << type;
         if (is_done) done++;
     };
+    auto take_parts = [&](int mask_bit, int parts_done, int parts_total) {
+        if (parts_total <= 0) return;
+        total += parts_total;
+        mask |= mask_bit;
+        done += parts_done < parts_total ? parts_done : parts_total;
+    };
     for (int i = 0; i < td->advancement_count; i++) {
         const TrackableCategory *a = td->advancements[i];
         if (!a) continue;
         RunCompletionType type = a->is_recipe ? RC_TYPE_RECIPES : RC_TYPE_ADVANCEMENTS;
         if (rule->types[type] || rc_goal_listed(rule, RC_GOAL_ADVANCEMENT, a->root_name)) take(type, a->done);
+        if (a->criteria_count > 0 && rc_goal_listed(rule, RC_GOAL_ADVANCEMENT_CRITERIA, a->root_name))
+            take_parts(RC_MASK_CRITERIA, a->completed_criteria_count, a->criteria_progress_total);
     }
     for (int i = 0; i < td->stat_count; i++) {
         const TrackableCategory *s = td->stats[i];
@@ -4545,6 +4553,8 @@ static void tracker_compute_completion_counts(TemplateData *td, MC_Version versi
             continue;
         if (rule->types[RC_TYPE_STATS] || rc_goal_listed(rule, RC_GOAL_STAT, s->root_name))
             take(RC_TYPE_STATS, s->done);
+        if (!s->is_single_stat_category && rc_goal_listed(rule, RC_GOAL_STAT_SUB_STATS, s->root_name))
+            take_parts(RC_MASK_SUB_STATS, s->completed_criteria_count, s->criteria_progress_total);
     }
     for (int i = 0; i < td->unlock_count; i++) {
         const TrackableItem *u = td->unlocks[i];
@@ -4583,6 +4593,8 @@ const char *run_completion_derived_label(int type_mask, bool modern) {
         if (type_mask != (1 << i)) continue;
         return (i == RC_TYPE_ADVANCEMENTS) ? (modern ? "Adv" : "Ach") : type_labels[i];
     }
+    if (type_mask == RC_MASK_CRITERIA) return "Criteria";
+    if (type_mask == RC_MASK_SUB_STATS) return "Sub-Stats";
     return "Goals";
 }
 

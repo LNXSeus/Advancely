@@ -691,8 +691,15 @@ enum RunCompletionGoalKind {
     RC_GOAL_CUSTOM,
     RC_GOAL_MULTISTAGE,
     RC_GOAL_COUNTER,
+    RC_GOAL_ADVANCEMENT_CRITERIA, // A complex advancement or recipe whose criteria count one by one
+    RC_GOAL_STAT_SUB_STATS, // A multi-stat whose sub-stats count one by one
     RC_GOAL_KIND_COUNT
 };
+
+// completion_type_mask bits past the RunCompletionType ones, for criteria and sub-stats that count
+// one by one.
+#define RC_MASK_CRITERIA (1 << RC_TYPE_COUNT)
+#define RC_MASK_SUB_STATS (1 << (RC_TYPE_COUNT + 1))
 
 struct RunCompletionGoalRef {
     RunCompletionGoalKind kind;

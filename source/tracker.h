@@ -344,7 +344,8 @@ bool tracker_progress_percent_shown(const TemplateData *td);
 
 /**
  * @brief The counter label used when the language file has no "run_completion.label": the name of
- * the single type the required set spans (type_mask has one bit set), or "Goals" for a mix.
+ * the single type the required set spans (type_mask has one bit set, criteria and sub-stats included),
+ * or "Goals" for a mix.
  * Shared with the template editor's preview so both agree.
  */
 const char *run_completion_derived_label(int type_mask, bool modern);

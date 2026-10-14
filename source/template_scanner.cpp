@@ -660,7 +660,8 @@ static const char *RC_TYPE_KEYS[RC_TYPE_COUNT] = {
 };
 
 static const char *RC_GOAL_KIND_KEYS[RC_GOAL_KIND_COUNT] = {
-    "advancement", "stat", "unlock", "custom", "multi_stage_goal", "counter"
+    "advancement", "stat", "unlock", "custom", "multi_stage_goal", "counter", "advancement_criteria",
+    "stat_sub_stats"
 };
 
 const char *run_completion_type_key(RunCompletionType type) {
