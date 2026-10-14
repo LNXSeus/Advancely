@@ -6186,7 +6186,7 @@ static void selected_only_checkbox(const char *id, bool *selected_only) {
                  "CHECKED: list only the entries that are currently selected, to review them\n"
                  "before confirming. Unticking an entry removes it from the list.\n"
                  "UNCHECKED: list every entry.\n"
-                 "Works together with the search bar. Default: unchecked.");
+                 "Works together with the search bar.");
         ImGui::SetTooltip("%s", tip);
     }
 }
