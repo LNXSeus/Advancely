@@ -717,6 +717,7 @@ enum OverlayCompactCounterType {
     COMPACT_COUNTER_CUSTOM, // Custom goals
     COMPACT_COUNTER_MULTISTAGE, // Multi-stage goals
     COMPACT_COUNTER_COUNTERS, // Completion counters
+    COMPACT_COUNTER_TASKS, // Sum of every type above (goals and criteria)
     COMPACT_COUNTER_TYPE_COUNT
 };
 

@@ -561,6 +561,14 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     snprintf(cnt->label, sizeof(cnt->label), "Counters");
     cnt->completed = cnt_done;
     cnt->total = cnt_total;
+
+    // Every goal type and criterion above added together.
+    CompactCounter *tasks = &out[COMPACT_COUNTER_TASKS];
+    snprintf(tasks->label, sizeof(tasks->label), "Tasks");
+    for (int i = 0; i < COMPACT_COUNTER_TASKS; i++) {
+        tasks->completed += out[i].completed;
+        tasks->total += out[i].total;
+    }
 }
 
 // Drops any selected individual goals that aren't present in the loaded template. Shared by the
