@@ -14002,10 +14002,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 // Start from the pre-rect snapshot (preserves Ctrl+Drag additive selection)
                 s_visual_selected_items = s_pre_rect_selected_items;
                 for (const auto &item: s_visual_layout_items) {
-                    ImVec2 item_center = ImVec2(item.screen_pos.x + item.size.x * 0.5f,
-                                                item.screen_pos.y + item.size.y * 0.5f);
-                    if (item_center.x >= rect_min.x && item_center.x <= rect_max.x &&
-                        item_center.y >= rect_min.y && item_center.y <= rect_max.y) {
+                    ImVec2 item_anchor = get_anchor_screen_pos(item.pos->anchor, item.screen_pos, item.size);
+                    if (item_anchor.x >= rect_min.x && item_anchor.x <= rect_max.x &&
+                        item_anchor.y >= rect_min.y && item_anchor.y <= rect_max.y) {
                         s_visual_selected_items.insert(item.pos);
                     }
                 }
