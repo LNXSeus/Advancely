@@ -6574,6 +6574,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
         s_template_import_layout_index = 0;
+        s_template_import_keep_positions = !s_template_import_layout_flags.empty();
 
         if (!reparse_template_import_data()) return;
 
@@ -27283,11 +27284,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 ImGui::Checkbox("Layout positions##template_import", &s_template_import_keep_positions);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s",
-                                      "CHECKED: keep manual layout positions (icon/text/progress) from the\n"
-                                      "source template. Useful when copying an entire visual layout block.\n"
-                                      "UNCHECKED (default): reset positions so imported items use the\n"
-                                      "auto-layout in this template.");
+                    char keep_positions_tooltip[512];
+                    snprintf(keep_positions_tooltip, sizeof(keep_positions_tooltip),
+                             "CHECKED: keep manual layout positions (icon/text/progress) from the\n"
+                             "source template. Useful when copying an entire visual layout block.\n"
+                             "UNCHECKED: reset positions so imported items use the auto-layout in\n"
+                             "this template.\n"
+                             "Default: checked when the source template has a layout file,\n"
+                             "otherwise unchecked.");
+                    ImGui::SetTooltip("%s", keep_positions_tooltip);
                 }
             }
 
