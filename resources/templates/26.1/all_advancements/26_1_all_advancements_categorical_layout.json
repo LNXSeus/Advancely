@@ -59,21 +59,15 @@
 			"y":	480
 		}
 	},
-	"advancement.minecraft.adventure.sleep_in_bed":	{
+	"advancement.minecraft.adventure.sniper_duel":	{
 		"icon_pos":	{
 			"x":	735,
 			"y":	355
 		}
 	},
-	"advancement.minecraft.adventure.sniper_duel":	{
-		"icon_pos":	{
-			"x":	865,
-			"y":	355
-		}
-	},
 	"advancement.minecraft.adventure.two_birds_one_arrow":	{
 		"icon_pos":	{
-			"x":	995,
+			"x":	865,
 			"y":	355
 		}
 	},
@@ -105,16 +99,26 @@
 			"y":	490
 		}
 	},
-	"advancement.minecraft.adventure.lightning_rod_with_villager_no_fire":	{
+	"advancement.minecraft.adventure.sleep_in_bed":	{
 		"icon_pos":	{
 			"x":	1525,
-			"y":	25
+			"y":	155
+		}
+	},
+	"advancement.minecraft.adventure.lightning_rod_with_villager_no_fire":	{
+		"icon_pos":	{
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.very_very_frightening":	{
 		"icon_pos":	{
-			"x":	1525,
-			"y":	155
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.voluntary_exile":	{
@@ -988,7 +992,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_cod":	{
 		"icon_pos":	{
-			"x":	2010,
+			"x":	2015,
 			"y":	65
 		},
 		"text_pos":	{
@@ -1010,7 +1014,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.poisonous_potato":	{
 		"icon_pos":	{
-			"x":	2010,
+			"x":	2015,
 			"y":	105
 		},
 		"text_pos":	{
@@ -1043,7 +1047,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_salmon":	{
 		"icon_pos":	{
-			"x":	2010,
+			"x":	2015,
 			"y":	265
 		},
 		"text_pos":	{
@@ -1153,7 +1157,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.enchanted_golden_apple":	{
 		"icon_pos":	{
-			"x":	315,
+			"x":	245,
 			"y":	700
 		},
 		"text_pos":	{
@@ -1164,7 +1168,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.pufferfish":	{
 		"icon_pos":	{
-			"x":	360,
+			"x":	290,
 			"y":	700
 		},
 		"text_pos":	{
@@ -1175,7 +1179,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.suspicious_stew":	{
 		"icon_pos":	{
-			"x":	405,
+			"x":	335,
 			"y":	700
 		},
 		"text_pos":	{
@@ -1186,7 +1190,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.honey_bottle":	{
 		"icon_pos":	{
-			"x":	450,
+			"x":	380,
 			"y":	700
 		},
 		"text_pos":	{
@@ -1456,7 +1460,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:bee":	{
 		"icon_pos":	{
-			"x":	315,
+			"x":	245,
 			"y":	745
 		},
 		"text_pos":	{
@@ -1467,7 +1471,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:sniffer":	{
 		"icon_pos":	{
-			"x":	360,
+			"x":	290,
 			"y":	745
 		},
 		"text_pos":	{
@@ -1478,7 +1482,7 @@
 	},
 	"advancement.minecraft.husbandry.bred_all_animals.criteria.minecraft:nautilus":	{
 		"icon_pos":	{
-			"x":	405,
+			"x":	335,
 			"y":	745
 		},
 		"text_pos":	{
@@ -1724,17 +1728,6 @@
 			"hidden":	true
 		}
 	},
-	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:phantom":	{
-		"icon_pos":	{
-			"x":	955,
-			"y":	245
-		},
-		"text_pos":	{
-			"x":	-3200,
-			"y":	-3200,
-			"hidden":	true
-		}
-	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:creeper":	{
 		"icon_pos":	{
 			"x":	820,
@@ -1760,6 +1753,17 @@
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:witch":	{
 		"icon_pos":	{
 			"x":	910,
+			"y":	245
+		},
+		"text_pos":	{
+			"x":	-3200,
+			"y":	-3200,
+			"hidden":	true
+		}
+	},
+	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:phantom":	{
+		"icon_pos":	{
+			"x":	955,
 			"y":	245
 		},
 		"text_pos":	{
@@ -1803,7 +1807,7 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_nautilus":	{
 		"icon_pos":	{
-			"x":	2010,
+			"x":	2015,
 			"y":	145
 		},
 		"text_pos":	{
@@ -2034,7 +2038,7 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:wither":	{
 		"icon_pos":	{
-			"x":	315,
+			"x":	245,
 			"y":	790
 		},
 		"text_pos":	{
@@ -2045,7 +2049,7 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:magma_cube":	{
 		"icon_pos":	{
-			"x":	360,
+			"x":	290,
 			"y":	790
 		},
 		"text_pos":	{
@@ -2056,7 +2060,7 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:ravager":	{
 		"icon_pos":	{
-			"x":	405,
+			"x":	335,
 			"y":	790
 		},
 		"text_pos":	{
@@ -2067,7 +2071,7 @@
 	},
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:guardian":	{
 		"icon_pos":	{
-			"x":	450,
+			"x":	380,
 			"y":	790
 		},
 		"text_pos":	{
@@ -2785,8 +2789,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	2810,
-			"y":	660
+			"x":	450,
+			"y":	705
 		}
 	},
 	"stat.hdwgh_summary.criteria.shulker_transport":	{
@@ -2980,13 +2984,19 @@
 	"stat.azure_bluet":	{
 		"icon_pos":	{
 			"x":	995,
-			"y":	205
+			"y":	355
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.carrots":	{
 		"icon_pos":	{
-			"x":	1400,
-			"y":	120
+			"x":	1525,
+			"y":	25
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.ominous_bottles":	{
@@ -3159,6 +3169,12 @@
 			"hidden":	true
 		}
 	},
+	"multi_stage_goal.phantoms_summary":	{
+		"icon_pos":	{
+			"x":	2810,
+			"y":	660
+		}
+	},
 	"multi_stage_goal.sniffers_summary":	{
 		"icon_pos":	{
 			"x":	2940,
@@ -3199,6 +3215,12 @@
 		"icon_pos":	{
 			"x":	170,
 			"y":	480
+		}
+	},
+	"multi_stage_goal.thunder":	{
+		"icon_pos":	{
+			"x":	1400,
+			"y":	130
 		}
 	},
 	"multi_stage_goal.wax":	{
@@ -3273,16 +3295,16 @@
 			"y":	700
 		}
 	},
-	"multi_stage_goal.end_again":	{
-		"icon_pos":	{
-			"x":	450,
-			"y":	860
-		}
-	},
 	"multi_stage_goal.snout_full":	{
 		"icon_pos":	{
 			"x":	865,
 			"y":	1165
+		}
+	},
+	"multi_stage_goal.end_again":	{
+		"icon_pos":	{
+			"x":	450,
+			"y":	860
 		}
 	},
 	"multi_stage_goal.sniffers_endgame":	{
@@ -3521,13 +3543,13 @@
 					"root_name":	"minecraft:story/upgrade_tools",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/sleep_in_bed",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:adventure/sniper_duel",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:adventure/two_birds_one_arrow",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/spear_many_mobs",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:adventure/summon_iron_golem",
@@ -3647,6 +3669,10 @@
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
 				}, {
+					"root_name":	"minecraft:zombie_horse",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
 					"root_name":	"minecraft:skeleton",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
@@ -3669,13 +3695,6 @@
 				}, {
 					"root_name":	"azure_bluet",
 					"type":	"stat"
-				}, {
-					"root_name":	"minecraft:adventure/spear_many_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:zombie_horse",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
 				}],
 			"pos":	{
 				"x":	605,
@@ -3891,6 +3910,9 @@
 					"root_name":	"nautilus_transport",
 					"parent_root":	"hdwgh_summary",
 					"type":	"stat"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}],
 			"pos":	{
 				"x":	30,
@@ -3900,10 +3922,7 @@
 			"id":	"village",
 			"type":	"text_header",
 			"linked_goals":	[{
-					"root_name":	"minecraft:adventure/lightning_rod_with_villager_no_fire",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:adventure/very_very_frightening",
+					"root_name":	"minecraft:adventure/sleep_in_bed",
 					"type":	"advancement"
 				}, {
 					"root_name":	"apple",
@@ -3972,6 +3991,9 @@
 				}, {
 					"root_name":	"carrots",
 					"type":	"stat"
+				}, {
+					"root_name":	"thunder",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	1145,
@@ -4640,9 +4662,6 @@
 					"root_name":	"trims_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"hdwgh_summary",
-					"type":	"stat"
-				}, {
 					"root_name":	"gold_blocks_summary",
 					"type":	"stat"
 				}, {
@@ -4717,6 +4736,9 @@
 				}, {
 					"root_name":	"endgame",
 					"type":	"counter"
+				}, {
+					"root_name":	"phantoms_summary",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	2810,
@@ -4948,6 +4970,55 @@
 				"x":	3059,
 				"y":	1512,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1512
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1662
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1692
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1542
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1572
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1602
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1632
 			}
 		}]
 }

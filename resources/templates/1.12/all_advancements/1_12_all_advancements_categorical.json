@@ -801,11 +801,13 @@
 	"stats":	{
 		"hdwgh_summary":	{
 			"icon":	"items/bucket_1.13.png",
+			"in_2nd_row":	true,
 			"hide_substats_in_row1":	true,
 			"criteria":	{
 				"stat.mineBlock.end_stone":	{
 					"icon":	"monsters/wither.png",
 					"target":	12,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/summon_wither",
 							"type":	"advancement"
@@ -813,11 +815,13 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -826,6 +830,7 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_1.13.png",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -839,7 +844,6 @@
 		},
 		"dedication_summary":	{
 			"icon":	"items/diamond_hoe_1.9.png",
-			"hidden":	true,
 			"root_name":	"stat.useItem.minecraft.diamond_hoe",
 			"target":	1561,
 			"linked_goals":	[{
@@ -853,7 +857,6 @@
 		},
 		"gold_blocks_summary":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
-			"hidden":	true,
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
@@ -902,6 +905,7 @@
 		},
 		"gold_blocks_copy":	{
 			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
@@ -944,6 +948,7 @@
 		},
 		"serious_dedication":	{
 			"icon":	"items/diamond_hoe_1.9.png",
+			"hidden":	true,
 			"in_2nd_row":	true,
 			"root_name":	"stat.useItem.minecraft.diamond_hoe",
 			"target":	1561,
@@ -1082,6 +1087,7 @@
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
@@ -1089,6 +1095,7 @@
 					"type":	"stat",
 					"root_name":	"stat.craft.minecraft.beacon",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"5",
@@ -1096,6 +1103,7 @@
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",

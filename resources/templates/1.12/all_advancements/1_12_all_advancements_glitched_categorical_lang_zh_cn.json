@@ -184,12 +184,12 @@
 	"custom.egap_summary":	"附魔金苹果",
 	"multi_stage_goal.beacon_summary.display_name":	"信标",
 	"multi_stage_goal.beacon_summary.stage.1":	"头颅",
-	"multi_stage_goal.beacon_summary.stage.2":	"3/3 头颅",
+	"multi_stage_goal.beacon_summary.stage.2":	"已获头颅",
 	"multi_stage_goal.beacon_summary.stage.3":	"已召唤凋灵",
 	"multi_stage_goal.beacon_summary.stage.4":	"已杀死凋灵",
 	"multi_stage_goal.beacon_summary.stage.5":	"已合成",
 	"multi_stage_goal.beacon_summary.stage.6":	"已放置",
-	"multi_stage_goal.beacon_summary.stage.final":	"完成",
+	"multi_stage_goal.beacon_summary.stage.final":	"已获信标工程师",
 	"counter.any%":	"前期",
 	"counter.overworld":	"主世界",
 	"counter.village":	"村庄",
@@ -213,5 +213,12 @@
 	"decoration.tundra":	"冻原",
 	"decoration.taiga_jungle":	"针叶林 + 丛林",
 	"decoration.savanna_desert_mesa":	"干旱生物群系",
-	"decoration.credits":	"模板由 ScrambledMC 制作"
+	"decoration.credits":	"模板由 ScrambledMC 制作",
+	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
+	"decoration.note2":	"Mode: Page",
+	"decoration.note3":	"Overlay Width: 1000 px",
+	"decoration.note4":	"Custom Row 3 Spacing: ON (160 px)",
+	"decoration.note5":	"Custom Row 3 Spacing: ON (240 px)",
+	"decoration.note6":	"Show Completed Row 2 Goals: ON",
+	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
 }

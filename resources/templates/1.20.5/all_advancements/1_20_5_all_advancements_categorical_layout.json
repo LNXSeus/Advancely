@@ -56,19 +56,19 @@
 	"advancement.minecraft.adventure.sleep_in_bed":	{
 		"icon_pos":	{
 			"x":	625,
-			"y":	355
+			"y":	350
 		}
 	},
 	"advancement.minecraft.adventure.sniper_duel":	{
 		"icon_pos":	{
 			"x":	795,
-			"y":	355
+			"y":	350
 		}
 	},
 	"advancement.minecraft.adventure.two_birds_one_arrow":	{
 		"icon_pos":	{
 			"x":	965,
-			"y":	355
+			"y":	350
 		}
 	},
 	"advancement.minecraft.adventure.summon_iron_golem":	{
@@ -96,25 +96,35 @@
 	"advancement.minecraft.adventure.trade_at_world_height":	{
 		"icon_pos":	{
 			"x":	1275,
-			"y":	110
+			"y":	105
 		}
 	},
 	"advancement.minecraft.adventure.lightning_rod_with_villager_no_fire":	{
 		"icon_pos":	{
-			"x":	1275,
-			"y":	235
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.very_very_frightening":	{
 		"icon_pos":	{
-			"x":	1275,
-			"y":	360
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.husbandry.allay_deliver_cake_to_note_block":	{
 		"icon_pos":	{
 			"x":	1145,
-			"y":	485
+			"y":	500
+		}
+	},
+	"advancement.minecraft.adventure.whos_the_pillager_now":	{
+		"icon_pos":	{
+			"x":	1275,
+			"y":	500
 		}
 	},
 	"advancement.minecraft.husbandry.tactical_fishing":	{
@@ -247,12 +257,6 @@
 		"icon_pos":	{
 			"x":	310,
 			"y":	850
-		}
-	},
-	"advancement.minecraft.adventure.whos_the_pillager_now":	{
-		"icon_pos":	{
-			"x":	30,
-			"y":	1160
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns":	{
@@ -928,7 +932,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.cooked_cod":	{
 		"icon_pos":	{
-			"x":	1785,
+			"x":	1790,
 			"y":	65
 		},
 		"text_pos":	{
@@ -950,7 +954,7 @@
 	},
 	"advancement.minecraft.husbandry.balanced_diet.criteria.poisonous_potato":	{
 		"icon_pos":	{
-			"x":	1785,
+			"x":	1790,
 			"y":	105
 		},
 		"text_pos":	{
@@ -2628,8 +2632,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	2525,
-			"y":	660
+			"x":	30,
+			"y":	1160
 		}
 	},
 	"stat.hdwgh_summary.criteria.shulker_transport":	{
@@ -2801,13 +2805,19 @@
 	"stat.azure_bluet":	{
 		"icon_pos":	{
 			"x":	965,
-			"y":	205
+			"y":	210
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.carrots":	{
 		"icon_pos":	{
 			"x":	1275,
-			"y":	485
+			"y":	375
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.ocean_items":	{
@@ -2963,6 +2973,12 @@
 			"hidden":	true
 		}
 	},
+	"multi_stage_goal.phantoms_summary":	{
+		"icon_pos":	{
+			"x":	2525,
+			"y":	660
+		}
+	},
 	"multi_stage_goal.sniffers_summary":	{
 		"icon_pos":	{
 			"x":	2655,
@@ -3003,6 +3019,12 @@
 		"icon_pos":	{
 			"x":	170,
 			"y":	480
+		}
+	},
+	"multi_stage_goal.thunder":	{
+		"icon_pos":	{
+			"x":	1275,
+			"y":	230
 		}
 	},
 	"multi_stage_goal.pottery_sherds":	{
@@ -3575,7 +3597,7 @@
 					"root_name":	"minecraft:end/dragon_egg",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/whos_the_pillager_now",
+					"root_name":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:nether/netherite_armor",
@@ -3584,20 +3606,8 @@
 					"root_name":	"minecraft:husbandry/obtain_netherite_hoe",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:wither",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:pillager",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:ravager",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:guardian",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"root_name":	"enchanted_golden_apple",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
 					"root_name":	"pufferfish",
@@ -3605,10 +3615,6 @@
 					"type":	"advancement"
 				}, {
 					"root_name":	"suspicious_stew",
-					"parent_root":	"minecraft:husbandry/balanced_diet",
-					"type":	"advancement"
-				}, {
-					"root_name":	"enchanted_golden_apple",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
@@ -3624,8 +3630,28 @@
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/trim_with_all_exclusive_armor_patterns",
+					"root_name":	"minecraft:wither",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
 					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:magma_cube",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:pillager",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:ravager",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:guardian",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}, {
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",
@@ -3653,15 +3679,11 @@
 					"root_name":	"sniffers_endgame",
 					"type":	"multi_stage"
 				}, {
-					"root_name":	"frogs",
-					"type":	"multi_stage"
-				}, {
 					"root_name":	"bees",
 					"type":	"multi_stage"
 				}, {
-					"root_name":	"minecraft:magma_cube",
-					"parent_root":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
+					"root_name":	"frogs",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	30,
@@ -3674,13 +3696,10 @@
 					"root_name":	"minecraft:adventure/trade_at_world_height",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/lightning_rod_with_villager_no_fire",
-					"type":	"advancement"
-				}, {
-					"root_name":	"minecraft:adventure/very_very_frightening",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:husbandry/allay_deliver_cake_to_note_block",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/whos_the_pillager_now",
 					"type":	"advancement"
 				}, {
 					"root_name":	"apple",
@@ -3749,6 +3768,9 @@
 				}, {
 					"root_name":	"carrots",
 					"type":	"stat"
+				}, {
+					"root_name":	"thunder",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	1145,
@@ -4432,9 +4454,6 @@
 					"root_name":	"minecraft:nether/explore_nether",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/kill_all_mobs",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
 				}, {
@@ -4444,8 +4463,38 @@
 					"root_name":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
+					"root_name":	"minecraft:husbandry/whole_pack",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
 					"root_name":	"trims_summary",
 					"type":	"stat"
+				}, {
+					"root_name":	"gold_blocks_summary",
+					"type":	"stat"
+				}, {
+					"root_name":	"phantoms_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"sniffers_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"bees_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"frogs_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"thunder_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"conduit_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"beacon_summary",
+					"type":	"multi_stage"
 				}, {
 					"root_name":	"early_game",
 					"type":	"counter"
@@ -4456,16 +4505,16 @@
 					"root_name":	"village_outpost",
 					"type":	"counter"
 				}, {
+					"root_name":	"underwater",
+					"type":	"counter"
+				}, {
+					"root_name":	"mushroom",
+					"type":	"counter"
+				}, {
+					"root_name":	"windswept_swamp",
+					"type":	"counter"
+				}, {
 					"root_name":	"mountains",
-					"type":	"counter"
-				}, {
-					"root_name":	"snowy",
-					"type":	"counter"
-				}, {
-					"root_name":	"taiga",
-					"type":	"counter"
-				}, {
-					"root_name":	"mansion",
 					"type":	"counter"
 				}, {
 					"root_name":	"jungle",
@@ -4477,13 +4526,13 @@
 					"root_name":	"desert_mesa",
 					"type":	"counter"
 				}, {
-					"root_name":	"underwater",
+					"root_name":	"snowy",
 					"type":	"counter"
 				}, {
-					"root_name":	"mushroom",
+					"root_name":	"taiga",
 					"type":	"counter"
 				}, {
-					"root_name":	"windswept_swamp",
+					"root_name":	"mansion",
 					"type":	"counter"
 				}, {
 					"root_name":	"underground",
@@ -4497,9 +4546,6 @@
 				}, {
 					"root_name":	"endgame",
 					"type":	"counter"
-				}, {
-					"root_name":	"minecraft:husbandry/whole_pack",
-					"type":	"advancement"
 				}],
 			"pos":	{
 				"x":	2525,
@@ -4660,6 +4706,55 @@
 				"x":	2774,
 				"y":	1512,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1512
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1542
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1572
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1602
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1632
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1662
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1692
 			}
 		}]
 }

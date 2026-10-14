@@ -122,13 +122,13 @@
 	"advancement.minecraft.end.respawn_dragon":	{
 		"icon_pos":	{
 			"x":	170,
-			"y":	800
+			"y":	795
 		}
 	},
 	"advancement.minecraft.end.dragon_breath":	{
 		"icon_pos":	{
 			"x":	310,
-			"y":	800
+			"y":	795
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time":	{
@@ -1208,8 +1208,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	1740,
-			"y":	670
+			"x":	30,
+			"y":	795
 		}
 	},
 	"stat.hdwgh_summary.criteria.stat.mineBlock.end_stone":	{
@@ -1310,7 +1310,7 @@
 	"stat.gold_blocks_copy":	{
 		"icon_pos":	{
 			"x":	1870,
-			"y":	810
+			"y":	755
 		}
 	},
 	"stat.fishing":	{
@@ -1322,7 +1322,7 @@
 	"stat.serious_dedication":	{
 		"icon_pos":	{
 			"x":	1870,
-			"y":	670
+			"y":	570
 		}
 	},
 	"stat.tears":	{
@@ -1383,14 +1383,14 @@
 	},
 	"custom.egap_summary":	{
 		"icon_pos":	{
-			"x":	1805,
-			"y":	545
+			"x":	1740,
+			"y":	570
 		}
 	},
 	"multi_stage_goal.beacon_summary":	{
 		"icon_pos":	{
 			"x":	1740,
-			"y":	810
+			"y":	755
 		}
 	},
 	"counter.any%":	{
@@ -1562,6 +1562,9 @@
 				}, {
 					"root_name":	"hdwgh_summary",
 					"parent_root":	"hdwgh_summary",
+					"type":	"stat"
+				}, {
+					"root_name":	"hdwgh_summary",
 					"type":	"stat"
 				}],
 			"pos":	{
@@ -1905,9 +1908,6 @@
 					"root_name":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"hdwgh_summary",
-					"type":	"stat"
-				}, {
 					"root_name":	"gold_blocks_copy",
 					"type":	"stat"
 				}, {
@@ -1917,7 +1917,7 @@
 					"root_name":	"egap_summary",
 					"type":	"custom"
 				}, {
-					"root_name":	"ms_goal:beacon",
+					"root_name":	"beacon_summary",
 					"type":	"multi_stage"
 				}],
 			"pos":	{
@@ -2281,6 +2281,55 @@
 				"x":	1989,
 				"y":	1141,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1142
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1172
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1202
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1232
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1262
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1292
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1322
 			}
 		}]
 }

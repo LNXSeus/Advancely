@@ -184,12 +184,12 @@
 	"custom.egap_summary":	"Egap",
 	"multi_stage_goal.beacon_summary.display_name":	"Beacon",
 	"multi_stage_goal.beacon_summary.stage.1":	"Skull",
-	"multi_stage_goal.beacon_summary.stage.2":	"3/3 Skulls",
+	"multi_stage_goal.beacon_summary.stage.2":	"Got Skull",
 	"multi_stage_goal.beacon_summary.stage.3":	"Wither Summoned",
 	"multi_stage_goal.beacon_summary.stage.4":	"Wither Killed",
 	"multi_stage_goal.beacon_summary.stage.5":	"Crafted",
 	"multi_stage_goal.beacon_summary.stage.6":	"Placed",
-	"multi_stage_goal.beacon_summary.stage.final":	"Done",
+	"multi_stage_goal.beacon_summary.stage.final":	"Got Beaconator",
 	"counter.any%":	"Early Game",
 	"counter.overworld":	"Overworld",
 	"counter.village":	"Village",
@@ -213,5 +213,12 @@
 	"decoration.tundra":	"Tundra",
 	"decoration.taiga_jungle":	"Taiga + Jungle",
 	"decoration.savanna_desert_mesa":	"Dry Biomes",
-	"decoration.credits":	"Template by ScrambledMC"
+	"decoration.credits":	"Template by ScrambledMC",
+	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
+	"decoration.note2":	"Mode: Page",
+	"decoration.note3":	"Overlay Width: 1000 px",
+	"decoration.note4":	"Custom Row 3 Spacing: ON (160 px)",
+	"decoration.note5":	"Custom Row 3 Spacing: ON (240 px)",
+	"decoration.note6":	"Show Completed Row 2 Goals: ON",
+	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
 }

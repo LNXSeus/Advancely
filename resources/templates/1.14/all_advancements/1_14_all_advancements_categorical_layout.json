@@ -50,19 +50,19 @@
 	"advancement.minecraft.adventure.sleep_in_bed":	{
 		"icon_pos":	{
 			"x":	615,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.sniper_duel":	{
 		"icon_pos":	{
 			"x":	755,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.two_birds_one_arrow":	{
 		"icon_pos":	{
 			"x":	895,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.summon_iron_golem":	{
@@ -86,7 +86,7 @@
 	"advancement.minecraft.adventure.very_very_frightening":	{
 		"icon_pos":	{
 			"x":	1170,
-			"y":	400
+			"y":	410
 		}
 	},
 	"advancement.minecraft.husbandry.tactical_fishing":	{
@@ -134,19 +134,19 @@
 	"advancement.minecraft.adventure.whos_the_pillager_now":	{
 		"icon_pos":	{
 			"x":	30,
-			"y":	905
+			"y":	955
 		}
 	},
 	"advancement.minecraft.adventure.totem_of_undying":	{
 		"icon_pos":	{
 			"x":	170,
-			"y":	905
+			"y":	955
 		}
 	},
 	"advancement.minecraft.end.dragon_egg":	{
 		"icon_pos":	{
 			"x":	310,
-			"y":	905
+			"y":	955
 		}
 	},
 	"advancement.minecraft.adventure.adventuring_time":	{
@@ -1612,8 +1612,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	1995,
-			"y":	605
+			"x":	30,
+			"y":	800
 		}
 	},
 	"stat.hdwgh_summary.criteria.shulker_transport":	{
@@ -1748,13 +1748,19 @@
 	"stat.azure_bluet":	{
 		"icon_pos":	{
 			"x":	895,
-			"y":	185
+			"y":	190
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.carrots":	{
 		"icon_pos":	{
 			"x":	1055,
-			"y":	400
+			"y":	410
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.underwater_items":	{
@@ -1810,7 +1816,7 @@
 	"stat.fermented_spider_eye":	{
 		"icon_pos":	{
 			"x":	1710,
-			"y":	165
+			"y":	170
 		},
 		"progress_pos":	{
 			"x":	-3000,
@@ -1821,7 +1827,10 @@
 	"stat.suspicious_stew":	{
 		"icon_pos":	{
 			"x":	1835,
-			"y":	165
+			"y":	170
+		},
+		"progress_pos":	{
+			"hidden":	true
 		}
 	},
 	"stat.leads":	{
@@ -1893,9 +1902,15 @@
 			"hidden":	true
 		}
 	},
-	"multi_stage_goal.egap_summary":	{
+	"multi_stage_goal.phantoms_summary":	{
 		"icon_pos":	{
 			"x":	2125,
+			"y":	605
+		}
+	},
+	"multi_stage_goal.egap_summary":	{
+		"icon_pos":	{
+			"x":	1995,
 			"y":	605
 		}
 	},
@@ -1920,7 +1935,7 @@
 	"multi_stage_goal.end_again":	{
 		"icon_pos":	{
 			"x":	450,
-			"y":	905
+			"y":	955
 		}
 	},
 	"counter.any%":	{
@@ -2159,6 +2174,9 @@
 				}, {
 					"root_name":	"end_again",
 					"type":	"multi_stage"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}],
 			"pos":	{
 				"x":	30,
@@ -2592,45 +2610,6 @@
 			"id":	"summary",
 			"type":	"text_header",
 			"linked_goals":	[{
-					"root_name":	"any%",
-					"type":	"counter"
-				}, {
-					"root_name":	"overworld",
-					"type":	"counter"
-				}, {
-					"root_name":	"village",
-					"type":	"counter"
-				}, {
-					"root_name":	"underwater",
-					"type":	"counter"
-				}, {
-					"root_name":	"tundra",
-					"type":	"counter"
-				}, {
-					"root_name":	"taiga",
-					"type":	"counter"
-				}, {
-					"root_name":	"jungle",
-					"type":	"counter"
-				}, {
-					"root_name":	"llamas",
-					"type":	"counter"
-				}, {
-					"root_name":	"mushroom",
-					"type":	"counter"
-				}, {
-					"root_name":	"swamp",
-					"type":	"counter"
-				}, {
-					"root_name":	"nether",
-					"type":	"counter"
-				}, {
-					"root_name":	"endgame",
-					"type":	"counter"
-				}, {
-					"root_name":	"desert_mesa",
-					"type":	"counter"
-				}, {
 					"root_name":	"minecraft:adventure/adventuring_time",
 					"type":	"advancement"
 				}, {
@@ -2646,13 +2625,13 @@
 					"root_name":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"hdwgh_summary",
-					"type":	"stat"
-				}, {
 					"root_name":	"gold_blocks_summary",
 					"type":	"stat"
 				}, {
-					"root_name":	"beacon_summary",
+					"root_name":	"phantoms_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"egap_summary",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"thunder_summary",
@@ -2661,8 +2640,11 @@
 					"root_name":	"conduit_summary",
 					"type":	"multi_stage"
 				}, {
-					"root_name":	"egap_summary",
+					"root_name":	"beacon_summary",
 					"type":	"multi_stage"
+				}, {
+					"root_name":	"endgame",
+					"type":	"counter"
 				}],
 			"pos":	{
 				"x":	1995,
@@ -3061,6 +3043,55 @@
 				"x":	2244,
 				"y":	1296,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1296
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1326
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1356
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1386
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1416
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1446
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1476
 			}
 		}]
 }

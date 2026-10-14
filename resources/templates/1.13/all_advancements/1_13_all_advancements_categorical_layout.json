@@ -133,7 +133,7 @@
 	},
 	"advancement.minecraft.end.dragon_egg":	{
 		"icon_pos":	{
-			"x":	70,
+			"x":	170,
 			"y":	850
 		}
 	},
@@ -1410,8 +1410,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	1790,
-			"y":	590
+			"x":	30,
+			"y":	850
 		}
 	},
 	"stat.hdwgh_summary.criteria.shulker_transport":	{
@@ -1664,14 +1664,14 @@
 	},
 	"custom.egap_summary":	{
 		"icon_pos":	{
-			"x":	1920,
+			"x":	1790,
 			"y":	590
 		}
 	},
-	"multi_stage_goal.beacon_summary":	{
+	"multi_stage_goal.phantoms_summary":	{
 		"icon_pos":	{
-			"x":	1790,
-			"y":	870
+			"x":	1920,
+			"y":	590
 		}
 	},
 	"multi_stage_goal.thunder_summary":	{
@@ -1686,9 +1686,15 @@
 			"y":	730
 		}
 	},
+	"multi_stage_goal.beacon_summary":	{
+		"icon_pos":	{
+			"x":	1790,
+			"y":	870
+		}
+	},
 	"multi_stage_goal.end_again":	{
 		"icon_pos":	{
-			"x":	270,
+			"x":	310,
 			"y":	850
 		}
 	},
@@ -1875,6 +1881,9 @@
 				}, {
 					"root_name":	"end_again",
 					"type":	"multi_stage"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}],
 			"pos":	{
 				"x":	30,
@@ -2266,16 +2275,13 @@
 					"root_name":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
 				}, {
-					"root_name":	"hdwgh_summary",
-					"type":	"stat"
-				}, {
 					"root_name":	"gold_blocks_summary",
 					"type":	"stat"
 				}, {
 					"root_name":	"egap_summary",
 					"type":	"custom"
 				}, {
-					"root_name":	"beacon_summary",
+					"root_name":	"phantoms_summary",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"thunder_summary",
@@ -2284,38 +2290,8 @@
 					"root_name":	"conduit_summary",
 					"type":	"multi_stage"
 				}, {
-					"root_name":	"any%",
-					"type":	"counter"
-				}, {
-					"root_name":	"overworld",
-					"type":	"counter"
-				}, {
-					"root_name":	"village",
-					"type":	"counter"
-				}, {
-					"root_name":	"mansion",
-					"type":	"counter"
-				}, {
-					"root_name":	"underwater",
-					"type":	"counter"
-				}, {
-					"root_name":	"tundra",
-					"type":	"counter"
-				}, {
-					"root_name":	"taiga_jungle",
-					"type":	"counter"
-				}, {
-					"root_name":	"dry",
-					"type":	"counter"
-				}, {
-					"root_name":	"mushroom_swamp",
-					"type":	"counter"
-				}, {
-					"root_name":	"nether",
-					"type":	"counter"
-				}, {
-					"root_name":	"endgame",
-					"type":	"counter"
+					"root_name":	"beacon_summary",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	1790,
@@ -2694,6 +2670,55 @@
 				"x":	2039,
 				"y":	1201,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1202
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1232
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1262
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1292
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1322
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1352
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1382
 			}
 		}]
 }

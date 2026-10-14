@@ -1173,6 +1173,7 @@
 				"shulker_transport":	{
 					"icon":	"monsters/shulker.png",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -1180,11 +1181,13 @@
 				},
 				"brew_potions":	{
 					"icon":	"items/Potion_of_Regeneration_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"beaconator":	{
 					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/create_full_beacon",
 							"type":	"advancement"
@@ -1192,11 +1195,13 @@
 				},
 				"minecraft:used/minecraft:conduit":	{
 					"icon":	"blocks/Conduit_unoptimized.gif",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"hero_of_the_village":	{
 					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:adventure/hero_of_the_village",
 							"type":	"advancement"
@@ -1205,6 +1210,7 @@
 				"hdwgh":	{
 					"icon":	"items/bucket_25w14craftmine.png",
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
@@ -1222,11 +1228,13 @@
 			"criteria":	{
 				"minecraft:picked_up/minecraft:tnt":	{
 					"icon":	"blocks/TNT_JE3_BE2.png",
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:picked_up/minecraft:ancient_debris":	{
 					"icon":	"blocks/Ancient_Debris_JE1_BE1.png",
-					"target":	20
+					"target":	20,
+					"hide_progress":	true
 				}
 			},
 			"linked_goals":	[{
@@ -1250,6 +1258,7 @@
 					"icon":	"items/lapis_lazuli_25w14craftmine.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:picked_up/minecraft:lapis_lazuli",
 							"parent_root":	"stat_complete_helper",
@@ -1260,6 +1269,7 @@
 					"icon":	"items/cod_25w14craftmine.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"cod",
 							"parent_root":	"minecraft:husbandry/balanced_diet",
@@ -1274,6 +1284,7 @@
 					"icon":	"items/salmon_25w14craftmine.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"cooked_salmon",
 							"parent_root":	"minecraft:husbandry/balanced_diet",
@@ -1292,6 +1303,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:picked_up/minecraft:azure_bluet",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:bee",
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
@@ -1307,6 +1319,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:picked_up/minecraft:carrot",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"carrot",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
@@ -1315,7 +1328,8 @@
 					"root_name":	"minecraft:crafted/minecraft:golden_carrot",
 					"parent_root":	"stat_complete_helper",
 					"type":	"stat"
-				}]
+				}],
+			"linked_goal_mode":	"or"
 		},
 		"underwater_items":	{
 			"icon":	"items/water_bucket_1.20.2.png",
@@ -1326,17 +1340,20 @@
 				"minecraft:picked_up/minecraft:pufferfish":	{
 					"icon":	"items/pufferfish_25w14craftmine.png",
 					"hidden":	true,
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:picked_up/minecraft:trident":	{
 					"icon":	"items/trident_1.13.png",
 					"hidden":	true,
-					"target":	1
+					"target":	1,
+					"hide_progress":	true
 				},
 				"minecraft:picked_up/minecraft:nautilus_shell":	{
 					"icon":	"items/nautilus_shell_25w14craftmine.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:crafted/minecraft:conduit",
 							"parent_root":	"stat_complete_helper",
@@ -1351,6 +1368,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:fermented_spider_eye",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",
@@ -1363,6 +1381,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:suspicious_stew",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
 				}]
@@ -1373,6 +1392,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:crafted/minecraft:lead",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:husbandry/bred_all_animals"
 				}, {
@@ -1391,6 +1411,7 @@
 					"icon":	"blocks/Wither_Skeleton_Skull.png",
 					"hidden":	true,
 					"target":	3,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"minecraft:picked_up/minecraft:wither_rose",
 							"parent_root":	"stat_complete_helper",
@@ -1404,6 +1425,7 @@
 					"icon":	"items/blaze_rod_25w14craftmine.png",
 					"hidden":	true,
 					"target":	4,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
 							"parent_root":	"hdwgh_summary",
@@ -1418,6 +1440,7 @@
 					"icon":	"items/nether_wart_25w14craftmine.png",
 					"hidden":	true,
 					"target":	1,
+					"hide_progress":	true,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
 							"parent_root":	"hdwgh_summary",
@@ -1443,6 +1466,7 @@
 			"in_2nd_row":	true,
 			"root_name":	"minecraft:picked_up/minecraft:ghast_tear",
 			"target":	1,
+			"hide_progress":	true,
 			"linked_goals":	[{
 					"root_name":	"minecraft:crafted/minecraft:end_crystal",
 					"parent_root":	"stat_complete_helper",
@@ -1455,7 +1479,7 @@
 			"criteria":	{
 				"minecraft:crafted/minecraft:end_crystal":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	4,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"minecraft:end/respawn_dragon",
 							"type":	"advancement"
@@ -1472,7 +1496,7 @@
 				},
 				"minecraft:picked_up/minecraft:obsidian":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	24,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"minecraft:nether/fast_travel",
 							"type":	"advancement"
@@ -1483,7 +1507,7 @@
 				},
 				"minecraft:picked_up/minecraft:lapis_lazuli":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	24,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"minecraft:story/enchant_item",
 							"type":	"advancement"
@@ -1491,7 +1515,7 @@
 				},
 				"minecraft:crafted/minecraft:golden_carrot":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	8,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"brew_potions",
 							"parent_root":	"hdwgh_summary",
@@ -1501,18 +1525,10 @@
 							"parent_root":	"minecraft:husbandry/balanced_diet",
 							"type":	"advancement"
 						}, {
-							"root_name":	"minecraft:horse",
-							"parent_root":	"minecraft:husbandry/bred_all_animals",
+							"root_name":	"minecraft:nether/all_effects",
 							"type":	"advancement"
-						}, {
-							"root_name":	"minecraft:donkey",
-							"parent_root":	"minecraft:husbandry/bred_all_animals",
-							"type":	"advancement"
-						}, {
-							"root_name":	"minecraft:mule",
-							"parent_root":	"minecraft:husbandry/bred_all_animals",
-							"type":	"advancement"
-						}]
+						}],
+					"linked_goal_mode":	"or"
 				},
 				"minecraft:picked_up/minecraft:wither_rose":	{
 					"icon":	"blocks/placeholder.png",
@@ -1524,7 +1540,7 @@
 				},
 				"minecraft:picked_up/minecraft:ender_pearl":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	64,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"minecraft:endermite",
 							"parent_root":	"minecraft:adventure/kill_all_mobs",
@@ -1533,7 +1549,7 @@
 				},
 				"minecraft:picked_up/minecraft:bee_nest":	{
 					"icon":	"blocks/placeholder.png",
-					"target":	2,
+					"target":	1,
 					"linked_goals":	[{
 							"root_name":	"bees",
 							"type":	"multi_stage"
@@ -1569,6 +1585,47 @@
 					"root_name":	"minecraft:nether/all_effects"
 				}]
 		}, {
+			"root_name":	"phantoms_summary",
+			"icon":	"monsters/Phantom_JE2_unoptimized.gif",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"1",
+					"icon":	"monsters/Phantom_JE2_unoptimized.gif",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:new_stat",
+					"target":	1,
+					"mirror_goal":	{
+						"root_name":	"minecraft:phantom",
+						"parent_root":	"minecraft:adventure/kill_all_mobs",
+						"type":	"advancement"
+					}
+				}, {
+					"stage_id":	"2",
+					"icon":	"items/phantom_membrane_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:new_stat",
+					"target":	1,
+					"mirror_goal":	{
+						"root_name":	"minecraft:adventure/two_birds_one_arrow",
+						"type":	"advancement"
+					}
+				}, {
+					"stage_id":	"3",
+					"icon":	"items/crossbow_standby_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:new_stat",
+					"target":	1,
+					"mirror_goal":	{
+						"root_name":	"minecraft:adventure/sleep_in_bed",
+						"type":	"advancement"
+					}
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Red_Bed_(N).png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
 			"root_name":	"bees_summary",
 			"icon":	"blocks/Bee_Nest_(S)_JE1.png",
 			"stages":	[{
@@ -1576,12 +1633,14 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1618,6 +1677,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:trident",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1640,6 +1700,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1647,6 +1708,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1654,6 +1716,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:conduit",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"4",
@@ -1678,6 +1741,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:wither_skeleton_skull",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"3",
@@ -1698,6 +1762,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:crafted/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"6",
@@ -1705,6 +1770,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:beacon",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"7",
@@ -1730,6 +1796,7 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:bee_nest",
 					"target":	1,
+					"hide_progress":	true,
 					"complete_with_next":	true
 				}, {
 					"stage_id":	"2",
@@ -1779,13 +1846,13 @@
 			"icon":	"blocks/Dragon_Head.png",
 			"in_2nd_row":	true,
 			"linked_goals":	[{
-					"root_name":	"minecraft:story/upgrade_tools",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:story/iron_tools",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:story/lava_bucket",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:nether/loot_bastion",
 					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:nether/distract_piglin",
@@ -1857,116 +1924,149 @@
 					"root_name":	"minecraft:picked_up/minecraft:salmon",
 					"parent_root":	"early_game_items",
 					"type":	"stat"
-				}, {
-					"root_name":	"minecraft:nether/loot_bastion",
-					"type":	"advancement"
 				}]
 		}, {
 			"root_name":	"overworld",
 			"icon":	"blocks/Grass_Block_JE7_BE6.png",
 			"in_2nd_row":	true,
 			"linked_goals":	[{
-					"root_name":	"minecraft:pig",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"minecraft:story/upgrade_tools",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:sheep",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"minecraft:adventure/sniper_duel",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:chicken",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"minecraft:adventure/two_birds_one_arrow",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:cow",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"minecraft:adventure/summon_iron_golem",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:horse",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
+					"root_name":	"minecraft:story/deflect_arrow",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:donkey",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:mule",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"cooked_porkchop",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"porkchop",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"cooked_beef",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"beef",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"cooked_chicken",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"chicken",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"cooked_mutton",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"mutton",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"golden_apple",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"golden_carrot",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
-				}, {
-					"root_name":	"minecraft:creeper",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}, {
-					"root_name":	"minecraft:zombie",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}, {
-					"root_name":	"minecraft:skeleton",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}, {
-					"root_name":	"minecraft:spider",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
-				}, {
-					"root_name":	"minecraft:phantom",
-					"parent_root":	"minecraft:adventure/kill_all_mobs"
+					"root_name":	"minecraft:adventure/arbalistic",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:plains",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:forest",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:wooded_hills",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
 					"root_name":	"minecraft:dark_forest",
-					"parent_root":	"minecraft:adventure/adventuring_time"
+					"parent_root":	"minecraft:adventure/adventuring_time",
+					"type":	"advancement"
 				}, {
-					"root_name":	"azure_bluet"
+					"root_name":	"minecraft:zombie",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/summon_iron_golem"
+					"root_name":	"minecraft:skeleton",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/arbalistic"
+					"root_name":	"minecraft:phantom",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/sniper_duel"
+					"root_name":	"minecraft:creeper",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:story/deflect_arrow"
+					"root_name":	"minecraft:spider",
+					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/two_birds_one_arrow"
+					"root_name":	"beef",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/sleep_in_bed"
+					"root_name":	"cooked_beef",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"mutton",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"cooked_mutton",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"porkchop",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"cooked_porkchop",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"chicken",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"cooked_chicken",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"golden_apple",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
+				}, {
+					"root_name":	"golden_carrot",
+					"parent_root":	"minecraft:husbandry/balanced_diet",
+					"type":	"advancement"
 				}, {
 					"root_name":	"pumpkin_pie",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:cow",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:sheep",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:pig",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:chicken",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:horse",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:donkey",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:mule",
+					"parent_root":	"minecraft:husbandry/bred_all_animals",
+					"type":	"advancement"
+				}, {
+					"root_name":	"azure_bluet",
+					"type":	"stat"
 				}]
 		}, {
 			"root_name":	"village",
 			"icon":	"items/emerald_3d_shareware_v1.34.png",
 			"in_2nd_row":	true,
 			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/sleep_in_bed",
+					"type":	"advancement"
+				}, {
 					"root_name":	"minecraft:adventure/very_very_frightening",
 					"type":	"advancement"
 				}, {
@@ -2518,6 +2618,9 @@
 					"root_name":	"minecraft:bee",
 					"parent_root":	"minecraft:husbandry/bred_all_animals",
 					"type":	"advancement"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}, {
 					"root_name":	"brew_potions",
 					"parent_root":	"hdwgh_summary",

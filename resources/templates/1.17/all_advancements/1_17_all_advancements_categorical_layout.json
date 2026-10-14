@@ -1,68 +1,62 @@
 {
-	"advancement.minecraft.story.upgrade_tools":	{
-		"icon_pos":	{
-			"x":	30,
-			"y":	165
-		}
-	},
 	"advancement.minecraft.story.iron_tools":	{
 		"icon_pos":	{
-			"x":	170,
+			"x":	30,
 			"y":	165
 		}
 	},
 	"advancement.minecraft.story.lava_bucket":	{
 		"icon_pos":	{
-			"x":	310,
+			"x":	170,
 			"y":	165
 		}
 	},
 	"advancement.minecraft.nether.distract_piglin":	{
 		"icon_pos":	{
-			"x":	170,
+			"x":	30,
 			"y":	300
 		}
 	},
 	"advancement.minecraft.story.obtain_armor":	{
 		"icon_pos":	{
-			"x":	310,
+			"x":	170,
 			"y":	300
 		}
 	},
 	"advancement.minecraft.nether.charge_respawn_anchor":	{
 		"icon_pos":	{
-			"x":	30,
-			"y":	435
+			"x":	310,
+			"y":	300
 		}
 	},
 	"advancement.minecraft.end.levitate":	{
 		"icon_pos":	{
-			"x":	170,
+			"x":	30,
 			"y":	435
 		}
 	},
 	"advancement.minecraft.story.enchant_item":	{
 		"icon_pos":	{
-			"x":	310,
+			"x":	170,
 			"y":	435
 		}
 	},
-	"advancement.minecraft.adventure.sleep_in_bed":	{
+	"advancement.minecraft.story.upgrade_tools":	{
 		"icon_pos":	{
 			"x":	615,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.sniper_duel":	{
 		"icon_pos":	{
 			"x":	755,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.two_birds_one_arrow":	{
 		"icon_pos":	{
 			"x":	895,
-			"y":	325
+			"y":	320
 		}
 	},
 	"advancement.minecraft.adventure.summon_iron_golem":	{
@@ -87,16 +81,26 @@
 			"y":	450
 		}
 	},
+	"advancement.minecraft.adventure.sleep_in_bed":	{
+		"icon_pos":	{
+			"x":	1055,
+			"y":	315
+		}
+	},
 	"advancement.minecraft.adventure.lightning_rod_with_villager_no_fire":	{
 		"icon_pos":	{
-			"x":	1170,
-			"y":	315
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.very_very_frightening":	{
 		"icon_pos":	{
-			"x":	1170,
-			"y":	445
+			"hidden":	true
+		},
+		"text_pos":	{
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.spyglass_at_parrot":	{
@@ -1812,8 +1816,8 @@
 	},
 	"advancement.minecraft.nether.loot_bastion":	{
 		"icon_pos":	{
-			"x":	30,
-			"y":	300
+			"x":	310,
+			"y":	165
 		}
 	},
 	"advancement.minecraft.adventure.shoot_arrow":	{
@@ -2186,8 +2190,8 @@
 	},
 	"stat.hdwgh_summary":	{
 		"icon_pos":	{
-			"x":	2140,
-			"y":	605
+			"x":	30,
+			"y":	885
 		}
 	},
 	"stat.hdwgh_summary.criteria.shulker_transport":	{
@@ -2343,13 +2347,13 @@
 	"stat.azure_bluet":	{
 		"icon_pos":	{
 			"x":	895,
-			"y":	185
+			"y":	190
 		}
 	},
 	"stat.carrots":	{
 		"icon_pos":	{
 			"x":	1055,
-			"y":	370
+			"y":	445
 		}
 	},
 	"stat.stat:bee_nests_picked_up":	{
@@ -2496,6 +2500,12 @@
 	"multi_stage_goal.egap_summary":	{
 		"icon_pos":	{
 			"x":	2140,
+			"y":	605
+		}
+	},
+	"multi_stage_goal.phantoms_summary":	{
+		"icon_pos":	{
+			"x":	2140,
 			"y":	760
 		}
 	},
@@ -2521,6 +2531,12 @@
 		"icon_pos":	{
 			"x":	2140,
 			"y":	1070
+		}
+	},
+	"multi_stage_goal.thunder":	{
+		"icon_pos":	{
+			"x":	1170,
+			"y":	315
 		}
 	},
 	"multi_stage_goal.axolotl":	{
@@ -2867,6 +2883,9 @@
 					"root_name":	"pumpkin_pie",
 					"parent_root":	"minecraft:husbandry/balanced_diet",
 					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:story/upgrade_tools",
+					"type":	"advancement"
 				}],
 			"pos":	{
 				"x":	605,
@@ -2876,9 +2895,6 @@
 			"id":	"early",
 			"type":	"text_header",
 			"linked_goals":	[{
-					"root_name":	"minecraft:story/upgrade_tools",
-					"type":	"advancement"
-				}, {
 					"root_name":	"minecraft:story/iron_tools",
 					"type":	"advancement"
 				}, {
@@ -3066,6 +3082,9 @@
 				}, {
 					"root_name":	"minecraft:end/dragon_egg",
 					"type":	"advancement"
+				}, {
+					"root_name":	"hdwgh_summary",
+					"type":	"stat"
 				}],
 			"pos":	{
 				"x":	30,
@@ -3075,7 +3094,7 @@
 			"id":	"village",
 			"type":	"text_header",
 			"linked_goals":	[{
-					"root_name":	"minecraft:adventure/very_very_frightening",
+					"root_name":	"minecraft:adventure/sleep_in_bed",
 					"type":	"advancement"
 				}, {
 					"root_name":	"apple",
@@ -3142,11 +3161,11 @@
 					"parent_root":	"minecraft:husbandry/complete_catalogue",
 					"type":	"advancement"
 				}, {
-					"root_name":	"minecraft:adventure/lightning_rod_with_villager_no_fire",
-					"type":	"advancement"
-				}, {
 					"root_name":	"carrots",
 					"type":	"stat"
+				}, {
+					"root_name":	"thunder",
+					"type":	"multi_stage"
 				}],
 			"pos":	{
 				"x":	1055,
@@ -3742,23 +3761,65 @@
 					"root_name":	"egap_summary",
 					"type":	"multi_stage"
 				}, {
+					"root_name":	"phantoms_summary",
+					"type":	"multi_stage"
+				}, {
+					"root_name":	"bees_summary",
+					"type":	"multi_stage"
+				}, {
 					"root_name":	"thunder_summary",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"conduit_summary",
 					"type":	"multi_stage"
 				}, {
-					"root_name":	"ms_goal:beacon",
-					"type":	"multi_stage"
-				}, {
-					"root_name":	"hdwgh_summaryyyy",
-					"type":	"stat"
-				}, {
-					"root_name":	"bees_summary",
-					"type":	"multi_stage"
-				}, {
 					"root_name":	"beacon_summary",
 					"type":	"multi_stage"
+				}, {
+					"root_name":	"early_game",
+					"type":	"counter"
+				}, {
+					"root_name":	"overworld",
+					"type":	"counter"
+				}, {
+					"root_name":	"village",
+					"type":	"counter"
+				}, {
+					"root_name":	"underwater",
+					"type":	"counter"
+				}, {
+					"root_name":	"mushroom",
+					"type":	"counter"
+				}, {
+					"root_name":	"swamp",
+					"type":	"counter"
+				}, {
+					"root_name":	"jungle",
+					"type":	"counter"
+				}, {
+					"root_name":	"birch_bees",
+					"type":	"counter"
+				}, {
+					"root_name":	"taiga",
+					"type":	"counter"
+				}, {
+					"root_name":	"snowy",
+					"type":	"counter"
+				}, {
+					"root_name":	"llamas",
+					"type":	"counter"
+				}, {
+					"root_name":	"desert_mesa",
+					"type":	"counter"
+				}, {
+					"root_name":	"underground",
+					"type":	"counter"
+				}, {
+					"root_name":	"nether",
+					"type":	"counter"
+				}, {
+					"root_name":	"endgame",
+					"type":	"counter"
 				}],
 			"pos":	{
 				"x":	2140,
@@ -3795,6 +3856,55 @@
 				"x":	2389,
 				"y":	1407,
 				"anchor":	2
+			}
+		}, {
+			"id":	"note1",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1407
+			}
+		}, {
+			"id":	"note2",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1437
+			}
+		}, {
+			"id":	"note3",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1467
+			}
+		}, {
+			"id":	"note4",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1497
+			}
+		}, {
+			"id":	"note5",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1527
+			}
+		}, {
+			"id":	"note6",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1557
+			}
+		}, {
+			"id":	"note7",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1,
+				"y":	1587
 			}
 		}]
 }
