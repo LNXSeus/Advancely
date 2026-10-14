@@ -1705,10 +1705,34 @@ static int multi_move_selected(std::vector<T> &vec, std::set<int> &sel, int targ
     return adjusted;
 }
 
-// Selects every index in [0, total_count). Used by the "Select All" bulk action in every tab.
-static void bulk_select_all(std::set<int> &sel, int total_count) {
-    sel.clear();
-    for (int i = 0; i < total_count; i++) sel.insert(i);
+// The bulk selection actions only touch the rows the current search shows (`scope`), so rows
+// filtered out keep whatever state they had. Without a search the scope is the whole list.
+static void bulk_select_all(std::set<int> &sel, const std::vector<int> &scope) {
+    for (int i: scope) sel.insert(i);
+}
+
+static void bulk_deselect_all(std::set<int> &sel, int &last_clicked, const std::vector<int> &scope) {
+    for (int i: scope) sel.erase(i);
+    last_clicked = -1;
+}
+
+// Indices into `items` of the rows a list renders, in render order.
+template<typename T>
+static std::vector<int> bulk_scope_from_rendered(const std::vector<T *> &rendered, const std::vector<T> &items) {
+    std::vector<int> scope;
+    scope.reserve(rendered.size());
+    for (const T *p: rendered) scope.push_back((int) (p - items.data()));
+    return scope;
+}
+
+template<typename T, typename Pred>
+static std::vector<int> bulk_scope_matching(const std::vector<T> &items, bool search_active, Pred matches) {
+    std::vector<int> scope;
+    scope.reserve(items.size());
+    for (int i = 0; i < (int) items.size(); i++) {
+        if (!search_active || matches(items[i])) scope.push_back(i);
+    }
+    return scope;
 }
 
 // Editing a list underneath a bulk selection must not cost the user their other ticks, so these
@@ -1749,14 +1773,10 @@ static void bulk_shift_after_move(std::set<int> &sel, int &last_clicked, int fro
     last_clicked = -1;
 }
 
-// Inverts a bulk selection: every index in [0, total_count) not currently selected becomes
-// selected, and vice versa. Used by the "Invert Selection" bulk action in every tab.
-static void bulk_invert_selection(std::set<int> &sel, int total_count) {
-    std::set<int> inverted;
-    for (int i = 0; i < total_count; i++) {
-        if (sel.find(i) == sel.end()) inverted.insert(i);
+static void bulk_invert_selection(std::set<int> &sel, const std::vector<int> &scope) {
+    for (int i: scope) {
+        if (!sel.erase(i)) sel.insert(i);
     }
-    sel.swap(inverted);
 }
 
 static bool has_duplicate_root_names(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
@@ -10373,21 +10393,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##adv_ba"))
                                 bulk_select_all(s_adv_selection,
-                                                (int) current_template_data.advancements.size());
+                                                bulk_scope_from_rendered(advancements_to_render,
+                                                                         current_template_data.advancements));
                             if (ImGui::IsItemHovered()) {
                                 char tip[256];
                                 snprintf(tip, sizeof(tip),
-                                         "Select every %s in the list.",
+                                         "Select every %s in the list.\n"
+                                         "While searching, only the shown rows are affected.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", tip);
                             }
                             if (ImGui::Selectable("Invert Selection##adv_ba"))
                                 bulk_invert_selection(s_adv_selection,
-                                                      (int) current_template_data.advancements.size());
+                                                      bulk_scope_from_rendered(advancements_to_render,
+                                                                               current_template_data.advancements));
                             if (ImGui::IsItemHovered()) {
                                 char tip[256];
                                 snprintf(tip, sizeof(tip),
-                                         "Select every %s that is not currently selected, and deselect the rest.",
+                                         "Select every %s that is not currently selected, and deselect the rest.\n"
+                                         "While searching, only the shown rows are affected.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", tip);
                             }
@@ -10944,12 +10968,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##adv")) {
-                            s_adv_selection.clear();
-                            s_adv_last_clicked = -1;
+                            bulk_deselect_all(s_adv_selection, s_adv_last_clicked,
+                                              bulk_scope_from_rendered(advancements_to_render,
+                                                                       current_template_data.advancements));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[160];
-                            snprintf(tip, sizeof(tip), "Clear the %s selection.",
+                            snprintf(tip, sizeof(tip), "Clear the %s selection.\n"
+                                     "While searching, only the shown rows are deselected.",
                                      advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", tip);
                         }
@@ -11797,6 +11823,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Determine if a details search is active
                         bool is_details_search_active = (
                             current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
+                        auto criterion_matches_search = [&](const EditorTrackableItem &c) {
+                            return str_contains_insensitive(c.display_name, tc_search_buffer) ||
+                                   str_contains_insensitive(c.root_name, tc_search_buffer) ||
+                                   str_contains_insensitive(c.icon_path, tc_search_buffer) ||
+                                   str_contains_insensitive(c.group, tc_search_buffer) ||
+                                   subitem_indicator_matches_search(c, tc_search_buffer);
+                        };
 
                         int criterion_to_remove = -1;
                         int criterion_to_copy = -1;
@@ -11856,15 +11889,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Select All##crit_ba"))
-                                    bulk_select_all(s_crit_selection, (int) advancement.criteria.size());
+                                    bulk_select_all(s_crit_selection,
+                                                    bulk_scope_matching(advancement.criteria, is_details_search_active,
+                                                                        criterion_matches_search));
                                 if (ImGui::IsItemHovered()) {
-                                    ImGui::SetTooltip("%s", "Select every criterion in the list.");
+                                    ImGui::SetTooltip("%s", "Select every criterion in the list.\n"
+                                                      "While searching, only the shown rows are affected.");
                                 }
                                 if (ImGui::Selectable("Invert Selection##crit_ba"))
-                                    bulk_invert_selection(s_crit_selection, (int) advancement.criteria.size());
+                                    bulk_invert_selection(s_crit_selection,
+                                                          bulk_scope_matching(advancement.criteria,
+                                                                              is_details_search_active,
+                                                                              criterion_matches_search));
                                 if (ImGui::IsItemHovered()) {
                                     ImGui::SetTooltip("%s",
-                                                      "Select every criterion that is not currently selected, and deselect the rest.");
+                                                      "Select every criterion that is not currently selected, and deselect the rest.\n"
+                                                      "While searching, only the shown rows are affected.");
                                 }
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Set Icon...##crit_ba")) ba_open_icon = true;
@@ -12266,12 +12306,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Deselect all##crit")) {
-                                s_crit_selection.clear();
-                                s_crit_last_clicked = -1;
+                                bulk_deselect_all(s_crit_selection, s_crit_last_clicked,
+                                                  bulk_scope_matching(advancement.criteria, is_details_search_active,
+                                                                      criterion_matches_search));
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tip[128];
-                                snprintf(tip, sizeof(tip), "Clear the selection checkboxes.");
+                                snprintf(tip, sizeof(tip), "Clear the selection checkboxes.\n"
+                                         "While searching, only the shown rows are deselected.");
                                 ImGui::SetTooltip("%s", tip);
                             }
                         }
@@ -12279,14 +12321,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (size_t j = 0; j < advancement.criteria.size(); j++) {
                             auto &criterion = advancement.criteria[j];
 
-                            if (is_details_search_active) {
-                                if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
-                                    !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
-                                    !str_contains_insensitive(criterion.icon_path, tc_search_buffer) &&
-                                    !str_contains_insensitive(criterion.group, tc_search_buffer) &&
-                                    !subitem_indicator_matches_search(criterion, tc_search_buffer)) {
-                                    continue;
-                                }
+                            if (is_details_search_active && !criterion_matches_search(criterion)) {
+                                continue;
                             }
 
                             ImGui::PushID(j);
@@ -12466,15 +12502,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     int lo = std::min(s_crit_last_clicked, (int) j);
                                     int hi = std::max(s_crit_last_clicked, (int) j);
                                     for (int k = lo; k <= hi && k < (int) advancement.criteria.size(); k++) {
-                                        if (is_details_search_active) {
-                                            const auto &cc = advancement.criteria[k];
-                                            if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
-                                                !str_contains_insensitive(cc.group, tc_search_buffer) &&
-                                                !subitem_indicator_matches_search(cc, tc_search_buffer)) {
-                                                continue;
-                                            }
+                                        if (is_details_search_active &&
+                                            !criterion_matches_search(advancement.criteria[k])) {
+                                            continue;
                                         }
                                         if (is_crit_selected) s_crit_selection.insert(k);
                                         else s_crit_selection.erase(k);
@@ -13133,14 +13163,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##stat_ba"))
-                                bulk_select_all(s_stat_selection, (int) current_template_data.stats.size());
+                                bulk_select_all(s_stat_selection,
+                                                bulk_scope_from_rendered(stats_to_render, current_template_data.stats));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every stat in the list.");
+                                ImGui::SetTooltip("%s", "Select every stat in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##stat_ba"))
-                                bulk_invert_selection(s_stat_selection, (int) current_template_data.stats.size());
+                                bulk_invert_selection(s_stat_selection,
+                                                      bulk_scope_from_rendered(stats_to_render,
+                                                                               current_template_data.stats));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip(
-                                    "%s", "Select every stat that is not currently selected, and deselect the rest.");
+                                    "%s", "Select every stat that is not currently selected, and deselect the rest.\n"
+                                    "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##stat_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
@@ -13500,12 +13535,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##stat_bulk")) {
-                            s_stat_selection.clear();
-                            s_stat_last_clicked = -1;
+                            bulk_deselect_all(s_stat_selection, s_stat_last_clicked,
+                                              bulk_scope_from_rendered(stats_to_render, current_template_data.stats));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the stat selection.");
+                            snprintf(tip, sizeof(tip), "Clear the stat selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
@@ -14295,21 +14331,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char crit_counter_text[128];
                             bool is_details_search_active = (
                                 current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
+                            auto substat_matches_search = [&](const EditorTrackableItem &crit) {
+                                char goal_str[32];
+                                snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
+                                return str_contains_insensitive(crit.display_name, tc_search_buffer) ||
+                                       str_contains_insensitive(crit.root_name, tc_search_buffer) ||
+                                       str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
+                                       (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
+                                       subitem_indicator_matches_search(crit, tc_search_buffer,
+                                                                        !stat_cat.hide_substats_in_row1);
+                            };
                             int visible_criteria_count = 0;
                             if (!is_details_search_active) {
                                 visible_criteria_count = stat_cat.criteria.size();
                             } else {
                                 for (const auto &crit: stat_cat.criteria) {
-                                    char goal_str[32];
-                                    snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
-                                    if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
-                                        str_contains_insensitive(crit.root_name, tc_search_buffer) ||
-                                        str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
-                                        (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr) ||
-                                        subitem_indicator_matches_search(crit, tc_search_buffer,
-                                                                         !stat_cat.hide_substats_in_row1)) {
-                                        visible_criteria_count++;
-                                    }
+                                    if (substat_matches_search(crit)) visible_criteria_count++;
                                 }
                             }
                             int sub_pos = snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s",
@@ -14567,14 +14604,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::TextDisabled("%s", hdr);
                                     ImGui::Separator();
                                     if (ImGui::Selectable("Select All##sub_ba"))
-                                        bulk_select_all(s_sub_selection, (int) stat_cat.criteria.size());
+                                        bulk_select_all(s_sub_selection,
+                                                        bulk_scope_matching(stat_cat.criteria, is_details_search_active,
+                                                                            substat_matches_search));
                                     if (ImGui::IsItemHovered())
-                                        ImGui::SetTooltip("%s", "Select every sub-stat in the list.");
+                                        ImGui::SetTooltip("%s", "Select every sub-stat in the list.\n"
+                                                          "While searching, only the shown rows are affected.");
                                     if (ImGui::Selectable("Invert Selection##sub_ba"))
-                                        bulk_invert_selection(s_sub_selection, (int) stat_cat.criteria.size());
+                                        bulk_invert_selection(s_sub_selection,
+                                                              bulk_scope_matching(stat_cat.criteria,
+                                                                                  is_details_search_active,
+                                                                                  substat_matches_search));
                                     if (ImGui::IsItemHovered())
                                         ImGui::SetTooltip("%s",
-                                                          "Select every sub-stat that is not currently selected, and deselect the rest.");
+                                                          "Select every sub-stat that is not currently selected, and deselect the rest.\n"
+                                                          "While searching, only the shown rows are affected.");
                                     ImGui::Separator();
                                     if (ImGui::Selectable("Set Icon...##sub_ba")) ba_open_icon = true;
                                     if (ImGui::IsItemHovered())
@@ -14860,12 +14904,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                                 ImGui::SameLine();
                                 if (ImGui::SmallButton("Deselect all##sub")) {
-                                    s_sub_selection.clear();
-                                    s_sub_last_clicked = -1;
+                                    bulk_deselect_all(s_sub_selection, s_sub_last_clicked,
+                                                      bulk_scope_matching(stat_cat.criteria, is_details_search_active,
+                                                                          substat_matches_search));
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tip[128];
-                                    snprintf(tip, sizeof(tip), "Clear the sub-stat selection.");
+                                    snprintf(tip, sizeof(tip), "Clear the sub-stat selection.\n"
+                                             "While searching, only the shown rows are deselected.");
                                     ImGui::SetTooltip("%s", tip);
                                 }
                             }
@@ -14873,17 +14919,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (size_t j = 0; j < stat_cat.criteria.size(); j++) {
                                 auto &crit = stat_cat.criteria[j];
 
-                                if (is_details_search_active) {
-                                    char goal_str[32];
-                                    snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
-                                    if (!str_contains_insensitive(crit.display_name, tc_search_buffer) &&
-                                        !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
-                                        !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
-                                        (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr) &&
-                                        !subitem_indicator_matches_search(crit, tc_search_buffer,
-                                                                          !stat_cat.hide_substats_in_row1)) {
-                                        continue;
-                                    }
+                                if (is_details_search_active && !substat_matches_search(crit)) {
+                                    continue;
                                 }
 
                                 ImGui::PushID(j);
@@ -15019,19 +15056,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             int lo = std::min(s_sub_last_clicked, (int) j);
                                             int hi = std::max(s_sub_last_clicked, (int) j);
                                             for (int k = lo; k <= hi && k < (int) stat_cat.criteria.size(); k++) {
-                                                if (is_details_search_active) {
-                                                    const auto &cc = stat_cat.criteria[k];
-                                                    char gs[32];
-                                                    snprintf(gs, sizeof(gs), "%d", cc.goal);
-                                                    if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
-                                                        !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
-                                                        !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
-                                                        (cc.goal == 0 || strstr(gs, tc_search_buffer) == nullptr) &&
-                                                        !subitem_indicator_matches_search(
-                                                            cc, tc_search_buffer,
-                                                            !stat_cat.hide_substats_in_row1)) {
-                                                        continue;
-                                                    }
+                                                if (is_details_search_active &&
+                                                    !substat_matches_search(stat_cat.criteria[k])) {
+                                                    continue;
                                                 }
                                                 if (is_sub_selected) s_sub_selection.insert(k);
                                                 else s_sub_selection.erase(k);
@@ -15634,14 +15661,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::TextDisabled("%s", hdr);
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##unlocks_ba"))
-                                bulk_select_all(s_unlocks_selection, (int) current_template_data.unlocks.size());
+                                bulk_select_all(s_unlocks_selection,
+                                                bulk_scope_from_rendered(unlocks_to_render,
+                                                                         current_template_data.unlocks));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every unlock in the list.");
+                                ImGui::SetTooltip("%s", "Select every unlock in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##unlocks_ba"))
-                                bulk_invert_selection(s_unlocks_selection, (int) current_template_data.unlocks.size());
+                                bulk_invert_selection(s_unlocks_selection,
+                                                      bulk_scope_from_rendered(unlocks_to_render,
+                                                                               current_template_data.unlocks));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
-                                                  "Select every unlock that is not currently selected, and deselect the rest.");
+                                                  "Select every unlock that is not currently selected, and deselect the rest.\n"
+                                                  "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##unlocks_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
@@ -15901,12 +15934,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##unlocks")) {
-                            s_unlocks_selection.clear();
-                            s_unlocks_last_clicked = -1;
+                            bulk_deselect_all(s_unlocks_selection, s_unlocks_last_clicked,
+                                              bulk_scope_from_rendered(unlocks_to_render,
+                                                                       current_template_data.unlocks));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the unlock selection.");
+                            snprintf(tip, sizeof(tip), "Clear the unlock selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
@@ -16569,15 +16604,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##custom_ba"))
                                 bulk_select_all(s_custom_selection,
-                                                (int) current_template_data.custom_goals.size());
+                                                bulk_scope_from_rendered(goals_to_render,
+                                                                         current_template_data.custom_goals));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every custom goal in the list.");
+                                ImGui::SetTooltip("%s", "Select every custom goal in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##custom_ba"))
                                 bulk_invert_selection(s_custom_selection,
-                                                      (int) current_template_data.custom_goals.size());
+                                                      bulk_scope_from_rendered(goals_to_render,
+                                                                               current_template_data.custom_goals));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
-                                                  "Select every custom goal that is not currently selected, and deselect the rest.");
+                                                  "Select every custom goal that is not currently selected, and deselect the rest.\n"
+                                                  "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##custom_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
@@ -16837,12 +16876,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##custom")) {
-                            s_custom_selection.clear();
-                            s_custom_last_clicked = -1;
+                            bulk_deselect_all(s_custom_selection, s_custom_last_clicked,
+                                              bulk_scope_from_rendered(goals_to_render,
+                                                                       current_template_data.custom_goals));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the custom goal selection.");
+                            snprintf(tip, sizeof(tip), "Clear the custom goal selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
@@ -17841,15 +17882,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##msg_ba"))
                                 bulk_select_all(s_msg_selection,
-                                                (int) current_template_data.multi_stage_goals.size());
+                                                bulk_scope_from_rendered(goals_to_render,
+                                                                         current_template_data.multi_stage_goals));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every multi-stage goal in the list.");
+                                ImGui::SetTooltip("%s", "Select every multi-stage goal in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##msg_ba"))
                                 bulk_invert_selection(s_msg_selection,
-                                                      (int) current_template_data.multi_stage_goals.size());
+                                                      bulk_scope_from_rendered(goals_to_render,
+                                                                               current_template_data.multi_stage_goals));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
-                                                  "Select every multi-stage goal that is not currently selected, and deselect the rest.");
+                                                  "Select every multi-stage goal that is not currently selected, and deselect the rest.\n"
+                                                  "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##msg_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
@@ -18144,12 +18189,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##msg_bulk")) {
-                            s_msg_selection.clear();
-                            s_msg_last_clicked = -1;
+                            bulk_deselect_all(s_msg_selection, s_msg_last_clicked,
+                                              bulk_scope_from_rendered(goals_to_render,
+                                                                       current_template_data.multi_stage_goals));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the multi-stage goal selection.");
+                            snprintf(tip, sizeof(tip), "Clear the multi-stage goal selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
@@ -18703,44 +18750,70 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char stage_counter_text[128];
                         bool is_details_search_active = (
                             current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
+                        auto stage_matches_search = [&](const EditorSubGoal &stage) {
+                            char target_val_str[32];
+                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+
+                            // Get the version-aware type display name
+                            const char *stage_type_name = "Unknown";
+                            switch (stage.type) {
+                                case SUBGOAL_STAT:
+                                    stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                          ? "Stat / Achievement"
+                                                          : "Stat";
+                                    break;
+                                case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
+                                    break;
+                                case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
+                                    break;
+                                case SUBGOAL_CRITERION: stage_type_name = "Criterion";
+                                    break;
+                                case SUBGOAL_MANUAL: stage_type_name = "Final";
+                                    break;
+                                case SUBGOAL_MIRROR: stage_type_name = "Mirror";
+                                    break;
+                            }
+
+                            // Check standard fields
+                            bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                                  str_contains_insensitive(
+                                                      stage.parent_advancement, tc_search_buffer)
+                                                  ||
+                                                  (stage.required_progress != 0 && strstr(
+                                                       target_val_str, tc_search_buffer) != nullptr) ||
+                                                  description_matches_search(stage.description, tc_search_buffer);
+
+                            // Check the type name
+                            bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
+
+                            // Check stage icon path IF enabled
+                            bool icon_match = false;
+                            if (goal.use_stage_icons) {
+                                icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
+                            }
+
+                            // A mirror stage hides its own trigger, so it is found by the goal it
+                            // mirrors, and by "mirror" itself since its type still reads as the
+                            // trigger type it keeps.
+                            bool mirror_match = stage.mirror_enabled &&
+                                                (str_contains_insensitive(stage.mirror_target.root_name,
+                                                                          tc_search_buffer) ||
+                                                 str_contains_insensitive(stage.mirror_target.parent_root,
+                                                                          tc_search_buffer) ||
+                                                 str_contains_insensitive(stage.mirror_target.stage_id,
+                                                                          tc_search_buffer) ||
+                                                 str_contains_insensitive("Mirror", tc_search_buffer));
+
+                            return standard_match || type_match || icon_match || mirror_match;
+                        };
                         int visible_stages_count = 0;
                         if (!is_details_search_active) {
                             visible_stages_count = goal.stages.size();
                         } else {
                             for (const auto &stage: goal.stages) {
-                                char target_val_str[32];
-                                snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-
-                                // Get the version-aware type display name
-                                const char *stage_type_name = "Unknown";
-                                switch (stage.type) {
-                                    case SUBGOAL_STAT:
-                                        stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                              ? "Stat / Achievement"
-                                                              : "Stat";
-                                        break;
-                                    case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
-                                        break;
-                                    case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
-                                        break;
-                                    case SUBGOAL_CRITERION: stage_type_name = "Criterion";
-                                        break;
-                                    case SUBGOAL_MANUAL: stage_type_name = "Final";
-                                        break;
-                                    case SUBGOAL_MIRROR: stage_type_name = "Mirror";
-                                        break;
-                                }
-
-                                if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                    str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                    str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
-                                    str_contains_insensitive(stage_type_name, tc_search_buffer) ||
-                                    (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) !=
-                                     nullptr) ||
-                                    description_matches_search(stage.description, tc_search_buffer)) {
-                                    visible_stages_count++;
-                                }
+                                if (stage_matches_search(stage)) visible_stages_count++;
                             }
                         }
                         int stage_pos = snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s",
@@ -18975,14 +19048,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::TextDisabled("%s", hdr);
                                 ImGui::Separator();
                                 if (ImGui::Selectable("Select All##stage_ba"))
-                                    bulk_select_all(s_stage_selection, (int) goal.stages.size());
+                                    bulk_select_all(s_stage_selection,
+                                                    bulk_scope_matching(goal.stages, is_details_search_active,
+                                                                        stage_matches_search));
                                 if (ImGui::IsItemHovered())
-                                    ImGui::SetTooltip("%s", "Select every stage in the list.");
+                                    ImGui::SetTooltip("%s", "Select every stage in the list.\n"
+                                                      "While searching, only the shown rows are affected.");
                                 if (ImGui::Selectable("Invert Selection##stage_ba"))
-                                    bulk_invert_selection(s_stage_selection, (int) goal.stages.size());
+                                    bulk_invert_selection(s_stage_selection,
+                                                          bulk_scope_matching(goal.stages, is_details_search_active,
+                                                                              stage_matches_search));
                                 if (ImGui::IsItemHovered())
                                     ImGui::SetTooltip("%s",
-                                                      "Select every stage that is not currently selected, and deselect the rest.");
+                                                      "Select every stage that is not currently selected, and deselect the rest.\n"
+                                                      "While searching, only the shown rows are affected.");
                                 ImGui::Separator();
                                 if (goal.use_stage_icons) {
                                     if (ImGui::Selectable("Set Icon...##stage_ba")) ba_open_icon = true;
@@ -19064,12 +19143,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Deselect all##stage")) {
-                                s_stage_selection.clear();
-                                s_stage_last_clicked = -1;
+                                bulk_deselect_all(s_stage_selection, s_stage_last_clicked,
+                                                  bulk_scope_matching(goal.stages, is_details_search_active,
+                                                                      stage_matches_search));
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tip[128];
-                                snprintf(tip, sizeof(tip), "Clear the stage selection.");
+                                snprintf(tip, sizeof(tip), "Clear the stage selection.\n"
+                                         "While searching, only the shown rows are deselected.");
                                 ImGui::SetTooltip("%s", tip);
                             }
                         }
@@ -19077,66 +19158,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         for (size_t j = 0; j < goal.stages.size(); ++j) {
                             auto &stage = goal.stages[j];
 
-                            if (is_details_search_active) {
-                                char target_val_str[32];
-                                snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-
-                                // Get the version-aware type display name
-                                const char *stage_type_name = "Unknown";
-                                switch (stage.type) {
-                                    case SUBGOAL_STAT:
-                                        stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                              ? "Stat / Achievement"
-                                                              : "Stat";
-                                        break;
-                                    case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
-                                        break;
-                                    case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
-                                        break;
-                                    case SUBGOAL_CRITERION: stage_type_name = "Criterion";
-                                        break;
-                                    case SUBGOAL_MANUAL: stage_type_name = "Final";
-                                        break;
-                                    case SUBGOAL_MIRROR: stage_type_name = "Mirror";
-                                        break;
-                                }
-
-                                // Check standard fields
-                                bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                                      str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                                      str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                                      str_contains_insensitive(
-                                                          stage.parent_advancement, tc_search_buffer)
-                                                      ||
-                                                      (stage.required_progress != 0 && strstr(
-                                                           target_val_str, tc_search_buffer) != nullptr) ||
-                                                      description_matches_search(stage.description, tc_search_buffer);
-
-                                // Check the type name
-                                bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
-
-                                // Check stage icon path IF enabled
-                                bool icon_match = false;
-                                if (goal.use_stage_icons) {
-                                    icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
-                                }
-
-                                // A mirror stage hides its own trigger, so it is found by the goal it
-                                // mirrors, and by "mirror" itself since its type still reads as the
-                                // trigger type it keeps.
-                                bool mirror_match = stage.mirror_enabled &&
-                                                    (str_contains_insensitive(stage.mirror_target.root_name,
-                                                                              tc_search_buffer) ||
-                                                     str_contains_insensitive(stage.mirror_target.parent_root,
-                                                                              tc_search_buffer) ||
-                                                     str_contains_insensitive(stage.mirror_target.stage_id,
-                                                                              tc_search_buffer) ||
-                                                     str_contains_insensitive("Mirror", tc_search_buffer));
-
-                                // If nothing matches, skip this stage
-                                if (!standard_match && !type_match && !icon_match && !mirror_match) {
-                                    continue;
-                                }
+                            if (is_details_search_active && !stage_matches_search(stage)) {
+                                continue;
                             }
 
                             ImGui::PushID(j);
@@ -19896,6 +19919,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         int lo = std::min(s_stage_last_clicked, (int) j);
                                         int hi = std::max(s_stage_last_clicked, (int) j);
                                         for (int k = lo; k <= hi && k < (int) goal.stages.size(); k++) {
+                                            if (is_details_search_active &&
+                                                !stage_matches_search(goal.stages[k])) {
+                                                continue;
+                                            }
                                             if (is_stage_selected) s_stage_selection.insert(k);
                                             else s_stage_selection.erase(k);
                                         }
@@ -20359,15 +20386,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##ctr_ba"))
                                 bulk_select_all(s_ctr_selection,
-                                                (int) current_template_data.counter_goals.size());
+                                                bulk_scope_from_rendered(counters_to_render,
+                                                                         current_template_data.counter_goals));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every counter in the list.");
+                                ImGui::SetTooltip("%s", "Select every counter in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##ctr_ba"))
                                 bulk_invert_selection(s_ctr_selection,
-                                                      (int) current_template_data.counter_goals.size());
+                                                      bulk_scope_from_rendered(counters_to_render,
+                                                                               current_template_data.counter_goals));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
-                                                  "Select every counter that is not currently selected, and deselect the rest.");
+                                                  "Select every counter that is not currently selected, and deselect the rest.\n"
+                                                  "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Set Icon...##ctr_ba")) ba_open_icon = true;
                             if (ImGui::IsItemHovered())
@@ -20637,12 +20668,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##ctr_bulk")) {
-                            s_ctr_selection.clear();
-                            s_ctr_last_clicked = -1;
+                            bulk_deselect_all(s_ctr_selection, s_ctr_last_clicked,
+                                              bulk_scope_from_rendered(counters_to_render,
+                                                                       current_template_data.counter_goals));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the counter selection.");
+                            snprintf(tip, sizeof(tip), "Clear the counter selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
@@ -21482,15 +21515,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Separator();
                             if (ImGui::Selectable("Select All##deco_ba"))
                                 bulk_select_all(s_deco_selection,
-                                                (int) current_template_data.decorations.size());
+                                                bulk_scope_matching(current_template_data.decorations,
+                                                                    is_deco_search_active, deco_matches_search));
                             if (ImGui::IsItemHovered())
-                                ImGui::SetTooltip("%s", "Select every decoration in the list.");
+                                ImGui::SetTooltip("%s", "Select every decoration in the list.\n"
+                                                  "While searching, only the shown rows are affected.");
                             if (ImGui::Selectable("Invert Selection##deco_ba"))
                                 bulk_invert_selection(s_deco_selection,
-                                                      (int) current_template_data.decorations.size());
+                                                      bulk_scope_matching(current_template_data.decorations,
+                                                                          is_deco_search_active, deco_matches_search));
                             if (ImGui::IsItemHovered())
                                 ImGui::SetTooltip("%s",
-                                                  "Select every decoration that is not currently selected, and deselect the rest.");
+                                                  "Select every decoration that is not currently selected, and deselect the rest.\n"
+                                                  "While searching, only the shown rows are affected.");
                             ImGui::Separator();
                             if (ImGui::Selectable("Delete Selected...##deco_ba")) ba_open_delete = true;
                             if (ImGui::IsItemHovered())
@@ -21521,12 +21558,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SameLine();
                         if (ImGui::SmallButton("Deselect all##deco")) {
-                            s_deco_selection.clear();
-                            s_deco_last_clicked = -1;
+                            bulk_deselect_all(s_deco_selection, s_deco_last_clicked,
+                                              bulk_scope_matching(current_template_data.decorations,
+                                                                  is_deco_search_active, deco_matches_search));
                         }
                         if (ImGui::IsItemHovered()) {
                             char tip[128];
-                            snprintf(tip, sizeof(tip), "Clear the decoration selection.");
+                            snprintf(tip, sizeof(tip), "Clear the decoration selection.\n"
+                                     "While searching, only the shown rows are deselected.");
                             ImGui::SetTooltip("%s", tip);
                         }
                     }
