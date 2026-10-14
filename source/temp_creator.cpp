@@ -9276,7 +9276,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Select the clicked or dragged goal in the template editor and switch to its tab.
         // Clicks just select; drags also force-open Layout Coordinates (handled above).
         bool just_interacted = was_just_dragged || (t && t->visual_layout_just_clicked);
-        if (just_interacted && t->visual_drag_root_name[0] != '\0') {
+        ImGuiContext &imgui_ctx = *GImGui;
+        if (just_interacted && imgui_ctx.ActiveId != 0 && imgui_ctx.ActiveId == imgui_ctx.InputTextState.ID) {
+            ImGui::ClearActiveID();
+        }
+        bool text_deactivation_pending = imgui_ctx.InputTextDeactivatedState.ID != 0 &&
+                                         imgui_ctx.DeactivatedItemData.ID == imgui_ctx.InputTextDeactivatedState.ID &&
+                                         imgui_ctx.DeactivatedItemData.ElapseFrame >= imgui_ctx.FrameCount;
+        if (just_interacted && t->visual_drag_root_name[0] != '\0' && text_deactivation_pending) {
+            t->visual_layout_just_clicked = true;
+        } else if (just_interacted && t->visual_drag_root_name[0] != '\0') {
             tc_search_buffer[0] = '\0';
 
             if (strcmp(t->visual_drag_goal_type, "Advancement") == 0 ||
