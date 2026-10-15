@@ -15,6 +15,19 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.8.0" date="2026-10-15">
+      <description>
+        <p>The Feinberg Update: accessibility and quality of life, with a settings search, an official AATool settings preset and a new preset import window.</p>
+        <ul>
+          <li>Settings search: a search bar (Ctrl/Cmd+F) that searches setting names, their tooltips and hotkeys, then scrolls to and highlights the setting.</li>
+          <li>Settings presets: loading a preset opens a window to pick exactly which settings to take over, auto-updates now ship official presets, and the first one is a 1.16.1 AATool preset that replicates the classic AATool look.</li>
+          <li>Overlay: icon size settings for all three rows, an option to hide row 1, a "Show Completed Row 2 Goals" setting, an icon and text alignment for the compact panel, a task counter in the compact overlay and a restart overlay button.</li>
+          <li>Tracker: remembers fullscreen (F11 toggles it), any goal's progress text can be hidden, hidden or empty names hand their spot to the progress text, custom goal values can be typed in directly, and an "Open Log Folder" button.</li>
+          <li>Template editor: descriptions for text headers, a "Selected" filter in popups, bulk selection respecting the search scope, run completion for a single complex advancement, stat category or recipe, and a "P" hotkey for independent positioning in the visual layout editor.</li>
+          <li>Templates: a new 26.4 AATool template, a vertical 1.16.1 AATool/coop layout by kittymmeow, new and updated templates by Scrambled, and Minecraft 27.2 as a version.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.7.2" date="2026-09-22">
       <description>
         <p>Goal descriptions, a Run Completion Criteria tab, more control over the compact overlay panel text, and an important overlay width fix.</p>
