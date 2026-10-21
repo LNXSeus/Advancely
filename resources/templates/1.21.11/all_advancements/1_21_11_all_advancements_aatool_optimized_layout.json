@@ -1837,82 +1837,90 @@
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	800
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	809
+			"y":	809,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	836
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	845
+			"y":	845,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	872
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	881
+			"y":	881,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	908
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	917
+			"y":	917,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	944
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	953
+			"y":	953,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	980
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	989
+			"y":	989,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	1016
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	1025
+			"y":	1025,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1760,
+			"x":	1726,
 			"y":	1052
 		},
 		"text_pos":	{
 			"x":	1796,
-			"y":	1061
+			"y":	1061,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.craft_decorated_pot_using_only_sherds":	{
@@ -3185,6 +3193,61 @@
 		"progress_pos":	{
 			"x":	-2620,
 			"y":	-796
+		}
+	},
+	"stat.trim_sub_stats":	{
+		"icon_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_snout":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	800
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_rib":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	836
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_spire":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	872
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_tide":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	908
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_wayfinder":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	944
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_vex":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	980
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_ward":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	1016
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_silence":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	1052
 		}
 	},
 	"multi_stage_goal.ms_goal:sniffers":	{

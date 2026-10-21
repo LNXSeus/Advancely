@@ -920,31 +920,40 @@
 		},
 		"minecraft:adventure/trim_with_all_exclusive_armor_patterns":	{
 			"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png",
+			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
 				"armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/rib_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/spire_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/wayfinder_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/ward_armor_trim_smithing_template_25w14craftmine.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				},
 				"armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim":	{
-					"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png"
+					"icon":	"blocks/Smithing_Table_JE2_BE2.png",
+					"hidden":	true
 				}
 			}
 		},
@@ -1490,6 +1499,84 @@
 					"stage_id":	"1",
 					"type":	"multi_stage"
 				}]
+		},
+		"trim_sub_stats":	{
+			"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png",
+			"in_2nd_row":	true,
+			"criteria":	{
+				"get_snout":	{
+					"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:snout",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_rib":	{
+					"icon":	"items/rib_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:rib",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_spire":	{
+					"icon":	"items/spire_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:spire",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_tide":	{
+					"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:tide",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_wayfinder":	{
+					"icon":	"items/wayfinder_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:wayfinder",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_vex":	{
+					"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:vex",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_ward":	{
+					"icon":	"items/ward_armor_trim_smithing_template_25w14craftmine.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:ward",
+							"type":	"multi_stage"
+						}]
+				},
+				"get_silence":	{
+					"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png",
+					"target":	1,
+					"hide_progress":	true,
+					"linked_goals":	[{
+							"root_name":	"ms_goal:silence",
+							"type":	"multi_stage"
+						}]
+				}
+			}
 		}
 	},
 	"unlocks":	[],
@@ -1791,6 +1878,7 @@
 		}, {
 			"root_name":	"ms_goal:spire",
 			"icon":	"items/spire_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1804,6 +1892,7 @@
 		}, {
 			"root_name":	"ms_goal:tide",
 			"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1817,6 +1906,7 @@
 		}, {
 			"root_name":	"ms_goal:snout",
 			"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1830,6 +1920,7 @@
 		}, {
 			"root_name":	"ms_goal:rib",
 			"icon":	"items/rib_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1843,6 +1934,7 @@
 		}, {
 			"root_name":	"ms_goal:wayfinder",
 			"icon":	"items/wayfinder_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1856,6 +1948,7 @@
 		}, {
 			"root_name":	"ms_goal:vex",
 			"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1869,6 +1962,7 @@
 		}, {
 			"root_name":	"ms_goal:ward",
 			"icon":	"items/ward_armor_trim_smithing_template_25w14craftmine.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
@@ -1882,6 +1976,7 @@
 		}, {
 			"root_name":	"ms_goal:silence",
 			"icon":	"items/silence_armor_trim_smithing_template_1.20.2.png",
+			"hidden":	true,
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",

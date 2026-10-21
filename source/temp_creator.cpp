@@ -9804,8 +9804,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Separator();
 
         // Save when creator window is focused
-        // Enter key is disabled when a popup is open
-        if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
+        // Enter key is disabled when a popup is open, and while typing a description (Enter is a newline there)
+        const bool description_box_active = s_description_active_id != 0 &&
+                                            ImGui::GetActiveID() == s_description_active_id;
+        if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && !description_box_active &&
                                       ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
             // Finalize any active field first (its deactivation callback runs this frame), then save

@@ -1762,27 +1762,33 @@
 			"y":	390
 		}
 	},
-	"advancement.minecraft.adventure.heart_transplanter":	{
+	"advancement.minecraft.adventure.what_goes_around_comes_around":	{
 		"icon_pos":	{
 			"x":	1008,
 			"y":	390
 		}
 	},
-	"advancement.minecraft.adventure.kill_mob_near_sculk_catalyst":	{
+	"advancement.minecraft.adventure.heart_transplanter":	{
 		"icon_pos":	{
 			"x":	1120,
 			"y":	390
 		}
 	},
-	"advancement.minecraft.adventure.read_power_of_chiseled_bookshelf":	{
+	"advancement.minecraft.adventure.kill_mob_near_sculk_catalyst":	{
 		"icon_pos":	{
 			"x":	1232,
 			"y":	390
 		}
 	},
-	"advancement.minecraft.adventure.crafters_crafting_crafters":	{
+	"advancement.minecraft.adventure.read_power_of_chiseled_bookshelf":	{
 		"icon_pos":	{
 			"x":	0,
+			"y":	520
+		}
+	},
+	"advancement.minecraft.adventure.crafters_crafting_crafters":	{
+		"icon_pos":	{
+			"x":	112,
 			"y":	520
 		}
 	},
@@ -1812,7 +1818,7 @@
 	},
 	"advancement.minecraft.adventure.lighten_up":	{
 		"icon_pos":	{
-			"x":	112,
+			"x":	224,
 			"y":	520
 		}
 	},
@@ -1843,105 +1849,113 @@
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	814
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	823
+			"y":	823,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	850
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	859
+			"y":	859,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	886
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	895
+			"y":	895,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	922
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	931
+			"y":	931,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	958
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	967
+			"y":	967,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	994
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	1003
+			"y":	1003,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	1030
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	1039
+			"y":	1039,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim":	{
 		"icon_pos":	{
-			"x":	1765,
+			"x":	1726,
 			"y":	1066
 		},
 		"text_pos":	{
 			"x":	1801,
-			"y":	1075
+			"y":	1075,
+			"hidden":	true
 		}
 	},
 	"advancement.minecraft.adventure.craft_decorated_pot_using_only_sherds":	{
-		"icon_pos":	{
-			"x":	224,
-			"y":	520
-		}
-	},
-	"advancement.minecraft.adventure.who_needs_rockets":	{
 		"icon_pos":	{
 			"x":	336,
 			"y":	520
 		}
 	},
-	"advancement.minecraft.adventure.blowback":	{
+	"advancement.minecraft.adventure.who_needs_rockets":	{
 		"icon_pos":	{
 			"x":	448,
 			"y":	520
 		}
 	},
-	"advancement.minecraft.adventure.under_lock_and_key":	{
+	"advancement.minecraft.adventure.blowback":	{
 		"icon_pos":	{
 			"x":	560,
+			"y":	520
+		}
+	},
+	"advancement.minecraft.adventure.under_lock_and_key":	{
+		"icon_pos":	{
+			"x":	672,
 			"y":	520
 		}
 	},
@@ -1959,13 +1973,13 @@
 	},
 	"advancement.minecraft.adventure.overoverkill":	{
 		"icon_pos":	{
-			"x":	672,
+			"x":	784,
 			"y":	520
 		}
 	},
 	"advancement.minecraft.nether.netherite_armor":	{
 		"icon_pos":	{
-			"x":	784,
+			"x":	896,
 			"y":	520
 		}
 	},
@@ -1983,26 +1997,26 @@
 	},
 	"advancement.minecraft.adventure.whos_the_pillager_now":	{
 		"icon_pos":	{
-			"x":	896,
+			"x":	1008,
 			"y":	520
 		}
 	},
 	"advancement.minecraft.story.deflect_arrow":	{
 		"icon_pos":	{
-			"x":	1008,
+			"x":	1120,
 			"y":	520
 		}
 	},
 	"advancement.minecraft.nether.all_effects":	{
 		"icon_pos":	{
-			"x":	1120,
+			"x":	1232,
 			"y":	520
 		}
 	},
 	"advancement.minecraft.adventure.totem_of_undying":	{
 		"icon_pos":	{
-			"x":	1232,
-			"y":	520
+			"x":	0,
+			"y":	650
 		}
 	},
 	"advancement.minecraft.adventure.revaulting":	{
@@ -2019,25 +2033,25 @@
 	},
 	"advancement.minecraft.husbandry.safely_harvest_honey":	{
 		"icon_pos":	{
-			"x":	0,
+			"x":	112,
 			"y":	650
 		}
 	},
 	"advancement.minecraft.adventure.honey_block_slide":	{
 		"icon_pos":	{
-			"x":	112,
+			"x":	224,
 			"y":	650
 		}
 	},
 	"advancement.minecraft.husbandry.wax_on":	{
 		"icon_pos":	{
-			"x":	224,
+			"x":	336,
 			"y":	650
 		}
 	},
 	"advancement.minecraft.adventure.fall_from_world_height":	{
 		"icon_pos":	{
-			"x":	336,
+			"x":	448,
 			"y":	650
 		}
 	},
@@ -2079,13 +2093,13 @@
 	},
 	"advancement.minecraft.end.respawn_dragon":	{
 		"icon_pos":	{
-			"x":	448,
+			"x":	560,
 			"y":	650
 		}
 	},
 	"advancement.minecraft.adventure.spyglass_at_dragon":	{
 		"icon_pos":	{
-			"x":	560,
+			"x":	672,
 			"y":	650
 		}
 	},
@@ -3115,7 +3129,7 @@
 	},
 	"advancement.minecraft.husbandry.obtain_netherite_hoe":	{
 		"icon_pos":	{
-			"x":	672,
+			"x":	784,
 			"y":	650
 		}
 	},
@@ -3231,6 +3245,61 @@
 		"progress_pos":	{
 			"x":	-2620,
 			"y":	-796
+		}
+	},
+	"stat.trim_sub_stats":	{
+		"icon_pos":	{
+			"x":	-3000,
+			"y":	-3000,
+			"hidden":	true
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_snout":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	814
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_rib":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	850
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_spire":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	886
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_tide":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	922
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_wayfinder":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	958
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_vex":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	994
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_ward":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	1030
+		}
+	},
+	"stat.trim_sub_stats.criteria.get_silence":	{
+		"icon_pos":	{
+			"x":	1762,
+			"y":	1066
 		}
 	},
 	"multi_stage_goal.ms_goal:sniffers":	{
