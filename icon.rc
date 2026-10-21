@@ -10,3 +10,38 @@ IDI_ICON1 ICON "resources/gui/Advancely_Icon.ico"
 // Unicode paths natively without needing wide-string (W) API variants.
 // Requires Windows 10 version 1903 or later.
 1 24 "Advancely.manifest"
+
+#include <winver.h>
+
+#define ADV_STR2(x) #x
+#define ADV_STR(x) ADV_STR2(x)
+#define ADV_VERSION_STR ADV_STR(ADVANCELY_VER_MAJOR.ADVANCELY_VER_MINOR.ADVANCELY_VER_PATCH)
+
+1 VERSIONINFO
+FILEVERSION ADVANCELY_VER_MAJOR, ADVANCELY_VER_MINOR, ADVANCELY_VER_PATCH, 0
+PRODUCTVERSION ADVANCELY_VER_MAJOR, ADVANCELY_VER_MINOR, ADVANCELY_VER_PATCH, 0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "LNXSeus"
+            VALUE "FileDescription", "Advancely"
+            VALUE "FileVersion", ADV_VERSION_STR
+            VALUE "InternalName", "Advancely"
+            VALUE "LegalCopyright", "Copyright (c) 2026 LNXSeus"
+            VALUE "OriginalFilename", "Advancely.exe"
+            VALUE "ProductName", "Advancely"
+            VALUE "ProductVersion", ADV_VERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

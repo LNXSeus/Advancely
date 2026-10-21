@@ -17,12 +17,16 @@ file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
 # Use a regular expression to find the line with the version and capture the number
 # This specifically looks for the pattern #define ADVANCELY_VERSION "vX.Y.Z"
 # and captures only the "X.Y.Z" part.
-string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
+string(REGEX MATCH "#define ADVANCELY_VERSION \"v(([0-9]+)\\.([0-9]+)\\.([0-9]+))\"" _ ${MAIN_H_CONTENTS})
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/source/main.h")
 
 
 # The captured version number is now in the variable CMAKE_MATCH_1
 if (CMAKE_MATCH_1)
     set(PROJECT_VERSION ${CMAKE_MATCH_1})
+    set(PROJECT_VERSION_MAJOR ${CMAKE_MATCH_2})
+    set(PROJECT_VERSION_MINOR ${CMAKE_MATCH_3})
+    set(PROJECT_VERSION_PATCH ${CMAKE_MATCH_4})
     message(STATUS "Project version set from main.h: ${PROJECT_VERSION}")
 else ()
     message(FATAL_ERROR "Could not parse ADVANCELY_VERSION from source/main.h!")
@@ -97,6 +101,8 @@ if (WIN32)
             # Windows-specific resource file
             "icon.rc"
     )
+    set_source_files_properties("icon.rc" PROPERTIES COMPILE_DEFINITIONS
+            "ADVANCELY_VER_MAJOR=${PROJECT_VERSION_MAJOR};ADVANCELY_VER_MINOR=${PROJECT_VERSION_MINOR};ADVANCELY_VER_PATCH=${PROJECT_VERSION_PATCH}")
 elseif (APPLE)
     list(APPEND SOURCE_FILES
             # Carbon-only translation unit for global hotkeys; it cannot be compiled together with
