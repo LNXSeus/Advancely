@@ -209,7 +209,7 @@ typedef enum {
     X("visuals.compact_panel_line_gap", PRESET_GROUP_OVERLAY, "Compact: Line Spacing", 0, NULL) \
     X("visuals.compact_stack_font_name", PRESET_GROUP_OVERLAY, "Compact: Stack Font", 0, NULL) \
     X("visuals.compact_stack_font_size", PRESET_GROUP_OVERLAY, "Compact: Stack Text Size", 0, NULL) \
-    X("visuals.overlay_bg_color", PRESET_GROUP_OVERLAY, "Overlay Background Color", 0, NULL) \
+    X("visuals.overlay_bg_color", PRESET_GROUP_OVERLAY, "Overlay Bkg Color", 0, NULL) \
     X("visuals.overlay_transparent", PRESET_GROUP_OVERLAY, "Transparent", 0, NULL) \
     X("visuals.overlay_text_color", PRESET_GROUP_OVERLAY, "Overlay Text Color", 0, NULL) \
     \

@@ -34,8 +34,10 @@
 #define SEARCH_DROPDOWN_MAX_HEIGHT 420.0f
 #define SEARCH_TOOLTIP_WRAP_EMS 45.0f
 #define SEARCH_JUMP_MAX_FRAMES 10
-#define SEARCH_JUMP_SCROLL_FRAMES 2 // the window resizes to the new tab, so the scroll is repeated once
+#define SEARCH_JUMP_SCROLL_FRAMES 2 // a tab shown for the first time has no content height yet, so the scroll is repeated once
 #define SEARCH_FLASH_SECONDS 1.5f
+#define SETTINGS_WINDOW_MAX_HEIGHT 720.0f
+#define SETTINGS_TAB_MIN_HEIGHT 120.0f
 
 struct SearchEntry {
     std::string tab;
@@ -43,7 +45,7 @@ struct SearchEntry {
     std::string tooltip;
     std::string keywords; // extra searchable lines, like a hotkey's bound key
     ImGuiID id;
-    ImVec2 rel_min; // rect to highlight, relative to the settings window's content
+    ImVec2 rel_min; // rect to highlight, relative to the tab's scroll region content
     ImVec2 rel_max;
     ImVec2 anchor; // where the widget with `id` started; the rect moves along with it
     ImGuiID section = 0; // the collapsing header it sits under, opened when jumping to it
@@ -84,6 +86,8 @@ static std::string s_open_tab; // the tab whose contents were drawn this frame
 static std::string s_select_tab; // tab to switch to after this frame's tab bar
 static float s_tabs_width = 0.0f;
 static float s_bottom_row_width = 0.0f;
+static float s_below_tabs_height = 0.0f;
+static ImGuiWindow *s_content_window = nullptr; // the open tab's scroll region
 
 static std::string s_capture_tab;
 static ImGuiWindow *s_capture_root = nullptr;
@@ -113,7 +117,7 @@ static bool s_jump_watching = false;
 static bool s_jump_found = false;
 static ImRect s_jump_rect;
 static std::string s_flash_tab;
-static ImVec2 s_flash_min; // relative to the settings window's content
+static ImVec2 s_flash_min; // relative to the tab's scroll region content
 static ImVec2 s_flash_max;
 static double s_flash_start = -1.0;
 
@@ -211,11 +215,11 @@ static std::string rich_text_from_log(const std::string &logged) {
 // Index building
 // ---------------------------------------------------------------------------------------------------
 
-static void rect_relative_to_root(const ImRect &rect, ImVec2 *out_min, ImVec2 *out_max) {
+static void rect_relative_to_content(const ImRect &rect, ImVec2 *out_min, ImVec2 *out_max) {
     ImVec2 origin(0.0f, 0.0f);
-    if (s_capture_root) {
-        origin = ImVec2(s_capture_root->Pos.x - s_capture_root->Scroll.x,
-                        s_capture_root->Pos.y - s_capture_root->Scroll.y);
+    if (s_content_window) {
+        origin = ImVec2(s_content_window->Pos.x - s_content_window->Scroll.x,
+                        s_content_window->Pos.y - s_content_window->Scroll.y);
     }
     *out_min = ImVec2(rect.Min.x - origin.x, rect.Min.y - origin.y);
     *out_max = ImVec2(rect.Max.x - origin.x, rect.Max.y - origin.y);
@@ -229,12 +233,12 @@ static ItemRef resolve_item() {
         s_use_info_item = false;
         ref.id = s_info_id;
         ref.label = s_info_label;
-        rect_relative_to_root(s_info_rect, &ref.rel_min, &ref.rel_max);
+        rect_relative_to_content(s_info_rect, &ref.rel_min, &ref.rel_max);
         return ref;
     }
     ImGuiContext &g = *GImGui;
     ref.id = g.LastItemData.ID;
-    rect_relative_to_root(g.LastItemData.Rect, &ref.rel_min, &ref.rel_max);
+    rect_relative_to_content(g.LastItemData.Rect, &ref.rel_min, &ref.rel_max);
     if (ref.id != 0 && ref.id == s_info_id) ref.label = s_info_label;
     else ref.label = label_from_log(log_since(s_item_log_offset));
     return ref;
@@ -420,7 +424,7 @@ static void update_jump(const std::string &open_tab) {
         if (s_jump_frames > SEARCH_JUMP_MAX_FRAMES) s_jump_active = false;
         return;
     }
-    ImGuiWindow *window = GImGui->CurrentWindow->RootWindow;
+    ImGuiWindow *window = GImGui->CurrentWindow;
     const ImVec2 origin(window->Pos.x - window->Scroll.x, window->Pos.y - window->Scroll.y);
     ImVec2 shift(0.0f, 0.0f);
     if (s_jump_found) {
@@ -454,25 +458,36 @@ static void draw_flash(const std::string &open_tab) {
     const float hold = SEARCH_FLASH_SECONDS / 3.0f;
     const float alpha = elapsed < hold ? 1.0f : 1.0f - (elapsed - hold) / (SEARCH_FLASH_SECONDS - hold);
 
-    ImGuiWindow *window = GImGui->CurrentWindow->RootWindow;
+    ImGuiWindow *window = GImGui->CurrentWindow;
     const ImGuiStyle &style = ImGui::GetStyle();
     const ImVec2 origin(window->Pos.x - window->Scroll.x, window->Pos.y - window->Scroll.y);
     const ImVec2 min(origin.x + s_flash_min.x - style.FramePadding.x, origin.y + s_flash_min.y - style.FramePadding.y);
     const ImVec2 max(origin.x + s_flash_max.x + style.FramePadding.x, origin.y + s_flash_max.y + style.FramePadding.y);
+    // The scroll region has no padding of its own, so the frame may reach into the window's padding.
+    const float pad_x = window->ParentWindow ? window->ParentWindow->WindowPadding.x : 0.0f;
+    window->DrawList->PushClipRect(ImVec2(window->Pos.x - pad_x, window->Pos.y),
+                                   ImVec2(window->Pos.x + window->Size.x + pad_x, window->Pos.y + window->Size.y));
     ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_NavCursor);
     color.w = 0.25f * alpha;
     window->DrawList->AddRectFilled(min, max, ImGui::GetColorU32(color), style.FrameRounding);
     color.w = alpha;
     window->DrawList->AddRect(min, max, ImGui::GetColorU32(color), style.FrameRounding, 0, 2.0f);
+    window->DrawList->PopClipRect();
 }
 
 void settings_search_prepare_window(const char *window_name) {
     ImGuiWindow *window = ImGui::FindWindowByName(window_name);
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float height = std::min(SETTINGS_WINDOW_MAX_HEIGHT,
+                                  ImGui::GetMainViewport()->WorkSize.y - style.DisplaySafeAreaPadding.y * 2.0f);
+    float min_width = 0.0f;
+    float max_width = FLT_MAX;
     if (window && s_bottom_row_width > 0.0f) {
-        const float width = std::max(s_tabs_width, s_bottom_row_width) + window->WindowPadding.x * 2.0f +
-                            window->ScrollbarSizes.x;
-        ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, FLT_MAX));
+        const float content_scrollbar = s_content_window ? s_content_window->ScrollbarSizes.x : 0.0f;
+        min_width = max_width = std::max(s_tabs_width, s_bottom_row_width) + window->WindowPadding.x * 2.0f +
+                                window->ScrollbarSizes.x + content_scrollbar;
     }
+    ImGui::SetNextWindowSizeConstraints(ImVec2(min_width, height), ImVec2(max_width, height));
     if (s_phase == INDEX_IDLE) return;
     // Begin() counts this down by one before using it, so 2 keeps the window hidden for this frame
     // while its widgets are still laid out.
@@ -506,6 +521,9 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
             std::find(s_indexed_tabs.begin(), s_indexed_tabs.end(), label) == s_indexed_tabs.end()) {
             begin_tab_capture(label);
         }
+        const float height = std::max(ImGui::GetContentRegionAvail().y - s_below_tabs_height, SETTINGS_TAB_MIN_HEIGHT);
+        ImGui::BeginChild("##tab_content", ImVec2(0.0f, height));
+        s_content_window = ImGui::GetCurrentWindow();
         if (s_jump_active && s_jump.id != 0 && s_jump.tab == label && s_capture_tab.empty()) {
             // The ItemAdd hook reports where the chosen widget is drawn this frame.
             s_jump_watching = true;
@@ -516,8 +534,23 @@ bool settings_search_tab_begin(const char *label, ImGuiTabItemFlags flags) {
     return open;
 }
 
+void settings_search_tab_end() {
+    end_tab_capture();
+    end_jump_watch();
+    if (s_phase == INDEX_IDLE) {
+        update_jump(s_open_tab);
+        draw_flash(s_open_tab);
+    }
+    ImGui::EndChild();
+    ImGui::EndTabItem();
+}
+
 void settings_search_set_bottom_row_width(float width) {
     s_bottom_row_width = width;
+}
+
+void settings_search_set_below_tabs_height(float height) {
+    s_below_tabs_height = height;
 }
 
 void settings_search_tabs_end() {
@@ -560,10 +593,6 @@ void settings_search_tabs_end() {
                 finish_index();
             }
             break;
-    }
-    if (s_phase == INDEX_IDLE) {
-        update_jump(open_tab);
-        draw_flash(open_tab);
     }
     queue_tab_selection();
 }
@@ -627,7 +656,7 @@ void settings_search_keyword(const char *owner_label, const char *keyword) {
         }), s_building.end());
     }
     ImVec2 item_min, item_max;
-    rect_relative_to_root(GImGui->LastItemData.Rect, &item_min, &item_max);
+    rect_relative_to_content(GImGui->LastItemData.Rect, &item_min, &item_max);
     const std::string owner = trim(owner_label);
     for (auto it = s_building.rbegin(); it != s_building.rend(); ++it) {
         if (it->tab != s_capture_tab) break;
@@ -687,7 +716,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext *ctx, ImGuiID id, const char *lab
     entry.tab = s_capture_tab;
     entry.label = text;
     entry.id = id;
-    rect_relative_to_root(s_info_rect, &entry.rel_min, &entry.rel_max);
+    rect_relative_to_content(s_info_rect, &entry.rel_min, &entry.rel_max);
     entry.anchor = entry.rel_min;
     entry.section = s_capture_section;
     s_building.push_back(entry);

@@ -2910,7 +2910,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (coop_session_active) ImGui::EndDisabled();
 
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of Paths and Templates Tab
 
         if (settings_search_tab_begin("Tracker Visuals")) {
@@ -3615,7 +3615,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
 
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of Tracker Visuals Tab
 
         if (settings_search_tab_begin("UI Visuals")) {
@@ -3751,7 +3751,7 @@ settings_tooltip(tooltip_buffer); \
 #endif
             }
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of UI Visuals Tab
 
         if (settings_search_tab_begin("Overlay")) {
@@ -3833,7 +3833,7 @@ settings_tooltip(tooltip_buffer); \
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n"
                              "More overlay-related settings become visible.\n\n"
                              "Tips:\n"
-                             " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                             " • Use a color key filter in your streaming software on the 'Overlay Bkg Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n"
                              "%s\n"
@@ -3849,7 +3849,7 @@ settings_tooltip(tooltip_buffer); \
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                              "Tips:\n"
-                             " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                             " • Use a color key filter in your streaming software on the 'Overlay Bkg Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n"
                              "%s\n"
@@ -3864,7 +3864,7 @@ settings_tooltip(tooltip_buffer); \
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                              "Tips:\n"
-                             " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                             " • Use a color key filter in your streaming software on the 'Overlay Bkg Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n"
                              "%s\n"
@@ -3879,7 +3879,7 @@ settings_tooltip(tooltip_buffer); \
                     snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                              "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                              "Tips:\n"
-                             " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                             " • Use a color key filter in your streaming software on the 'Overlay Bkg Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n"
                              "%s\n"
@@ -5858,7 +5858,7 @@ settings_tooltip(tooltip_buffer); \
                 // Conditionally display overlay background color picker
                 if (temp_settings.enable_overlay) {
                     ImGui::BeginDisabled(temp_settings.overlay_transparent);
-                    if (ImGui::ColorEdit3("Overlay Background Color", overlay_bg)) {
+                    if (ImGui::ColorEdit3("Overlay Bkg Color", overlay_bg)) {
                         temp_settings.overlay_bg_color = {
                             (Uint8) (overlay_bg[0] * 255), (Uint8) (overlay_bg[1] * 255), (Uint8) (overlay_bg[2] * 255),
                             (Uint8) (overlay_bg[3] * 255)
@@ -5927,7 +5927,7 @@ settings_tooltip(tooltip_buffer); \
                     }
                 }
             } // End of conditional overlay settings
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of Overlay Tab
 
         // Account Tab — auto-select when forced open for first-time account setup
@@ -6164,7 +6164,7 @@ settings_tooltip(tooltip_buffer); \
                     "This can read the wrong player's data in shared worlds.");
             }
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         }
 
         if (settings_search_tab_begin("Co-op")) {
@@ -7747,7 +7747,7 @@ settings_tooltip(tooltip_buffer); \
                 }
             }
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of Co-op Tab
 
         if (settings_search_tab_begin("Hotkeys")) {
@@ -8409,7 +8409,7 @@ settings_tooltip(tooltip_buffer); \
                 }
             }
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of Hotkeys Tab
 
         if (settings_search_tab_begin("System & Debug")) {
@@ -8491,12 +8491,13 @@ settings_tooltip(tooltip_buffer); \
                 settings_tooltip(open_logs_tooltip_buffer);
             }
 
-            ImGui::EndTabItem();
+            settings_search_tab_end();
         } // End of System & Debug Tab
 
         ImGui::EndTabBar();
     } // Ending of Settings Tabs
     settings_search_tabs_end();
+    const float below_tabs_start_y = ImGui::GetCursorPosY();
 
     // --- Supporters box (always visible regardless of active tab) ---
     ImGui::Separator();
@@ -8896,6 +8897,7 @@ settings_tooltip(tooltip_buffer); \
     settings_search_set_bottom_row_width(settings_bottom_row_width(
         are_settings_different(&temp_settings, &saved_settings), show_applied_message,
         show_defaults_applied_message));
+    settings_search_set_below_tabs_height(ImGui::GetCursorPosY() - below_tabs_start_y);
 
     if (roboto_font) {
         ImGui::PopFont();
