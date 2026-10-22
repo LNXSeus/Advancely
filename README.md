@@ -967,9 +967,10 @@ before editing it.
 <summary><strong>View Preset List</strong></summary>
 <br>
 
-| Preset          | Made for Template                            | Description                                                                                                                                       |
-|-----------------|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `1.16.1 AATool` | 1.16.1 `all_advancements` `aatool_optimized` | Most closely replicates the overlay and tracker layout of the classic 1.16.1 AATool compact mode. Only overlay settings differ from the defaults. |
+| Preset                  | Made for Template                            | Description                                                                                                                                        |
+|-------------------------|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `1.16.1 AATool`         | 1.16.1 `all_advancements` `aatool_optimized` | Most closely replicates the overlay and tracker layout of the classic 1.16.1 AATool compact mode. Only overlay settings differ from the defaults.  |
+| `1.16.1 AA Categorical` | 1.16.1 `all_advancements` `categorical`      | The preferred overlay setup for the 1.16.1 categorical template. All other categorical templates only alter the overlay width and the row spacing. |
 
 _(Submit your preset through the [official discord](https://discord.gg/TyNgXDz))._
 </details>
