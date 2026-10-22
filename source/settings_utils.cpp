@@ -4370,6 +4370,16 @@ cJSON *settings_to_json(const AppSettings *settings) {
     return root;
 }
 
+cJSON *settings_defaults_to_json() {
+    AppSettings *defaults = new AppSettings();
+    settings_set_defaults(defaults);
+    cJSON *root = cJSON_CreateObject();
+    settings_fill_json(root, defaults, nullptr, SAVE_CONTEXT_ALL);
+    save_window_rect(get_or_create_object(root, "visuals"), "overlay_window", &defaults->overlay_window);
+    delete defaults;
+    return root;
+}
+
 void settings_save_overlay_width_only(int width) {
     cJSON *root = cJSON_from_file(get_settings_file_path());
     if (!root) root = cJSON_CreateObject();

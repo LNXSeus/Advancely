@@ -19,6 +19,7 @@
 
 #include "file_utils.h"
 #include "logger.h"
+#include "main.h" // For get_settings_file_path
 #include "tracker.h" // For str_contains_insensitive
 #include "imgui_internal.h" // For ImGuiItemFlags_MixedValue
 
@@ -75,8 +76,13 @@ struct PresetRow {
 
 #define PRESET_IMPORT_POPUP_ID "###preset_import_popup"
 
+// When creating, s_preset_json holds settings.json and s_current_json the defaults, so "after" is
+// what the new preset would store.
 static cJSON *s_preset_json = nullptr;
 static cJSON *s_current_json = nullptr;
+static bool s_creating = false;
+static bool s_replacing = false;
+static char s_create_path[MAX_PATH_LENGTH] = "";
 static std::vector<PresetRow> s_rows;
 static char s_title[256] = "Load Preset" PRESET_IMPORT_POPUP_ID;
 static bool s_open_requested = false;
@@ -395,19 +401,7 @@ static void preset_import_release() {
     s_last_clicked = -1;
 }
 
-bool preset_import_open(const char *preset_path, const char *preset_name, const AppSettings *current) {
-    preset_import_release();
-    s_preset_json = cJSON_from_file(preset_path);
-    if (!s_preset_json || !cJSON_IsObject(s_preset_json)) {
-        preset_import_release();
-        return false;
-    }
-    s_current_json = settings_to_json(current);
-    if (!s_current_json) {
-        preset_import_release();
-        return false;
-    }
-
+static void build_rows() {
     std::unordered_set<std::string> listed;
     std::unordered_set<std::string> listed_parents;
     build_listed_sets(listed, listed_parents);
@@ -428,11 +422,60 @@ bool preset_import_open(const char *preset_path, const char *preset_name, const 
     collect_unlisted(s_preset_json, "", listed, listed_parents, unlisted);
     for (const auto &path: unlisted) add_row({path}, path.c_str(), PRESET_GROUP_OTHER, 0, nullptr);
 
-    snprintf(s_title, sizeof(s_title), "Load Preset '%s'%s", preset_name, PRESET_IMPORT_POPUP_ID);
     s_only_changes = true;
     s_focus_search = true;
     s_open_requested = true;
+}
+
+bool preset_import_open(const char *preset_path, const char *preset_name, const AppSettings *current) {
+    preset_import_release();
+    s_creating = false;
+    s_preset_json = cJSON_from_file(preset_path);
+    if (!s_preset_json || !cJSON_IsObject(s_preset_json)) {
+        preset_import_release();
+        return false;
+    }
+    s_current_json = settings_to_json(current);
+    if (!s_current_json) {
+        preset_import_release();
+        return false;
+    }
+    build_rows();
+    snprintf(s_title, sizeof(s_title), "Load Preset '%s'%s", preset_name, PRESET_IMPORT_POPUP_ID);
     return true;
+}
+
+bool preset_create_open(const char *preset_path, const char *preset_name, bool replacing) {
+    preset_import_release();
+    s_creating = true;
+    s_replacing = replacing;
+    strncpy(s_create_path, preset_path, sizeof(s_create_path) - 1);
+    s_create_path[sizeof(s_create_path) - 1] = '\0';
+    s_preset_json = cJSON_from_file(get_settings_file_path());
+    if (!s_preset_json || !cJSON_IsObject(s_preset_json)) {
+        preset_import_release();
+        return false;
+    }
+    s_current_json = settings_defaults_to_json();
+    build_rows();
+    snprintf(s_title, sizeof(s_title), "%s Preset '%s'%s", replacing ? "Replace" : "Create", preset_name,
+             PRESET_IMPORT_POPUP_ID);
+    return true;
+}
+
+static bool write_created_preset() {
+    cJSON *out = cJSON_Duplicate(s_current_json, true);
+    if (!out) return false;
+    for (const auto &row: s_rows) {
+        if (!row.selected) continue;
+        for (const auto &p: row.paths) {
+            const cJSON *value = json_at(s_preset_json, p);
+            if (value) json_set_at(out, p, cJSON_Duplicate(value, true));
+        }
+    }
+    bool ok = cJSON_write_to_file_atomic(s_create_path, out);
+    cJSON_Delete(out);
+    return ok;
 }
 
 static bool row_matches_search(const PresetRow &row) {
@@ -491,18 +534,24 @@ static const char *group_description(PresetGroup g) {
         case PRESET_GROUP_STARTUP:
             return "The welcome window and what Advancely counts across launches.";
         case PRESET_GROUP_PROGRESS:
+            if (s_creating) {
+                return "Manually set progress: custom goal checkboxes and counters, manually\n"
+                        "completed stats and stat stage starting points. Checked sections are\n"
+                        "saved into the preset.";
+            }
             return "Manually set progress: custom goal checkboxes and counters, manually\n"
                     "completed stats and stat stage starting points. The preset's copy\n"
                     "replaces yours on 'Apply Settings'.";
         case PRESET_GROUP_OTHER:
-            return "Settings in the preset that this list does not know yet.\n"
+            return "Settings that this list does not know yet.\n"
                     "They are shown by their settings.json name.";
         default:
             return nullptr;
     }
 }
 
-bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRESET_PROGRESS_SECTION_COUNT]) {
+PresetPopupResult preset_import_render(AppSettings *settings,
+                                       bool out_progress_sections[PRESET_PROGRESS_SECTION_COUNT]) {
     if (s_open_requested) {
         ImGui::OpenPopup(s_title);
         s_open_requested = false;
@@ -512,10 +561,10 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal(s_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         if (s_preset_json && !ImGui::IsPopupOpen(s_title)) preset_import_release();
-        return false;
+        return PRESET_POPUP_NONE;
     }
 
-    bool loaded = false;
+    PresetPopupResult result = PRESET_POPUP_NONE;
 
     if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -572,9 +621,15 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     if (ImGui::Checkbox(only_changes_label, &s_only_changes)) s_last_clicked = -1;
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[256];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "CHECKED: List only the settings the preset would change.\n"
-                 "UNCHECKED: Also list the ones that already match.");
+        if (s_creating) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "CHECKED: List only the settings that differ from the defaults.\n"
+                     "UNCHECKED: Also list the ones that are still at their default.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "CHECKED: List only the settings the preset would change.\n"
+                     "UNCHECKED: Also list the ones that already match.");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::SameLine();
@@ -615,7 +670,8 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     ImGui::BeginChild("PresetImportScrollingRegion", ImVec2(760, 440), true);
     if (visible.empty()) {
         if (s_search[0] == '\0' && s_only_changes && total_changes == 0) {
-            ImGui::Text("This preset matches your current settings.");
+            ImGui::Text("%s", s_creating ? "Your settings match the defaults."
+                                         : "This preset matches your current settings.");
         } else {
             ImGui::Text("No settings match the search.");
         }
@@ -681,8 +737,9 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
                 }
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buffer[2048];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "settings.json: %s\n\nCurrent: %s\nPreset: %s%s",
-                             row.path_text.c_str(), row.before.c_str(), row.after.c_str(),
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "settings.json: %s\n\n%s: %s\n%s: %s%s",
+                             row.path_text.c_str(), s_creating ? "Default" : "Current", row.before.c_str(),
+                             s_creating ? "Yours" : "Preset", row.after.c_str(),
                              (row.flags & PRESET_KEY_USER)
                                  ? "\n\nUnchecked by default: this belongs to you rather than to the preset."
                                  : "");
@@ -699,7 +756,7 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
                 } else {
                     draw_value(row.before, row.has_color, row.before_color, old_color, "##before");
                     ImGui::SameLine();
-                    ImGui::TextDisabled("(unchanged)");
+                    ImGui::TextDisabled("%s", s_creating ? "(default)" : "(unchanged)");
                 }
                 ImGui::PopID();
             }
@@ -714,8 +771,12 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     if (s_error[0] != '\0') {
         ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", s_error);
     }
-    ImGui::TextDisabled("Unchecked settings keep their current values. Nothing changes until you click "
-        "'Apply Settings'.");
+    if (s_creating) {
+        ImGui::TextDisabled("Unchecked settings are saved into the preset with their default values.");
+    } else {
+        ImGui::TextDisabled("Unchecked settings keep their current values. Nothing changes until you click "
+            "'Apply Settings'.");
+    }
 
     int selected_changes = 0;
     for (const auto &row: s_rows) {
@@ -724,20 +785,31 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
 
     const bool enter_pressed = !ImGui::IsWindowAppearing() &&
                                (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter));
-    if (ImGui::Button("Load", ImVec2(120, 0)) || enter_pressed) {
+    const char *confirm_label = s_creating ? (s_replacing ? "Replace" : "Create") : "Load";
+    if (ImGui::Button(confirm_label, ImVec2(120, 0)) || enter_pressed) {
         if (selected_changes == 0) {
             snprintf(s_error, sizeof(s_error), "Error: No changed settings are selected.");
         } else {
-            apply_selection(settings, out_progress_sections);
-            loaded = true;
+            if (s_creating) {
+                result = write_created_preset() ? PRESET_POPUP_CREATED : PRESET_POPUP_CREATE_FAILED;
+            } else {
+                apply_selection(settings, out_progress_sections);
+                result = PRESET_POPUP_LOADED;
+            }
             preset_import_release();
             ImGui::CloseCurrentPopup();
         }
     }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[256];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Fill the settings window with the checked settings of the preset.\n(You can also press ENTER)");
+        if (s_creating) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "%s the preset file with the checked settings.\n(You can also press ENTER)",
+                     s_replacing ? "Overwrite" : "Write");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Fill the settings window with the checked settings of the preset.\n(You can also press ENTER)");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::SameLine();
@@ -747,8 +819,9 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[256];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Keep your current settings and close this window.\n(You can also press ESCAPE)");
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "%s\n(You can also press ESCAPE)",
+                 s_creating ? "Close this window without saving a preset."
+                            : "Keep your current settings and close this window.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -762,5 +835,5 @@ bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRES
     ImGui::Text("%s", counter_text);
 
     ImGui::EndPopup();
-    return loaded;
+    return result;
 }

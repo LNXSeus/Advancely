@@ -38,7 +38,7 @@ typedef enum {
 // Expands into one row per Advancely hotkey, labeled from APP_HOTKEY_DEFS.
 #define PRESET_KEY_APP_HOTKEYS (1u << 3)
 
-// Every settings.json key the "Load Preset" popup lists, in the order the settings window shows them.
+// Every settings.json key the "Load Preset" and "Create Preset" popups list, in the order the settings window shows them.
 // When a setting moves in the window (or a new one is added), move or add its line here too. Keys
 // missing from this list still show up, under "Other" with their raw settings.json path.
 // Columns: settings.json path ('.' between levels, '|' between keys that only make sense together),
@@ -275,6 +275,13 @@ typedef enum {
 #define PRESET_PROGRESS_SECTION_COUNT 3
 extern const char *PRESET_PROGRESS_SECTIONS[PRESET_PROGRESS_SECTION_COUNT];
 
+typedef enum {
+    PRESET_POPUP_NONE = 0,
+    PRESET_POPUP_LOADED, // The selection was loaded into the settings window
+    PRESET_POPUP_CREATED, // The preset file was written
+    PRESET_POPUP_CREATE_FAILED, // The preset file could not be written
+} PresetPopupResult;
+
 /**
  * @brief Opens the "Load Preset" popup, which lists every setting the preset would change.
  *
@@ -289,15 +296,31 @@ extern const char *PRESET_PROGRESS_SECTIONS[PRESET_PROGRESS_SECTION_COUNT];
 bool preset_import_open(const char *preset_path, const char *preset_name, const AppSettings *current);
 
 /**
- * @brief Draws the "Load Preset" popup opened by preset_import_open(). Call every frame.
+ * @brief Opens the "Create Preset" popup, which lists every setting of settings.json that differs
+ * from the defaults.
  *
- * On the frame the user confirms, the selected settings are written into `settings` (everything
- * else keeps its value) and `out_progress_sections` tells, per PRESET_PROGRESS_SECTIONS entry,
- * whether the preset's copy should replace the user's on Apply.
+ * Checked settings are saved with the value from settings.json, unchecked ones with their default.
+ * preset_import_render() draws the popup and writes the file once the user confirms.
  *
- * @return true on the frame the selection was loaded into `settings`.
+ * @param preset_path Full path of the preset .json file to write.
+ * @param preset_name Name shown in the popup title.
+ * @param replacing True if `preset_path` is an existing preset that gets overwritten.
+ * @return false if settings.json could not be read (nothing is opened).
  */
-bool preset_import_render(AppSettings *settings, bool out_progress_sections[PRESET_PROGRESS_SECTION_COUNT]);
+bool preset_create_open(const char *preset_path, const char *preset_name, bool replacing);
+
+/**
+ * @brief Draws the popup opened by preset_import_open() or preset_create_open(). Call every frame.
+ *
+ * Loading: on the frame the user confirms, the selected settings are written into `settings`
+ * (everything else keeps its value) and `out_progress_sections` tells, per PRESET_PROGRESS_SECTIONS
+ * entry, whether the preset's copy should replace the user's on Apply.
+ * Creating: on the frame the user confirms, the preset file is written; `settings` is untouched.
+ *
+ * @return What happened this frame.
+ */
+PresetPopupResult preset_import_render(AppSettings *settings,
+                                       bool out_progress_sections[PRESET_PROGRESS_SECTION_COUNT]);
 
 /**
  * @brief Logs every settings.json key that PRESET_KEY_LIST does not cover, as an error.

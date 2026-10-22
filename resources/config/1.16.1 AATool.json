@@ -298,7 +298,7 @@
 		"auto_accept":	false,
 		"network_mode":	"singleplayer",
 		"merge_settings":	{
-			"stat_merge":	"highest",
+			"stat_merge":	"cumulative",
 			"stat_checkbox":	"any_player",
 			"custom_goal_mode":	"any_player"
 		},

@@ -1244,6 +1244,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // The preset whose selection popup is open.
     static char preset_import_path[MAX_PATH_LENGTH] = "";
     static char preset_import_name[SETTING_PRESET_NAME_LEN] = "";
+    static bool preset_create_replacing = false;
     // The ENTER that confirms the popup must not also reach the Apply shortcut once focus returns here.
     static int preset_import_loaded_frame = -1;
 
@@ -1613,7 +1614,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Spacing();
 
     // --- Settings Presets (always visible above the tabs) ---
-    // Presets are full snapshots of settings.json stored next to it in resources/config/.
+    // Presets are snapshots of settings.json stored next to it in resources/config/.
     {
         // Some settings clash with the synchronised lobby state, so lock the section while active.
         bool preset_lobby_locked = g_coop_ctx &&
@@ -1633,37 +1634,30 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             out[i] = '\0';
         };
 
-        // Copy the entire current settings.json verbatim into the preset file.
-        auto write_preset = [](const char *file_name, bool replacing) {
-            cJSON *root = cJSON_from_file(get_settings_file_path());
-            if (!root) {
+        // Opens the popup that picks which settings of settings.json go into the preset.
+        auto open_create_preset = [](const char *file_name, bool replacing) {
+            char preset_path[MAX_PATH_LENGTH];
+            snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(), file_name);
+            if (preset_create_open(preset_path, file_name, replacing)) {
+                strncpy(preset_import_name, file_name, sizeof(preset_import_name) - 1);
+                preset_import_name[sizeof(preset_import_name) - 1] = '\0';
+                preset_create_replacing = replacing;
+            } else {
                 snprintf(preset_status_msg, sizeof(preset_status_msg),
                          "Could not read settings.json to create the preset.");
                 preset_status_is_error = true;
-                return;
             }
-            char preset_path[MAX_PATH_LENGTH];
-            snprintf(preset_path, sizeof(preset_path), "%s/config/%s.json", get_resources_path(), file_name);
-            if (cJSON_write_to_file_atomic(preset_path, root)) {
-                snprintf(preset_status_msg, sizeof(preset_status_msg),
-                         replacing ? "Replaced preset '%s'." : "Created preset '%s'.", file_name);
-                preset_status_is_error = false;
-                new_preset_name[0] = '\0';
-                presets_need_rescan = true;
-            } else {
-                snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to write the preset file.");
-                preset_status_is_error = true;
-            }
-            cJSON_Delete(root);
         };
 
         ImGui::Text("Settings Presets");
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (settings_tooltip_wanted()) {
-            char preset_help_buffer[768];
+            char preset_help_buffer[1024];
             snprintf(preset_help_buffer, sizeof(preset_help_buffer),
-                     "Save and switch between full snapshots of your settings.\n"
+                     "Save and switch between snapshots of your settings. Creating a\n"
+                     "preset lets you pick which of your settings to save; the rest are\n"
+                     "saved with their default values.\n"
                      "Presets are stored as .json files in %s/, right next to\n"
                      "settings.json. Advancely always reads only settings.json itself, so\n"
                      "loading a preset lets you pick which of its settings to take over and\n"
@@ -1731,7 +1725,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 preset_replace_name[sizeof(preset_replace_name) - 1] = '\0';
                 ImGui::OpenPopup("Replace Existing Preset?");
             } else if (ok) {
-                write_preset(start, false);
+                open_create_preset(start, false);
             }
         }
         if (create_disabled) ImGui::EndDisabled();
@@ -1745,6 +1739,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             } else {
                 snprintf(create_tooltip_buffer, sizeof(create_tooltip_buffer),
                          "Save the current settings as a new preset file in %s/.\n"
+                         "Pick which settings to save; settings you changed are checked,\n"
+                         "except ones that belong to you (account, paths, hotkeys, ...).\n"
+                         "Unchecked settings are saved with their default values.\n"
                          "The name cannot be 'settings'. Using an existing preset's name\n"
                          "asks to replace that preset with the current settings.",
                          get_config_display_path());
@@ -1926,7 +1923,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::Button("Replace", ImVec2(120, 0)) ||
                 (!ImGui::IsWindowAppearing() &&
                  (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)))) {
-                write_preset(preset_replace_name, true);
+                open_create_preset(preset_replace_name, true);
                 preset_replace_name[0] = '\0';
                 ImGui::CloseCurrentPopup();
             }
@@ -1956,7 +1953,19 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
 
         bool progress_picked[PRESET_PROGRESS_SECTION_COUNT] = {};
-        if (preset_import_render(&temp_settings, progress_picked)) {
+        PresetPopupResult preset_popup_result = preset_import_render(&temp_settings, progress_picked);
+        if (preset_popup_result == PRESET_POPUP_CREATED) {
+            snprintf(preset_status_msg, sizeof(preset_status_msg),
+                     preset_create_replacing ? "Replaced preset '%s'." : "Created preset '%s'.", preset_import_name);
+            preset_status_is_error = false;
+            new_preset_name[0] = '\0';
+            presets_need_rescan = true;
+            preset_import_loaded_frame = ImGui::GetFrameCount();
+        } else if (preset_popup_result == PRESET_POPUP_CREATE_FAILED) {
+            snprintf(preset_status_msg, sizeof(preset_status_msg), "Failed to write the preset file.");
+            preset_status_is_error = true;
+            preset_import_loaded_frame = ImGui::GetFrameCount();
+        } else if (preset_popup_result == PRESET_POPUP_LOADED) {
             // Force the template list to rescan so the tabs refresh in place.
             last_scanned_version[0] = '\0';
             // Remember the source and the picked sections so Apply can restore that progress.

@@ -1221,6 +1221,15 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
  */
 cJSON *settings_to_json(const AppSettings *settings);
 
+/**
+ * @brief Builds the settings.json tree of the default settings, without reading or writing the disk.
+ *
+ * Holds no progress sections, since the defaults carry no progress.
+ *
+ * @return A new cJSON tree the caller must cJSON_Delete.
+ */
+cJSON *settings_defaults_to_json();
+
 void settings_save_overlay_width_only(int width);
 
 /**
