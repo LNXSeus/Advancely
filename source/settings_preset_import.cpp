@@ -333,7 +333,7 @@ static void add_row(const std::vector<std::string> &paths, const char *label, Pr
     row.group = group;
     row.flags = flags;
     row.changed = changed;
-    row.selected = !(flags & PRESET_KEY_USER);
+    row.selected = changed && !(flags & PRESET_KEY_USER);
     row.before = format_paths(s_current_json, paths, flags, value_names);
     row.after = format_paths(s_preset_json, paths, flags, value_names);
     if (changed && row.after == row.before) row.after += " (different values)";
@@ -401,7 +401,15 @@ static void preset_import_release() {
     s_last_clicked = -1;
 }
 
+static void resolve_overlay_width(cJSON *root) {
+    cJSON *w = (cJSON *) json_at(root, "visuals.overlay_window.w");
+    if (cJSON_IsNumber(w) && w->valueint == DEFAULT_WINDOW_SIZE) cJSON_SetNumberValue(w, OVERLAY_DEFAULT_WIDTH);
+}
+
 static void build_rows() {
+    resolve_overlay_width(s_preset_json);
+    resolve_overlay_width(s_current_json);
+
     std::unordered_set<std::string> listed;
     std::unordered_set<std::string> listed_parents;
     build_listed_sets(listed, listed_parents);
@@ -464,7 +472,7 @@ bool preset_create_open(const char *preset_path, const char *preset_name, bool r
 }
 
 static bool write_created_preset() {
-    cJSON *out = cJSON_Duplicate(s_current_json, true);
+    cJSON *out = cJSON_CreateObject();
     if (!out) return false;
     for (const auto &row: s_rows) {
         if (!row.selected) continue;
@@ -772,7 +780,7 @@ PresetPopupResult preset_import_render(AppSettings *settings,
         ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", s_error);
     }
     if (s_creating) {
-        ImGui::TextDisabled("Unchecked settings are saved into the preset with their default values.");
+        ImGui::TextDisabled("Only the checked settings are saved into the preset.");
     } else {
         ImGui::TextDisabled("Unchecked settings keep their current values. Nothing changes until you click "
             "'Apply Settings'.");

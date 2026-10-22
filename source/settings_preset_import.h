@@ -299,7 +299,8 @@ bool preset_import_open(const char *preset_path, const char *preset_name, const 
  * @brief Opens the "Create Preset" popup, which lists every setting of settings.json that differs
  * from the defaults.
  *
- * Checked settings are saved with the value from settings.json, unchecked ones with their default.
+ * Only the checked settings are saved, with their value from settings.json. Loading the preset
+ * later lists just those.
  * preset_import_render() draws the popup and writes the file once the user confirms.
  *
  * @param preset_path Full path of the preset .json file to write.

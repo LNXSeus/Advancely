@@ -1,0 +1,53 @@
+{
+	"version":	"1.16.1",
+	"category":	"all_advancements",
+	"optional_flag":	"_categorical",
+	"layout_flag":	"",
+	"category_display_name":	"All Advancements",
+	"general":	{
+		"tracker_font_size":	20,
+		"tracker_sub_font_size":	16,
+		"tracker_ui_font_size":	24,
+		"overlay_render_mode":	1,
+		"overlay_show_hidden_goals":	false,
+		"igt_freeze_on_completion":	true,
+		"overlay_show_world":	false,
+		"overlay_show_run_details":	false,
+		"overlay_show_progress":	true,
+		"overlay_show_igt":	false,
+		"overlay_show_update_timer":	false,
+		"overlay_row2_show_completed":	true,
+		"overlay_row3_remove_completed":	false,
+		"overlay_stat_cycle_speed":	1.2000000476837158,
+		"overlay_clear_animation":	-1,
+		"overlay_page_interval":	10,
+		"overlay_page_align":	0,
+		"overlay_progress_text_align":	"left",
+		"overlay_progress_font_size":	40,
+		"overlay_row_font_size":	20
+	},
+	"visuals":	{
+		"adv_icon_size":	64,
+		"adv_icon_offset_x":	16,
+		"adv_icon_offset_y":	16,
+		"tracker_shared_icon_size":	24,
+		"tracker_shared_icon_keep_redundant":	false,
+		"overlay_row2_custom_scroll_speed_enabled":	false,
+		"overlay_row2_scroll_speed":	1,
+		"overlay_row2_freeze_enabled":	true,
+		"overlay_row2_freeze_align":	0,
+		"overlay_row3_custom_scroll_speed_enabled":	false,
+		"overlay_row3_scroll_speed":	1,
+		"overlay_row3_freeze_enabled":	true,
+		"overlay_row3_freeze_align":	0,
+		"overlay_window":	{
+			"w":	1150
+		},
+		"overlay_row2_bg_size":	96,
+		"overlay_row3_bg_size":	96,
+		"overlay_row2_custom_spacing_enabled":	true,
+		"overlay_row2_custom_spacing":	160,
+		"overlay_row3_custom_spacing_enabled":	true,
+		"overlay_row3_custom_spacing":	160
+	}
+}
