@@ -2168,7 +2168,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	325
+			"y":	333,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:obsidian":	{
@@ -2179,7 +2180,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	361
+			"y":	369,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	{
@@ -2190,7 +2192,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	397
+			"y":	405,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:cod":	{
@@ -2201,7 +2204,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	433
+			"y":	441,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:salmon":	{
@@ -2212,7 +2216,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	469
+			"y":	477,
+			"anchor":	3
 		}
 	},
 	"stat.azure_bluet":	{
@@ -2239,7 +2244,8 @@
 		},
 		"progress_pos":	{
 			"x":	1585,
-			"y":	455
+			"y":	463,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:trident":	{
@@ -2248,7 +2254,8 @@
 		},
 		"progress_pos":	{
 			"x":	1585,
-			"y":	491
+			"y":	499,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:nautilus_shell":	{
@@ -2257,7 +2264,8 @@
 		},
 		"progress_pos":	{
 			"x":	1585,
-			"y":	527
+			"y":	535,
+			"anchor":	3
 		}
 	},
 	"stat.fermented":	{
@@ -2313,7 +2321,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	920
+			"y":	928,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:blaze_rod":	{
@@ -2324,7 +2333,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	956
+			"y":	964,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:nether_wart":	{
@@ -2335,7 +2345,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	992
+			"y":	1000,
+			"anchor":	3
 		}
 	},
 	"stat.ghast_tears":	{
@@ -3630,48 +3641,6 @@
 			"pos":	{
 				"x":	1,
 				"y":	1407
-			}
-		}, {
-			"id":	"note2",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1437
-			}
-		}, {
-			"id":	"note3",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1467
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1497
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1527
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1557
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1587
 			}
 		}]
 }

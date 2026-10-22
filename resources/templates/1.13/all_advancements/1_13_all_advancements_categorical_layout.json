@@ -1489,7 +1489,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	250
+			"y":	258,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	{
@@ -1500,7 +1501,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	286
+			"y":	294,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:redstone_dust":	{
@@ -1511,7 +1513,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	322
+			"y":	330,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:cod":	{
@@ -1520,7 +1523,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	358
+			"y":	366,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.minecraft:picked_up/minecraft:salmon":	{
@@ -1529,7 +1533,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	394
+			"y":	402,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items":	{
@@ -1546,7 +1551,8 @@
 		},
 		"progress_pos":	{
 			"x":	1485,
-			"y":	430
+			"y":	438,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:pufferfish":	{
@@ -1557,7 +1563,8 @@
 		},
 		"progress_pos":	{
 			"x":	1485,
-			"y":	466
+			"y":	474,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:trident":	{
@@ -1568,7 +1575,8 @@
 		},
 		"progress_pos":	{
 			"x":	1485,
-			"y":	502
+			"y":	510,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:nautilus_shell":	{
@@ -1579,7 +1587,8 @@
 		},
 		"progress_pos":	{
 			"x":	1485,
-			"y":	538
+			"y":	546,
+			"anchor":	3
 		}
 	},
 	"stat.fermented_spider_eye":	{
@@ -1630,7 +1639,8 @@
 		},
 		"progress_pos":	{
 			"x":	805,
-			"y":	820
+			"y":	828,
+			"anchor":	3
 		}
 	},
 	"stat.fortress.criteria.minecraft:picked_up/minecraft:blaze_rod":	{
@@ -1641,7 +1651,8 @@
 		},
 		"progress_pos":	{
 			"x":	805,
-			"y":	856
+			"y":	864,
+			"anchor":	3
 		}
 	},
 	"stat.fortress.criteria.minecraft:picked_up/minecraft:nether_wart":	{
@@ -1652,7 +1663,8 @@
 		},
 		"progress_pos":	{
 			"x":	805,
-			"y":	892
+			"y":	900,
+			"anchor":	3
 		}
 	},
 	"stat.stat_complete_helper":	{
@@ -2691,34 +2703,6 @@
 			"pos":	{
 				"x":	1,
 				"y":	1262
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1292
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1322
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1352
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1382
 			}
 		}]
 }

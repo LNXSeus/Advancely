@@ -168,6 +168,13 @@
 			"criteria":	{
 			}
 		},
+		"minecraft:adventure/craft_decorated_pot_using_only_sherds":	{
+			"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
+			"hidden":	true,
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
 		"minecraft:husbandry/tactical_fishing":	{
 			"icon":	"items/pufferfish_bucket_3d_shareware_v1.34.png",
 			"hidden":	true,
@@ -1603,13 +1610,6 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:adventure/craft_decorated_pot_using_only_sherds":	{
-			"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
-			"hidden":	true,
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
 		"minecraft:husbandry/feed_snifflet":	{
 			"icon":	"items/torchflower_seeds_25w14craftmine.png",
 			"hidden":	true,
@@ -2805,30 +2805,6 @@
 					"root_name":	""
 				}]
 		}, {
-			"root_name":	"pottery_sherds",
-			"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
-			"hidden":	true,
-			"in_2nd_row":	true,
-			"use_stage_icons":	true,
-			"stages":	[{
-					"stage_id":	"1",
-					"icon":	"items/brush_1.20.2.png",
-					"type":	"advancement",
-					"root_name":	"minecraft:adventure/salvage_sherd",
-					"target":	1
-				}, {
-					"stage_id":	"2",
-					"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
-					"type":	"advancement",
-					"root_name":	"minecraft:adventure/craft_decorated_pot_using_only_sherds",
-					"target":	1
-				}, {
-					"stage_id":	"final",
-					"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png",
-					"type":	"final",
-					"root_name":	""
-				}]
-		}, {
 			"root_name":	"tide_full",
 			"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png",
 			"hidden":	true,
@@ -3702,14 +3678,14 @@
 					"parent_root":	"ocean_items",
 					"type":	"stat"
 				}, {
-					"root_name":	"pottery_sherds",
-					"type":	"multi_stage"
-				}, {
 					"root_name":	"tide_full",
 					"type":	"multi_stage"
 				}, {
 					"root_name":	"minecraft:zombie_nautilus",
 					"parent_root":	"minecraft:adventure/kill_all_mobs",
+					"type":	"advancement"
+				}, {
+					"root_name":	"minecraft:adventure/craft_decorated_pot_using_only_sherds",
 					"type":	"advancement"
 				}]
 		}, {

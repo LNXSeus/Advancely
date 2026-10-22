@@ -344,7 +344,7 @@
 	"multi_stage_goal.bees.stage.final":	"Done",
 	"multi_stage_goal.end_again.display_name":	"End Again",
 	"multi_stage_goal.end_again.stage.1":	"Respawn Dragon",
-	"multi_stage_goal.end_again.stage.2":	"Spyglass",
+	"multi_stage_goal.end_again.stage.2":	"Use Spyglass",
 	"multi_stage_goal.end_again.stage.3":	"Get Breath",
 	"multi_stage_goal.end_again.stage.final":	"Done",
 	"counter.early_game":	"Early Game",
@@ -379,11 +379,7 @@
 	"decoration.summary":	"Summary",
 	"decoration.underground":	"Underground",
 	"decoration.credits":	"Template by ScrambledMC",
-	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
-	"decoration.note2":	"Mode: Page",
-	"decoration.note3":	"Overlay Width: 1270 px",
-	"decoration.note4":	"Custom Row 2 Spacing: ON (160 px)",
-	"decoration.note5":	"Custom Row 3 Spacing: ON (180 px)",
-	"decoration.note6":	"Show Completed Row 2 Goals: ON",
-	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
+	"decoration.note1":	"For recommended settings, load preset \"1.16.1 AA Categorical\", then change:",
+	"decoration.note2":	"Overlay Width: 1270",
+	"decoration.note3":	"Row 3 Item Width: 180 px"
 }

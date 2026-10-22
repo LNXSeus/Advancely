@@ -361,7 +361,7 @@
 	"multi_stage_goal.end_again.stage.1":	"Place Crystals",
 	"multi_stage_goal.end_again.stage.2":	"C&C",
 	"multi_stage_goal.end_again.stage.3":	"Respawn Dragon",
-	"multi_stage_goal.end_again.stage.4":	"Spyglass",
+	"multi_stage_goal.end_again.stage.4":	"Use Spyglass",
 	"multi_stage_goal.end_again.stage.5":	"Get Breath",
 	"multi_stage_goal.end_again.stage.final":	"Done",
 	"counter.early_game":	"Early Game",
@@ -394,11 +394,5 @@
 	"decoration.summary":	"Summary",
 	"decoration.underground":	"Underground",
 	"decoration.credits":	"Template by ScrambledMC",
-	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
-	"decoration.note2":	"Mode: Page",
-	"decoration.note3":	"Overlay Width: 1150 px",
-	"decoration.note4":	"Custom Row 2 Spacing: ON (160 px)",
-	"decoration.note5":	"Custom Row 3 Spacing: ON (160 px)",
-	"decoration.note6":	"Show Completed Row 2 Goals: ON",
-	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
+	"decoration.note1":	"Load preset \"1.16.1 AA Categorical\" for recommended settings"
 }

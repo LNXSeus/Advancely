@@ -3552,47 +3552,5 @@
 				"x":	1,
 				"y":	1407
 			}
-		}, {
-			"id":	"note2",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1437
-			}
-		}, {
-			"id":	"note3",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1467
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1497
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1527
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1557
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1587
-			}
 		}]
 }

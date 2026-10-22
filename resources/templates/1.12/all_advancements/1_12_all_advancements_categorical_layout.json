@@ -1282,7 +1282,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	265
+			"y":	273,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.stat.pickup.minecraft.lapis_lazuli":	{
@@ -1293,7 +1294,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	301
+			"y":	309,
+			"anchor":	3
 		}
 	},
 	"stat.early_game_items.criteria.stat.pickup.minecraft.redstone":	{
@@ -1304,7 +1306,8 @@
 		},
 		"progress_pos":	{
 			"x":	370,
-			"y":	337
+			"y":	345,
+			"anchor":	3
 		}
 	},
 	"stat.gold_blocks_copy":	{
@@ -1345,7 +1348,8 @@
 		},
 		"progress_pos":	{
 			"x":	795,
-			"y":	760
+			"y":	768,
+			"anchor":	3
 		}
 	},
 	"stat.fortress.criteria.stat.pickup.minecraft.blaze_rod":	{
@@ -1356,7 +1360,8 @@
 		},
 		"progress_pos":	{
 			"x":	795,
-			"y":	796
+			"y":	804,
+			"anchor":	3
 		}
 	},
 	"stat.fortress.criteria.stat.pickup.minecraft.nether_wart":	{
@@ -1367,7 +1372,8 @@
 		},
 		"progress_pos":	{
 			"x":	795,
-			"y":	832
+			"y":	840,
+			"anchor":	3
 		}
 	},
 	"stat.stat_complete_helper":	{
@@ -2302,34 +2308,6 @@
 			"pos":	{
 				"x":	1,
 				"y":	1202
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1232
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1262
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1292
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1322
 			}
 		}]
 }

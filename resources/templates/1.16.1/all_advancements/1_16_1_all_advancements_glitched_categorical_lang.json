@@ -342,11 +342,5 @@
 	"decoration.llamas":	"Mountains + Savanna",
 	"decoration.summary":	"Summary",
 	"decoration.credits":	"Template by ScrambledMC",
-	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
-	"decoration.note2":	"Mode: Page",
-	"decoration.note3":	"Overlay Width: 1150 px",
-	"decoration.note4":	"Custom Row 2 Spacing: ON (160 px)",
-	"decoration.note5":	"Custom Row 3 Spacing: ON (160 px)",
-	"decoration.note6":	"Show Completed Row 2 Goals: ON",
-	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
+	"decoration.note1":	"Load preset \"1.16.1 AA Categorical\" for recommended settings"
 }

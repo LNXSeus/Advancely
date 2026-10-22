@@ -145,6 +145,12 @@
 			"y":	480
 		}
 	},
+	"advancement.minecraft.adventure.craft_decorated_pot_using_only_sherds":	{
+		"icon_pos":	{
+			"x":	1845,
+			"y":	345
+		}
+	},
 	"advancement.minecraft.husbandry.tactical_fishing":	{
 		"icon_pos":	{
 			"x":	1845,
@@ -2608,13 +2614,6 @@
 			"hidden":	true
 		}
 	},
-	"advancement.minecraft.adventure.craft_decorated_pot_using_only_sherds":	{
-		"icon_pos":	{
-			"x":	-3000,
-			"y":	-3000,
-			"hidden":	true
-		}
-	},
 	"advancement.minecraft.husbandry.feed_snifflet":	{
 		"icon_pos":	{
 			"x":	-3000,
@@ -2840,7 +2839,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	340
+			"y":	348,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:obsidian":	{
@@ -2851,7 +2851,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	376
+			"y":	384,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	{
@@ -2862,7 +2863,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	412
+			"y":	420,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:redstone_dust":	{
@@ -2873,7 +2875,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	448
+			"y":	456,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:raw_copper":	{
@@ -2884,7 +2887,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	484
+			"y":	492,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:cod":	{
@@ -2895,7 +2899,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	520
+			"y":	528,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:salmon":	{
@@ -2906,7 +2911,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	556
+			"y":	564,
+			"anchor":	3
 		}
 	},
 	"stat.azure_bluet":	{
@@ -2958,7 +2964,8 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	475
+			"y":	483,
+			"anchor":	3
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:pufferfish":	{
@@ -2969,7 +2976,8 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	511
+			"y":	519,
+			"anchor":	3
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:trident":	{
@@ -2980,7 +2988,8 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	547
+			"y":	555,
+			"anchor":	3
 		}
 	},
 	"stat.ocean_items.criteria.minecraft:picked_up/minecraft:nautilus_shell":	{
@@ -2991,7 +3000,8 @@
 		},
 		"progress_pos":	{
 			"x":	1760,
-			"y":	583
+			"y":	591,
+			"anchor":	3
 		}
 	},
 	"stat.fermented":	{
@@ -3059,7 +3069,8 @@
 		},
 		"progress_pos":	{
 			"x":	925,
-			"y":	860
+			"y":	868,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:blaze_rod":	{
@@ -3070,7 +3081,8 @@
 		},
 		"progress_pos":	{
 			"x":	925,
-			"y":	896
+			"y":	904,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:nether_wart":	{
@@ -3081,7 +3093,8 @@
 		},
 		"progress_pos":	{
 			"x":	925,
-			"y":	932
+			"y":	940,
+			"anchor":	3
 		}
 	},
 	"stat.stat:gold_blocks_picked_up":	{
@@ -3161,12 +3174,6 @@
 		"icon_pos":	{
 			"x":	1450,
 			"y":	480
-		}
-	},
-	"multi_stage_goal.pottery_sherds":	{
-		"icon_pos":	{
-			"x":	1845,
-			"y":	345
 		}
 	},
 	"multi_stage_goal.tide_full":	{
@@ -4029,11 +4036,11 @@
 					"parent_root":	"ocean_items",
 					"type":	"stat"
 				}, {
-					"root_name":	"pottery_sherds",
-					"type":	"multi_stage"
-				}, {
 					"root_name":	"tide_full",
 					"type":	"multi_stage"
+				}, {
+					"root_name":	"minecraft:adventure/craft_decorated_pot_using_only_sherds",
+					"type":	"advancement"
 				}],
 			"pos":	{
 				"x":	1695,
@@ -4884,42 +4891,14 @@
 			"type":	"text_header",
 			"pos":	{
 				"x":	1,
-				"y":	1662
+				"y":	1542
 			}
 		}, {
 			"id":	"note3",
 			"type":	"text_header",
 			"pos":	{
 				"x":	1,
-				"y":	1692
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1542
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
 				"y":	1572
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1602
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1632
 			}
 		}]
 }

@@ -1553,7 +1553,8 @@
 				}, {
 					"root_name":	"minecraft:adventure/spyglass_at_dragon",
 					"type":	"advancement"
-				}]
+				}],
+			"linked_goal_mode":	"or"
 		},
 		"fortress_items":	{
 			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
@@ -2052,7 +2053,7 @@
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"animals/Bee_unoptimized.gif",
+					"icon":	"blocks/Honey_Block_JE1_BE2.png",
 					"type":	"final",
 					"root_name":	""
 				}]

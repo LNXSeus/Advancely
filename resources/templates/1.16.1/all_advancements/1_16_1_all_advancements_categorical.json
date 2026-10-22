@@ -1879,7 +1879,7 @@
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"animals/Bee_unoptimized.gif",
+					"icon":	"blocks/Honey_Block_JE1_BE2.png",
 					"type":	"final",
 					"root_name":	""
 				}]
@@ -1900,7 +1900,11 @@
 					"icon":	"items/dragon_breath_1.20.2.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:end/dragon_breath",
-					"target":	1
+					"target":	1,
+					"mirror_goal":	{
+						"root_name":	"minecraft:end/dragon_breath",
+						"type":	"advancement"
+					}
 				}, {
 					"stage_id":	"final",
 					"icon":	"items/end_crystal_1.20.2.png",

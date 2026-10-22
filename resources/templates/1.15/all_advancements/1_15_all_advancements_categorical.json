@@ -1670,7 +1670,7 @@
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"animals/Bee_unoptimized.gif",
+					"icon":	"blocks/Honey_Block_JE1_BE2.png",
 					"type":	"final",
 					"root_name":	""
 				}]

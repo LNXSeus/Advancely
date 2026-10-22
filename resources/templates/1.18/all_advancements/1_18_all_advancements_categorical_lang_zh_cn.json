@@ -361,7 +361,7 @@
 	"multi_stage_goal.end_again.stage.1":	"放置末地水晶",
 	"multi_stage_goal.end_again.stage.2":	"上天入地",
 	"multi_stage_goal.end_again.stage.3":	"重生末影龙",
-	"multi_stage_goal.end_again.stage.4":	"望远镜",
+	"multi_stage_goal.end_again.stage.4":	"使用望远镜",
 	"multi_stage_goal.end_again.stage.5":	"获得龙息",
 	"multi_stage_goal.end_again.stage.final":	"完成",
 	"counter.early_game":	"前期",
@@ -394,11 +394,5 @@
 	"decoration.summary":	"总结",
 	"decoration.underground":	"地下",
 	"decoration.credits":	"模板由 ScrambledMC 制作",
-	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
-	"decoration.note2":	"Mode: Page",
-	"decoration.note3":	"Overlay Width: 1150 px",
-	"decoration.note4":	"Custom Row 2 Spacing: ON (160 px)",
-	"decoration.note5":	"Custom Row 3 Spacing: ON (160 px)",
-	"decoration.note6":	"Show Completed Row 2 Goals: ON",
-	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
+	"decoration.note1":	"Load preset \"1.16.1 AA Categorical\" for recommended settings"
 }

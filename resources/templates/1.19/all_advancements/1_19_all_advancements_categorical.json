@@ -267,8 +267,15 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:end/dragon_egg":	{
-			"icon":	"blocks/Dragon_Egg_JE5.png",
+		"minecraft:nether/netherite_armor":	{
+			"icon":	"items/netherite_chestplate_20w14infinite.png",
+			"hidden":	true,
+			"groups_enabled":	false,
+			"criteria":	{
+			}
+		},
+		"minecraft:husbandry/obtain_netherite_hoe":	{
+			"icon":	"items/netherite_hoe_20w14infinite.png",
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
@@ -281,15 +288,8 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:nether/netherite_armor":	{
-			"icon":	"items/netherite_chestplate_20w14infinite.png",
-			"hidden":	true,
-			"groups_enabled":	false,
-			"criteria":	{
-			}
-		},
-		"minecraft:husbandry/obtain_netherite_hoe":	{
-			"icon":	"items/netherite_hoe_20w14infinite.png",
+		"minecraft:end/dragon_egg":	{
+			"icon":	"blocks/Dragon_Egg_JE5.png",
 			"hidden":	true,
 			"groups_enabled":	false,
 			"criteria":	{
@@ -1671,7 +1671,8 @@
 				}, {
 					"root_name":	"minecraft:adventure/spyglass_at_dragon",
 					"type":	"advancement"
-				}]
+				}],
+			"linked_goal_mode":	"or"
 		},
 		"stat:gold_blocks_picked_up":	{
 			"icon":	"blocks/Block_of_Gold_JE6_BE3.png",
@@ -2300,7 +2301,7 @@
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"animals/Bee_unoptimized.gif",
+					"icon":	"blocks/Honey_Block_JE1_BE2.png",
 					"type":	"final",
 					"root_name":	""
 				}]

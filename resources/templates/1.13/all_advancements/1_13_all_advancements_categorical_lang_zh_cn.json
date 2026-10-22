@@ -255,11 +255,7 @@
 	"decoration.taiga_jungle":	"针叶林 + 丛林",
 	"decoration.savanna_desert_mesa":	"干旱生物群系",
 	"decoration.credits":	"模板由 ScrambledMC 制作",
-	"decoration.note1":	"RECOMMENDED OVERLAY SETTINGS",
-	"decoration.note2":	"Mode: Page",
-	"decoration.note3":	"Overlay Width: 1000 px",
-	"decoration.note4":	"Custom Row 2 Spacing: ON (160 px)",
-	"decoration.note5":	"Custom Row 3 Spacing: ON (200 px)",
-	"decoration.note6":	"Show Completed Row 2 Goals: ON",
-	"decoration.note7":	"Hide Completed Row 3 Goals: OFF"
+	"decoration.note1":	"For recommended settings, load preset \"1.16.1 AA Categorical\", then change:",
+	"decoration.note2":	"Overlay Width: 1000 px",
+	"decoration.note3":	"Row 3 Item Width: 200 px"
 }

@@ -235,9 +235,15 @@
 			"y":	1120
 		}
 	},
-	"advancement.minecraft.end.dragon_egg":	{
+	"advancement.minecraft.nether.netherite_armor":	{
 		"icon_pos":	{
 			"x":	30,
+			"y":	940
+		}
+	},
+	"advancement.minecraft.husbandry.obtain_netherite_hoe":	{
+		"icon_pos":	{
+			"x":	170,
 			"y":	940
 		}
 	},
@@ -247,15 +253,9 @@
 			"y":	1105
 		}
 	},
-	"advancement.minecraft.nether.netherite_armor":	{
+	"advancement.minecraft.end.dragon_egg":	{
 		"icon_pos":	{
 			"x":	310,
-			"y":	1105
-		}
-	},
-	"advancement.minecraft.husbandry.obtain_netherite_hoe":	{
-		"icon_pos":	{
-			"x":	450,
 			"y":	1105
 		}
 	},
@@ -2435,7 +2435,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	325
+			"y":	333,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:obsidian":	{
@@ -2446,7 +2447,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	361
+			"y":	369,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:lapis_lazuli":	{
@@ -2457,7 +2459,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	397
+			"y":	405,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:raw_copper":	{
@@ -2468,7 +2471,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	433
+			"y":	441,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:cod":	{
@@ -2479,7 +2483,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	469
+			"y":	477,
+			"anchor":	3
 		}
 	},
 	"stat.early_items.criteria.minecraft:picked_up/minecraft:salmon":	{
@@ -2490,7 +2495,8 @@
 		},
 		"progress_pos":	{
 			"x":	510,
-			"y":	505
+			"y":	513,
+			"anchor":	3
 		}
 	},
 	"stat.azure_bluet":	{
@@ -2523,7 +2529,8 @@
 		},
 		"progress_pos":	{
 			"x":	1640,
-			"y":	500
+			"y":	508,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:trident":	{
@@ -2532,7 +2539,8 @@
 		},
 		"progress_pos":	{
 			"x":	1640,
-			"y":	536
+			"y":	544,
+			"anchor":	3
 		}
 	},
 	"stat.underwater_items.criteria.minecraft:picked_up/minecraft:nautilus_shell":	{
@@ -2541,7 +2549,8 @@
 		},
 		"progress_pos":	{
 			"x":	1640,
-			"y":	572
+			"y":	580,
+			"anchor":	3
 		}
 	},
 	"stat.fermented":	{
@@ -2609,7 +2618,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	1010
+			"y":	1018,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:blaze_rod":	{
@@ -2620,7 +2630,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	1046
+			"y":	1054,
+			"anchor":	3
 		}
 	},
 	"stat.fortress_items.criteria.minecraft:picked_up/minecraft:nether_wart":	{
@@ -2631,7 +2642,8 @@
 		},
 		"progress_pos":	{
 			"x":	910,
-			"y":	1082
+			"y":	1090,
+			"anchor":	3
 		}
 	},
 	"stat.ghast_tears":	{
@@ -2709,8 +2721,8 @@
 	},
 	"multi_stage_goal.end_again":	{
 		"icon_pos":	{
-			"x":	170,
-			"y":	940
+			"x":	450,
+			"y":	1105
 		}
 	},
 	"multi_stage_goal.bees":	{
@@ -4116,48 +4128,6 @@
 			"pos":	{
 				"x":	1,
 				"y":	1462
-			}
-		}, {
-			"id":	"note2",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1492
-			}
-		}, {
-			"id":	"note3",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1522
-			}
-		}, {
-			"id":	"note4",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1552
-			}
-		}, {
-			"id":	"note5",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1582
-			}
-		}, {
-			"id":	"note6",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1612
-			}
-		}, {
-			"id":	"note7",
-			"type":	"text_header",
-			"pos":	{
-				"x":	1,
-				"y":	1642
 			}
 		}]
 }
