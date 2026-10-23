@@ -4594,7 +4594,7 @@
 			"root_name":	"ms_goal:shulker_shells",
 			"icon":	"items/shulker_shell_1.20.2.png",
 			"stages":	[{
-					"stage_id":	"Obtaining shells",
+					"stage_id":	"obtaining_shells",
 					"type":	"stat",
 					"root_name":	"minecraft:picked_up/minecraft:shulker_shell",
 					"target":	34
