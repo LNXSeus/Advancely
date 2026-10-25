@@ -10006,7 +10006,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Render Checkbox for Multi-Criteria Stats
                         // LOD: Hide checkbox if zoomed out too far (tied to MAIN text threshold as requested)
-                        if (is_stat_section && cat->criteria_count > 1 && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                        if (is_stat_section && cat->criteria_count > 1 && !hide_crit_icon_in_layout &&
+                            t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                             ImVec2 check_pos = ImVec2(current_element_x_screen,
                                                       crit_base_pos_screen.y + 6 * t->zoom_level);
                             ImRect checkbox_rect(
@@ -10555,7 +10556,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Render Parent Checkbox for Stats (single or multi)
                 // LOD: Hide parent checkbox if zoomed out too far (tied to main text threshold)
-                if (is_stat_section && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                if (is_stat_section && !hide_icon_in_layout && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                     ImVec2 check_pos_parent = ImVec2(screen_pos.x + 4 * t->zoom_level,
                                                      screen_pos.y + 4 * t->zoom_level); // Top-left corner
                     ImRect checkbox_rect_parent(check_pos_parent,
@@ -11856,7 +11857,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
 
             // LOD: Hide Checkbox if zoomed out too far (tied to MAIN text)
-            if (can_be_overridden && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+            if (can_be_overridden && !hide_item_icon_in_layout && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 ImVec2 check_pos = ImVec2(screen_pos.x + 4 * t->zoom_level, screen_pos.y + 4 * t->zoom_level);
                 // Top-right corner
                 ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
