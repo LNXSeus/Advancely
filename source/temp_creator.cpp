@@ -6441,6 +6441,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         SCOPE_MULTISTAGE_DETAILS
     };
     static TemplateSearchScope current_search_scope = SCOPE_TEMPLATES;
+    // The scope follows the editor tab on screen and the list or details pane clicked last. A request
+    // is applied before the search box of the next frame, and any real change clears the search.
+    static int tc_search_scope_request = -1;
+    static int tc_last_editor_tab = -1;
+    static const int TC_RUN_COMPLETION_TAB = -2;
+    auto tc_search_scope_follow_click = [](TemplateSearchScope scope) {
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+            (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+            tc_search_scope_request = scope;
+    };
 
 
     // State for user feedback next to save button in editor view
@@ -7578,6 +7588,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // TEMPLATE CREATOR SEARCH BOX
     {
+        if (!editing_template) {
+            tc_last_editor_tab = -1;
+            if (current_search_scope >= SCOPE_ADVANCEMENTS) tc_search_scope_request = SCOPE_TEMPLATES;
+        }
+        if (tc_search_scope_request != -1) {
+            if (tc_search_scope_request != current_search_scope) {
+                current_search_scope = (TemplateSearchScope) tc_search_scope_request;
+                tc_search_buffer[0] = '\0';
+            }
+            tc_search_scope_request = -1;
+        }
+
         const float search_bar_width = 250.0f;
         const float scope_dropdown_width = 150.0f;
         const float clear_button_size = ImGui::GetFrameHeight(); // Use fixed, consistent size for the button
@@ -7828,7 +7850,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[1024];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Change the search scope.\n\nYou can search the main lists (e.g., Templates, Stats)\nor filter the contents of a selected item's details panel.");
+                     "Change the search scope.\n\nYou can search the main lists (e.g., Templates, Stats)\nor filter the contents of a selected item's details panel.\n\n"
+                     "The scope follows the editor tab you are looking at and the list\n"
+                     "or details panel you clicked last. Changing it clears the search.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
     }
@@ -7839,6 +7863,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Left Pane: Template List
     ImGui::BeginDisabled(template_switching_disabled);
     ImGui::BeginChild("TemplateList", ImVec2(250, 0), true);
+    tc_search_scope_follow_click(SCOPE_TEMPLATES);
     ImGui::Text("Existing Templates");
     ImGui::Separator();
 
@@ -8846,6 +8871,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Use a child window to create a scrollable area for the list
         ImGui::BeginChild("LanguageListChild", ImVec2(-1, 125), true); // 125px height
+        tc_search_scope_follow_click(SCOPE_LANGUAGES);
 
         for (int i: langs_to_render_indices) {
             const auto &flag = selected.available_lang_flags[i];
@@ -9035,6 +9061,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::TextDisabled("%s", layout_counter_text);
 
         ImGui::BeginChild("LayoutListChild", ImVec2(-1, 125), true);
+        tc_search_scope_follow_click(SCOPE_LAYOUTS);
         if (selected.available_layout_flags.empty()) {
             ImGui::TextDisabled("No layout files yet. Click 'Create Layout' to add one.");
         }
@@ -10071,6 +10098,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::BeginTabBar("EditorTabs")) {
+            int tc_visible_editor_tab = -1;
             // "Advancements" or "Achievements" tab depending on version
             {
                 ImGuiTabItemFlags adv_tab_flags = (force_select_tab == FORCE_TAB_ADVANCEMENTS)
@@ -10078,6 +10106,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       : 0;
                 if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_ADVANCEMENTS;
                     static int s_adv_last_clicked = -1;
                     for (auto it = s_adv_selection.begin(); it != s_adv_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.advancements.size())
@@ -10087,6 +10116,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_ADVANCEMENTS);
 
                     // LEFT PANE: List of Advancements/Achievements
 
@@ -11468,6 +11498,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // RIGHT PANE: Details of Selected Advancement
                     ImGui::BeginChild("AdvancementDetailsPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_ADVANCEMENT_DETAILS);
                     if (selected_advancement != nullptr) {
                         auto &advancement = *selected_advancement; // Dereference pointer
 
@@ -12864,6 +12895,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         : 0;
                 if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_STATS;
                     static int s_stat_last_clicked = -1;
                     for (auto it = s_stat_selection.begin(); it != s_stat_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.stats.size())
@@ -12873,6 +12905,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_STATS);
 
                     if (ImGui::Button("Import...##stats_top")) {
                         ImGui::OpenPopup("import_stats_source_popup");
@@ -14001,6 +14034,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SameLine();
 
                     ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_STAT_DETAILS);
                     if (selected_stat != nullptr) {
                         auto &stat_cat = *selected_stat;
 
@@ -15527,6 +15561,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_UNLOCKS;
                     static int s_unlocks_last_clicked = -1;
                     for (auto it = s_unlocks_selection.begin(); it != s_unlocks_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.unlocks.size())
@@ -15536,6 +15571,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("UnlockListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_UNLOCKS);
 
                     if (ImGui::Button("Import...##unlocks")) {
                         ImGui::OpenPopup("import_unlocks_source_popup");
@@ -16340,6 +16376,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // ===== Right Pane: Details =====
                     ImGui::BeginChild("UnlockDetailPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_UNLOCKS);
                     if (selected_unlock_index >= 0 &&
                         selected_unlock_index < (int) current_template_data.unlocks.size()) {
                         auto &unlock = current_template_data.unlocks[selected_unlock_index];
@@ -16496,6 +16533,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem
                     ("Custom Goals", nullptr, custom_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_CUSTOM;
                     static int s_custom_last_clicked = -1;
                     for (auto it = s_custom_selection.begin(); it != s_custom_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.custom_goals.size())
@@ -16505,6 +16543,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("CustomGoalListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_CUSTOM);
 
                     if (ImGui::Button("Import...##custom_goals")) {
                         ImGui::OpenPopup("import_custom_goals_source_popup");
@@ -17286,6 +17325,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // ===== Right Pane: Details =====
                     ImGui::BeginChild("CustomGoalDetailPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_CUSTOM);
                     if (selected_custom_index >= 0 &&
                         selected_custom_index < (int) current_template_data.custom_goals.size()) {
                         auto &goal = current_template_data.custom_goals[selected_custom_index];
@@ -17591,6 +17631,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      : 0;
                 if (force_select_tab == FORCE_TAB_MULTISTAGE) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Multi-Stage Goals", nullptr, ms_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_MULTISTAGE;
                     // Flag to track changes in this version
                     // Specifically for hidden legacy stats for multi-stage goals
                     // This flag still tracks ALL CHANGES within multi-stage goals
@@ -17605,6 +17646,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_MULTISTAGE);
 
                     if (ImGui::Button("Import...##ms_goals")) {
                         ImGui::OpenPopup("import_ms_source_popup");
@@ -18660,6 +18702,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SameLine();
 
                     ImGui::BeginChild("MSGoalDetailsPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_MULTISTAGE_DETAILS);
                     if (selected_ms_goal != nullptr) {
                         auto &goal = *selected_ms_goal;
 
@@ -20271,6 +20314,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_COUNTERS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Counters", nullptr, counter_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_COUNTERS;
                     static int s_ctr_last_clicked = -1;
                     for (auto it = s_ctr_selection.begin(); it != s_ctr_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.counter_goals.size())
@@ -20280,6 +20324,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_COUNTERS);
 
                     if (ImGui::Button("Import...##counters")) {
                         ImGui::OpenPopup("import_counters_source_popup");
@@ -21096,6 +21141,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // ===== Right Pane: Details =====
                     ImGui::BeginChild("CounterDetailPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_COUNTERS);
                     if (selected_counter_index >= 0 &&
                         selected_counter_index < (int) current_template_data.counter_goals.size()) {
                         auto &counter = current_template_data.counter_goals[selected_counter_index];
@@ -21344,6 +21390,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        : 0;
                 if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
+                    tc_visible_editor_tab = SCOPE_DECORATIONS;
                     static int s_deco_last_clicked = -1;
                     for (auto it = s_deco_selection.begin(); it != s_deco_selection.end();) {
                         if (*it < 0 || (size_t) *it >= current_template_data.decorations.size())
@@ -21360,6 +21407,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("DecorationListPane", ImVec2(pane_width, 0), true);
+                    tc_search_scope_follow_click(SCOPE_DECORATIONS);
 
                     if (ImGui::Button("Import...##decorations")) {
                         ImGui::OpenPopup("import_decorations_source_popup");
@@ -21977,6 +22025,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // ===== Right Pane: Details =====
                     ImGui::BeginChild("DecorationDetailPane", ImVec2(0, 0), true);
+                    tc_search_scope_follow_click(SCOPE_DECORATIONS);
                     if (selected_deco_index >= 0 &&
                         selected_deco_index < (int) current_template_data.decorations.size()) {
                         auto &deco = current_template_data.decorations[selected_deco_index];
@@ -22398,10 +22447,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // ==================== RUN COMPLETION TAB ====================
             if (ImGui::BeginTabItem("Run Completion")) {
+                tc_visible_editor_tab = TC_RUN_COMPLETION_TAB;
                 ImGui::BeginChild("RunCompletionPane", ImVec2(0, 0), true);
                 tc_render_run_completion_tab(current_template_data, creator_selected_version, t);
                 ImGui::EndChild();
                 ImGui::EndTabItem();
+            }
+            if (tc_visible_editor_tab != tc_last_editor_tab) {
+                tc_search_buffer[0] = '\0';
+                if (tc_visible_editor_tab >= 0) tc_search_scope_request = tc_visible_editor_tab;
+                tc_last_editor_tab = tc_visible_editor_tab;
             }
             ImGui::EndTabBar();
         }

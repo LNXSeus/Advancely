@@ -774,7 +774,7 @@ explained in its tooltip, so this only covers what isn't obvious at first glance
 The **Visual Layout Editor** button in the top-right of the Template Editor lets you drag goals directly on the live
 tracker map. It only works on the template that is currently applied in the settings.
 
-* While it runs, every goal shows as incomplete and normally hidden elements are drawn see-through, so you can place
+* While it runs, every goal shows as incomplete and elements hidden in the manual layout are drawn see-through, so you can place
   everything. The overlay keeps showing your real progress.
 * Drag to move, drag on empty space for a selection rectangle, and `Ctrl+Click` (`Cmd+Click`) to add or remove items.
   Arrow keys nudge by one pixel, `WASD` by ten; all of its keys are listed and rebindable in
