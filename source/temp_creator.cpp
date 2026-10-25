@@ -10045,7 +10045,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Applying settings is also disabled while active to prevent template reloads.\n"
                          "Unsaved template changes are shown on the map without being saved.\n"
                          "Every goal shows as incomplete on the map while active (the overlay is unaffected).\n"
-                         "Hidden goals and elements stay on the map, drawn see-through.\n\n"
+                         "Elements hidden in the manual layout stay on the map, drawn see-through.\n\n"
                          "Multi-Select:\n"
                          " - Click and drag on empty space to draw a selection rectangle.\n"
                          " - Hold Ctrl (Cmd on macOS) and click items to add/remove them individually.\n"
