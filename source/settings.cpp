@@ -3909,8 +3909,10 @@ settings_tooltip(tooltip_buffer); \
                 if (settings_tooltip_wanted()) {
                     char restart_overlay_tooltip_buffer[512];
                     snprintf(restart_overlay_tooltip_buffer, sizeof(restart_overlay_tooltip_buffer),
-                             "Closes the overlay window and opens it again with the applied settings.\n"
-                             "Unapplied changes are not used.\n"
+                             "Closes the overlay window and opens it again with the last applied settings.\n\n"
+                             "This does NOT apply or reload settings. Any changes you made in this window\n"
+                             "are ignored until you click 'Apply Settings' at the bottom, which also\n"
+                             "restarts the overlay on its own when needed.\n\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).");
                     settings_tooltip(restart_overlay_tooltip_buffer);
                 }
