@@ -1775,7 +1775,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                       ? preset_names[preset_selected]
                                       : "Select a preset";
             const bool preset_combo_open = ImGui::BeginCombo("##preset_select", preview);
-            if (!preset_combo_open) combo_wheel_step(&preset_selected, preset_count);
+            if (!preset_combo_open) combo_wheel_step(&preset_selected, preset_count, true);
             if (preset_combo_open) {
                 for (int i = 0; i < preset_count; ++i) {
                     bool is_sel = (i == preset_selected);

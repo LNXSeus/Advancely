@@ -23,9 +23,11 @@
  * still being wheel-scrolled the wheel keeps scrolling it instead.
  * @param current_item Index of the chosen option, updated in place.
  * @param items_count Number of options.
+ * @param allow_none For a dropdown that starts with nothing chosen (-1): the wheel passes through that
+ * empty state too, in front of the first option, so it can be reached again.
  * @return true if the chosen option changed.
  */
-inline bool combo_wheel_step(int *current_item, int items_count) {
+inline bool combo_wheel_step(int *current_item, int items_count, bool allow_none = false) {
     static ImGuiID s_wheel_id = 0;
     static float s_wheel_accum = 0.0f;
     ImGuiContext &g = *ImGui::GetCurrentContext();
@@ -42,10 +44,20 @@ inline bool combo_wheel_step(int *current_item, int items_count) {
     const int steps = (int) s_wheel_accum;
     if (steps == 0) return false;
     s_wheel_accum -= (float) steps;
-    int start = *current_item;
-    if (start < 0 || start >= items_count) start = steps < 0 ? -1 : items_count;
-    int next = (start - steps) % items_count;
-    if (next < 0) next += items_count;
+    int next;
+    if (allow_none) {
+        const int positions = items_count + 1;
+        int start = *current_item + 1;
+        if (start < 0 || start >= positions) start = 0;
+        next = (start - steps) % positions;
+        if (next < 0) next += positions;
+        next -= 1;
+    } else {
+        int start = *current_item;
+        if (start < 0 || start >= items_count) start = steps < 0 ? -1 : items_count;
+        next = (start - steps) % items_count;
+        if (next < 0) next += items_count;
+    }
     if (next == *current_item) return false;
     *current_item = next;
     return true;
