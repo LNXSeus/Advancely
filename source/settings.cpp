@@ -47,6 +47,7 @@
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_scancode.h>
 #include "settings_search.h" // For the settings_tooltip helpers
+#include "combo_wheel.h"
 
 // Tooltips in this file must go through the settings_tooltip helpers (settings_search.h) so the
 // settings search can read them. Calling ImGui's tooltip functions directly is a compile error.
@@ -1773,7 +1774,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             const char *preview = (preset_selected >= 0 && preset_selected < preset_count)
                                       ? preset_names[preset_selected]
                                       : "Select a preset";
-            if (ImGui::BeginCombo("##preset_select", preview)) {
+            const bool preset_combo_open = ImGui::BeginCombo("##preset_select", preview);
+            if (!preset_combo_open) combo_wheel_step(&preset_selected, preset_count);
+            if (preset_combo_open) {
                 for (int i = 0; i < preset_count; ++i) {
                     bool is_sel = (i == preset_selected);
                     if (ImGui::Selectable(preset_names[i], is_sel)) preset_selected = i;
@@ -2274,8 +2277,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
             bool version_disabled = coop_template_locked || template_editor_is_editing;
             if (version_disabled) ImGui::BeginDisabled();
-            if (ImGui::Combo("Template Version", &current_template_version_idx, version_display_c_strs.data(),
-                             version_display_c_strs.size())) {
+            if (combo_wheel("Template Version", &current_template_version_idx, version_display_c_strs.data(),
+                            version_display_c_strs.size())) {
                 if (current_template_version_idx >= 0) {
                     strncpy(temp_settings.version_str, VERSION_STRINGS[current_template_version_idx],
                             sizeof(temp_settings.version_str) - 1);
@@ -2323,7 +2326,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
             // Use the *non-count* version strings for the display version dropdown
-            if (ImGui::Combo("Display Version", &current_display_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+            if (combo_wheel("Display Version", &current_display_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
                 if (current_display_version_idx >= 0) {
                     strncpy(temp_settings.display_version_str, VERSION_STRINGS[current_display_version_idx],
                             sizeof(temp_settings.display_version_str) - 1);
@@ -2567,7 +2570,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             bool category_disabled = coop_template_locked || template_editor_is_editing;
             if (category_disabled) ImGui::BeginDisabled();
-            if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
+            if (combo_wheel("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
                 if (category_idx >= 0 && (size_t) category_idx < unique_category_values.size()) {
                     // Use the raw category value, not the display name with "(has layout)"
                     strncpy(temp_settings.category, unique_category_values[category_idx].c_str(),
@@ -2655,7 +2658,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             bool flag_disabled = coop_template_locked || template_editor_is_editing;
             if (flag_disabled) ImGui::BeginDisabled();
-            if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
+            if (combo_wheel("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
                 if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
                     // Use the raw flag value, not the display name with "(has layout)"
                     strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
@@ -2718,8 +2721,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     }
 
                     if (template_editor_is_editing) ImGui::BeginDisabled();
-                    if (ImGui::Combo("Language", &lang_idx, lang_display_names.data(),
-                                     (int) lang_display_names.size())) {
+                    if (combo_wheel("Language", &lang_idx, lang_display_names.data(),
+                                    (int) lang_display_names.size())) {
                         if (lang_idx >= 0 && (size_t) lang_idx < selected_template->available_lang_flags.size()) {
                             const std::string &selected_flag_str = selected_template->available_lang_flags[lang_idx];
                             strncpy(temp_settings.lang_flag, selected_flag_str.c_str(),
@@ -2764,8 +2767,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         }
 
                         if (template_editor_is_editing) ImGui::BeginDisabled();
-                        if (ImGui::Combo("Layout", &layout_idx, layout_display_names.data(),
-                                         (int) layout_display_names.size())) {
+                        if (combo_wheel("Layout", &layout_idx, layout_display_names.data(),
+                                        (int) layout_display_names.size())) {
                             if (layout_idx >= 0 &&
                                 (size_t) layout_idx < selected_template->available_layout_flags.size()) {
                                 const std::string &selected_flag_str =
@@ -4366,7 +4369,7 @@ settings_tooltip(tooltip_buffer); \
                     }
 
                     ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("Page Alignment", (int *) &temp_settings.overlay_page_align, "Left\0Center\0Right\0");
+                    combo_wheel("Page Alignment", (int *) &temp_settings.overlay_page_align, "Left\0Center\0Right\0");
                     if (settings_tooltip_wanted()) {
                         char page_align_tooltip_buffer[640];
                         snprintf(page_align_tooltip_buffer, sizeof(page_align_tooltip_buffer),
@@ -4677,8 +4680,8 @@ settings_tooltip(tooltip_buffer); \
                     }
 
                     ImGui::SetNextItemWidth(120.0f);
-                    ImGui::Combo("Panel Alignment", (int *) &temp_settings.compact_panel_align,
-                                 "Left\0Center\0Right\0");
+                    combo_wheel("Panel Alignment", (int *) &temp_settings.compact_panel_align,
+                                "Left\0Center\0Right\0");
                     if (settings_tooltip_wanted()) {
                         const char *compact_align_names[] = {"Left", "Center", "Right"};
                         char compact_panel_align_tooltip_buffer[640];
@@ -4874,8 +4877,8 @@ settings_tooltip(tooltip_buffer); \
                         }
                         if (temp_settings.compact_panel_goal_icon) {
                             ImGui::SetNextItemWidth(120.0f);
-                            ImGui::Combo("Text Alignment", (int *) &temp_settings.compact_panel_text_align,
-                                         "Left\0Center\0Right\0");
+                            combo_wheel("Text Alignment", (int *) &temp_settings.compact_panel_text_align,
+                                        "Left\0Center\0Right\0");
                             if (settings_tooltip_wanted()) {
                                 const char *compact_text_align_names[] = {"Left", "Center", "Right"};
                                 char compact_text_align_tooltip_buffer[512];
@@ -5281,8 +5284,8 @@ settings_tooltip(tooltip_buffer); \
                     if (temp_settings.overlay_row1_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
-                        ImGui::Combo("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
-                                     "Left\0Center\0Right\0");
+                        combo_wheel("##row1_align", (int *) &temp_settings.overlay_row1_freeze_align,
+                                    "Left\0Center\0Right\0");
                         if (!row1_off_tooltip() && settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -5330,8 +5333,8 @@ settings_tooltip(tooltip_buffer); \
                     if (temp_settings.overlay_row2_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
-                        ImGui::Combo("##row2_align", (int *) &temp_settings.overlay_row2_freeze_align,
-                                     "Left\0Center\0Right\0");
+                        combo_wheel("##row2_align", (int *) &temp_settings.overlay_row2_freeze_align,
+                                    "Left\0Center\0Right\0");
                         if (settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -5380,8 +5383,8 @@ settings_tooltip(tooltip_buffer); \
                     if (temp_settings.overlay_row3_freeze_enabled) {
                         ImGui::SameLine();
                         ImGui::SetNextItemWidth(120.0f);
-                        ImGui::Combo("##row3_align", (int *) &temp_settings.overlay_row3_freeze_align,
-                                     "Left\0Center\0Right\0");
+                        combo_wheel("##row3_align", (int *) &temp_settings.overlay_row3_freeze_align,
+                                    "Left\0Center\0Right\0");
                         if (settings_tooltip_wanted()) {
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -7585,7 +7588,28 @@ settings_tooltip(tooltip_buffer); \
                                     }
 
                                     ImGui::SetNextItemWidth(220.0f);
-                                    if (ImGui::BeginCombo("##assign", preview)) {
+                                    const bool assign_open = ImGui::BeginCombo("##assign", preview);
+                                    if (!assign_open) {
+                                        const int player_count = app_settings->coop_player_count;
+                                        int owner_idx = owner ? -1 : 0;
+                                        for (int p = 0; owner && owner_idx < 0 && p < player_count; p++)
+                                            if (strcmp(app_settings->coop_players[p].uuid, owner) == 0)
+                                                owner_idx = 1 + p;
+                                        for (int g = 0; owner && owner_idx < 0 && g < assign_ghost_count; g++)
+                                            if (strcmp(assign_ghosts[g].uuid, owner) == 0)
+                                                owner_idx = 1 + player_count + g;
+                                        if (combo_wheel_step(&owner_idx, 1 + player_count + assign_ghost_count)) {
+                                            const char *new_owner = nullptr;
+                                            if (owner_idx > player_count)
+                                                new_owner = assign_ghosts[owner_idx - 1 - player_count].uuid;
+                                            else if (owner_idx > 0)
+                                                new_owner = app_settings->coop_players[owner_idx - 1].uuid;
+                                            coop_set_advancement_owner(app_settings, adv->root_name, new_owner);
+                                            settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                                            SDL_SetAtomicInt(&g_settings_changed, 1);
+                                        }
+                                    }
+                                    if (assign_open) {
                                         bool is_auto = (owner == nullptr);
                                         if (ImGui::Selectable("Auto (most criteria)", is_auto)) {
                                             coop_set_advancement_owner(app_settings, adv->root_name, nullptr);

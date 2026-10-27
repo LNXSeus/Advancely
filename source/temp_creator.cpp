@@ -22,6 +22,7 @@
 #include "file_utils.h" // For cJSON_from_file
 #include "dialog_utils.h" // For open_icon_file_dialog()
 #include "imgui_internal.h" // For ImGui::ClearActiveID()
+#include "combo_wheel.h"
 
 #include <vector>
 #include <string>
@@ -5470,7 +5471,7 @@ static void bulk_layout_fill_order_ui() {
     ImGui::TextDisabled("Rows/Columns 0 = linear: item N gets (base + N * stride) on both X and Y.");
     ImGui::TextDisabled("Rows/Columns >= 1 = grid with exactly that many rows (or columns), walked in the fill order.");
     ImGui::SetNextItemWidth(230);
-    ImGui::Combo("Fill order", &s_bulk_layout_fill_order, fill_order_labels, IM_ARRAYSIZE(fill_order_labels));
+    combo_wheel("Fill order", &s_bulk_layout_fill_order, fill_order_labels, IM_ARRAYSIZE(fill_order_labels));
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s",
                           "Left to right, then next row: spread the selection over 'Rows' rows, stepping down by +Y.\n"
@@ -5684,7 +5685,7 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
             ImGui::SameLine();
             ImGui::SetNextItemWidth(110);
             int current_anchor = (int) pos->anchor;
-            if (ImGui::Combo("Anchor", &current_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels))) {
+            if (combo_wheel("Anchor", &current_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels))) {
                 pos->anchor = (AnchorPoint) current_anchor;
                 save_msg = MSG_NONE;
             }
@@ -7552,8 +7553,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     bool template_switching_disabled = visual_editing_active || has_unsaved_changes_in_editor;
     ImGui::BeginDisabled(template_switching_disabled);
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
-    if (ImGui::Combo("Template Version", &creator_version_idx, version_display_c_strs.data(),
-                     version_display_c_strs.size())) {
+    if (combo_wheel("Template Version", &creator_version_idx, version_display_c_strs.data(),
+                    version_display_c_strs.size())) {
         strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
         creator_version_str[sizeof(creator_version_str) - 1] = '\0';
         editing_template = false; // Always exit editor on version change
@@ -7770,78 +7771,55 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 break;
         }
 
-        if (ImGui::BeginCombo("##Scope", current_scope_name)) {
-            // --- Main List Scopes ---
+        // The scopes offered right now, in dropdown order.
+        TemplateSearchScope available_scopes[16];
+        int available_scope_count = 0;
 
-            // Always available
-            if (ImGui::Selectable(scope_names[SCOPE_TEMPLATES], current_search_scope == SCOPE_TEMPLATES)) {
-                current_search_scope = SCOPE_TEMPLATES;
+        // --- Main List Scopes ---
+
+        // Always available
+        available_scopes[available_scope_count++] = SCOPE_TEMPLATES;
+
+        // Available only when viewing a template's language/layout lists (not in editor)
+        if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view &&
+            !show_rename_view) {
+            available_scopes[available_scope_count++] = SCOPE_LANGUAGES;
+            available_scopes[available_scope_count++] = SCOPE_LAYOUTS;
+        }
+
+        // --- Editor Scopes (only available when editing a template) ---
+        if (editing_template) {
+            // Main Editor Tabs
+            available_scopes[available_scope_count++] = SCOPE_ADVANCEMENTS;
+            available_scopes[available_scope_count++] = SCOPE_STATS;
+            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE)
+                available_scopes[available_scope_count++] = SCOPE_UNLOCKS;
+            available_scopes[available_scope_count++] = SCOPE_CUSTOM;
+            available_scopes[available_scope_count++] = SCOPE_MULTISTAGE;
+            available_scopes[available_scope_count++] = SCOPE_COUNTERS;
+            available_scopes[available_scope_count++] = SCOPE_DECORATIONS;
+
+            // Details panes
+            available_scopes[available_scope_count++] = SCOPE_ADVANCEMENT_DETAILS;
+            available_scopes[available_scope_count++] = SCOPE_STAT_DETAILS;
+            available_scopes[available_scope_count++] = SCOPE_MULTISTAGE_DETAILS;
+        }
+
+        const bool scope_combo_open = ImGui::BeginCombo("##Scope", current_scope_name);
+        if (!scope_combo_open) {
+            int scope_idx = -1;
+            for (int i = 0; i < available_scope_count; i++)
+                if (available_scopes[i] == current_search_scope) scope_idx = i;
+            if (combo_wheel_step(&scope_idx, available_scope_count)) {
+                current_search_scope = available_scopes[scope_idx];
                 tc_search_buffer[0] = '\0'; // Clear search on change
             }
-
-            // Available only when viewing a template's language/layout lists (not in editor)
-            if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view &&
-                !show_rename_view) {
-                if (ImGui::Selectable(scope_names[SCOPE_LANGUAGES], current_search_scope == SCOPE_LANGUAGES)) {
-                    current_search_scope = SCOPE_LANGUAGES;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_LAYOUTS], current_search_scope == SCOPE_LAYOUTS)) {
-                    current_search_scope = SCOPE_LAYOUTS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-            }
-
-            // --- Editor Scopes (only available when editing a template) ---
-            if (editing_template) {
-                // Main Editor Tabs
-                if (ImGui::Selectable(adv_ach_scope_name, current_search_scope == SCOPE_ADVANCEMENTS)) {
-                    current_search_scope = SCOPE_ADVANCEMENTS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_STATS], current_search_scope == SCOPE_STATS)) {
-                    current_search_scope = SCOPE_STATS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                    if (ImGui::Selectable(scope_names[SCOPE_UNLOCKS], current_search_scope == SCOPE_UNLOCKS)) {
-                        current_search_scope = SCOPE_UNLOCKS;
-                        tc_search_buffer[0] = '\0'; // Clear search on change
-                    }
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_CUSTOM], current_search_scope == SCOPE_CUSTOM)) {
-                    current_search_scope = SCOPE_CUSTOM;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE], current_search_scope == SCOPE_MULTISTAGE)) {
-                    current_search_scope = SCOPE_MULTISTAGE;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_COUNTERS], current_search_scope == SCOPE_COUNTERS)) {
-                    current_search_scope = SCOPE_COUNTERS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-                if (ImGui::Selectable(scope_names[SCOPE_DECORATIONS], current_search_scope == SCOPE_DECORATIONS)) {
-                    current_search_scope = SCOPE_DECORATIONS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-
-                // Advancement Details
-                if (ImGui::Selectable(adv_details_scope_name, current_search_scope == SCOPE_ADVANCEMENT_DETAILS)) {
-                    current_search_scope = SCOPE_ADVANCEMENT_DETAILS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-
-                // Stat Details
-                if (ImGui::Selectable(scope_names[SCOPE_STAT_DETAILS], current_search_scope == SCOPE_STAT_DETAILS)) {
-                    current_search_scope = SCOPE_STAT_DETAILS;
-                    tc_search_buffer[0] = '\0'; // Clear search on change
-                }
-
-                // Multi-Stage Goal Details
-                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE_DETAILS],
-                                      current_search_scope == SCOPE_MULTISTAGE_DETAILS)) {
-                    current_search_scope = SCOPE_MULTISTAGE_DETAILS;
+        }
+        if (scope_combo_open) {
+            for (int i = 0; i < available_scope_count; i++) {
+                const TemplateSearchScope scope = available_scopes[i];
+                if (ImGui::Selectable(scope_names[scope], current_search_scope == scope)) {
+                    current_search_scope = scope;
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
             }
@@ -9719,8 +9697,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        if (ImGui::Combo("Display Language", &current_lang_idx, lang_display_names.data(),
-                         (int) lang_display_names.size())) {
+        if (combo_wheel("Display Language", &current_lang_idx, lang_display_names.data(),
+                        (int) lang_display_names.size())) {
             selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
                                           selected_layout_flag, current_template_data, status_message)) {
@@ -9791,8 +9769,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (current_layout_idx == -1) current_layout_idx = 0; // fall back to default
 
-        if (ImGui::Combo("Layout", &current_layout_idx, layout_display_names.data(),
-                         (int) layout_display_names.size())) {
+        if (combo_wheel("Layout", &current_layout_idx, layout_display_names.data(),
+                        (int) layout_display_names.size())) {
             selected_layout_flag = layout_flags[current_layout_idx];
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
                                           selected_layout_flag, current_template_data, status_message)) {
@@ -10794,8 +10772,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
                             }
                             ImGui::SetNextItemWidth(140);
-                            ImGui::Combo("Anchor##adv_bl_icon", &s_adv_bl_icon_anchor, anchor_point_labels,
-                                         IM_ARRAYSIZE(anchor_point_labels));
+                            combo_wheel("Anchor##adv_bl_icon", &s_adv_bl_icon_anchor, anchor_point_labels,
+                                        IM_ARRAYSIZE(anchor_point_labels));
                             ImGui::SameLine();
                             bulk_layout_wrap_ui(&s_adv_bl_icon_cols);
                             bool icon_t_en = (s_adv_bl_icon_set != s_adv_bl_base_set[0]);
@@ -10897,8 +10875,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
                             }
                             ImGui::SetNextItemWidth(140);
-                            ImGui::Combo("Anchor##adv_bl_text", &s_adv_bl_text_anchor, anchor_point_labels,
-                                         IM_ARRAYSIZE(anchor_point_labels));
+                            combo_wheel("Anchor##adv_bl_text", &s_adv_bl_text_anchor, anchor_point_labels,
+                                        IM_ARRAYSIZE(anchor_point_labels));
                             ImGui::SameLine();
                             bulk_layout_wrap_ui(&s_adv_bl_text_cols);
                             bool text_t_en = (s_adv_bl_text_set != s_adv_bl_base_set[1]);
@@ -11011,8 +10989,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip("%s", "Increment added to Y for each item after the first.");
                                 }
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo("Anchor##adv_bl_prog", &s_adv_bl_prog_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel("Anchor##adv_bl_prog", &s_adv_bl_prog_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(&s_adv_bl_prog_cols);
                                 bool prog_t_en = (s_adv_bl_prog_set != s_adv_bl_base_set[2]);
@@ -12226,8 +12204,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel("Anchor##crit_bl_icon", &s_crit_bl_icon_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(&s_crit_bl_icon_cols);
                                 bool icon_t_en = (s_crit_bl_icon_set != s_crit_bl_base_set[0]);
@@ -12319,8 +12297,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel("Anchor##crit_bl_text", &s_crit_bl_text_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(&s_crit_bl_text_cols);
                                 bool text_t_en = (s_crit_bl_text_set != s_crit_bl_base_set[1]);
@@ -13593,8 +13571,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -14318,7 +14296,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetNextItemWidth(60);
                                 char combo_id[64];
                                 snprintf(combo_id, sizeof(combo_id), "##stat_cat_mode_%s", stat_cat.root_name);
-                                if (ImGui::Combo(combo_id, &mode_int, "AND\0OR\0")) {
+                                if (combo_wheel(combo_id, &mode_int, "AND\0OR\0")) {
                                     stat_cat.linked_goal_mode = (LinkedGoalMode) mode_int;
                                     save_message_type = MSG_NONE;
                                 }
@@ -14960,8 +14938,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             ImGui::SetTooltip(
                                                 "%s", "Increment added to Y for each item after the first.");
                                         ImGui::SetNextItemWidth(140);
-                                        ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                                     IM_ARRAYSIZE(anchor_point_labels));
+                                        combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                                    IM_ARRAYSIZE(anchor_point_labels));
                                         ImGui::SameLine();
                                         bulk_layout_wrap_ui(s.p_cols);
                                         bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -15354,7 +15332,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         char crit_combo_id[128];
                                         snprintf(crit_combo_id, sizeof(crit_combo_id),
                                                  "##sub_stat_mode_%s_%zu", stat_cat.root_name, j);
-                                        if (ImGui::Combo(crit_combo_id, &crit_mode_int, "AND\0OR\0")) {
+                                        if (combo_wheel(crit_combo_id, &crit_mode_int, "AND\0OR\0")) {
                                             crit.linked_goal_mode = (LinkedGoalMode) crit_mode_int;
                                             save_message_type = MSG_NONE;
                                         }
@@ -15997,8 +15975,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -16943,8 +16921,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -17553,7 +17531,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char mode_id[128];
                                 snprintf(mode_id, sizeof(mode_id), "##custom_goal_mode_%s", goal.root_name);
                                 ImGui::SetNextItemWidth(60);
-                                if (ImGui::Combo(mode_id, &mode_int, "AND\0OR\0")) {
+                                if (combo_wheel(mode_id, &mode_int, "AND\0OR\0")) {
                                     goal.linked_goal_mode = (LinkedGoalMode) mode_int;
                                     save_message_type = MSG_NONE;
                                 }
@@ -18254,8 +18232,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -19510,7 +19488,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         break;
                                 }
 
-                                if (ImGui::BeginCombo("Type", current_type_name)) {
+                                const bool type_combo_open = ImGui::BeginCombo("Type", current_type_name);
+                                if (!type_combo_open) {
+                                    // Same options and order as the dropdown below.
+                                    SubGoalType type_options[5];
+                                    int type_option_count = 0;
+                                    type_options[type_option_count++] = SUBGOAL_STAT;
+                                    if (creator_selected_version >= MC_VERSION_1_12)
+                                        type_options[type_option_count++] = SUBGOAL_ADVANCEMENT;
+                                    if (creator_selected_version >= MC_VERSION_1_7_2)
+                                        type_options[type_option_count++] = SUBGOAL_CRITERION;
+                                    if (creator_selected_version == MC_VERSION_25W14CRAFTMINE)
+                                        type_options[type_option_count++] = SUBGOAL_UNLOCK;
+                                    type_options[type_option_count++] = SUBGOAL_MANUAL;
+                                    int type_idx = -1;
+                                    for (int i = 0; i < type_option_count; i++)
+                                        if (type_options[i] == stage.type) type_idx = i;
+                                    if (combo_wheel_step(&type_idx, type_option_count)) {
+                                        stage.type = type_options[type_idx];
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+                                if (type_combo_open) {
                                     // Show "Stat / Achievement" for legacy and mid-era versions
                                     if (creator_selected_version <= MC_VERSION_1_11_2) {
                                         if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
@@ -20005,7 +20005,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         char stage_combo_id[128];
                                         snprintf(stage_combo_id, sizeof(stage_combo_id),
                                                  "##stage_mode_%s_%zu", goal.root_name, j);
-                                        if (ImGui::Combo(stage_combo_id, &stage_mode_int, "AND\0OR\0")) {
+                                        if (combo_wheel(stage_combo_id, &stage_mode_int, "AND\0OR\0")) {
                                             stage.linked_goal_mode = (LinkedGoalMode) stage_mode_int;
                                             ms_goal_data_changed = true;
                                             save_message_type = MSG_NONE;
@@ -20737,8 +20737,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     ImGui::SetTooltip(
                                         "%s", "Increment added to Y for each item after the first.");
                                 ImGui::SetNextItemWidth(140);
-                                ImGui::Combo(s.anchor_id, s.p_anchor, anchor_point_labels,
-                                             IM_ARRAYSIZE(anchor_point_labels));
+                                combo_wheel(s.anchor_id, s.p_anchor, anchor_point_labels,
+                                            IM_ARRAYSIZE(anchor_point_labels));
                                 ImGui::SameLine();
                                 bulk_layout_wrap_ui(s.p_cols);
                                 bool t_en = (*s.p_set != s_bl_base_set[si]);
@@ -22543,7 +22543,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::Text("Copying from: %s", selected.category);
         }
 
-        ImGui::Combo("New Template Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        combo_wheel("New Template Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
@@ -22639,7 +22639,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::Spacing();
 
-        ImGui::Combo("New Template Version", &rename_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        combo_wheel("New Template Version", &rename_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the template.\n"
@@ -22787,7 +22787,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::Text("Please confirm or edit the details for the new template:");
 
-        ImGui::Combo("Template Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        combo_wheel("Template Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
@@ -27243,7 +27243,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                : s_template_import_lang_flags[i].c_str();
                 };
                 ImGui::SetNextItemWidth(220.0f);
-                if (ImGui::BeginCombo("Language", lang_label(s_template_import_lang_index))) {
+                const bool import_lang_open = ImGui::BeginCombo("Language", lang_label(s_template_import_lang_index));
+                if (!import_lang_open && combo_wheel_step(&s_template_import_lang_index,
+                                                          (int) s_template_import_lang_flags.size())) {
+                    reparse_template_import_data();
+                }
+                if (import_lang_open) {
                     for (int i = 0; i < (int) s_template_import_lang_flags.size(); i++) {
                         bool sel = (i == s_template_import_lang_index);
                         ImGui::PushID(i);
@@ -27281,7 +27286,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                : s_template_import_layout_flags[i].c_str();
                 };
                 ImGui::SetNextItemWidth(220.0f);
-                if (ImGui::BeginCombo("Layout", layout_label(s_template_import_layout_index))) {
+                const bool import_layout_open =
+                        ImGui::BeginCombo("Layout", layout_label(s_template_import_layout_index));
+                if (!import_layout_open && combo_wheel_step(&s_template_import_layout_index,
+                                                            (int) s_template_import_layout_flags.size())) {
+                    reparse_template_import_data();
+                }
+                if (import_layout_open) {
                     for (int i = 0; i < (int) s_template_import_layout_flags.size(); i++) {
                         bool sel = (i == s_template_import_layout_index);
                         ImGui::PushID(i);
@@ -27344,7 +27355,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 char parent_preview[256];
                 parent_label_at(s_template_import_parent_index, parent_preview, sizeof(parent_preview));
                 ImGui::SetNextItemWidth(420.0f);
-                if (ImGui::BeginCombo(combo_label, parent_preview)) {
+                const bool parent_combo_open = ImGui::BeginCombo(combo_label, parent_preview);
+                if (!parent_combo_open && combo_wheel_step(&s_template_import_parent_index, pcount)) {
+                    s_template_import_selected.clear();
+                    s_template_import_last_clicked = -1;
+                }
+                if (parent_combo_open) {
                     for (int p = 0; p < pcount; p++) {
                         char plabel[256];
                         parent_label_at(p, plabel, sizeof(plabel));

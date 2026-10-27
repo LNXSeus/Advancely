@@ -42,6 +42,7 @@
 #include "main.h" // For show_error_message
 
 #include "imgui_internal.h"
+#include "combo_wheel.h"
 
 // Helper macros for font scaling
 #define SET_FONT_SCALE(size, base_size) \
@@ -14716,7 +14717,29 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
 
             ImGui::SetNextItemWidth(160.0f);
-            if (ImGui::BeginCombo("##PlayerView", preview, ImGuiComboFlags_None)) {
+            const bool player_view_open = ImGui::BeginCombo("##PlayerView", preview, ImGuiComboFlags_None);
+            if (!player_view_open) {
+                const int player_count = settings->coop_player_count;
+                int view_idx = 0;
+                if (t->selected_coop_ghost_idx >= 0 && t->selected_coop_ghost_idx < dd_ghost_count)
+                    view_idx = 1 + player_count + t->selected_coop_ghost_idx;
+                else if (t->selected_coop_player_idx >= 0 && t->selected_coop_player_idx < player_count)
+                    view_idx = 1 + t->selected_coop_player_idx;
+                if (combo_wheel_step(&view_idx, 1 + player_count + dd_ghost_count)) {
+                    t->selected_coop_player_idx = -1;
+                    t->selected_coop_ghost_idx = -1;
+                    if (view_idx > player_count) {
+                        const CoopGhostPlayer *g = &dd_ghosts[view_idx - 1 - player_count];
+                        t->selected_coop_ghost_idx = view_idx - 1 - player_count;
+                        strncpy(t->selected_coop_ghost_uuid, g->uuid, sizeof(t->selected_coop_ghost_uuid) - 1);
+                        t->selected_coop_ghost_uuid[sizeof(t->selected_coop_ghost_uuid) - 1] = '\0';
+                    } else if (view_idx > 0) {
+                        t->selected_coop_player_idx = view_idx - 1;
+                    }
+                    t->coop_view_dirty = 1;
+                }
+            }
+            if (player_view_open) {
                 // Fetch the live lobby so each entry can carry the correct
                 // account_type (offline players resolve to the Notch face).
                 CoopLobbyPlayer dd_lobby[COOP_MAX_LOBBY];
@@ -15120,7 +15143,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
 
             ImGui::SetNextItemWidth(visibility_dropdown_width);
-            if (ImGui::BeginCombo("##VisibilityMode", visibility_options[current_idx].label)) {
+            const bool visibility_open = ImGui::BeginCombo("##VisibilityMode", visibility_options[current_idx].label);
+            if (!visibility_open && combo_wheel_step(&current_idx, visibility_option_count)) {
+                settings->goal_hiding_mode = visibility_options[current_idx].mode;
+                settings->invert_hiding_mode = visibility_options[current_idx].inverted;
+                settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+            }
+            if (visibility_open) {
                 for (int i = 0; i < visibility_option_count; i++) {
                     bool is_selected = (i == current_idx);
                     if (ImGui::Selectable(visibility_options[i].label, is_selected)) {
