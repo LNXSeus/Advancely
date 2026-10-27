@@ -36,7 +36,7 @@
 #define SEARCH_JUMP_MAX_FRAMES 10
 #define SEARCH_JUMP_SCROLL_FRAMES 2 // a tab shown for the first time has no content height yet, so the scroll is repeated once
 #define SEARCH_FLASH_SECONDS 1.5f
-#define SETTINGS_WINDOW_MAX_HEIGHT 720.0f
+#define SETTINGS_WINDOW_MAX_HEIGHT 880.0f
 #define SETTINGS_TAB_MIN_HEIGHT 120.0f
 
 struct SearchEntry {
@@ -475,11 +475,14 @@ static void draw_flash(const std::string &open_tab) {
     window->DrawList->PopClipRect();
 }
 
+float settings_search_window_height() {
+    return std::min(SETTINGS_WINDOW_MAX_HEIGHT,
+                    ImGui::GetMainViewport()->WorkSize.y - ImGui::GetStyle().DisplaySafeAreaPadding.y * 2.0f);
+}
+
 void settings_search_prepare_window(const char *window_name) {
     ImGuiWindow *window = ImGui::FindWindowByName(window_name);
-    const ImGuiStyle &style = ImGui::GetStyle();
-    const float height = std::min(SETTINGS_WINDOW_MAX_HEIGHT,
-                                  ImGui::GetMainViewport()->WorkSize.y - style.DisplaySafeAreaPadding.y * 2.0f);
+    const float height = settings_search_window_height();
     float min_width = 0.0f;
     float max_width = FLT_MAX;
     if (window && s_bottom_row_width > 0.0f) {

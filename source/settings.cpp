@@ -1519,8 +1519,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Position the settings window to the right half of the viewport when force-opened,
     // so it doesn't overlap the welcome window which ImGui places near the top-left.
     if (just_opened && force_open_reason && *force_open_reason != FORCE_OPEN_NONE) {
-        ImGuiIO &io = ImGui::GetIO();
-        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.1f), ImGuiCond_Always);
+        const ImGuiViewport *viewport = ImGui::GetMainViewport();
+        const float pos_y = viewport->WorkPos.y + (viewport->WorkSize.y - settings_search_window_height()) * 0.5f;
+        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, pos_y), ImGuiCond_Always);
     }
 
     if (just_opened) settings_search_on_open();

@@ -97,6 +97,11 @@ bool settings_search_collapsing_header(const char *label);
 void settings_search_prepare_window(const char *window_name);
 
 /**
+ * @brief The fixed height of the settings window: SETTINGS_WINDOW_MAX_HEIGHT, capped by the screen.
+ */
+float settings_search_window_height();
+
+/**
  * @brief Replaces ImGui::BeginTabItem() for a tab of the settings window. An open tab's contents go
  * into their own scroll region, which fills the window down to the part below the tabs.
  * @param label The tab label.
