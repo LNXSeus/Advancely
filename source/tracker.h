@@ -343,6 +343,13 @@ bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, co
 bool tracker_progress_percent_shown(const TemplateData *td);
 
 /**
+ * @brief The name in front of the progress percentage. While the run completion rule requires only
+ * the progress percentage, the percentage stands in for the counter, so the lang file's
+ * "run_completion.label" names it; otherwise (or without a label) it is `fallback`.
+ */
+const char *tracker_progress_percent_label(const TemplateData *td, const char *fallback);
+
+/**
  * @brief The counter label used when the language file has no "run_completion.label": the name of
  * the single type the required set spans (type_mask has one bit set, criteria and sub-stats included),
  * or "Goals" for a mix.

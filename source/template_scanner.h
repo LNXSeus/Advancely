@@ -63,7 +63,8 @@ const char *run_completion_type_key(RunCompletionType type); // e.g. "advancemen
 const char *run_completion_goal_kind_key(RunCompletionGoalKind kind); // e.g. "advancement", "stat"
 void run_completion_reset(RunCompletionRule *rule); // Everything required, no count/percent targets
 bool run_completion_is_default(const RunCompletionRule *rule); // Nothing selected and no targets on
-bool run_completion_requires_everything(const RunCompletionRule *rule); // No types and no goals selected
+bool run_completion_requires_everything(const RunCompletionRule *rule); // No types, goals or progress selected
+bool run_completion_has_goal_set(const RunCompletionRule *rule); // Any type or individual goal selected
 // Parses template_root["run_completion"] into rule (missing section = default). Allocates goal_refs;
 // release with run_completion_free().
 void run_completion_parse(const cJSON *template_root, RunCompletionRule *rule);

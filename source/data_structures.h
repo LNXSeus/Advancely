@@ -707,11 +707,14 @@ struct RunCompletionGoalRef {
 };
 
 // A template's completion rule. The required set is every goal of every checked type plus every
-// individually listed goal; an empty set means "everything in the template". The run completes when
-// the whole set is done, or (count/percent targets) when `count` goals of the set are done and/or the
-// overall progress percentage reaches `percent`, combined with AND or OR via require_both.
+// individually listed goal; an empty set means "everything in the template". `progress` additionally
+// requires the overall progress percentage to reach 100% (stored as "progress" in the "types" array).
+// The run completes when the whole set is done, or (count/percent targets) when `count` goals of the
+// set are done and/or the overall progress percentage reaches `percent`, combined with AND or OR via
+// require_both.
 struct RunCompletionRule {
     bool types[RC_TYPE_COUNT];
+    bool progress;
     int goal_ref_count;
     RunCompletionGoalRef *goal_refs; // Dynamically allocated (tracker side), NULL when empty
     bool use_count;

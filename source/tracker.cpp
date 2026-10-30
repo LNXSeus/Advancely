@@ -4517,14 +4517,14 @@ static void tracker_read_completion_label(TemplateData *td, const cJSON *lang_js
 // Counts the goals the template's completion rule requires and how many of them are done, into
 // completion_goal_count / completion_goals_completed, plus completion_type_mask (which types the set
 // spans, for the derived counter label). A goal is in the required set when its whole type is checked
-// or it is listed individually, so a goal picked both ways counts once. With nothing selected the rule
-// means "everything" and the counts stay 0.
+// or it is listed individually, so a goal picked both ways counts once. Without any type or goal
+// selected ("everything" or only the progress percentage) the counts stay 0.
 static void tracker_compute_completion_counts(TemplateData *td, MC_Version version) {
     const RunCompletionRule *rule = &td->run_completion;
     td->completion_goal_count = 0;
     td->completion_goals_completed = 0;
     td->completion_type_mask = 0;
-    if (run_completion_requires_everything(rule)) return;
+    if (!run_completion_has_goal_set(rule)) return;
 
     int total = 0, done = 0, mask = 0;
     auto take = [&](RunCompletionType type, bool is_done) {
@@ -4600,12 +4600,37 @@ const char *run_completion_derived_label(int type_mask, bool modern) {
 }
 
 bool tracker_progress_percent_shown(const TemplateData *td) {
-    return td && td->total_progress_steps > 0 && td->completion_goal_count == 0;
+    return td && td->total_progress_steps > 0 && (td->completion_goal_count == 0 || td->run_completion.progress);
+}
+
+const char *tracker_progress_percent_label(const TemplateData *td, const char *fallback) {
+    if (td && td->run_completion.progress && td->completion_goal_count == 0 && td->completion_label[0] != '\0')
+        return td->completion_label;
+    return fallback;
 }
 
 bool tracker_run_meets_completion(const TemplateData *td) {
     if (!td) return false;
     const RunCompletionRule *rule = &td->run_completion;
+    // Small epsilon so a target of e.g. 50.00% isn't missed by float rounding.
+    const bool pct_met = td->overall_progress_percentage >= rule->percent - 0.001f;
+
+    // The progress percentage picked as its own requirement, next to (or instead of) a goal set. Each
+    // target only replaces its own part: the count target the goal set, the percentage target the
+    // 100% progress. With both targets on, require_both decides between AND and OR.
+    if (rule->progress) {
+        const bool has_set = run_completion_has_goal_set(rule);
+        // An empty set (every goal of a checked type was removed from the template) never completes.
+        const bool set_done = !has_set || (td->completion_goal_count > 0 &&
+                                           td->completion_goals_completed >= td->completion_goal_count);
+        const bool use_count = rule->use_count && has_set;
+        int needed = rule->count < td->completion_goal_count ? rule->count : td->completion_goal_count;
+        const bool goals_met = use_count ? (td->completion_goal_count > 0 && td->completion_goals_completed >= needed)
+                                         : set_done;
+        const bool progress_met = rule->use_percent ? pct_met : td->overall_progress_percentage >= 100.0f;
+        if (use_count && rule->use_percent && !rule->require_both) return goals_met || progress_met;
+        return goals_met && progress_met;
+    }
 
     // The rule's own "all of the required set is done" check. With nothing selected that is the
     // whole template: every advancement done and the progress at 100% (default behaviour).
@@ -4619,8 +4644,9 @@ bool tracker_run_meets_completion(const TemplateData *td) {
                    td->completion_goals_completed >= td->completion_goal_count;
     }
 
-    // The percentage target spans the whole template, so it only applies to the "everything" rule;
-    // a required subset is measured by its own count (the editor greys the target out then too).
+    // The percentage target spans the whole template, so without the progress picked it only applies
+    // to the "everything" rule; a required subset is measured by its own count (the editor greys the
+    // target out then too).
     const bool use_percent = rule->use_percent && run_completion_requires_everything(rule);
 
     // No count / percent target active: the required set has to be done.
@@ -4648,8 +4674,6 @@ bool tracker_run_meets_completion(const TemplateData *td) {
     }
     int needed = rule->count < set_total ? rule->count : set_total;
     const bool count_met = set_completed >= needed;
-    // Small epsilon so a target of e.g. 50.00% isn't missed by float rounding.
-    const bool pct_met = td->overall_progress_percentage >= rule->percent - 0.001f;
 
     if (rule->use_count && use_percent) {
         return rule->require_both ? (count_met && pct_met) : (count_met || pct_met);
@@ -4668,6 +4692,8 @@ bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, co
         *total = td->completion_goal_count;
         return true;
     }
+    // Only the progress percentage is required, so the progress text shows only the percentage.
+    if (td->run_completion.progress) return false;
     if (td->advancement_goal_count <= 0) return false;
     *label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
     *done = td->advancements_completed_count;
@@ -14385,8 +14411,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                      info_sep, counter_label, counter_done, counter_total);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_prog_percent) {
-            snprintf(temp_chunk, sizeof(temp_chunk), "%sProg: %.2f%%",
-                     info_sep, t->template_data->overall_progress_percentage);
+            snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %.2f%%",
+                     info_sep, tracker_progress_percent_label(t->template_data, "Prog"),
+                     t->template_data->overall_progress_percentage);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         }
 
@@ -17767,8 +17794,9 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
         snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d",
                  title_sep, counter_label, counter_done, counter_total);
     } else if (show_prog_percent) {
-        snprintf(progress_chunk, sizeof(progress_chunk), "%sProgress: %.2f%%",
-                 title_sep, t->template_data->overall_progress_percentage);
+        snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %.2f%%",
+                 title_sep, tracker_progress_percent_label(t->template_data, "Progress"),
+                 t->template_data->overall_progress_percentage);
     }
 
     char category_chunk[MAX_PATH_LENGTH + 10] = "";
@@ -18089,7 +18117,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         }
 
         // Print if advancements are more than zero or progress isn't empty
-        if (t->template_data->advancement_goal_count > 0) {
+        if (t->template_data->advancement_goal_count > 0 &&
+            !(t->template_data->run_completion.progress && t->template_data->completion_goal_count == 0)) {
             if (version >= MC_VERSION_1_12) {
                 log_message(LOG_INFO, "[Advancements] %d / %d completed\n",
                             t->template_data->advancements_completed_count,
@@ -18114,6 +18143,10 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                 if (rule_types[0] != '\0') strncat(rule_types, ", ", sizeof(rule_types) - strlen(rule_types) - 1);
                 strncat(rule_types, run_completion_type_key((RunCompletionType) i),
                         sizeof(rule_types) - strlen(rule_types) - 1);
+            }
+            if (rule->progress) {
+                if (rule_types[0] != '\0') strncat(rule_types, ", ", sizeof(rule_types) - strlen(rule_types) - 1);
+                strncat(rule_types, "progress", sizeof(rule_types) - strlen(rule_types) - 1);
             }
             log_message(LOG_INFO, "[Run Completion] %s: %d / %d completed (types: %s; individual goals: %d)\n",
                         rc_label, rc_done, rc_total, rule_types[0] != '\0' ? rule_types : "none",

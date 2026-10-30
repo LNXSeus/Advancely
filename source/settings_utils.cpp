@@ -20,7 +20,7 @@
 #include "main.h"
 #include "format_utils.h"
 #include "coop_net.h" // g_coop_ctx for ghost-player prune exemption
-#include "template_scanner.h" // run_completion_requires_everything for the template-driven Compact default
+#include "template_scanner.h" // run_completion_has_goal_set for the template-driven Compact default
 
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
@@ -693,7 +693,7 @@ bool settings_default_compact_progress_text(AppSettings *settings, const Templat
                         settings->compact_cycle_run_counter;
     if (!adv_only && !counter_only) return false;
 
-    bool custom_labelled = !run_completion_requires_everything(&td->run_completion) &&
+    bool custom_labelled = run_completion_has_goal_set(&td->run_completion) &&
                            td->completion_label[0] != '\0';
     if (custom_labelled == counter_only) return false;
     settings->compact_cycle_type[COMPACT_COUNTER_ADVANCEMENTS] = !custom_labelled;

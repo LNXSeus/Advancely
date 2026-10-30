@@ -458,6 +458,7 @@ struct EditorDecorationElement {
 // and so belongs to the language being edited, like display_category.
 struct EditorRunCompletion {
     bool types[RC_TYPE_COUNT] = {};
+    bool progress = false;
     std::vector<RunCompletionGoalRef> goals;
     bool use_count = false;
     int count = 1;
@@ -528,6 +529,7 @@ static bool tc_run_completion_prune(EditorTemplate &data) {
 
 static bool are_editor_run_completions_different(const EditorRunCompletion &a, const EditorRunCompletion &b) {
     for (int i = 0; i < RC_TYPE_COUNT; i++) if (a.types[i] != b.types[i]) return true;
+    if (a.progress != b.progress) return true;
     if (a.goals.size() != b.goals.size()) return true;
     for (size_t i = 0; i < a.goals.size(); i++) {
         if (a.goals[i].kind != b.goals[i].kind || strcmp(a.goals[i].root_name, b.goals[i].root_name) != 0)
@@ -544,6 +546,7 @@ static void tc_run_completion_load(const cJSON *root, const cJSON *lang_json, Ed
     RunCompletionRule rule;
     run_completion_parse(root, &rule);
     for (int i = 0; i < RC_TYPE_COUNT; i++) out.types[i] = rule.types[i];
+    out.progress = rule.progress;
     out.goals.assign(rule.goal_refs, rule.goal_refs + rule.goal_ref_count);
     out.use_count = rule.use_count;
     out.count = rule.count;
@@ -569,6 +572,7 @@ static void tc_run_completion_serialize(cJSON *root, const EditorTemplate &data)
     RunCompletionRule rule;
     run_completion_reset(&rule);
     for (int i = 0; i < RC_TYPE_COUNT; i++) rule.types[i] = rc.types[i];
+    rule.progress = rc.progress;
     rule.goal_ref_count = (int) present.size();
     rule.goal_refs = present.empty() ? nullptr : present.data();
     rule.use_count = rc.use_count;
@@ -5786,9 +5790,15 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
 
     bool any_type = false;
     for (int i = 0; i < RC_TYPE_COUNT; i++) if (rc.types[i]) any_type = true;
-    const bool everything = !any_type && rc.goals.empty();
+    const bool has_goal_set = any_type || !rc.goals.empty();
+    const bool everything = !has_goal_set && !rc.progress;
     // The size of the required set; with nothing picked the rule spans the whole template.
     const int set_size = everything ? everything_total : required_total;
+    // Whether the template has anything the overall progress percentage counts (every goal but simple
+    // advancements, see tracker_calculate_overall_progress).
+    bool has_progress_steps = everything_total > type_total[RC_TYPE_ADVANCEMENTS];
+    for (const auto &a: data.advancements)
+        if (!a.is_recipe && tc_criteria_progress_total(a) > 0) has_progress_steps = true;
 
     const char *type_names[RC_TYPE_COUNT] = {
         adv_word, "Recipes", "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals", "Counters"
@@ -5819,12 +5829,14 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     } else {
         int checked = 0;
         for (int i = 0; i < RC_TYPE_COUNT; i++) if (rc.types[i] && type_total[i] > 0) checked++;
+        if (rc.progress) checked++;
         snprintf(types_preview, sizeof(types_preview), "%d selected", checked);
     }
     ImGui::SetNextItemWidth(260.0f);
     if (ImGui::BeginCombo("Goal Types", types_preview)) {
         if (ImGui::Selectable("Everything (whole template)", everything, ImGuiSelectableFlags_NoAutoClosePopups)) {
             for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = false;
+            rc.progress = false;
             rc.goals.clear();
             s_rc_type_anchor = -1;
         }
@@ -5853,6 +5865,21 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
                 s_rc_type_anchor = i;
             }
         }
+        if (has_progress_steps || rc.progress) {
+            ImGui::Separator();
+            if (ImGui::Selectable("Progress Percentage (100%)", rc.progress, ImGuiSelectableFlags_NoAutoClosePopups))
+                rc.progress = !rc.progress;
+            if (ImGui::IsItemHovered()) {
+                char tip[512];
+                snprintf(tip, sizeof(tip),
+                         "The overall progress percentage shown in the tracker and overlay has to reach 100%%.\n"
+                         "It counts criteria, recipes, stats, unlocks, custom goals, stages and counters, but\n"
+                         "not simple advancements, so 'All %s' plus this equals 'Everything'.\n"
+                         "Lets the percentage be required on its own or next to other picks, and enables the\n"
+                         "progress percentage target below.", adv_word);
+                ImGui::SetTooltip("%s", tip);
+            }
+        }
         ImGui::EndCombo();
     }
     if (ImGui::IsItemHovered()) {
@@ -5860,17 +5887,22 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
         snprintf(tip, sizeof(tip),
                  "Whole goal types the run has to finish. Every goal of a checked type is required,\n"
                  "including goals hidden from the tracker. Only types this template has are listed.\n"
+                 "The last entry requires the overall progress percentage instead.\n"
                  "Combine with the individual goals below; the run needs all of them.\n"
                  "Shift+Click to range-select.\n"
                  "Default: Everything");
         ImGui::SetTooltip("%s", tip);
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("All##rc_types"))
+    if (ImGui::SmallButton("All##rc_types")) {
         for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = type_total[i] > 0;
+        rc.progress = has_progress_steps;
+    }
     ImGui::SameLine();
-    if (ImGui::SmallButton("None##rc_types"))
+    if (ImGui::SmallButton("None##rc_types")) {
         for (int i = 0; i < RC_TYPE_COUNT; i++) rc.types[i] = false;
+        rc.progress = false;
+    }
 
     // --- Individual goals, one dropdown per kind the template has ---
     auto goal_index = [&](RunCompletionGoalKind kind, const char *root) -> int {
@@ -6047,17 +6079,25 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     int max_count = set_size > 0 ? set_size : 1;
     if (rc.count < 1) rc.count = 1;
     if (rc.count > max_count) rc.count = max_count;
+    // With only the progress percentage picked there is no goal set to count.
+    const bool count_available = everything || has_goal_set;
+    if (!count_available) ImGui::BeginDisabled();
     ImGui::Checkbox("Complete at goal count", &rc.use_count);
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tip[512];
-        snprintf(tip, sizeof(tip),
-                 "When enabled, the run completes once this many of the required goals are done\n"
-                 "instead of all of them. The maximum (%d) is the size of the required set above\n"
-                 "(the whole template when nothing is picked).\n"
-                 "Default: Off", max_count);
+        if (!count_available)
+            snprintf(tip, sizeof(tip),
+                     "Only the progress percentage is picked above, so there are no goals to count.\n"
+                     "Use the progress percentage target instead.");
+        else
+            snprintf(tip, sizeof(tip),
+                     "When enabled, the run completes once this many of the required goals are done\n"
+                     "instead of all of them. The maximum (%d) is the size of the required set above\n"
+                     "(the whole template when nothing is picked).\n"
+                     "Default: Off", max_count);
         ImGui::SetTooltip("%s", tip);
     }
-    if (rc.use_count) {
+    if (rc.use_count && count_available) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120.0f);
         if (ImGui::InputInt("##rc_count", &rc.count)) {
@@ -6070,18 +6110,27 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
             ImGui::SetTooltip("%s", tip);
         }
     }
+    if (!count_available) ImGui::EndDisabled();
 
     // The overall progress percentage spans the whole template, so it is only a target (and only
-    // shown next to the counter) while the rule requires everything.
-    if (!everything) ImGui::BeginDisabled();
+    // shown next to the counter) while the rule requires everything or picks the percentage itself.
+    const bool percent_available = everything || rc.progress;
+    if (!percent_available) ImGui::BeginDisabled();
     ImGui::Checkbox("Complete at progress percentage", &rc.use_percent);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tip[512];
-        if (!everything)
+        if (!percent_available)
             snprintf(tip, sizeof(tip),
-                     "Only available with 'Everything': the overall progress percentage covers the whole\n"
-                     "template, which says nothing about the required goals picked above.\n"
+                     "Only available with 'Everything' or 'Progress Percentage' picked in Goal Types: the\n"
+                     "overall progress percentage covers the whole template, which says nothing about the\n"
+                     "required goals picked above.\n"
                      "Use the goal count target for a partial completion instead.");
+        else if (rc.progress)
+            snprintf(tip, sizeof(tip),
+                     "When enabled, the picked 'Progress Percentage' only has to reach this percentage\n"
+                     "instead of 100%%. The other picks above still have to be done (or reach the goal\n"
+                     "count target).\n"
+                     "Default: Off");
         else
             snprintf(tip, sizeof(tip),
                      "When enabled, the run completes once the overall progress reaches this percentage.\n"
@@ -6090,7 +6139,7 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
                      "Default: Off");
         ImGui::SetTooltip("%s", tip);
     }
-    if (rc.use_percent && everything) {
+    if (rc.use_percent && percent_available) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120.0f);
         if (ImGui::InputFloat("##rc_percent", &rc.percent, 0.0f, 0.0f, "%.2f")) {
@@ -6104,9 +6153,9 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
         }
     }
 
-    if (!everything) ImGui::EndDisabled();
+    if (!percent_available) ImGui::EndDisabled();
 
-    bool both_targets = rc.use_count && rc.use_percent && everything;
+    bool both_targets = rc.use_count && rc.use_percent && (everything || (rc.progress && has_goal_set));
     if (!both_targets) ImGui::BeginDisabled();
     ImGui::Checkbox("Require both targets (AND)", &rc.require_both);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
@@ -6131,17 +6180,22 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     ImGui::TextWrapped("The 'X/Y' counter in the tracker title, the info bar and the overlay progress text "
         "(Scrolling Belt and Page modes). It counts the required goals picked above, each picked criterion "
         "or sub-stat as one, and replaces the "
-        "%s counter; the overall progress percentage is left out then, as it covers the whole template. "
-        "With 'Everything' the plain %s counter and the percentage stay.",
+        "%s counter; the overall progress percentage is left out then, as it covers the whole template, "
+        "unless 'Progress Percentage' is picked too. "
+        "With 'Everything' the plain %s counter and the percentage stay; with only 'Progress Percentage' "
+        "just the percentage is shown, named by the label below.",
         modern ? "advancement" : "achievement", modern ? "advancement" : "achievement");
 
-    const char *derived = run_completion_derived_label(required_mask, modern);
+    // With only the progress percentage picked, the label names the percentage instead of a counter.
+    const bool progress_only = rc.progress && !has_goal_set;
+    const char *derived = progress_only ? "Prog" : run_completion_derived_label(required_mask, modern);
     ImGui::SetNextItemWidth(260.0f);
     ImGui::InputTextWithHint("Counter Label", derived, rc.label, sizeof(rc.label));
     if (ImGui::IsItemHovered()) {
         char tip[512];
         snprintf(tip, sizeof(tip),
                  "Text shown in front of the counter, e.g. 'Blocks Placed' for 'Blocks Placed: 12/40'.\n"
+                 "With only 'Progress Percentage' picked it names the percentage instead.\n"
                  "Saved into the language file selected above (key 'run_completion.label'), so each\n"
                  "language can have its own. Leave empty for the automatic name (%s).\n"
                  "Ignored while 'Everything' is picked.", derived);
@@ -6149,12 +6203,15 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     }
 
     char shown[256];
-    if (everything) {
+    if (progress_only) {
+        snprintf(shown, sizeof(shown), "%s: 0.00%%", rc.label[0] != '\0' ? rc.label : derived);
+    } else if (!has_goal_set) {
         snprintf(shown, sizeof(shown), "%s: 0/%d", modern ? "Adv" : "Ach", type_total[RC_TYPE_ADVANCEMENTS]);
     } else {
         snprintf(shown, sizeof(shown), "%s: 0/%d", rc.label[0] != '\0' ? rc.label : derived, set_size);
     }
-    ImGui::TextWrapped("Shown as: %s", shown);
+    if (rc.progress && has_goal_set) ImGui::TextWrapped("Shown as: %s, plus the progress percentage", shown);
+    else ImGui::TextWrapped("Shown as: %s", shown);
 }
 
 static const char *const SELECTED_ONLY_LABEL = "Selected";

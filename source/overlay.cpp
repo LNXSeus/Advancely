@@ -1139,7 +1139,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         }
     }
     if (td && settings->compact_cycle_run_percent && tracker_progress_percent_shown(td) && n < max_entries) {
-        snprintf(out[n].label, sizeof(out[n].label), "Prog");
+        snprintf(out[n].label, sizeof(out[n].label), "%s", tracker_progress_percent_label(td, "Prog"));
         out[n].completed = 0;
         out[n].total = 0;
         out[n].percent = true;
@@ -3769,7 +3769,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                              counter_label, counter_done, counter_total);
                     add_component(temp_chunk);
                 } else if (show_prog_percent) {
-                    snprintf(temp_chunk, sizeof(temp_chunk), "Prog: %.2f%%",
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s: %.2f%%",
+                             tracker_progress_percent_label(t->template_data, "Prog"),
                              t->template_data->overall_progress_percentage);
                     add_component(temp_chunk);
                 }

@@ -227,8 +227,9 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         }
         if (percent_shown) {
             any_present = true;
-            char row[64];
-            snprintf(row, sizeof(row), "Progress Text: Prog (%.2f%%)", ctd->overall_progress_percentage);
+            char row[192];
+            snprintf(row, sizeof(row), "Progress Text: %s (%.2f%%)", tracker_progress_percent_label(ctd, "Prog"),
+                     ctd->overall_progress_percentage);
             if (ImGui::Selectable(row, *run_percent, ImGuiSelectableFlags_NoAutoClosePopups))
                 *run_percent = !*run_percent;
         }

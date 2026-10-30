@@ -659,6 +659,8 @@ static const char *RC_TYPE_KEYS[RC_TYPE_COUNT] = {
     "advancements", "recipes", "stats", "unlocks", "custom", "multi_stage_goals", "counters"
 };
 
+static const char *RC_PROGRESS_KEY = "progress";
+
 static const char *RC_GOAL_KIND_KEYS[RC_GOAL_KIND_COUNT] = {
     "advancement", "stat", "unlock", "custom", "multi_stage_goal", "counter", "advancement_criteria",
     "stat_sub_stats"
@@ -684,13 +686,18 @@ void run_completion_reset(RunCompletionRule *rule) {
 bool run_completion_is_default(const RunCompletionRule *rule) {
     if (!rule) return true;
     for (int i = 0; i < RC_TYPE_COUNT; i++) if (rule->types[i]) return false;
-    return rule->goal_ref_count == 0 && !rule->use_count && !rule->use_percent;
+    return !rule->progress && rule->goal_ref_count == 0 && !rule->use_count && !rule->use_percent;
+}
+
+bool run_completion_has_goal_set(const RunCompletionRule *rule) {
+    if (!rule) return false;
+    for (int i = 0; i < RC_TYPE_COUNT; i++) if (rule->types[i]) return true;
+    return rule->goal_ref_count > 0;
 }
 
 bool run_completion_requires_everything(const RunCompletionRule *rule) {
     if (!rule) return true;
-    for (int i = 0; i < RC_TYPE_COUNT; i++) if (rule->types[i]) return false;
-    return rule->goal_ref_count == 0;
+    return !rule->progress && !run_completion_has_goal_set(rule);
 }
 
 void run_completion_parse(const cJSON *template_root, RunCompletionRule *rule) {
@@ -704,6 +711,7 @@ void run_completion_parse(const cJSON *template_root, RunCompletionRule *rule) {
         const cJSON *entry = nullptr;
         cJSON_ArrayForEach(entry, types) {
             if (!cJSON_IsString(entry) || !entry->valuestring) continue;
+            if (strcmp(entry->valuestring, RC_PROGRESS_KEY) == 0) rule->progress = true;
             for (int i = 0; i < RC_TYPE_COUNT; i++) {
                 if (strcmp(entry->valuestring, RC_TYPE_KEYS[i]) == 0) rule->types[i] = true;
             }
@@ -771,6 +779,7 @@ cJSON *run_completion_to_json(const RunCompletionRule *rule) {
     for (int i = 0; i < RC_TYPE_COUNT; i++) {
         if (rule->types[i]) cJSON_AddItemToArray(types, cJSON_CreateString(RC_TYPE_KEYS[i]));
     }
+    if (rule->progress) cJSON_AddItemToArray(types, cJSON_CreateString(RC_PROGRESS_KEY));
     cJSON_AddItemToObject(rc, "types", types);
 
     cJSON *goals = cJSON_CreateArray();
