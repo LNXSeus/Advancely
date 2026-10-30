@@ -2348,7 +2348,7 @@ int main(int argc, char *argv[]) {
     // before anything reads or writes settings, templates or the single-instance lock. Only the main
     // process seeds; the overlay child is spawned later and inherits the populated directory.
     // No-ops on portable layouts, where both paths resolve to the same directory.
-    if (!seed_user_data_dir()) {
+    if (!seed_user_data_dir() && !is_test_mode) {
 #if defined(__APPLE__)
         if (!SDL_WasInit(SDL_INIT_VIDEO)) SDL_Init(SDL_INIT_VIDEO);
         show_error_message("Resources Folder Missing",
