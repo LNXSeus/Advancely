@@ -1866,14 +1866,17 @@ int main(int argc, char *argv[]) {
             char message[2048]; // Allocated buffer for dynamic message
 
             snprintf(message, sizeof(message),
-                     "macOS is running Advancely from a temporary, read-only location (App Translocation).\n\n"
-                     "Current Location:\n%s\n\n"
-                     "This happens when running an app directly from the Downloads folder.\n\n"
+                     "macOS marked Advancely as downloaded from the internet, so it runs a hidden, "
+                     "read-only copy instead of your real files (App Translocation). This can happen "
+                     "even if Advancely is already in your Applications folder.\n\n"
+                     "The hidden copy is here (you will not find it in Finder):\n%s\n\n"
                      "TO FIX THIS:\n"
-                     "1. Quit Advancely.\n"
-                     "2. Move 'Advancely.app' and the 'resources' folder to your 'Applications' "
-                     "folder or 'Desktop' using Finder.\n"
-                     "3. Run it from the new location.",
+                     "1. Open the 'Terminal' app.\n"
+                     "2. Type this, followed by a space:\n"
+                     "   xattr -dr com.apple.quarantine\n"
+                     "3. In Finder, select both 'Advancely.app' and the 'resources' folder, drag them "
+                     "into the Terminal window, then press Enter.\n"
+                     "4. Start Advancely again.",
                      mac_exe_path);
 
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, nullptr);
