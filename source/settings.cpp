@@ -653,7 +653,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row3_freeze_align != b->overlay_row3_freeze_align ||
         a->overlay_show_row1 != b->overlay_show_row1 ||
         a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
-        a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+        a->overlay_row3_show_completed != b->overlay_row3_show_completed ||
         a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
@@ -930,7 +930,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
             a->overlay_show_row1 != b->overlay_show_row1 ||
             a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
-            a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+            a->overlay_row3_show_completed != b->overlay_row3_show_completed ||
             a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
 
             // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
@@ -4215,19 +4215,19 @@ settings_tooltip(tooltip_buffer); \
                         settings_tooltip(show_completed_row_2_tooltip_buffer);
                     }
 
-                    ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
+                    ImGui::Checkbox("Show Completed Row 3 Goals", &temp_settings.overlay_row3_show_completed);
                     if (settings_tooltip_wanted()) {
-                        char hide_completed_row_3_tooltip_buffer[1024];
-                        snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
+                        char show_completed_row_3_tooltip_buffer[1024];
+                        snprintf(show_completed_row_3_tooltip_buffer, sizeof(show_completed_row_3_tooltip_buffer),
                                  "If checked, goals in Row 3 (Stats, Custom Goals,\n"
                                  "Multi-Stage Goals, Counters, and any %s/Unlocks\n"
-                                 "forced to Row 3) will disappear when completed.\n"
+                                 "forced to Row 3) stay visible when completed instead of disappearing.\n"
                                  "This is independent of the main 'Goal Visibility' setting.\n\n"
                                  "NOTE: Goals forced to Row 2 via the Template Editor follow\n"
                                  "'Show Completed Row 2 Goals' instead.\n"
-                                 "Default: Off", advancements_label_plural_uppercase);
+                                 "Default: On", advancements_label_plural_uppercase);
 
-                        settings_tooltip(hide_completed_row_3_tooltip_buffer);
+                        settings_tooltip(show_completed_row_3_tooltip_buffer);
                     }
 
                     if (ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f,
@@ -5376,7 +5376,7 @@ settings_tooltip(tooltip_buffer); \
                                  "When Row 3's still-visible items fit within the overlay width, stop scrolling\n"
                                  "and show each item once, statically (measured with text width). Useful once only\n"
                                  "a few items remain so they no longer repeat across the row.\n"
-                                 "Works best with 'Hide Completed Row 3 Goals' enabled, so the row actually\n"
+                                 "Works best with 'Show Completed Row 3 Goals' disabled, so the row actually\n"
                                  "clears out its completed goals and shrinks down to a static few.\n"
                                  "Default: On");
                         settings_tooltip(tooltip_buffer);

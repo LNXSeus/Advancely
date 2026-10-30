@@ -26,7 +26,7 @@
 		"overlay_progress_text_align":	"left",
 		"overlay_show_row1":	true,
 		"overlay_row2_show_completed":	false,
-		"overlay_row3_remove_completed":	false,
+		"overlay_row3_show_completed":	true,
 		"overlay_show_hidden_goals":	false,
 		"overlay_stat_cycle_speed":	3,
 		"overlay_clear_animation":	-1.2,

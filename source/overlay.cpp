@@ -3443,7 +3443,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
                 should_hide_when_done = !settings->overlay_row2_show_completed;
             } else {
                 // Otherwise, respect the Row 3 setting.
-                should_hide_when_done = settings->overlay_row3_remove_completed;
+                should_hide_when_done = !settings->overlay_row3_show_completed;
             }
             break;
 
@@ -3452,7 +3452,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
         default:
             // If forced to Row 3, respect the Row 3 setting.
             if (in_3rd_row) {
-                should_hide_when_done = settings->overlay_row3_remove_completed;
+                should_hide_when_done = !settings->overlay_row3_show_completed;
             } else {
                 // These types belong to Row 2, respect the Row 2 setting
                 should_hide_when_done = !settings->overlay_row2_show_completed;

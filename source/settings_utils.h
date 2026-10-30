@@ -145,7 +145,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING 256.0f // 96px icon + more (took spacing from 1.16 AA template)
 #define DEFAULT_OVERLAY_SHOW_ROW1 true // If false, the belt/page overlay leaves Row 1 out and moves Rows 2/3 up
 #define DEFAULT_OVERLAY_ROW2_SHOW_COMPLETED false
-#define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
+#define DEFAULT_OVERLAY_ROW3_SHOW_COMPLETED true
 #define DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS false // If true, goals marked hidden in the template still show in the overlay
 #define DEFAULT_IGT_FREEZE_ON_COMPLETION true // If true, the IGT freezes at the final time once the run is completed
 
@@ -920,7 +920,7 @@ struct AppSettings {
     float overlay_row3_custom_spacing; // The custom spacing value for row 3
     bool overlay_show_row1; // If false, the belt/page overlay hides Row 1 and moves Rows 2/3 up.
     bool overlay_row2_show_completed; // If true, the second row keeps completed goals instead of removing them.
-    bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
+    bool overlay_row3_show_completed; // If true, the third row keeps completed goals instead of removing them.
     bool overlay_show_hidden_goals;
     // If true, goals marked hidden in the template are still shown in the overlay (all modes).
     bool overlay_custom_vertical_spacing_enabled;

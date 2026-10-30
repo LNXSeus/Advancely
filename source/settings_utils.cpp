@@ -1155,7 +1155,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
     settings->overlay_show_row1 = DEFAULT_OVERLAY_SHOW_ROW1;
     settings->overlay_row2_show_completed = DEFAULT_OVERLAY_ROW2_SHOW_COMPLETED;
-    settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+    settings->overlay_row3_show_completed = DEFAULT_OVERLAY_ROW3_SHOW_COMPLETED;
     settings->overlay_show_hidden_goals = DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS;
     settings->overlay_custom_vertical_spacing_enabled = DEFAULT_OVERLAY_CUSTOM_VERTICAL_SPACING_ENABLED;
     settings->overlay_gap_top_to_row1 = DEFAULT_OVERLAY_GAP_TOP_TO_ROW1;
@@ -1644,10 +1644,14 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             defaults_were_used = true;
         }
 
-        const cJSON *row3_hide = cJSON_GetObjectItem(general_settings, "overlay_row3_remove_completed");
-        if (row3_hide && cJSON_IsBool(row3_hide)) settings->overlay_row3_remove_completed = cJSON_IsTrue(row3_hide);
-        else {
-            settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+        const cJSON *row3_show = cJSON_GetObjectItem(general_settings, "overlay_row3_show_completed");
+        const cJSON *row3_hide_legacy = cJSON_GetObjectItem(general_settings, "overlay_row3_remove_completed");
+        if (row3_show && cJSON_IsBool(row3_show)) settings->overlay_row3_show_completed = cJSON_IsTrue(row3_show);
+        else if (row3_hide_legacy && cJSON_IsBool(row3_hide_legacy)) {
+            settings->overlay_row3_show_completed = !cJSON_IsTrue(row3_hide_legacy);
+            defaults_were_used = true;
+        } else {
+            settings->overlay_row3_show_completed = DEFAULT_OVERLAY_ROW3_SHOW_COMPLETED;
             defaults_were_used = true;
         }
 
@@ -3647,8 +3651,9 @@ static void settings_fill_json(cJSON *root, const AppSettings *settings, const T
         cJSON_AddItemToObject(general_obj, "overlay_row2_show_completed",
                               cJSON_CreateBool(settings->overlay_row2_show_completed));
         cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
-        cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed",
-                              cJSON_CreateBool(settings->overlay_row3_remove_completed));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_row3_show_completed");
+        cJSON_AddItemToObject(general_obj, "overlay_row3_show_completed",
+                              cJSON_CreateBool(settings->overlay_row3_show_completed));
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_hidden_goals");
         cJSON_AddItemToObject(general_obj, "overlay_show_hidden_goals",
                               cJSON_CreateBool(settings->overlay_show_hidden_goals));
