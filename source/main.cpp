@@ -1650,20 +1650,37 @@ static void seed_stamp_write(const char *support) {
 // the install directory (Windows, portable Linux) there is nothing to seed and this returns early.
 //
 // Safe to call every launch: once this version has seeded successfully the walk is skipped entirely.
-static void seed_user_data_dir(void) {
+//
+// Returns false only when the shipped resources cannot be found AND the data directory has never
+// been populated, so the app would start with no templates or settings at all.
+static bool seed_user_data_dir(void) {
     const char *shipped = get_application_dir(); // Read-only source (install dir or .app bundle).
     const char *data = get_resources_path();     // Writable destination.
 
     // Portable layouts resolve both to the same place, and so does macOS when HOME is unavailable.
-    if (strcmp(shipped, data) == 0) return;
+    if (strcmp(shipped, data) == 0) return true;
+
+    char shipped_templates[MAX_PATH_LENGTH];
+    char data_templates[MAX_PATH_LENGTH];
+    snprintf(shipped_templates, sizeof(shipped_templates), "%s/templates", shipped);
+    snprintf(data_templates, sizeof(data_templates), "%s/templates", data);
+    bool data_populated = path_exists(data_templates);
+
+    // A misplaced resources folder (not next to Advancely.app on macOS) leaves nothing to seed from.
+    // Never write the stamp in that case, otherwise putting the folder back would not reseed.
+    if (!path_exists(shipped_templates)) {
+        log_message(LOG_ERROR, "[MAIN] Shipped resources not found at: %s\n", shipped);
+        return data_populated;
+    }
 
     // Recursive: ~/.local/share may not exist yet on a fresh Linux account. macOS always has
     // ~/Library/Application Support, but creating it recursively is harmless there.
     fs_ensure_directory_exists(data);
 
     // Version-gated: without this every launch stat()s the whole tree before the window opens,
-    // which grows with the shipped asset count.
-    if (seed_stamp_matches(data)) return;
+    // which grows with the shipped asset count. A stamp without templates is stale (written by an
+    // older build that seeded from a missing resources folder), so it does not count.
+    if (data_populated && seed_stamp_matches(data)) return true;
 
     // SEED_REFRESH for content the app ships and updates, SEED_PRESERVE for anything the user owns.
     // fonts/ and gui/ receive user imports at runtime, so they must never be clobbered.
@@ -1700,11 +1717,12 @@ static void seed_user_data_dir(void) {
         // Leave the stamp unwritten so the next launch retries rather than caching a partial seed.
         log_message(LOG_ERROR, "[MAIN] User data directory seeded with errors: %s. "
                     "Retrying on next launch.\n", data);
-        return;
+        return true;
     }
 
     seed_stamp_write(data);
     log_message(LOG_INFO, "[MAIN] User data directory ready: %s\n", data);
+    return true;
 }
 #endif
 
@@ -2330,7 +2348,21 @@ int main(int argc, char *argv[]) {
     // before anything reads or writes settings, templates or the single-instance lock. Only the main
     // process seeds; the overlay child is spawned later and inherits the populated directory.
     // No-ops on portable layouts, where both paths resolve to the same directory.
-    seed_user_data_dir();
+    if (!seed_user_data_dir()) {
+#if defined(__APPLE__)
+        if (!SDL_WasInit(SDL_INIT_VIDEO)) SDL_Init(SDL_INIT_VIDEO);
+        show_error_message("Resources Folder Missing",
+                           "Advancely cannot find its 'resources' folder.\n\n"
+                           "The 'resources' folder must be in the same folder as 'Advancely.app'. "
+                           "Both come in the download, so keep them together.\n\n"
+                           "TO FIX THIS:\n"
+                           "1. Quit Advancely.\n"
+                           "2. Put 'Advancely.app' and 'resources' in the same folder.\n"
+                           "3. Start Advancely again.");
+        log_close();
+        return EXIT_FAILURE;
+#endif
+    }
 #endif
 
 #if !defined(__APPLE__)
