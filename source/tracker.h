@@ -159,6 +159,7 @@ struct Tracker {
     bool visual_toggle_manual_pos_pressed;
     bool visual_delete_pressed;
     bool visual_copy_pressed;
+    bool visual_select_all_pressed;
     // Save/apply/revert hotkeys, consumed by whichever window owns them. They are cleared at the
     // start of every event poll, so one that nobody picks up cannot fire a frame later.
     bool editor_save_pressed;

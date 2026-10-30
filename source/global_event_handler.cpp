@@ -148,14 +148,11 @@ bool hotkey_apply_counter_action(Tracker *t, AppSettings *app_settings,
 // of teleporting the selection across the map.
 #define VISUAL_MOVE_MAX_STEPS_PER_FRAME 16
 
-// Whether the key bound to an action is currently held down, with the modifiers matching exactly,
-// just like app_hotkey_matches does for a key press.
-static bool app_hotkey_is_held(const AppSettings *settings, AppHotkeyAction action,
-                               const bool *key_state, Uint16 held_mods) {
+// Whether the key bound to an action is currently held down, whatever modifiers are held with it.
+static bool app_hotkey_key_down(const AppSettings *settings, AppHotkeyAction action, const bool *key_state) {
     if (!settings || !key_state || action < 0 || action >= APP_HOTKEY_COUNT) return false;
     const AppHotkey *hk = &settings->app_hotkeys[action];
     if (hk->key[0] == '\0' || strcmp(hk->key, "None") == 0) return false;
-    if (held_mods != hk->mods) return false;
 
     SDL_Keycode key = SDL_GetKeyFromName(hk->key);
     if (key == SDLK_UNKNOWN) return false;
@@ -223,7 +220,7 @@ static bool app_shortcut_is_bound(const Tracker *t, const AppSettings *app_setti
     };
     static const AppHotkeyAction visual_editing[] = {
         APP_HOTKEY_TOGGLE_LAYOUT_HIDDEN, APP_HOTKEY_TOGGLE_GOAL_HIDDEN, APP_HOTKEY_TOGGLE_MANUAL_POS,
-        APP_HOTKEY_DELETE_SELECTION, APP_HOTKEY_COPY_SELECTION,
+        APP_HOTKEY_DELETE_SELECTION, APP_HOTKEY_COPY_SELECTION, APP_HOTKEY_SELECT_ALL,
     };
     for (AppHotkeyAction action: always) {
         if (app_hotkey_matches(app_settings, action, key, app_mods)) return true;
@@ -343,6 +340,9 @@ static void app_shortcut_key_pressed(Tracker *t, AppSettings *app_settings, SDL_
             }
             if (app_hotkey_matches(app_settings, APP_HOTKEY_COPY_SELECTION, key, app_mods)) {
                 t->visual_copy_pressed = true;
+            }
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_SELECT_ALL, key, app_mods)) {
+                t->visual_select_all_pressed = true;
             }
         }
     }
@@ -628,6 +628,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
     {
         static float s_visual_move_timers[APP_HOTKEY_COUNT] = {};
         static bool s_visual_move_held[APP_HOTKEY_COUNT] = {};
+        // Set while the key is down as part of another combination (A inside Ctrl+A). Letting go
+        // of the modifier first must not start moving, so the key has to be released and pressed again.
+        static bool s_visual_move_blocked[APP_HOTKEY_COUNT] = {};
 
         struct VisualMoveBinding {
             AppHotkeyAction action;
@@ -658,9 +661,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         float frame_time = deltaTime ? *deltaTime : 0.0f;
 
         for (const VisualMoveBinding &binding: VISUAL_MOVE_BINDINGS) {
-            bool held = movement_allowed &&
-                        app_hotkey_is_held(app_settings, binding.action, key_state, poll_mods);
-            if (!held) {
+            bool key_down = movement_allowed && app_hotkey_key_down(app_settings, binding.action, key_state);
+            if (!key_down) s_visual_move_blocked[binding.action] = false;
+            else if (poll_mods != app_settings->app_hotkeys[binding.action].mods)
+                s_visual_move_blocked[binding.action] = true;
+
+            if (!key_down || s_visual_move_blocked[binding.action]) {
                 s_visual_move_held[binding.action] = false;
                 s_visual_move_timers[binding.action] = 0.0f;
                 continue;

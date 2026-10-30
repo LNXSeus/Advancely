@@ -933,6 +933,7 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 |                          | `P`                        | Toggle the manual positioning checkbox (`Icon`, `Text` or `Progress`) of every selected element. If any has no position yet they all get one, starting where they currently sit, otherwise they all return to the automatic layout.                           |
 |                          | `Delete`                   | Remove the selected goals, criteria, sub-stats and decorations from the template.                                                                                                                                                                             |
 |                          | `Ctrl+C`                   | Duplicate them, layout coordinates included, under the usual `_copy` id. The copy ends up selected in the editor.                                                                                                                                             |
+|                          | `Ctrl+A`                   | Select every element on the map, decoration handles included. |
 
 The three `View` menu toggles only fire while the tracker map itself is focused, never while you are working in the
 settings or the template editor, which is what lets `Lock Layout` keep the bare `Space` it has always used. Each one

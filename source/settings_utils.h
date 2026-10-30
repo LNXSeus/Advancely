@@ -641,7 +641,13 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Duplicates every selected goal, criterion, sub-stat and decoration, layout coordinates\n" \
       "and all, so the copy starts out exactly on top of the original.\n" \
       "Each copy gets the usual \"_copy\" id, counting up when that one is taken.\n" \
-      "The copies appear in the template editor and show up on the map once you save.")
+      "The copies appear in the template editor and show up on the map once you save.") \
+    X(APP_HOTKEY_SELECT_ALL, "select_all", "A", HOTKEY_MOD_CTRL, \
+      APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_VISUAL, \
+      "Select All", \
+      "Selects every element on the map: icons, texts, progress texts, criteria, sub-stats\n" \
+      "and decoration handles.\n" \
+      "Does nothing while a text box is being typed in, where it selects the text instead.")
 
 typedef enum {
 #define X(enum_id, ...) enum_id,

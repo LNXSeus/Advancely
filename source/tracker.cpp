@@ -14051,6 +14051,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
         }
 
+        if (t->visual_select_all_pressed && !t->visual_select_rect_active) {
+            for (const auto &item: s_visual_layout_items) {
+                s_visual_selected_items.insert(item.pos);
+            }
+        }
+        t->visual_select_all_pressed = false;
+
         // Rebuild the deduplicated linkable-goal identities for the template editor.
         s_visual_selected_goals.clear();
         for (const auto &item: s_visual_layout_items) {
@@ -14117,6 +14124,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         t->visual_toggle_manual_pos_pressed = false;
         t->visual_delete_pressed = false;
         t->visual_copy_pressed = false;
+        t->visual_select_all_pressed = false;
         tracker_clear_visual_edit_request();
         // Duplicates that never made it onto the map must not select themselves much later.
         s_visual_pending_selection.clear();
