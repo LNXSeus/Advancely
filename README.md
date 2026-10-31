@@ -1407,7 +1407,7 @@ This way templates don't need to be copied for each subversion.
 | `all_advancements` | 1.16.1                                                                                                       | `half%_categorical`        | Default, ger, zh_cn     |            |
 | `all_advancements` | 1.16.1                                                                                                       | `_categorical`             | Default, ger, zh_cn, jp |            |
 | `all_advancements` | 1.12, 1.13, 25w14craftmine                                                                                   |                            | Default                 |            |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3                                                    |                            | Default, ger, zh_cn     |            |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.4, 1.21.6, 1.21.11, 26.1, 26.2, 26.3, 26.4                                              |                            | Default, ger, zh_cn     |            |
 | `all_advancements` | 1.12, 1.13, 1.14, 1.15, 1.16.2, 1.17, 1.18, 1.19, 1.20, 1.20.5, 1.21, 1.21.6 1.21.11, 26.1, 26.2, 26.3, 26.4 | `categorical`              | Default, ger, zh_cn     |            |
 | `all_advancements` | 1.16.1, 1.17, 1.21.11, 26.1, 26.2, 26.3, 26.4                                                                | `aatool_optimized`         | Default, ger, zh_cn     |            |
 | `all_advancements` | 1.16.1                                                                                                       | `aatool_optimized`, `coop` | Default, ger, zh_cn     | `vertical` |
