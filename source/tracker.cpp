@@ -8491,6 +8491,17 @@ static inline bool tracker_layout_hiding_active(const AppSettings *settings, boo
     }
 }
 
+static bool tracker_sub_item_fully_hidden_in_layout(const AppSettings *settings, const TrackableItem *crit,
+                                                    bool is_stat_section, bool parent_fully_hidden_in_layout) {
+    if (!settings->use_manual_layout) return false;
+    bool hiding_active = tracker_layout_hiding_active(settings, crit->done);
+    auto hidden = [&](const ManualPos &pos) {
+        return (pos.is_hidden_in_layout && hiding_active) || (!pos.is_set && parent_fully_hidden_in_layout);
+    };
+    bool has_progress = is_stat_section && ((crit->goal > 0 && !item_progress_hidden(crit)) || crit->goal == -1);
+    return hidden(crit->icon_pos) && hidden(crit->text_pos) && (!has_progress || hidden(crit->progress_pos));
+}
+
 /**
  * @brief Decides whether an item should be drawn faded (greyed out / lower transparency).
  *
@@ -9260,6 +9271,34 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (has_snapshot_text) item_height += sub_text_line_height + 4.0f;
             if (has_progress_text) item_height += sub_text_line_height + 4.0f;
 
+            // --- Layout and Culling ---
+            // Per-position hiding for manual layout
+            bool layout_hiding_active = tracker_layout_hiding_active(settings, is_considered_complete_render);
+            bool hide_icon_in_layout = settings->use_manual_layout && cat->icon_pos.is_hidden_in_layout &&
+                                       layout_hiding_active;
+            bool hide_text_in_layout = settings->use_manual_layout && cat->text_pos.is_hidden_in_layout &&
+                                       layout_hiding_active;
+            bool hide_progress_in_layout = settings->use_manual_layout && cat->progress_pos.is_hidden_in_layout &&
+                                           layout_hiding_active;
+
+            // A fully hidden parent takes its sub-items with it, but only the ones that ride along with
+            // it. Sub-item elements with their own position are independent and stay visible.
+            bool parent_fully_hidden_in_layout = hide_icon_in_layout && hide_text_in_layout &&
+                                                 (!has_progress_text || hide_progress_in_layout);
+
+            bool is_simple_stat = is_stat_section && cat->is_single_stat_category;
+            bool collapse_hidden_rows = is_complex && !is_simple_stat && !has_manual_child &&
+                                        unplaced_criteria_count > settings->scrollable_list_threshold;
+            int listed_criteria_count = unplaced_criteria_count;
+            if (collapse_hidden_rows) {
+                for (TrackableItem *crit: children_to_render) {
+                    if (crit && tracker_sub_item_fully_hidden_in_layout(settings, crit, is_stat_section,
+                                                                        parent_fully_hidden_in_layout)) {
+                        listed_criteria_count--;
+                    }
+                }
+            }
+
             bool use_scrolling_list = false;
             // Height for each criterion row. The configurable spacing only ever adds to the base
             // row height, so rows can never overlap.
@@ -9269,16 +9308,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // ONLY expand parent height based on UNPLACED criteria!
             // Skip for simple stat categories — their single criterion is rendered
             // as inline progress text, not as a sub-item row.
-            bool is_simple_stat = is_stat_section && cat->is_single_stat_category;
-            if (unplaced_criteria_count > 0 && !is_simple_stat) {
+            if (listed_criteria_count > 0 && !is_simple_stat) {
                 item_height += 12.0f; // Initial padding before criteria list
 
                 // Check if we exceed the threshold AND no children are manually placed
-                if (is_complex && unplaced_criteria_count > settings->scrollable_list_threshold && !has_manual_child) {
+                if (is_complex && listed_criteria_count > settings->scrollable_list_threshold && !has_manual_child) {
                     use_scrolling_list = true;
                     criteria_list_height = (float) settings->scrollable_list_threshold * single_criterion_height;
                 } else {
-                    criteria_list_height = (float) unplaced_criteria_count * single_criterion_height;
+                    criteria_list_height = (float) listed_criteria_count * single_criterion_height;
                 }
                 item_height += criteria_list_height;
             }
@@ -9300,20 +9338,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
 
-            // --- Layout and Culling ---
-            // Per-position hiding for manual layout
-            bool layout_hiding_active = tracker_layout_hiding_active(settings, is_considered_complete_render);
-            bool hide_icon_in_layout = settings->use_manual_layout && cat->icon_pos.is_hidden_in_layout &&
-                                       layout_hiding_active;
-            bool hide_text_in_layout = settings->use_manual_layout && cat->text_pos.is_hidden_in_layout &&
-                                       layout_hiding_active;
-            bool hide_progress_in_layout = settings->use_manual_layout && cat->progress_pos.is_hidden_in_layout &&
-                                           layout_hiding_active;
-
-            // A fully hidden parent takes its sub-items with it, but only the ones that ride along with
-            // it. Sub-item elements with their own position are independent and stay visible.
-            bool parent_fully_hidden_in_layout = hide_icon_in_layout && hide_text_in_layout &&
-                                                 (!has_progress_text || hide_progress_in_layout);
             bool has_independent_child_element = false;
             if (parent_fully_hidden_in_layout && is_complex) {
                 for (TrackableItem *crit: children_to_render) {
@@ -9752,7 +9776,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // --- SCROLLING SETUP ---
                     ImVec2 list_min_screen, list_max_screen;
-                    float total_content_height_logical = (float) unplaced_criteria_count * single_criterion_height;
+                    float total_content_height_logical = (float) listed_criteria_count * single_criterion_height;
                     float visible_height_logical = criteria_list_height;
                     float max_scroll_logical = total_content_height_logical - visible_height_logical;
                     if (max_scroll_logical < 0) max_scroll_logical = 0;
@@ -9812,6 +9836,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                  (!crit->progress_pos.is_set && parent_fully_hidden_in_layout));
                         bool crit_name_takes_spot = tracker_name_takes_line(crit->display_name,
                                                                             hide_crit_text_in_layout);
+
+                        if (collapse_hidden_rows && !is_manually_placed &&
+                            tracker_sub_item_fully_hidden_in_layout(settings, crit, is_stat_section,
+                                                                    parent_fully_hidden_in_layout)) {
+                            continue;
+                        }
 
                         float item_screen_y = 0.0f;
                         if (!is_manually_placed) {
@@ -9974,8 +10004,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                       "Icon", crit->root_name,
                                                       cat->display_name, cat->root_name, &cat->icon_pos);
 
-                        current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
-                        // Icon width + padding
+                        if (!hide_crit_icon_in_layout) {
+                            current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
+                            // Icon width + padding
+                        }
 
                         // Coop: parent-advancement leader face beside each criterion.
                         // Reuses cat->first_contributor_uuid (current leader of the
@@ -10213,7 +10245,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         }
 
                         // ADVANCE LAYOUT EVEN IF CHECKBOX NOT RENDERED
-                        if (is_stat_section && cat->criteria_count > 1) {
+                        if (is_stat_section && cat->criteria_count > 1 && !hide_crit_icon_in_layout) {
                             current_element_x_screen += 20.0f * t->zoom_level + 4.0f * t->zoom_level;
                             // Checkbox width + padding
                         }
