@@ -252,6 +252,8 @@ typedef enum {
     X("view_state.camera_locked", PRESET_GROUP_TRACKER_VIEW, "Lock Camera", PRESET_KEY_USER, NULL) \
     X("view_state.locked|view_state.locked_width", PRESET_GROUP_TRACKER_VIEW, "Lock Layout", PRESET_KEY_USER, NULL) \
     X("view_state.sweep_enabled", PRESET_GROUP_TRACKER_VIEW, "Selection Rectangle", PRESET_KEY_USER, NULL) \
+    X("view_state.template_editor_show_all", PRESET_GROUP_TRACKER_VIEW, "Template Editor: Show All", \
+      PRESET_KEY_USER, NULL) \
     X("visuals.tracker_fullscreen|view_state.use_manual_layout|general.goal_hiding_mode|" \
       "general.invert_hiding_mode", PRESET_GROUP_TRACKER_VIEW, "Live Tracker State", PRESET_KEY_SKIP, NULL) \
     \

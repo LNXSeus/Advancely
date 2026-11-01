@@ -8659,6 +8659,7 @@ settings_tooltip(tooltip_buffer); \
                 // the hiding mode to whatever it was when the window was opened.
                 temp_settings.goal_hiding_mode = app_settings->goal_hiding_mode;
                 temp_settings.invert_hiding_mode = app_settings->invert_hiding_mode;
+                temp_settings.template_editor_show_all_versions = app_settings->template_editor_show_all_versions;
 
                 // Preserve the coop_players roster — it's managed by the lobby sync in main.cpp,
                 // not the settings UI. Without this, Apply Settings wipes the roster to 0 players
@@ -8815,6 +8816,7 @@ settings_tooltip(tooltip_buffer); \
         // Restore the preserved goal hiding mode
         temp_settings.goal_hiding_mode = current_hiding_mode;
         temp_settings.invert_hiding_mode = current_invert_hiding;
+        temp_settings.template_editor_show_all_versions = app_settings->template_editor_show_all_versions;
     }
     if (settings_tooltip_wanted()) {
         char tooltip_buffer[512];
@@ -8838,6 +8840,7 @@ settings_tooltip(tooltip_buffer); \
         temp_settings.tracker_fullscreen = app_settings->tracker_fullscreen;
         temp_settings.goal_hiding_mode = app_settings->goal_hiding_mode;
         temp_settings.invert_hiding_mode = app_settings->invert_hiding_mode;
+        temp_settings.template_editor_show_all_versions = app_settings->template_editor_show_all_versions;
         temp_settings.coop_player_count = app_settings->coop_player_count;
         memcpy(temp_settings.coop_players, app_settings->coop_players,
                sizeof(app_settings->coop_players));

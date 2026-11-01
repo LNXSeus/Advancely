@@ -346,6 +346,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_VIEW_LOCKED_WIDTH 0.0f
 #define DEFAULT_TRACKER_USE_MANUAL_LAYOUT true
 #define DEFAULT_TRACKER_VIEW_SWEEP_ENABLED true
+#define DEFAULT_TEMPLATE_EDITOR_SHOW_ALL_VERSIONS false
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
@@ -1015,6 +1016,7 @@ struct AppSettings {
     float view_locked_width;
     bool use_manual_layout; // Manual Layout or Auto Layout
     bool view_sweep_enabled; // Left-drag on empty map sweeps manual checkboxes. Off disables the rectangle.
+    bool template_editor_show_all_versions; // Template editor lists every version's templates in sections.
 
     // --- Overlay Text Sections ---
     bool overlay_show_world; // If true, the world name is shown in the overlay.

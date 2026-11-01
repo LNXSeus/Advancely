@@ -6841,6 +6841,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<std::string> version_display_names;
     static std::vector<const char *> version_display_c_strs;
     static bool version_counts_generated = false;
+    static std::vector<std::vector<DiscoveredTemplate> > all_version_templates;
+    static char pending_select_category[MAX_PATH_LENGTH] = "";
+    static char pending_select_flag[MAX_PATH_LENGTH] = "";
+    static bool pending_select_active = false;
 
     if (!version_counts_generated) {
         // This can run more than once (regenerated when templates change). Clear first so we rebuild
@@ -6849,10 +6853,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         version_display_names.clear();
         version_display_c_strs.clear();
         version_display_names.reserve(VERSION_STRINGS_COUNT);
+        all_version_templates.assign(VERSION_STRINGS_COUNT, std::vector<DiscoveredTemplate>());
         for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
             DiscoveredTemplate *templates = nullptr;
             int count = 0;
             scan_for_templates(VERSION_STRINGS[i], &templates, &count);
+            all_version_templates[i].assign(templates, templates + count);
 
             char buffer[128];
             if (count > 0) {
@@ -7084,6 +7090,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     break;
                 }
             }
+        }
+
+        if (pending_select_active) {
+            for (int i = 0; i < discovered_template_count; i++) {
+                if (strcmp(discovered_templates[i].category, pending_select_category) == 0 &&
+                    strcmp(discovered_templates[i].optional_flag, pending_select_flag) == 0) {
+                    selected_template_index = i;
+                    selected_lang_index = -1;
+                    selected_layout_mgmt_index = -1;
+                    selected_lang_flag = "";
+                    selected_layout_flag = "";
+                    break;
+                }
+            }
+            pending_select_active = false;
         }
         status_message[0] = '\0'; // Clear status message
     }
@@ -7608,7 +7629,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Version Selector
     bool template_switching_disabled = visual_editing_active || has_unsaved_changes_in_editor;
-    ImGui::BeginDisabled(template_switching_disabled);
+    bool &show_all_versions = app_settings->template_editor_show_all_versions;
+    ImGui::BeginDisabled(template_switching_disabled || show_all_versions);
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
     if (combo_wheel("Template Version", &creator_version_idx, version_display_c_strs.data(),
                     version_display_c_strs.size())) {
@@ -7633,6 +7655,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
                      "Cannot change version while the template has unsaved changes.\n"
                      "Save or revert your changes first.");
+        } else if (show_all_versions) {
+            snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
+                     "Disabled while 'Show All' is checked.\n"
+                     "The list shows the templates of every version, and selecting one\n"
+                     "switches to its version.");
         } else {
             snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
                      "Select the game version for which you want to manage templates.\n"
@@ -7640,7 +7667,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SetTooltip("%s", version_combo_tooltip_buffer);
     }
-    ImGui::EndDisabled(); // template_switching_disabled
+    ImGui::EndDisabled(); // template_switching_disabled || show_all_versions
+
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Show All##tc_show_all_versions", &show_all_versions)) {
+        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+        settings_save(app_settings, t ? t->template_data : nullptr, SAVE_CONTEXT_ALL);
+    }
+    if (ImGui::IsItemHovered()) {
+        char show_all_tooltip_buffer[256];
+        snprintf(show_all_tooltip_buffer, sizeof(show_all_tooltip_buffer),
+                 "List the templates of every version at once, in a collapsible section per version.\n"
+                 "The search then filters templates across all versions.");
+        ImGui::SetTooltip("%s", show_all_tooltip_buffer);
+    }
 
     ImGui::SameLine();
 
@@ -7905,54 +7945,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Determine if search is active for the template list
     bool is_template_search_active = (current_search_scope == SCOPE_TEMPLATES && tc_search_buffer[0] != '\0');
 
-    // Create a filtered list of indices to count and render from
-    std::vector<int> templates_to_render_indices;
-    if (is_template_search_active) {
-        for (int i = 0; i < discovered_template_count; i++) {
-            char item_label[MAX_PATH_LENGTH * 2];
-            if (discovered_templates[i].optional_flag[0] != '\0') {
-                snprintf(item_label, sizeof(item_label), "%s%s", discovered_templates[i].category,
-                         discovered_templates[i].optional_flag);
-            } else {
-                snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
-            }
-            if (str_contains_insensitive(item_label, tc_search_buffer)) {
-                templates_to_render_indices.push_back(i);
-            }
+    auto template_matches_search = [&](const DiscoveredTemplate &tpl) {
+        if (!is_template_search_active) return true;
+        char item_label[MAX_PATH_LENGTH * 2];
+        if (tpl.optional_flag[0] != '\0') {
+            snprintf(item_label, sizeof(item_label), "%s%s", tpl.category, tpl.optional_flag);
+        } else {
+            snprintf(item_label, sizeof(item_label), "%s", tpl.category);
         }
-    } else {
-        for (int i = 0; i < discovered_template_count; i++) {
-            templates_to_render_indices.push_back(i);
-        }
-    }
+        return str_contains_insensitive(item_label, tc_search_buffer);
+    };
 
-    // --- Centered Counter for the list ---
-    char counter_text[128];
-    snprintf(counter_text, sizeof(counter_text), "%zu %s", templates_to_render_indices.size(),
-             templates_to_render_indices.size() == 1 ? "Template" : "Templates");
-    float text_width = ImGui::CalcTextSize(counter_text).x;
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - text_width) * 0.5f);
-    ImGui::TextDisabled("%s", counter_text);
-
-    bool edit_double_click_fired = false;
-
-    // Render the filtered list using the stored indices
-    for (int i: templates_to_render_indices) {
-        const DiscoveredTemplate &tpl = discovered_templates[i];
-
-        // Two templates can share the same concatenated name with a different category/flag split
-        // (e.g. category "all"/flag "_x" vs category "all_x"/flag ""). They are distinct templates in
-        // separate folders, so PushID(i) keeps their rows from colliding on the same ImGui ID, and the
-        // optional flag is drawn faded so the split is always visible.
-        ImGui::PushID(i);
-
-        // Full-width selectable with a hidden label; the two-tone text is painted on top via the draw
-        // list (no cursor juggling, which would otherwise trip ImGui's "SetCursorPos extends boundary"
-        // warning when the last row is followed directly by EndChild).
+    // Full-width selectable with a hidden label; the two-tone text is painted on top via the draw
+    // list (no cursor juggling, which would otherwise trip ImGui's "SetCursorPos extends boundary"
+    // warning when the last row is followed directly by EndChild).
+    auto draw_template_row = [&](const DiscoveredTemplate &tpl, bool is_selected, bool *double_clicked) {
         ImVec2 row_screen_pos = ImGui::GetCursorScreenPos();
-        bool clicked = ImGui::Selectable("##tpl_row", selected_template_index == i,
-                                         ImGuiSelectableFlags_AllowDoubleClick);
-        bool double_clicked = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        bool clicked = ImGui::Selectable("##tpl_row", is_selected, ImGuiSelectableFlags_AllowDoubleClick);
+        *double_clicked = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[64];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Double-click to edit this template.");
@@ -7978,43 +7988,161 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             row_draw_list->AddText(ImVec2(flag_x, row_screen_pos.y), ImGui::GetColorU32(flag_col), flag_text);
         }
+        return clicked;
+    };
 
-        if (clicked) {
-            selected_template_index = i;
-            selected_lang_index = -1; // Reset language selection
-            selected_layout_mgmt_index = -1; // Reset layout selection
-            selected_lang_flag = ""; // default
-            selected_layout_flag = ""; // default
-            // If we are in the editor, we must update the loaded data
-            if (editing_template) {
-                selected_template_info = discovered_templates[i];
-                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                              selected_layout_flag, current_template_data,
-                                              status_message)) {
-                    // Also update the 'saved' snapshot to reflect the newly loaded state
-                    saved_template_data = current_template_data;
+    bool edit_double_click_fired = false;
 
-                    // Exit editor to prevent confusion
-                    editing_template = false;
+    auto select_template = [&](int i, bool double_clicked) {
+        selected_template_index = i;
+        selected_lang_index = -1; // Reset language selection
+        selected_layout_mgmt_index = -1; // Reset layout selection
+        selected_lang_flag = ""; // default
+        selected_layout_flag = ""; // default
+        // If we are in the editor, we must update the loaded data
+        if (editing_template) {
+            selected_template_info = discovered_templates[i];
+            if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                          selected_layout_flag, current_template_data,
+                                          status_message)) {
+                // Also update the 'saved' snapshot to reflect the newly loaded state
+                saved_template_data = current_template_data;
 
-                    // Reset search buffer and selections
-                    tc_search_buffer[0] = '\0';
-                    selected_advancement = nullptr;
-                    selected_stat = nullptr;
-                    selected_ms_goal = nullptr;
-                }
+                // Exit editor to prevent confusion
+                editing_template = false;
+
+                // Reset search buffer and selections
+                tc_search_buffer[0] = '\0';
+                selected_advancement = nullptr;
+                selected_stat = nullptr;
+                selected_ms_goal = nullptr;
             }
-
-            // General state changes on any selection
-            show_create_new_view = false;
-            show_copy_view = false;
-            show_rename_view = false;
-            status_message[0] = '\0';
-
-            if (double_clicked) edit_double_click_fired = true;
         }
 
-        ImGui::PopID();
+        // General state changes on any selection
+        show_create_new_view = false;
+        show_copy_view = false;
+        show_rename_view = false;
+        status_message[0] = '\0';
+
+        if (double_clicked) edit_double_click_fired = true;
+    };
+
+    // Create a filtered list of indices to count and render from
+    std::vector<int> templates_to_render_indices;
+    std::vector<std::vector<int> > version_matches;
+    size_t listed_template_count = 0;
+    if (show_all_versions) {
+        version_matches.resize(all_version_templates.size());
+        for (size_t v = 0; v < all_version_templates.size(); v++) {
+            for (size_t j = 0; j < all_version_templates[v].size(); j++) {
+                if (template_matches_search(all_version_templates[v][j])) version_matches[v].push_back((int) j);
+            }
+            listed_template_count += version_matches[v].size();
+        }
+    } else {
+        for (int i = 0; i < discovered_template_count; i++) {
+            if (template_matches_search(discovered_templates[i])) templates_to_render_indices.push_back(i);
+        }
+        listed_template_count = templates_to_render_indices.size();
+    }
+
+    // --- Centered Counter for the list ---
+    char counter_text[128];
+    snprintf(counter_text, sizeof(counter_text), "%zu %s", listed_template_count,
+             listed_template_count == 1 ? "Template" : "Templates");
+    float text_width = ImGui::CalcTextSize(counter_text).x;
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - text_width) * 0.5f);
+    ImGui::TextDisabled("%s", counter_text);
+
+    if (!show_all_versions) {
+        // Render the filtered list using the stored indices
+        for (int i: templates_to_render_indices) {
+            // Two templates can share the same concatenated name with a different category/flag split
+            // (e.g. category "all"/flag "_x" vs category "all_x"/flag ""). They are distinct templates in
+            // separate folders, so PushID(i) keeps their rows from colliding on the same ImGui ID, and the
+            // optional flag is drawn faded so the split is always visible.
+            ImGui::PushID(i);
+            bool double_clicked = false;
+            if (draw_template_row(discovered_templates[i], selected_template_index == i, &double_clicked)) {
+                select_template(i, double_clicked);
+            }
+            ImGui::PopID();
+        }
+    } else {
+        static std::string last_show_all_search;
+        bool search_changed = last_show_all_search != tc_search_buffer;
+        last_show_all_search = tc_search_buffer;
+
+        const DiscoveredTemplate *selected_tpl =
+                (selected_template_index >= 0 && selected_template_index < discovered_template_count)
+                    ? &discovered_templates[selected_template_index]
+                    : nullptr;
+
+        if (is_template_search_active && search_changed) {
+            ImGuiStorage *header_storage = ImGui::GetStateStorage();
+            for (size_t v = 0; v < version_matches.size(); v++) {
+                char header_id[96];
+                snprintf(header_id, sizeof(header_id), "###tc_ver_%s", VERSION_STRINGS[v]);
+                header_storage->SetInt(ImGui::GetID(header_id), version_matches[v].empty() ? 0 : 1);
+            }
+        }
+
+        for (size_t v = 0; v < version_matches.size(); v++) {
+            if (version_matches[v].empty()) continue;
+            const char *version_name = VERSION_STRINGS[v];
+            bool is_current_version = strcmp(version_name, creator_version_str) == 0;
+
+            char header_label[128];
+            snprintf(header_label, sizeof(header_label), "%s (%zu)###tc_ver_%s", version_name,
+                     version_matches[v].size(), version_name);
+            if (is_current_version) ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+            if (!ImGui::CollapsingHeader(header_label)) continue;
+
+            ImGui::PushID((int) v);
+            for (int j: version_matches[v]) {
+                const DiscoveredTemplate &tpl = all_version_templates[v][j];
+                bool is_selected = is_current_version && selected_tpl &&
+                                   strcmp(selected_tpl->category, tpl.category) == 0 &&
+                                   strcmp(selected_tpl->optional_flag, tpl.optional_flag) == 0;
+                ImGui::PushID(j);
+                bool double_clicked = false;
+                if (draw_template_row(tpl, is_selected, &double_clicked)) {
+                    if (is_current_version) {
+                        for (int i = 0; i < discovered_template_count; i++) {
+                            if (strcmp(discovered_templates[i].category, tpl.category) == 0 &&
+                                strcmp(discovered_templates[i].optional_flag, tpl.optional_flag) == 0) {
+                                select_template(i, double_clicked);
+                                break;
+                            }
+                        }
+                    } else {
+                        strncpy(creator_version_str, version_name, sizeof(creator_version_str) - 1);
+                        creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                        creator_version_idx = (int) v;
+                        editing_template = false;
+                        selected_template_index = -1;
+                        selected_lang_index = -1;
+                        selected_layout_mgmt_index = -1;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        show_create_new_view = false;
+                        show_copy_view = false;
+                        show_rename_view = false;
+                        status_message[0] = '\0';
+
+                        strncpy(pending_select_category, tpl.category, sizeof(pending_select_category) - 1);
+                        pending_select_category[sizeof(pending_select_category) - 1] = '\0';
+                        strncpy(pending_select_flag, tpl.optional_flag, sizeof(pending_select_flag) - 1);
+                        pending_select_flag[sizeof(pending_select_flag) - 1] = '\0';
+                        pending_select_active = true;
+                    }
+                }
+                ImGui::PopID();
+            }
+            ImGui::PopID();
+        }
     }
     ImGui::EndChild();
     ImGui::EndDisabled(); // template_switching_disabled (template list)

@@ -1267,6 +1267,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->view_locked_width = DEFAULT_TRACKER_VIEW_LOCKED_WIDTH;
     settings->use_manual_layout = DEFAULT_TRACKER_USE_MANUAL_LAYOUT;
     settings->view_sweep_enabled = DEFAULT_TRACKER_VIEW_SWEEP_ENABLED;
+    settings->template_editor_show_all_versions = DEFAULT_TEMPLATE_EDITOR_SHOW_ALL_VERSIONS;
 
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
@@ -3464,6 +3465,9 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
 
         cJSON *sweep_enabled = cJSON_GetObjectItem(view_state_json, "sweep_enabled");
         if (cJSON_IsBool(sweep_enabled)) settings->view_sweep_enabled = cJSON_IsTrue(sweep_enabled);
+
+        cJSON *tc_show_all = cJSON_GetObjectItem(view_state_json, "template_editor_show_all");
+        if (cJSON_IsBool(tc_show_all)) settings->template_editor_show_all_versions = cJSON_IsTrue(tc_show_all);
     }
 
     return defaults_were_used;
@@ -4330,6 +4334,8 @@ static void settings_fill_json(cJSON *root, const AppSettings *settings, const T
         cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
         cJSON_AddBoolToObject(view_state_obj, "use_manual_layout", settings->use_manual_layout);
         cJSON_AddBoolToObject(view_state_obj, "sweep_enabled", settings->view_sweep_enabled);
+        cJSON_AddBoolToObject(view_state_obj, "template_editor_show_all",
+                              settings->template_editor_show_all_versions);
 
         // Safely replace or add view_state
         cJSON_DeleteItemFromObject(root, "view_state");
