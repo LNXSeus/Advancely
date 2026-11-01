@@ -7934,6 +7934,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - text_width) * 0.5f);
     ImGui::TextDisabled("%s", counter_text);
 
+    bool edit_double_click_fired = false;
+
     // Render the filtered list using the stored indices
     for (int i: templates_to_render_indices) {
         const DiscoveredTemplate &tpl = discovered_templates[i];
@@ -7948,7 +7950,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // list (no cursor juggling, which would otherwise trip ImGui's "SetCursorPos extends boundary"
         // warning when the last row is followed directly by EndChild).
         ImVec2 row_screen_pos = ImGui::GetCursorScreenPos();
-        bool clicked = ImGui::Selectable("##tpl_row", selected_template_index == i);
+        bool clicked = ImGui::Selectable("##tpl_row", selected_template_index == i,
+                                         ImGuiSelectableFlags_AllowDoubleClick);
+        bool double_clicked = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[64];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Double-click to edit this template.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
 
         ImDrawList *row_draw_list = ImGui::GetWindowDrawList();
         row_draw_list->AddText(row_screen_pos, ImGui::GetColorU32(ImGuiCol_Text), tpl.category);
@@ -8001,6 +8010,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             show_copy_view = false;
             show_rename_view = false;
             status_message[0] = '\0';
+
+            if (double_clicked) edit_double_click_fired = true;
         }
 
         ImGui::PopID();
@@ -8087,7 +8098,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     ImGui::BeginDisabled(selected_template_index == -1);
-    if (ImGui::Button("Edit Template") || edit_hotkey_fired) {
+    if (ImGui::Button("Edit Template") || edit_hotkey_fired || edit_double_click_fired) {
         editing_template = true;
         show_create_new_view = false;
         show_copy_view = false;
