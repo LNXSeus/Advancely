@@ -1050,6 +1050,7 @@ void settings_set_defaults(AppSettings *settings) {
     // New visual/general defaults
     settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
     settings->using_stats_per_world_legacy = DEFAULT_USING_STATS_PER_WORLD_LEGACY;
+    settings->using_hermes = DEFAULT_USING_HERMES;
     settings->fps = DEFAULT_FPS;
     settings->overlay_fps = DEFAULT_OVERLAY_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
