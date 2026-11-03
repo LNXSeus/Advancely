@@ -772,6 +772,7 @@ struct TemplateData {
     int completion_goals_completed; // Done goals within that set
     int completion_type_mask;
     char completion_label[128];
+    char completion_progress_label[128]; // lang "run_completion.progress_label", empty = "Prog"
 
     float host_time_since_last_update; // Co-op: host's update timer, mirrored by receivers
 

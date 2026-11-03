@@ -3695,7 +3695,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     if (t && t->template_data) {
         char info_buffer[512] = {0};
         char final_buffer[1024];
-        char temp_chunk[256];
+        char temp_chunk[512];
         bool first_item_added = false;
 
         // Build the separator string ("|" by default, configurable for fonts that
@@ -3760,8 +3760,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 bool show_prog_percent = tracker_progress_percent_shown(t->template_data);
 
                 if (show_adv_counter && show_prog_percent) {
-                    snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - %s: %.2f%%",
                              counter_label, counter_done, counter_total,
+                             tracker_progress_percent_label(t->template_data, "Prog"),
                              t->template_data->overall_progress_percentage);
                     add_component(temp_chunk);
                 } else if (show_adv_counter) {

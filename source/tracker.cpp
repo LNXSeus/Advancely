@@ -4512,6 +4512,14 @@ static void tracker_read_completion_label(TemplateData *td, const cJSON *lang_js
         strncpy(td->completion_label, label->valuestring, sizeof(td->completion_label) - 1);
         td->completion_label[sizeof(td->completion_label) - 1] = '\0';
     }
+    td->completion_progress_label[0] = '\0';
+    const cJSON *progress_label =
+            lang_json ? cJSON_GetObjectItem(lang_json, "run_completion.progress_label") : nullptr;
+    if (progress_label && cJSON_IsString(progress_label) && progress_label->valuestring) {
+        strncpy(td->completion_progress_label, progress_label->valuestring,
+                sizeof(td->completion_progress_label) - 1);
+        td->completion_progress_label[sizeof(td->completion_progress_label) - 1] = '\0';
+    }
 }
 
 // Counts the goals the template's completion rule requires and how many of them are done, into
@@ -4604,8 +4612,11 @@ bool tracker_progress_percent_shown(const TemplateData *td) {
 }
 
 const char *tracker_progress_percent_label(const TemplateData *td, const char *fallback) {
-    if (td && td->run_completion.progress && td->completion_goal_count == 0 && td->completion_label[0] != '\0')
-        return td->completion_label;
+    if (!td) return fallback;
+    const RunCompletionRule *rule = &td->run_completion;
+    if (rule->progress && td->completion_goal_count == 0)
+        return td->completion_label[0] != '\0' ? td->completion_label : fallback;
+    if (td->completion_progress_label[0] != '\0') return td->completion_progress_label;
     return fallback;
 }
 
@@ -4695,7 +4706,10 @@ bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, co
     // Only the progress percentage is required, so the progress text shows only the percentage.
     if (td->run_completion.progress) return false;
     if (td->advancement_goal_count <= 0) return false;
-    *label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+    if (run_completion_requires_everything(&td->run_completion) && td->completion_label[0] != '\0')
+        *label = td->completion_label;
+    else
+        *label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
     *done = td->advancements_completed_count;
     *total = td->advancement_goal_count;
     return true;
@@ -14412,7 +14426,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time),
                                  settings->igt_unit_spacing);
 
-        char temp_chunk[256];
+        char temp_chunk[512];
         const char *counter_label = "";
         int counter_done = 0, counter_total = 0;
         bool show_adv_counter = tracker_get_progress_counter(t->template_data, version, &counter_label,
@@ -14442,8 +14456,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
-            snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d  -  Prog: %.2f%%",
+            snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d  -  %s: %.2f%%",
                      info_sep, counter_label, counter_done, counter_total,
+                     tracker_progress_percent_label(t->template_data, "Prog"),
                      t->template_data->overall_progress_percentage);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_adv_counter) {
@@ -17812,7 +17827,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     // The counter is the run completion set when the template has one, else Adv/Ach by version.
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    char progress_chunk[256] = "";
+    char progress_chunk[512] = "";
     const char *counter_label = "";
     int counter_done = 0, counter_total = 0;
     bool show_adv_counter = tracker_get_progress_counter(t->template_data, version, &counter_label,
@@ -17827,8 +17842,9 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     snprintf(title_sep, sizeof(title_sep), "    %s    ", title_sep_char);
 
     if (show_adv_counter && show_prog_percent) {
-        snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d    -    Progress: %.2f%%",
+        snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d    -    %s: %.2f%%",
                  title_sep, counter_label, counter_done, counter_total,
+                 tracker_progress_percent_label(t->template_data, "Progress"),
                  t->template_data->overall_progress_percentage);
     } else if (show_adv_counter) {
         snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d",

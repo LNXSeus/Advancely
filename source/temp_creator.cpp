@@ -466,6 +466,7 @@ struct EditorRunCompletion {
     float percent = 100.0f;
     bool require_both = false;
     char label[128] = {0};
+    char progress_label[128] = {0};
 };
 
 struct EditorTemplate {
@@ -537,7 +538,8 @@ static bool are_editor_run_completions_different(const EditorRunCompletion &a, c
     }
     return a.use_count != b.use_count || a.count != b.count ||
            a.use_percent != b.use_percent || a.percent != b.percent ||
-           a.require_both != b.require_both || strcmp(a.label, b.label) != 0;
+           a.require_both != b.require_both || strcmp(a.label, b.label) != 0 ||
+           strcmp(a.progress_label, b.progress_label) != 0;
 }
 
 // Reads the template's "run_completion" section and the language's counter label into the editor.
@@ -559,6 +561,12 @@ static void tc_run_completion_load(const cJSON *root, const cJSON *lang_json, Ed
     if (label && cJSON_IsString(label) && label->valuestring) {
         strncpy(out.label, label->valuestring, sizeof(out.label) - 1);
         out.label[sizeof(out.label) - 1] = '\0';
+    }
+    const cJSON *progress_label =
+            lang_json ? cJSON_GetObjectItem(lang_json, "run_completion.progress_label") : nullptr;
+    if (progress_label && cJSON_IsString(progress_label) && progress_label->valuestring) {
+        strncpy(out.progress_label, progress_label->valuestring, sizeof(out.progress_label) - 1);
+        out.progress_label[sizeof(out.progress_label) - 1] = '\0';
     }
 }
 
@@ -3643,6 +3651,10 @@ static cJSON *build_editor_lang_json(const EditorTemplate &editor_data,
     if (editor_data.run_completion.label[0] != '\0') {
         cJSON_AddStringToObject(lang_json, "run_completion.label", editor_data.run_completion.label);
     }
+    if (editor_data.run_completion.progress_label[0] != '\0') {
+        cJSON_AddStringToObject(lang_json, "run_completion.progress_label",
+                                editor_data.run_completion.progress_label);
+    }
 
     tc_for_each_lang_entry(editor_data, [&](const char *display_key, const char *desc_key,
                                             const char *display_text, const std::string *description,
@@ -3762,6 +3774,10 @@ static void write_other_language_files(const char *version, const DiscoveredTemp
         if (completion_label) {
             cJSON_AddItemToObject(rebuilt, "run_completion.label", cJSON_Duplicate(completion_label, 1));
         }
+        cJSON *progress_label = cJSON_GetObjectItem(existing, "run_completion.progress_label");
+        if (progress_label) {
+            cJSON_AddItemToObject(rebuilt, "run_completion.progress_label", cJSON_Duplicate(progress_label, 1));
+        }
         for (const auto &kv: lang_writes) {
             cJSON_AddStringToObject(rebuilt, kv.first.c_str(), kv.second.c_str());
         }
@@ -3771,6 +3787,7 @@ static void write_other_language_files(const char *version, const DiscoveredTemp
             if (!entry->string) continue;
             if (strcmp(entry->string, "display_category") == 0) continue;
             if (strcmp(entry->string, "run_completion.label") == 0) continue;
+            if (strcmp(entry->string, "run_completion.progress_label") == 0) continue;
             if (current_keys.count(entry->string) || stale_keys.count(entry->string)) continue;
             cJSON_AddItemToObject(rebuilt, entry->string, cJSON_Duplicate(entry, 1));
         }
@@ -6188,7 +6205,9 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
 
     // With only the progress percentage picked, the label names the percentage instead of a counter.
     const bool progress_only = rc.progress && !has_goal_set;
-    const char *derived = progress_only ? "Prog" : run_completion_derived_label(required_mask, modern);
+    const char *derived = progress_only ? "Prog"
+                          : everything  ? (modern ? "Adv" : "Ach")
+                                        : run_completion_derived_label(required_mask, modern);
     ImGui::SetNextItemWidth(260.0f);
     ImGui::InputTextWithHint("Counter Label", derived, rc.label, sizeof(rc.label));
     if (ImGui::IsItemHovered()) {
@@ -6197,21 +6216,40 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
                  "Text shown in front of the counter, e.g. 'Blocks Placed' for 'Blocks Placed: 12/40'.\n"
                  "With only 'Progress Percentage' picked it names the percentage instead.\n"
                  "Saved into the language file selected above (key 'run_completion.label'), so each\n"
-                 "language can have its own. Leave empty for the automatic name (%s).\n"
-                 "Ignored while 'Everything' is picked.", derived);
+                 "language can have its own. Leave empty for the automatic name (%s).", derived);
         ImGui::SetTooltip("%s", tip);
     }
 
-    char shown[256];
+    const bool counter_and_percent = everything || (rc.progress && has_goal_set);
+    if (counter_and_percent) {
+        ImGui::SetNextItemWidth(260.0f);
+        ImGui::InputTextWithHint("Progress Label", "Prog", rc.progress_label, sizeof(rc.progress_label));
+        if (ImGui::IsItemHovered()) {
+            char tip[512];
+            snprintf(tip, sizeof(tip),
+                     "Text shown in front of the progress percentage next to the counter,\n"
+                     "e.g. 'Progress' for 'Advancements: 12/80 - Progress: 15.00%%'.\n"
+                     "Saved into the language file selected above (key 'run_completion.progress_label'),\n"
+                     "so each language can have its own. Leave empty for the default (Prog).");
+            ImGui::SetTooltip("%s", tip);
+        }
+    }
+
+    char shown[512];
     if (progress_only) {
         snprintf(shown, sizeof(shown), "%s: 0.00%%", rc.label[0] != '\0' ? rc.label : derived);
     } else if (!has_goal_set) {
-        snprintf(shown, sizeof(shown), "%s: 0/%d", modern ? "Adv" : "Ach", type_total[RC_TYPE_ADVANCEMENTS]);
+        snprintf(shown, sizeof(shown), "%s: 0/%d", rc.label[0] != '\0' ? rc.label : derived,
+                 type_total[RC_TYPE_ADVANCEMENTS]);
     } else {
         snprintf(shown, sizeof(shown), "%s: 0/%d", rc.label[0] != '\0' ? rc.label : derived, set_size);
     }
-    if (rc.progress && has_goal_set) ImGui::TextWrapped("Shown as: %s, plus the progress percentage", shown);
-    else ImGui::TextWrapped("Shown as: %s", shown);
+    if (counter_and_percent && has_progress_steps) {
+        const size_t len = strlen(shown);
+        snprintf(shown + len, sizeof(shown) - len, " - %s: 0.00%%",
+                 rc.progress_label[0] != '\0' ? rc.progress_label : "Prog");
+    }
+    ImGui::TextWrapped("Shown as: %s", shown);
 }
 
 static const char *const SELECTED_ONLY_LABEL = "Selected";
@@ -8233,10 +8271,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         show_rename_view = false;
 
         if (selected_template_index != -1) {
-            if (selected_lang_index == -1) selected_lang_index = 0;
-
             selected_template_info = discovered_templates[selected_template_index];
-            selected_lang_flag = selected_template_info.available_lang_flags[selected_lang_index];
+            const auto &lang_flags = selected_template_info.available_lang_flags;
+            const auto &layout_flags = selected_template_info.available_layout_flags;
+            selected_lang_flag = lang_flags.empty() ? "" : lang_flags[0];
             selected_layout_flag = ""; // default layout
 
             // When opening the template that's already applied, adopt its current language + layout
@@ -8247,6 +8285,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 selected_lang_flag = app_settings->lang_flag;
                 selected_layout_flag = app_settings->layout_flag;
             }
+
+            if (selected_lang_index >= 0 && selected_lang_index < (int) lang_flags.size())
+                selected_lang_flag = lang_flags[selected_lang_index];
+            if (selected_layout_mgmt_index >= 0 && selected_layout_mgmt_index < (int) layout_flags.size())
+                selected_layout_flag = layout_flags[selected_layout_mgmt_index];
 
             if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
                                           selected_layout_flag, current_template_data, status_message)) {
