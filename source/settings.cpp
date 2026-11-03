@@ -182,16 +182,15 @@ struct CompactSelTarget {
 // `is_cycle` picks cycle-vs-stack wording (and the cycle's "at least one must stay selected" note).
 // Presence/label rules match compact_compute_type_counters and the tracker's section separators, so
 // `cc` has to come from it with the caller's own hidden rule: real totals for the cycle, hidden-aware
-// (`show_hidden`) for the stack, which only lists what can really pop. The cycle's types list also
+// (`hidden_rule`) for the stack, which only lists what can really pop. The cycle's types list also
 // leads with the progress text the other modes show in their top bar (the run-completion counter
 // and the overall percentage), toggled through `run_counter` / `run_percent` (nullptr for the stack).
 static void compact_selection_ui(const char *suffix, const TemplateData *ctd, const CompactCounter *cc,
                                  bool modern, MC_Version version, const char *types_label, CompactSelTarget tgt,
-                                 int *type_anchor, int *item_anchor, bool is_cycle, bool show_hidden,
+                                 int *type_anchor, int *item_anchor, bool is_cycle, const AppSettings *hidden_rule,
                                  bool *run_counter, bool *run_percent) {
     // A goal hidden in the template is normally not listed here; the "Show Hidden Goals" overlay
-    // option surfaces it so it can be selected. hidden_now() folds that in (true = treat as hidden).
-    auto hidden_now = [&](bool h) { return h && !show_hidden; };
+    // option surfaces it so it can be selected (see goal_is_hidden).
     // --- Goal types (multiselect) ---
     // The panel cycle lists every present type (each is one big "label over count" cycle entry). The
     // pop-out stack lists ONLY the "pickerless" whole-goal types (advancements, recipes, unlocks) -
@@ -277,7 +276,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                      "dropdowns below (so they pop once, via their criteria, instead of twice). Criteria,\n"
                      "stats, custom goals, multi-stage goals and counters are likewise chosen there.\n"
                      "The totals count only goals that can actually pop: goals hidden in the template are\n"
-                     "left out unless \"Show Hidden Goals\" is on, and a type with none left is not listed.\n"
+                     "left out unless \"Show Hidden Goals\" covers them, and a type with none left is not listed.\n"
                      "Shift+Click to range-select. Default: Simple Advancements.");
         settings_tooltip(tip);
     }
@@ -332,35 +331,38 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             if (i < ctd->advancement_count) {
                 TrackableCategory *a = ctd->advancements[i];
                 bool want_recipe = (kind == COMPACT_COUNTER_RECIPE_CRITERIA);
-                if (a && a->is_recipe == want_recipe && a->criteria_count > 0 && !hidden_now(a->is_hidden))
+                if (a && a->is_recipe == want_recipe && a->criteria_count > 0 &&
+                    !goal_is_hidden(a->is_hidden, hidden_rule, adv_hidden_type(a)))
                     return a->root_name;
             }
         } else if (kind == COMPACT_COUNTER_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && st->is_single_stat_category && !hidden_now(st->is_hidden) && st->criteria_count >= 1 &&
+                if (st && st->is_single_stat_category && !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS) &&
+                    st->criteria_count >= 1 &&
                     st->criteria[0] && (st->criteria[0]->goal > 0 || st->criteria[0]->goal == -1))
                     return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_SUB_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && !st->is_single_stat_category && !hidden_now(st->is_hidden)) return st->root_name;
+                if (st && !st->is_single_stat_category && !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS))
+                    return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_CUSTOM) {
             if (i < ctd->custom_goal_count) {
                 TrackableItem *cg = ctd->custom_goals[i];
-                if (cg && !hidden_now(cg->is_hidden)) return cg->root_name;
+                if (cg && !goal_is_hidden(cg->is_hidden, hidden_rule, OVERLAY_HIDDEN_CUSTOM)) return cg->root_name;
             }
         } else if (kind == COMPACT_COUNTER_MULTISTAGE) {
             if (i < ctd->multi_stage_goal_count) {
                 MultiStageGoal *g = ctd->multi_stage_goals[i];
-                if (g && !hidden_now(g->is_hidden)) return g->root_name;
+                if (g && !goal_is_hidden(g->is_hidden, hidden_rule, OVERLAY_HIDDEN_MULTISTAGE)) return g->root_name;
             }
         } else if (kind == COMPACT_COUNTER_COUNTERS) {
             if (i < ctd->counter_goal_count) {
                 CounterGoal *cg = ctd->counter_goals[i];
-                if (cg && !hidden_now(cg->is_hidden)) return cg->root_name;
+                if (cg && !goal_is_hidden(cg->is_hidden, hidden_rule, OVERLAY_HIDDEN_COUNTERS)) return cg->root_name;
             }
         }
         return nullptr;
@@ -504,7 +506,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                 snprintf(item_combo_tooltip_buffer, sizeof(item_combo_tooltip_buffer),
                          "%s\n"
                          "Only goals that can actually pop are listed: goals hidden in the template are\n"
-                         "left out unless \"Show Hidden Goals\" is on.\n"
+                         "left out unless \"Show Hidden Goals\" covers them.\n"
                          "Shift+Click to range-select.\n"
                          "Up to %d individual goals can be added in total.", tip, MAX_COMPACT_CYCLE_ITEMS);
             settings_tooltip(item_combo_tooltip_buffer);
@@ -571,6 +573,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
         strcmp(a->layout_flag, b->layout_flag) != 0 ||
         a->enable_overlay != b->enable_overlay ||
+        a->overlay_window.w != b->overlay_window.w ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
         a->using_hermes != b->using_hermes ||
         a->fps != b->fps ||
@@ -655,6 +658,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
         a->overlay_row3_show_completed != b->overlay_row3_show_completed ||
         a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
+        memcmp(a->overlay_show_hidden_type, b->overlay_show_hidden_type, sizeof(a->overlay_show_hidden_type)) != 0 ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->overlay_clear_animation != b->overlay_clear_animation ||
         a->overlay_clear_fade_enabled != b->overlay_clear_fade_enabled ||
@@ -932,6 +936,7 @@ static bool overlay_settings_different(const AppSettings *a, const AppSettings *
             a->overlay_row2_show_completed != b->overlay_row2_show_completed ||
             a->overlay_row3_show_completed != b->overlay_row3_show_completed ||
             a->overlay_show_hidden_goals != b->overlay_show_hidden_goals ||
+            memcmp(a->overlay_show_hidden_type, b->overlay_show_hidden_type, sizeof(a->overlay_show_hidden_type)) != 0 ||
 
             // Vertical spacing (row gaps) feed the layout math computed once at overlay init.
             a->overlay_custom_vertical_spacing_enabled != b->overlay_custom_vertical_spacing_enabled ||
@@ -4000,11 +4005,12 @@ settings_tooltip(tooltip_buffer); \
                 // Applies to every render mode, so it lives here (outside the mode-specific sections).
                 ImGui::Checkbox("Show Hidden Goals", &temp_settings.overlay_show_hidden_goals);
                 if (settings_tooltip_wanted()) {
-                    char show_hidden_tooltip_buffer[512];
+                    char show_hidden_tooltip_buffer[640];
                     snprintf(show_hidden_tooltip_buffer, sizeof(show_hidden_tooltip_buffer),
                              "Show goals that are marked hidden in the template anyway, in every overlay mode\n"
-                             "(scrolling belt, page and compact). Turn this on to also select hidden goals in\n"
-                             "the Compact panel/stack dropdowns above.\n"
+                             "(scrolling belt, page and compact). The boxes below it pick which goal types\n"
+                             "this applies to. Turn this on to also select hidden goals in the Compact\n"
+                             "panel/stack dropdowns.\n"
                              "The Stack Content dropdowns list and count only goals that can pop, so an\n"
                              "optimized template shows fewer of them there until this is on. The Panel Content\n"
                              "counts are the real section totals and don't change with this.\n"
@@ -4012,11 +4018,72 @@ settings_tooltip(tooltip_buffer); \
                     settings_tooltip(show_hidden_tooltip_buffer);
                 }
 
+                if (temp_settings.overlay_show_hidden_goals) {
+                    const TemplateData *hidden_td = (t && t->template_data &&
+                                                     settings_template_is_loaded(&temp_settings, t))
+                                                        ? t->template_data
+                                                        : nullptr;
+                    CompactCounter hidden_cc[COMPACT_COUNTER_TYPE_COUNT];
+                    compact_compute_type_counters(hidden_td, selected_version, hidden_cc, nullptr);
+                    auto type_present = [&](OverlayCompactCounterType kind) {
+                        return !hidden_td || hidden_cc[kind].total > 0;
+                    };
+
+                    char hidden_adv_label[32], hidden_adv_tip[160], hidden_crit_tip[192];
+                    snprintf(hidden_adv_label, sizeof(hidden_adv_label), "Hidden %s",
+                             advancements_label_plural_uppercase);
+                    snprintf(hidden_adv_tip, sizeof(hidden_adv_tip), "Show %s marked hidden in the template.",
+                             advancements_label_plural_lowercase);
+                    snprintf(hidden_crit_tip, sizeof(hidden_crit_tip),
+                             "Show criteria marked hidden in the template. A hidden criterion of a hidden\n"
+                             "%s also needs the %s box.",
+                             advancement_label_uppercase, hidden_adv_label);
+                    const struct {
+                        OverlayHiddenType type;
+                        const char *label;
+                        const char *tip;
+                        bool present;
+                    } hidden_rows[OVERLAY_HIDDEN_TYPE_COUNT] = {
+                        {OVERLAY_HIDDEN_ADVANCEMENTS, hidden_adv_label, hidden_adv_tip,
+                         type_present(COMPACT_COUNTER_ADVANCEMENTS)},
+                        {OVERLAY_HIDDEN_RECIPES, "Hidden Recipes", "Show recipes marked hidden in the template.",
+                         type_present(COMPACT_COUNTER_RECIPES)},
+                        {OVERLAY_HIDDEN_CRITERIA, "Hidden Criteria", hidden_crit_tip,
+                         type_present(COMPACT_COUNTER_CRITERIA) || type_present(COMPACT_COUNTER_RECIPE_CRITERIA)},
+                        {OVERLAY_HIDDEN_STATS, "Hidden Stats", "Show stats marked hidden in the template.",
+                         type_present(COMPACT_COUNTER_STATS)},
+                        {OVERLAY_HIDDEN_SUB_STATS, "Hidden Sub-Stats",
+                         "Show sub-stats marked hidden in the template. A hidden sub-stat of a hidden stat\n"
+                         "also needs the Hidden Stats box.",
+                         type_present(COMPACT_COUNTER_SUB_STATS)},
+                        {OVERLAY_HIDDEN_UNLOCKS, "Hidden Unlocks", "Show unlocks marked hidden in the template.",
+                         type_present(COMPACT_COUNTER_UNLOCKS)},
+                        {OVERLAY_HIDDEN_CUSTOM, "Hidden Custom Goals",
+                         "Show custom goals marked hidden in the template.", type_present(COMPACT_COUNTER_CUSTOM)},
+                        {OVERLAY_HIDDEN_MULTISTAGE, "Hidden Multi-Stage Goals",
+                         "Show multi-stage goals marked hidden in the template.",
+                         type_present(COMPACT_COUNTER_MULTISTAGE)},
+                        {OVERLAY_HIDDEN_COUNTERS, "Hidden Counters", "Show counters marked hidden in the template.",
+                         type_present(COMPACT_COUNTER_COUNTERS)},
+                    };
+                    ImGui::Indent();
+                    for (const auto &row: hidden_rows) {
+                        if (!row.present) continue;
+                        ImGui::Checkbox(row.label, &temp_settings.overlay_show_hidden_type[row.type]);
+                        if (settings_tooltip_wanted()) {
+                            char hidden_type_tooltip_buffer[320];
+                            snprintf(hidden_type_tooltip_buffer, sizeof(hidden_type_tooltip_buffer),
+                                     "%s\nDefault: %s", row.tip, DEFAULT_OVERLAY_SHOW_HIDDEN_TYPE ? "On" : "Off");
+                            settings_tooltip(hidden_type_tooltip_buffer);
+                        }
+                    }
+                    ImGui::Unindent();
+                }
+
                 const TemplateData *row1_td = (t && t->template_data) ? t->template_data : nullptr;
                 const bool row1_empty = row1_td &&
-                                        !overlay_template_has_row1_icons(row1_td,
-                                                                         temp_settings.overlay_show_hidden_goals);
-                const bool row1_all_hidden = row1_empty && overlay_template_has_row1_icons(row1_td, true);
+                                        !overlay_template_has_row1_icons(row1_td, &temp_settings);
+                const bool row1_all_hidden = row1_empty && overlay_template_has_row1_icons(row1_td, nullptr);
                 // Read live, since the Show Row 1 checkbox sits below this point.
                 auto row1_hidden = [&]() -> bool {
                     return !overlay_compact_mode && !temp_settings.overlay_show_row1;
@@ -4031,7 +4098,10 @@ settings_tooltip(tooltip_buffer); \
                                  "(%s criteria or sub-stats of complex stats), so the overlay leaves\n"
                                  "Row 1 out and moves everything below it up.%s",
                                  advancement_label_uppercase,
-                                 row1_all_hidden ? "\nThey are all hidden. Turn on Show Hidden Goals to show them." : "");
+                                 row1_all_hidden
+                                     ? "\nThey are all hidden. Turn on Show Hidden Goals with the boxes for\n"
+                                       "these goal types to show them."
+                                     : "");
                     } else {
                         snprintf(row1_off_tooltip_buffer, sizeof(row1_off_tooltip_buffer),
                                  "Disabled because Show Row 1 is off, so the overlay leaves\n"
@@ -4740,7 +4810,7 @@ settings_tooltip(tooltip_buffer); \
                         CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
                         // The panel cycles whole-section counts, which are the real totals: a hidden
                         // goal is still part of "Advancements 12/80", so it counts here either way.
-                        compact_compute_type_counters(ctd, cver, cc, true);
+                        compact_compute_type_counters(ctd, cver, cc, nullptr);
 
                         // Per-dropdown range-select anchors for Shift+Click (template index of the last
                         // row clicked without shift). -1 = no anchor yet.
@@ -4768,7 +4838,7 @@ settings_tooltip(tooltip_buffer); \
                         int cycle_items_before = temp_settings.compact_cycle_item_count;
                         compact_selection_ui("cycle", ctd, cc, modern, cver, "Main Goal Types", cycle_tgt,
                                              &s_type_anchor, s_item_anchor, true,
-                                             temp_settings.overlay_show_hidden_goals,
+                                             &temp_settings,
                                              &temp_settings.compact_cycle_run_counter,
                                              &temp_settings.compact_cycle_run_percent);
                         if (memcmp(cycle_types_before, temp_settings.compact_cycle_type, sizeof(cycle_types_before)) != 0 ||
@@ -4923,21 +4993,20 @@ settings_tooltip(tooltip_buffer); \
                         // The stack pops individual goals, and a hidden goal never pops, so these
                         // counts leave hidden goals out: an optimized template shows how many
                         // advancements can really appear, and "Show Hidden Goals" brings the rest back.
-                        compact_compute_type_counters(sctd, sver, scc, temp_settings.overlay_show_hidden_goals);
+                        compact_compute_type_counters(sctd, sver, scc, &temp_settings);
 
                         // In the stack, a whole advancement / recipe only pops when it is SIMPLE (no
                         // trackable criteria); complex ones pop through their own criteria dropdown below.
                         // So recompute these two type rows to count only simple goals and relabel them,
                         // instead of the real totals the cycle uses. Mirrors the counter's hidden rule
-                        // (a hidden goal counts only when "Show Hidden Goals" is on).
+                        // (a hidden goal counts only when "Show Hidden Goals" covers it).
                         {
-                            bool count_hidden = temp_settings.overlay_show_hidden_goals;
                             int simple_adv_done = 0, simple_adv_total = 0;
                             int simple_rec_done = 0, simple_rec_total = 0;
                             for (int i = 0; i < sctd->advancement_count; i++) {
                                 const TrackableCategory *a = sctd->advancements[i];
                                 if (!a || a->criteria_count > 0) continue; // complex -> chosen in the dropdown below
-                                if (!count_hidden && a->is_hidden) continue;
+                                if (goal_is_hidden(a->is_hidden, &temp_settings, adv_hidden_type(a))) continue;
                                 if (a->is_recipe) {
                                     simple_rec_total++;
                                     if (a->done) simple_rec_done++;
@@ -4974,7 +5043,7 @@ settings_tooltip(tooltip_buffer); \
                         };
                         compact_selection_ui("stack", sctd, scc, smodern, sver, "Stack Goal Types", stack_tgt,
                                              &s_stack_type_anchor, s_stack_item_anchor, false,
-                                             temp_settings.overlay_show_hidden_goals, nullptr, nullptr);
+                                             &temp_settings, nullptr, nullptr);
 
                         // Per-type pop trigger. Only the counting types can pop mid-progress, so the
                         // rest (advancements, recipes, unlocks, criteria) are left out: they have
@@ -8811,6 +8880,9 @@ settings_tooltip(tooltip_buffer); \
         // Restore the preserved window geometry
         temp_settings.tracker_window = current_tracker_window;
         temp_settings.overlay_window = current_overlay_window;
+        // The sentinel already means the default, and turning it into the real width would read as a change.
+        if (temp_settings.overlay_window.w != DEFAULT_WINDOW_SIZE)
+            temp_settings.overlay_window.w = OVERLAY_DEFAULT_WIDTH;
         temp_settings.tracker_fullscreen = current_tracker_fullscreen;
 
         // Restore the preserved goal hiding mode
@@ -8821,8 +8893,8 @@ settings_tooltip(tooltip_buffer); \
     if (settings_tooltip_wanted()) {
         char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Resets all settings (besides window size/position & hotkeys) in this window to their\n"
-                 "default values. This does not modify your template files.\n\n"
+                 "Resets all settings in this window to their default values, besides the window\n"
+                 "positions, the tracker window size and hotkeys. This does not modify your template files.\n\n"
                  "Hover over any individual setting to see the default value it will be reset to.\n"
                  "The full default set also lives in %s/settings.json.", get_reference_files_display_path());
         settings_tooltip(tooltip_buffer);

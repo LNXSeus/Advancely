@@ -109,6 +109,15 @@ typedef enum {
     X("general.overlay_fps", PRESET_GROUP_OVERLAY, "Overlay FPS Limit", 0, NULL) \
     X("general.overlay_render_mode", PRESET_GROUP_OVERLAY, "Mode", 0, "Scrolling Belt|Page|Compact") \
     X("general.overlay_show_hidden_goals", PRESET_GROUP_OVERLAY, "Show Hidden Goals", 0, NULL) \
+    X("general.overlay_show_hidden_advancements", PRESET_GROUP_OVERLAY, "Hidden Advancements / Achievements", 0, NULL) \
+    X("general.overlay_show_hidden_recipes", PRESET_GROUP_OVERLAY, "Hidden Recipes", 0, NULL) \
+    X("general.overlay_show_hidden_criteria", PRESET_GROUP_OVERLAY, "Hidden Criteria", 0, NULL) \
+    X("general.overlay_show_hidden_stats", PRESET_GROUP_OVERLAY, "Hidden Stats", 0, NULL) \
+    X("general.overlay_show_hidden_sub_stats", PRESET_GROUP_OVERLAY, "Hidden Sub-Stats", 0, NULL) \
+    X("general.overlay_show_hidden_unlocks", PRESET_GROUP_OVERLAY, "Hidden Unlocks", 0, NULL) \
+    X("general.overlay_show_hidden_custom_goals", PRESET_GROUP_OVERLAY, "Hidden Custom Goals", 0, NULL) \
+    X("general.overlay_show_hidden_multi_stage_goals", PRESET_GROUP_OVERLAY, "Hidden Multi-Stage Goals", 0, NULL) \
+    X("general.overlay_show_hidden_counters", PRESET_GROUP_OVERLAY, "Hidden Counters", 0, NULL) \
     X("general.igt_freeze_on_completion", PRESET_GROUP_OVERLAY, "Freeze Timer on Completion", 0, NULL) \
     X("general.igt_unit_spacing", PRESET_GROUP_OVERLAY, "Timers Unit Spacing", 0, NULL) \
     X("general.igt_always_show_ms", PRESET_GROUP_OVERLAY, "IGT Always Show ms", 0, NULL) \

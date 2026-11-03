@@ -147,6 +147,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW2_SHOW_COMPLETED false
 #define DEFAULT_OVERLAY_ROW3_SHOW_COMPLETED true
 #define DEFAULT_OVERLAY_SHOW_HIDDEN_GOALS false // If true, goals marked hidden in the template still show in the overlay
+#define DEFAULT_OVERLAY_SHOW_HIDDEN_TYPE true // Every goal type is brought back until the user unticks it
 #define DEFAULT_IGT_FREEZE_ON_COMPLETION true // If true, the IGT freezes at the final time once the run is completed
 
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
@@ -728,6 +729,21 @@ enum OverlayCompactCounterType {
     COMPACT_COUNTER_TYPE_COUNT
 };
 
+// The goal types "Show Hidden Goals" can bring back on their own. Recipe criteria share CRITERIA.
+// OVERLAY_HIDDEN_TYPE_COUNT must stay last: it sizes overlay_show_hidden_type and the key table.
+enum OverlayHiddenType {
+    OVERLAY_HIDDEN_ADVANCEMENTS,
+    OVERLAY_HIDDEN_RECIPES,
+    OVERLAY_HIDDEN_CRITERIA,
+    OVERLAY_HIDDEN_STATS,
+    OVERLAY_HIDDEN_SUB_STATS,
+    OVERLAY_HIDDEN_UNLOCKS,
+    OVERLAY_HIDDEN_CUSTOM,
+    OVERLAY_HIDDEN_MULTISTAGE,
+    OVERLAY_HIDDEN_COUNTERS,
+    OVERLAY_HIDDEN_TYPE_COUNT
+};
+
 // A single individual goal selected to appear in the Compact cycle by its own name (as opposed to
 // a whole-section type count). Stored globally by goal ID (root_name), mirroring stat_progress_override
 // / custom_progress; the overlay skips any item not present in the current template. `kind` selects
@@ -924,6 +940,8 @@ struct AppSettings {
     bool overlay_row3_show_completed; // If true, the third row keeps completed goals instead of removing them.
     bool overlay_show_hidden_goals;
     // If true, goals marked hidden in the template are still shown in the overlay (all modes).
+    bool overlay_show_hidden_type[OVERLAY_HIDDEN_TYPE_COUNT];
+    // Which goal types overlay_show_hidden_goals applies to, indexed by OverlayHiddenType.
     bool overlay_custom_vertical_spacing_enabled;
     // If true, the overlay row gaps below are added to the default layout.
     float overlay_gap_top_to_row1; // Extra vertical gap between the top info bar and row 1 (pixels).
@@ -1076,13 +1094,27 @@ struct AppSettings {
  */
 MC_Version settings_get_version_from_string(const char *version_str);
 
+// settings.json key of each overlay_show_hidden_type entry, indexed by OverlayHiddenType.
+extern const char *const OVERLAY_HIDDEN_TYPE_KEYS[OVERLAY_HIDDEN_TYPE_COUNT];
+
+// True when a goal stays out of the overlay: it is hidden in the template and neither "Show Hidden
+// Goals" nor that type's own box bring it back. A null `settings` never hides anything.
+inline bool goal_is_hidden(bool is_hidden, const AppSettings *settings, OverlayHiddenType type) {
+    if (!is_hidden || !settings) return false;
+    return !(settings->overlay_show_hidden_goals && settings->overlay_show_hidden_type[type]);
+}
+
+inline OverlayHiddenType adv_hidden_type(const TrackableCategory *adv) {
+    return adv->is_recipe ? OVERLAY_HIDDEN_RECIPES : OVERLAY_HIDDEN_ADVANCEMENTS;
+}
+
 // Fills out[COMPACT_COUNTER_TYPE_COUNT] (indexed by OverlayCompactCounterType) with each Compact
 // counter category's version-correct label and completed/total; total == 0 marks a category absent.
-// Shared by the Compact settings UI and the overlay so their counts never drift. `count_hidden` true
-// counts template-hidden goals (the panel's real totals), false leaves them out (what the pop-out
-// stack can actually show) - pass the "Show Hidden Goals" setting for the latter.
+// Shared by the Compact settings UI and the overlay so their counts never drift. A null `hidden_rule`
+// counts template-hidden goals (the panel's real totals); pass the settings to leave out what
+// goal_is_hidden() keeps off the overlay (what the pop-out stack can actually show).
 void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out,
-                                   bool count_hidden);
+                                   const AppSettings *hidden_rule);
 
 // True if a Compact goal type counts up toward its target rather than just flipping done, so the
 // pop-out stack can show it mid-progress and compact_stack_pop_on_progress applies to it. Advancements,
@@ -1092,9 +1124,10 @@ bool compact_type_has_progress(OverlayCompactCounterType kind);
 
 // True if the template gives the overlay's first row (Belt/Page Row 1, Compact icon strip) anything
 // to ever show: a criterion or multi-stat sub-stat that is not hidden. Completed items still count, so
-// the answer only changes with the template or `show_hidden` (pass the "Show Hidden Goals" setting).
+// the answer only changes with the template or `hidden_rule` (the settings, or null to count every
+// hidden item too).
 // Shared by the overlay (collapses the row) and the settings UI (disables the row's settings).
-bool overlay_template_has_row1_icons(const TemplateData *td, bool show_hidden);
+bool overlay_template_has_row1_icons(const TemplateData *td, const AppSettings *hidden_rule);
 
 // Drops any selected Compact individual-goal items that no longer exist in `td`, so switching
 // templates (including via the template editor) doesn't leave stale selections in the dropdowns.

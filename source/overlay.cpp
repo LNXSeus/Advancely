@@ -31,13 +31,6 @@
 // title fully visible. Tune by trial and error - the panel stays centered within this width.
 #define COMPACT_MIN_WINDOW_WIDTH 440
 
-// A goal marked hidden in the template is normally excluded from every overlay mode; the "Show Hidden
-// Goals" setting overrides that. Returns true only when a goal should still be treated as hidden
-// (hidden AND the override is off), so exclusion checks read `... || goal_is_hidden(x->is_hidden, s)`.
-static inline bool goal_is_hidden(bool is_hidden, const AppSettings *settings) {
-    return is_hidden && !settings->overlay_show_hidden_goals;
-}
-
 // TODO: Add more socials here
 const char *SOCIALS[] = {
     "Advancely " ADVANCELY_VERSION "!",
@@ -1108,7 +1101,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
     const TemplateData *td = (t && t->template_data) ? t->template_data : nullptr;
 
     CompactCounter cc[COMPACT_COUNTER_TYPE_COUNT];
-    compact_compute_type_counters(td, version, cc, true); // panel counts show the real totals
+    compact_compute_type_counters(td, version, cc, nullptr); // panel counts show the real totals
 
     // Only the two goal kinds with a target of their own ever set this, so clear it for the rest.
     for (int i = 0; i < max_entries; i++) {
@@ -1178,7 +1171,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
             for (int i = 0; i < td->advancement_count && n < max_entries; i++) {
                 TrackableCategory *a = td->advancements[i];
                 if (!a || a->is_recipe != want_recipe || a->criteria_count <= 0 ||
-                    goal_is_hidden(a->is_hidden, settings))
+                    goal_is_hidden(a->is_hidden, settings, adv_hidden_type(a)))
                     continue;
                 int item_order = compact_item_order(settings, kind, a->root_name);
                 if (item_order < 0) continue;
@@ -1202,7 +1195,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // an open-ended stat (goal -1) shows the checkbox + running value. goal 0 = legacy helper, skip.
         for (int i = 0; i < td->stat_count && n < max_entries; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || !s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings)) continue;
+            if (!s || !s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             if (s->criteria_count < 1 || !s->criteria[0]) continue;
             int goal = s->criteria[0]->goal;
             if (goal <= 0 && goal != -1) continue;
@@ -1231,7 +1224,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // Multi-stats (complex stat categories) -> their sub-stat progress.
         for (int i = 0; i < td->stat_count && n < max_entries; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings)) continue;
+            if (!s || s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             int item_order = compact_item_order(settings, COMPACT_COUNTER_SUB_STATS, s->root_name);
             if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
@@ -1252,7 +1245,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // (goal -1 or 0) shows the checkbox + running count and its manual done state.
         for (int i = 0; i < td->custom_goal_count && n < max_entries; i++) {
             TrackableItem *c = td->custom_goals[i];
-            if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+            if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CUSTOM)) continue;
             int item_order = compact_item_order(settings, COMPACT_COUNTER_CUSTOM, c->root_name);
             if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
@@ -1283,7 +1276,7 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // Completion counters -> completed/linked goals.
         for (int i = 0; i < td->counter_goal_count && n < max_entries; i++) {
             CounterGoal *c = td->counter_goals[i];
-            if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+            if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_COUNTERS)) continue;
             int item_order = compact_item_order(settings, COMPACT_COUNTER_COUNTERS, c->root_name);
             if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(c->display_name, c->root_name));
@@ -1787,7 +1780,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         // Advancements / recipes: the whole goal (1 line) + each criterion (2-line group).
         for (int i = 0; i < td->advancement_count; i++) {
             TrackableCategory *a = td->advancements[i];
-            if (!a || goal_is_hidden(a->is_hidden, settings)) continue;
+            if (!a || goal_is_hidden(a->is_hidden, settings, adv_hidden_type(a))) continue;
             bool recipe = a->is_recipe;
             OverlayCompactCounterType whole_kind = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
             OverlayCompactCounterType crit_kind = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
@@ -1811,7 +1804,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             int adv_newly_done = 0;
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings) || !c->done) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CRITERIA) || !c->done) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
                 auto it = eng.prev.find(key);
                 unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
@@ -1820,7 +1813,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             int adv_shown = a->completed_criteria_count - adv_newly_done; // completed before this batch
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings)) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CRITERIA)) continue;
                 snprintf(key, sizeof(key), "crit|%s|%s", a->root_name, c->root_name);
                 int shown = a->completed_criteria_count;
                 if (c->done) {
@@ -1842,7 +1835,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         // Stats: simple stats pop as a graded single line; multi-stat sub-stats pop as 2-line groups.
         for (int i = 0; i < td->stat_count; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || goal_is_hidden(s->is_hidden, settings)) continue;
+            if (!s || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             const char *sname = compact_display_name(s->display_name, s->root_name);
             if (s->is_single_stat_category) {
                 if (s->criteria_count < 1 || !s->criteria[0]) continue;
@@ -1882,7 +1875,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 int sub_newly_done = 0;
                 for (int j = 0; j < s->criteria_count; j++) {
                     TrackableItem *sub = s->criteria[j];
-                    if (!sub || goal_is_hidden(sub->is_hidden, settings) || !sub->done) continue;
+                    if (!sub || goal_is_hidden(sub->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS) || !sub->done) continue;
                     snprintf(key, sizeof(key), "sub|%s|%s", s->root_name, sub->root_name);
                     auto it = eng.prev.find(key);
                     unsigned long long penc = (it == eng.prev.end()) ? 0ULL : it->second;
@@ -1891,7 +1884,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                 int sub_shown = s->completed_criteria_count - sub_newly_done; // done before this batch
                 for (int j = 0; j < s->criteria_count; j++) {
                     TrackableItem *sub = s->criteria[j];
-                    if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
+                    if (!sub || goal_is_hidden(sub->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS)) continue;
                     // [x] manually checked off, [a] auto-completed (linked goal), [o] not done. A
                     // sub-stat counts up, so it shows its value and pops on every increment (goal > 0
                     // shows value / target, an open-ended one just the value).
@@ -1942,7 +1935,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         }
         for (int i = 0; i < td->unlock_count; i++) {
             TrackableItem *u = td->unlocks[i];
-            if (!u || goal_is_hidden(u->is_hidden, settings)) continue;
+            if (!u || goal_is_hidden(u->is_hidden, settings, OVERLAY_HIDDEN_UNLOCKS)) continue;
             snprintf(key, sizeof(key), "unl|%s", u->root_name);
             // Unlocks are AND-merged across players (no single contributor), so no face, like the tracker.
             consider(COMPACT_COUNTER_UNLOCKS, COMPACT_COUNTER_UNLOCKS, nullptr, key, 0, u->done, false,
@@ -1951,7 +1944,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         }
         for (int i = 0; i < td->custom_goal_count; i++) {
             TrackableItem *c = td->custom_goals[i];
-            if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+            if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CUSTOM)) continue;
             const char *cname = compact_display_name(c->display_name, c->root_name);
             if (c->goal > 0) {
                 // Targeted custom goals are counter-driven, not manually checkable; the count usually
@@ -1983,7 +1976,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         }
         for (int i = 0; i < td->multi_stage_goal_count; i++) {
             MultiStageGoal *g = td->multi_stage_goals[i];
-            if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
+            if (!g || goal_is_hidden(g->is_hidden, settings, OVERLAY_HIDDEN_MULTISTAGE)) continue;
             int stage = g->current_stage;
             bool done = (g->stage_count > 0 && stage >= g->stage_count - 1);
             char gname[224];
@@ -2016,7 +2009,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         }
         for (int i = 0; i < td->counter_goal_count; i++) {
             CounterGoal *c = td->counter_goals[i];
-            if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+            if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_COUNTERS)) continue;
             // Counters aren't manually checkable; mark [a] (auto) when done, nothing otherwise.
             const char *cbox = compact_auto_box(settings, c->done);
             char cntbody[240];
@@ -2220,7 +2213,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     open[6] = '\0';
     for (int i = 0; i < td->advancement_count; i++) {
         TrackableCategory *a = td->advancements[i];
-        if (!a || goal_is_hidden(a->is_hidden, settings)) continue;
+        if (!a || goal_is_hidden(a->is_hidden, settings, adv_hidden_type(a))) continue;
         bool recipe = a->is_recipe;
         OverlayCompactCounterType wk = recipe ? COMPACT_COUNTER_RECIPES : COMPACT_COUNTER_ADVANCEMENTS;
         OverlayCompactCounterType ck = recipe ? COMPACT_COUNTER_RECIPE_CRITERIA : COMPACT_COUNTER_CRITERIA;
@@ -2234,14 +2227,14 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             measure(buf);
             for (int j = 0; j < a->criteria_count; j++) {
                 TrackableItem *c = a->criteria[j];
-                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings)) continue;
+                if (!c || c->hidden_by_group || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CRITERIA)) continue;
                 measure(compact_display_name(c->display_name, c->root_name));
             }
         }
     }
     for (int i = 0; i < td->stat_count; i++) {
         TrackableCategory *s = td->stats[i];
-        if (!s || goal_is_hidden(s->is_hidden, settings)) continue;
+        if (!s || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
         const char *sn = compact_display_name(s->display_name, s->root_name);
         if (s->is_single_stat_category) {
             if (s->criteria_count < 1 || !s->criteria[0]) continue;
@@ -2265,7 +2258,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
             measure(buf);
             for (int j = 0; j < s->criteria_count; j++) {
                 TrackableItem *sub = s->criteria[j];
-                if (!sub || goal_is_hidden(sub->is_hidden, settings)) continue;
+                if (!sub || goal_is_hidden(sub->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS)) continue;
                 const char *subn = sub->display_name;
                 if (item_progress_hidden(sub)) {
                     snprintf(buf, sizeof(buf), "[x] %s", subn);
@@ -2281,13 +2274,13 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     }
     for (int i = 0; i < td->unlock_count; i++) {
         TrackableItem *u = td->unlocks[i];
-        if (!u || goal_is_hidden(u->is_hidden, settings)) continue;
+        if (!u || goal_is_hidden(u->is_hidden, settings, OVERLAY_HIDDEN_UNLOCKS)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_UNLOCKS, COMPACT_COUNTER_UNLOCKS, nullptr)) continue;
         measure(compact_display_name(u->display_name, u->root_name));
     }
     for (int i = 0; i < td->custom_goal_count; i++) {
         TrackableItem *c = td->custom_goals[i];
-        if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+        if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_CUSTOM)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_CUSTOM, COMPACT_COUNTER_CUSTOM, c->root_name)) continue;
         const char *cn = compact_display_name(c->display_name, c->root_name);
         if (item_progress_hidden(c)) {
@@ -2302,7 +2295,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     }
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *g = td->multi_stage_goals[i];
-        if (!g || goal_is_hidden(g->is_hidden, settings)) continue;
+        if (!g || goal_is_hidden(g->is_hidden, settings, OVERLAY_HIDDEN_MULTISTAGE)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_MULTISTAGE, COMPACT_COUNTER_MULTISTAGE, g->root_name))
             continue;
         char gn[224];
@@ -2325,7 +2318,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     }
     for (int i = 0; i < td->counter_goal_count; i++) {
         CounterGoal *c = td->counter_goals[i];
-        if (!c || goal_is_hidden(c->is_hidden, settings)) continue;
+        if (!c || goal_is_hidden(c->is_hidden, settings, OVERLAY_HIDDEN_COUNTERS)) continue;
         if (!compact_stack_allows(settings, COMPACT_COUNTER_COUNTERS, COMPACT_COUNTER_COUNTERS, c->root_name)) continue;
         const char *cn = compact_display_name(c->display_name, c->root_name);
         compact_worst_count(cnt, sizeof(cnt), c->linked_goal_count, wdig);
@@ -2647,7 +2640,7 @@ typedef std::pair<TrackableItem *, TrackableCategory *> Row1Item;
 // Gather the row-1 items (advancement criteria + multi-stat sub-stats) in template order, then build
 // the parallel removal mask (a done or hidden item becomes a gap) and an FNV signature over the item
 // root names so a consumer can reset only when the template itself changes. Hidden items follow the
-// same "Show Hidden Goals" override every other overlay row uses (goal_is_hidden).
+// per-type "Show Hidden Goals" override every other overlay row uses (goal_is_hidden).
 static void build_row1_items(const Tracker *t, const AppSettings *settings,
                              std::vector<Row1Item> &items, std::vector<char> &removed,
                              unsigned long long &signature) {
@@ -2665,6 +2658,7 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
             items.push_back({cat->criteria[j], cat});
         }
     }
+    const int first_sub_stat = (int) items.size();
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
         if (cat->is_single_stat_category) continue;
@@ -2678,8 +2672,11 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
     for (int i = 0; i < F; i++) {
         TrackableItem *item = items[i].first;
         TrackableCategory *parent = items[i].second;
-        removed[i] = (item->done || goal_is_hidden(parent->is_hidden, settings) ||
-                      goal_is_hidden(item->is_hidden, settings))
+        const bool is_sub_stat = i >= first_sub_stat;
+        OverlayHiddenType parent_type = is_sub_stat ? OVERLAY_HIDDEN_STATS : adv_hidden_type(parent);
+        OverlayHiddenType item_type = is_sub_stat ? OVERLAY_HIDDEN_SUB_STATS : OVERLAY_HIDDEN_CRITERIA;
+        removed[i] = (item->done || goal_is_hidden(parent->is_hidden, settings, parent_type) ||
+                      goal_is_hidden(item->is_hidden, settings, item_type))
                          ? 1
                          : 0;
         for (const char *s = item->root_name; *s; s++) signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
@@ -2906,7 +2903,7 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     float icon_full_w = snap_px(icon_size + settings->compact_row1_spacing);
     bool have_icons = false;
     if (settings->compact_show_row1_icons && !run_complete &&
-        overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals)) {
+        overlay_template_has_row1_icons(td, settings)) {
         build_row1_items(t, settings, icon_items, icon_removed, icon_sig);
         have_icons = !icon_items.empty();
     }
@@ -3157,7 +3154,7 @@ static void overlay_compute_layout(Overlay *o, const AppSettings *settings) {
 // so the window stays put during a run.
 static void overlay_apply_row1_collapse(Overlay *o, const TemplateData *td, const AppSettings *settings) {
     bool collapse = !settings->overlay_show_row1 ||
-                    !overlay_template_has_row1_icons(td, settings->overlay_show_hidden_goals);
+                    !overlay_template_has_row1_icons(td, settings);
     if (collapse == o->layout_row1_collapsed) return;
     o->layout_row1_collapsed = collapse;
 
@@ -3408,6 +3405,19 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
     }
 }
 
+static OverlayHiddenType display_item_hidden_type(const OverlayDisplayItem &display_item) {
+    switch (display_item.type) {
+        case OverlayDisplayItem::ADVANCEMENT:
+            return adv_hidden_type(static_cast<const TrackableCategory *>(display_item.item_ptr));
+        case OverlayDisplayItem::UNLOCK: return OVERLAY_HIDDEN_UNLOCKS;
+        case OverlayDisplayItem::STAT: return OVERLAY_HIDDEN_STATS;
+        case OverlayDisplayItem::CUSTOM: return OVERLAY_HIDDEN_CUSTOM;
+        case OverlayDisplayItem::MULTISTAGE: return OVERLAY_HIDDEN_MULTISTAGE;
+        case OverlayDisplayItem::COUNTER: return OVERLAY_HIDDEN_COUNTERS;
+    }
+    return OVERLAY_HIDDEN_ADVANCEMENTS;
+}
+
 // Helper to check the 'done' status of any displayable item type
 static bool is_display_item_done(const OverlayDisplayItem &display_item, const AppSettings *settings) {
     // --- Step 1 & 2: Incorporate the "hidden" check from the new code ---
@@ -3448,7 +3458,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
 
     // If the item is marked as hidden in the template, hide it from the overlay - unless the user
     // has turned on "Show Hidden Goals".
-    if (goal_is_hidden(is_hidden, settings)) {
+    if (goal_is_hidden(is_hidden, settings, display_item_hidden_type(display_item))) {
         return true;
     }
 
@@ -4232,7 +4242,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 else if (display_item.type == OverlayDisplayItem::COUNTER)
                     is_template_hidden = static_cast<CounterGoal *>(display_item.item_ptr)->is_hidden;
 
-                if (goal_is_hidden(is_template_hidden, settings)) continue;
+                if (goal_is_hidden(is_template_hidden, settings, display_item_hidden_type(display_item))) continue;
 
                 char name_buf[256] = {0};
                 char potential_progress_buf[64] = {0};
@@ -4502,7 +4512,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     std::vector<int> incomplete_indices;
                                     for (int j = 0; j < stat->criteria_count; ++j) {
                                         if (!stat->criteria[j]->done && !goal_is_hidden(
-                                                stat->criteria[j]->is_hidden, settings)) {
+                                                stat->criteria[j]->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS)) {
                                             incomplete_indices.push_back(j);
                                         }
                                     }
@@ -4744,7 +4754,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             } else if (display_item.type == OverlayDisplayItem::COUNTER) {
                 is_template_hidden = static_cast<CounterGoal *>(display_item.item_ptr)->is_hidden;
             }
-            if (goal_is_hidden(is_template_hidden, settings)) continue;
+            if (goal_is_hidden(is_template_hidden, settings, display_item_hidden_type(display_item))) continue;
 
             char name_buf[256] = {0};
             char longest_progress_buf[256] = {0}; // To store the potentially longest progress/stage text
@@ -5015,7 +5025,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 std::vector<int> incomplete_indices;
                                 for (int j = 0; j < stat->criteria_count; ++j) {
                                     if (!stat->criteria[j]->done && !goal_is_hidden(
-                                            stat->criteria[j]->is_hidden, settings)) {
+                                            stat->criteria[j]->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS)) {
                                         incomplete_indices.push_back(j);
                                     }
                                 }
