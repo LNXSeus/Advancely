@@ -15,6 +15,19 @@
   </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
   <releases>
+    <release version="1.8.1" date="2026-11-03">
+      <description>
+        <p>Quality of life for the template editor and settings, a categorical settings preset by ScrambledMC and new 26.3/26.4 content.</p>
+        <ul>
+          <li>Template editor: a "Show All" view listing every template grouped by version, double-clicking a template opens it, the search picks the scope you last interacted with, and Ctrl/Cmd+A selects all items in the visual layout editor.</li>
+          <li>Settings: creating a settings preset lets you pick which settings go into it, a new categorical preset by ScrambledMC, the scroll wheel changes the value of any dropdown, and "Hide Completed Row 3 Goals" is now "Show Completed Row 3 Goals".</li>
+          <li>Run completion: a separate Progress Percentage goal type, the label can always be changed, and a second progress label.</li>
+          <li>Tracker: the manual layout scrollbar hides when it is not needed, and a hidden sub-icon gives its spot to the text and progress.</li>
+          <li>Templates: a 26.4 all advancements template, all new 26.3 item and block textures, a Japanese translation of the 1.16.1 categorical template and updated AATool and Scrambled templates.</li>
+          <li>Fixes: Enter creates a new line in description fields again, hidden icons also hide their checkbox, a selected language or layout carries over into the editor, and macOS resource folder handling is more robust.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.8.0" date="2026-10-15">
       <description>
         <p>The Feinberg Update: accessibility and quality of life, with a settings search, an official AATool settings preset and a new preset import window.</p>
