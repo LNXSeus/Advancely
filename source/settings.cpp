@@ -4690,7 +4690,7 @@ settings_tooltip(tooltip_buffer); \
                                  "How the panel sits within the auto-fitted overlay window.\n"
                                  "Left keeps the panel's left edge fixed as the background grows (best for\n"
                                  "left-aligning the overlay in OBS), Center keeps it centered, Right keeps its\n"
-                                 "right edge fixed. The pop-out stack below always left-aligns to the panel's left edge.\n"
+                                 "right edge fixed. The pop-out stack below follows the same alignment.\n"
                                  "Default: %s", compact_align_names[DEFAULT_COMPACT_PANEL_ALIGN]);
                         settings_tooltip(compact_panel_align_tooltip_buffer);
                     }

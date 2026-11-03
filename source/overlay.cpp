@@ -1703,7 +1703,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     bool faces_on = overlay_coop_stack_faces_on(o, settings);
     // A right-aligned panel mirrors the whole stack: text, then face, then icon (icon flush to the
     // panel's right edge), with each line's completion marker moved to the text's right side.
+    // A centered panel centers each line on the panel instead.
     bool right_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
+    bool center_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER;
 
     // Reseed (and clear) when the template changes or on the first frame, so nothing pops on load.
     unsigned long long sig = compact_stack_signature(td);
@@ -2126,7 +2128,8 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
     // size, and a face taller than the icon is centered within the (grown) line box.
     // Left-aligned: icon at stack_x, then the face slot, then the text. Right-aligned mirrors the row
     // about the panel's right edge (stack_x + panel_w): the icon sits flush to that edge, the face to
-    // its left, and the text is right-aligned to the face slot's left.
+    // its left, and the text is right-aligned to the face slot's left. Centered uses the left layout,
+    // starting wherever the line's total width centers it on the panel.
     float stack_right = stack_x + panel_w;
     auto draw_line = [&](const std::string &icon, const std::string &text, float ly, bool shared,
                          const std::string &shared_icon, const std::string &face_uuid, bool draw_face,
@@ -2135,10 +2138,18 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         // actually displays (a two-line group's parent passes draw_face = false and stays flush).
         bool show_face = faces_on && draw_face && !face_uuid.empty();
         float face_slot = show_face ? (face_size + COMPACT_POP_FACE_GAP) : 0.0f;
-        float icon_x = right_align ? (stack_right - icon_size) : stack_x;
+        SDL_Texture *tt = text.empty() ? nullptr : get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
+        float tw = 0.0f, th = 0.0f;
+        if (tt) SDL_GetTextureSize(tt, &tw, &th);
+        float line_x = stack_x;
+        if (center_align) {
+            float line_w = icon_size + face_slot + (tt ? COMPACT_POP_TEXT_GAP + tw : 0.0f);
+            line_x = snap_px(stack_x + (panel_w - line_w) / 2.0f);
+        }
+        float icon_x = right_align ? (stack_right - icon_size) : line_x;
         float face_x = right_align
                            ? (stack_right - icon_size - face_slot)
-                           : (stack_x + icon_size + COMPACT_POP_FACE_GAP);
+                           : (line_x + icon_size + COMPACT_POP_FACE_GAP);
         float icon_y = ly + (line_box - icon_size) / 2.0f;
         compact_draw_icon(o, icon.c_str(), icon_x, icon_y, icon_size, alpha);
         if (shared && settings->compact_stack_shared_icon_size > 0.0f)
@@ -2147,20 +2158,15 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
             AccountType acc = overlay_coop_account_type(o, face_uuid.c_str());
             compact_draw_face(o, face_uuid.c_str(), acc, face_x, ly + (line_box - face_size) / 2.0f, face_size, alpha);
         }
-        if (!text.empty()) {
-            SDL_Texture *tt = get_text_texture_from_cache(o, stack_font, text.c_str(), text_color);
-            if (tt) {
-                float tw = 0.0f, th = 0.0f;
-                SDL_GetTextureSize(tt, &tw, &th);
-                float text_x = right_align
-                                   ? (stack_right - icon_size - face_slot - COMPACT_POP_TEXT_GAP - tw)
-                                   : (stack_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP);
-                SDL_FRect d = {snap_px(text_x), snap_px(ly + (line_box - th) / 2.0f), tw, th};
-                // Cached texture, so full opacity goes back on afterwards for every other user of it.
-                SDL_SetTextureAlphaMod(tt, alpha);
-                SDL_RenderTexture(o->renderer, tt, nullptr, &d);
-                SDL_SetTextureAlphaMod(tt, 255);
-            }
+        if (tt) {
+            float text_x = right_align
+                               ? (stack_right - icon_size - face_slot - COMPACT_POP_TEXT_GAP - tw)
+                               : (line_x + icon_size + face_slot + COMPACT_POP_TEXT_GAP);
+            SDL_FRect d = {snap_px(text_x), snap_px(ly + (line_box - th) / 2.0f), tw, th};
+            // Cached texture, so full opacity goes back on afterwards for every other user of it.
+            SDL_SetTextureAlphaMod(tt, alpha);
+            SDL_RenderTexture(o->renderer, tt, nullptr, &d);
+            SDL_SetTextureAlphaMod(tt, 255);
         }
     };
     auto draw_group = [&](CompactPopGroup &g) {
@@ -2506,8 +2512,10 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     }
 
     // A right-aligned panel mirrors the promo/showcase like the goal stack: the icon sits flush to the
-    // panel's right edge and the text band runs to its left, out to the window's far padding.
+    // panel's right edge and the text band runs to its left, out to the window's far padding. A
+    // centered panel centers each row's icon and text on it, up to the window's width between paddings.
     bool right_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
+    bool center_align = settings->compact_panel_align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER;
     float pad = settings->compact_panel_padding;
     float stack_right = stack_x + panel_w;
     float icon_x = right_align ? snap_px(stack_right - icon_size) : stack_x;
@@ -2515,11 +2523,25 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (right_align) {
         band_x = snap_px(pad);
         band_w = snap_px(stack_right - icon_size - COMPACT_POP_TEXT_GAP) - band_x; // band left of the icons
+    } else if (center_align) {
+        band_x = snap_px(pad + icon_size + COMPACT_POP_TEXT_GAP);
+        band_w = (float) window_w - pad - band_x;
     } else {
         band_x = snap_px(stack_x + icon_size + COMPACT_POP_TEXT_GAP); // text band, right of the icons
         band_w = (float) window_w - pad - band_x;
     }
     if (band_w <= 0.0f) return;
+
+    struct RowPlacement {
+        float icon_x, band_x, band_w;
+    };
+    auto place_row = [&](float text_w) -> RowPlacement {
+        if (!center_align) return {icon_x, band_x, band_w};
+        float row_band_w = fminf(text_w, band_w);
+        float row_w = icon_size + COMPACT_POP_TEXT_GAP + row_band_w;
+        float row_icon_x = snap_px(stack_x + (panel_w - row_w) / 2.0f);
+        return {row_icon_x, row_icon_x + icon_size + COMPACT_POP_TEXT_GAP, row_band_w};
+    };
 
     // Entrance slide: emerge from under the panel bottom and settle into the first stack slot at
     // stack_top, exactly like a goal pop-out. `promo_y` drives the promo row; `slide` shifts the
@@ -2540,19 +2562,21 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (reveal_clip.h < 0) reveal_clip.h = 0;
 
     // --- The promo row (slides in with promo_y, clipped to below the panel) ---
-    char logo_path[MAX_PATH_LENGTH];
-    snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_resources_path(), COMPACT_PROMO_ICON);
-    SDL_SetRenderClipRect(o->renderer, &reveal_clip);
-    compact_draw_icon(o, logo_path, icon_x, promo_y, icon_size);
-    SDL_SetRenderClipRect(o->renderer, nullptr);
-
     // The rotating line is the shared one the other modes cycle through (advanced in overlay_update),
     // so every mode promotes the same thing at the same time. A completed run pins the donation line.
     const char *promo_text = run_complete ? COMPACT_PROMO_DONATE_TEXT : SOCIALS[o->current_social_index];
     SDL_Texture *promo_tex = get_text_texture_from_cache(o, font, promo_text, text_color);
+    float tw = 0.0f;
+    if (promo_tex) SDL_GetTextureSize(promo_tex, &tw, nullptr); // only the width decides whether it has to move
+    RowPlacement promo_row = place_row(tw);
+
+    char logo_path[MAX_PATH_LENGTH];
+    snprintf(logo_path, sizeof(logo_path), "%s/gui/%s", get_resources_path(), COMPACT_PROMO_ICON);
+    SDL_SetRenderClipRect(o->renderer, &reveal_clip);
+    compact_draw_icon(o, logo_path, promo_row.icon_x, promo_y, icon_size);
+    SDL_SetRenderClipRect(o->renderer, nullptr);
+
     if (promo_tex) {
-        float tw = 0.0f;
-        SDL_GetTextureSize(promo_tex, &tw, nullptr); // only the width decides whether it has to move
         if (strncmp(p.shown_text, promo_text, sizeof(p.shown_text) - 1) != 0) {
             // a new line starts over
             strncpy(p.shown_text, promo_text, sizeof(p.shown_text) - 1);
@@ -2563,7 +2587,7 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         }
         // Only a line too long for the band moves: it scrolls until its right edge shows, rests, comes
         // back until its left edge shows, rests, and so on, so all of a long URL can be read.
-        float overflow = tw - band_w;
+        float overflow = tw - promo_row.band_w;
         if (overflow <= 0.0f) {
             p.scroll_x = 0.0f;
             p.dir = -1.0f;
@@ -2584,8 +2608,9 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         }
         // Left-aligned rests at the band's left and scrolls left to reveal its end; right-aligned rests
         // flush to the band's right (against the icon) and mirrors the same bounce to reveal its start.
-        float promo_tx = right_align ? (band_x + band_w - tw - p.scroll_x) : (band_x + p.scroll_x);
-        compact_draw_band_text(o, promo_tex, promo_tx, promo_y, band_x, band_w, icon_size, panel_bottom);
+        float promo_tx = right_align ? (band_x + band_w - tw - p.scroll_x) : (promo_row.band_x + p.scroll_x);
+        compact_draw_band_text(o, promo_tex, promo_tx, promo_y, promo_row.band_x, promo_row.band_w, icon_size,
+                               panel_bottom);
     }
 
     // --- The supporters, stacked below the promo, newest first ---
@@ -2596,24 +2621,22 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
         // Ride the promo's entrance slide so the whole showcase moves in as one, and clip to below the
         // panel like the promo row.
         float row_y = snap_px(stack_top + (float) (i + 1) * line_h + slide);
-        char emote_path[MAX_PATH_LENGTH];
-        snprintf(emote_path, sizeof(emote_path), "%s/%s", get_icons_base_path(),
-                 p.emotes[si] ? p.emotes[si] : "");
-        SDL_SetRenderClipRect(o->renderer, &reveal_clip);
-        compact_draw_icon(o, emote_path, icon_x, row_y, icon_size);
-        SDL_SetRenderClipRect(o->renderer, nullptr);
         char supporter_text[128];
         snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
                  SUPPORTERS[si].amount);
         SDL_Texture *st = get_text_texture_from_cache(o, font, supporter_text, text_color);
-        // Right-aligned hugs the band's right edge (against the icon); left-aligned starts at its left.
-        float stx = band_x;
-        if (right_align && st) {
-            float stw = 0.0f;
-            SDL_GetTextureSize(st, &stw, nullptr);
-            stx = band_x + band_w - stw;
-        }
-        compact_draw_band_text(o, st, stx, row_y, band_x, band_w, icon_size, panel_bottom);
+        float stw = 0.0f;
+        if (st) SDL_GetTextureSize(st, &stw, nullptr);
+        RowPlacement row = place_row(stw);
+        char emote_path[MAX_PATH_LENGTH];
+        snprintf(emote_path, sizeof(emote_path), "%s/%s", get_icons_base_path(),
+                 p.emotes[si] ? p.emotes[si] : "");
+        SDL_SetRenderClipRect(o->renderer, &reveal_clip);
+        compact_draw_icon(o, emote_path, row.icon_x, row_y, icon_size);
+        SDL_SetRenderClipRect(o->renderer, nullptr);
+        // Right-aligned hugs the band's right edge (against the icon); otherwise it starts at the left.
+        float stx = right_align ? (band_x + band_w - stw) : row.band_x;
+        compact_draw_band_text(o, st, stx, row_y, row.band_x, row.band_w, icon_size, panel_bottom);
     }
 }
 
@@ -2894,8 +2917,8 @@ static void overlay_render_compact(Overlay *o, const Tracker *t, const AppSettin
     // strip above and stack area below). Only resizes when the needed size actually changes (a new
     // template with more digits, or a settings tweak), so it stays put during a run. Panel by alignment.
     int want_w = (int) snap_px(panel_w + 2.0f * pad);
-    // Also widen to fit the worst-case pop-out line so long stack text isn't clipped. The stack
-    // left-aligns at the panel's left edge (pad for Left alignment), so it needs stack_w + 2*pad.
+    // Also widen to fit the worst-case pop-out line so long stack text isn't clipped: it needs
+    // stack_w + 2*pad.
     float stack_w = compact_stack_worst_width(o, t, settings);
     if (stack_w > 0.0f) {
         int stack_want_w = (int) snap_px(stack_w + 2.0f * pad);
