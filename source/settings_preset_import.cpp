@@ -75,6 +75,7 @@ struct PresetRow {
 };
 
 #define PRESET_IMPORT_POPUP_ID "###preset_import_popup"
+#define PRESET_TOOLTIP_WRAP_EMS 45.0f
 
 // When creating, s_preset_json holds settings.json and s_current_json the defaults, so "after" is
 // what the new preset would store.
@@ -751,7 +752,13 @@ PresetPopupResult preset_import_render(AppSettings *settings,
                              (row.flags & PRESET_KEY_USER)
                                  ? "\n\nUnchecked by default: this belongs to you rather than to the preset."
                                  : "");
-                    ImGui::SetTooltip("%s", tooltip_buffer);
+                    if (ImGui::BeginTooltip()) {
+                        float max_wrap = ImGui::GetMainViewport()->WorkSize.x - ImGui::GetStyle().WindowPadding.x * 2.0f;
+                        ImGui::PushTextWrapPos(std::min(ImGui::GetFontSize() * PRESET_TOOLTIP_WRAP_EMS, max_wrap));
+                        ImGui::TextUnformatted(tooltip_buffer);
+                        ImGui::PopTextWrapPos();
+                        ImGui::EndTooltip();
+                    }
                 }
 
                 ImGui::SameLine(value_x);
