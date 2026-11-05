@@ -524,8 +524,8 @@ the [settings window](#the-settings-window-esc).
 
 * **View Menu**: The `View` button in the bottom-right corner holds everything that decides how the map is drawn:
   `Zoom`, `Reset Camera`, `Lock Camera`, `Lock Layout`, `Selection Rectangle`, `Manual Layout`, and the goal visibility
-  dropdown. `Lock Camera`, `Lock Layout`, `Selection Rectangle`, and `Manual Layout` also have shortcuts (`Shift+C`,
-  `Space`, `Shift+S`, and `Shift+M` by default).
+  dropdown. `Reset Camera`, `Lock Camera`, `Lock Layout`, `Selection Rectangle`, and `Manual Layout` also have shortcuts
+  (`Shift+R`, `Shift+C`, `Space`, `Shift+S`, and `Shift+M` by default).
 * **Pan & Zoom**: Hold `Right-Click` or `Middle-Click` and drag to pan, and use the `Mouse Wheel` to zoom. For an
   exact zoom level, use the `Zoom` slider in the `View` menu.
 * **Scroll Lists**: Hovering over a goal with many sub-items makes the `Mouse Wheel` scroll the list instead of
@@ -914,6 +914,7 @@ editor is open, so its rows can reuse their keys freely, `Global` ones included.
 |                          | `Shift+E`                  | Toggle the Template Editor window.                                                                                                                                                                                                                            |
 |                          | `Shift+N`                  | Toggle the `Notes` window.                                                                                                                                                                                                                                    |
 |                          | `F11`                      | Toggle fullscreen for the tracker window. Whether it was fullscreen is remembered on restart. On macOS, the green window button and `Ctrl+Cmd+F` do the same.                                                                                                 |
+|                          | `Shift+R`                  | Press `Reset Camera` in the `View` menu. Does nothing while `Lock Camera` is on. Opens the menu to show the new state.                                                                                                                                        |
 |                          | `Shift+C`                  | Toggle `Lock Camera` in the `View` menu, which makes the map ignore wheel zooming and drag panning. Opens the menu to show the new state.                                                                                                                     |
 |                          | `Space`                    | Toggle `Lock Layout` in the `View` menu. Opens the menu to show the new state.                                                                                                                                                                                |
 |                          | `Shift+M`                  | Toggle `Manual Layout` in the `View` menu. Does nothing while the Visual Layout Editor runs, which forces it on. Opens the menu to show the new state.                                                                                                        |

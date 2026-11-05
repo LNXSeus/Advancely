@@ -511,12 +511,19 @@ extern const char *APP_HOTKEY_GROUP_TOOLTIPS[APP_HOTKEY_GROUP_COUNT];
       "Switches the tracker window between fullscreen and windowed.\n" \
       "Whether it was fullscreen is remembered and restored on the next start.\n" \
       "On macOS, Ctrl+Cmd+F and the green window button do the same and are not configurable.") \
+    X(APP_HOTKEY_RESET_CAMERA, "reset_camera", "R", HOTKEY_MOD_SHIFT, \
+      APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
+      "Reset Camera", \
+      "Presses the \"Reset Camera\" button in the View menu, which resets camera position and\n" \
+      "zoom level to their defaults and unlocks the layout.\n" \
+      "Does nothing while \"Lock Camera\" is on.\n" \
+      "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_LOCK_CAMERA, "lock_camera", "C", HOTKEY_MOD_SHIFT, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \
       "Lock Camera (Zoom & Pan)", \
       "Flips the \"Lock Camera\" checkbox in the View menu, which makes the map ignore mouse\n" \
       "wheel zooming and right/middle mouse dragging.\n" \
-      "The Zoom slider and \"Reset Camera\" keep working while locked.\n" \
+      "The Zoom slider and the \"Reset Camera\" button keep working while locked.\n" \
       "Only fires while the tracker map itself is focused, not the settings or editor windows.") \
     X(APP_HOTKEY_LOCK_LAYOUT, "lock_layout", "Space", HOTKEY_MOD_NONE, \
       APP_HOTKEY_CTX_TRACKER | APP_HOTKEY_CTX_VISUAL, APP_HOTKEY_GROUP_TRACKER, \

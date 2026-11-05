@@ -98,6 +98,7 @@ struct Tracker {
 
     // View menu shortcuts. The event handler only records the press; the toggles themselves happen
     // where the checkboxes are drawn, so a key and a click go through exactly the same code.
+    bool view_reset_camera_pressed;
     bool view_lock_camera_pressed;
     bool view_lock_layout_pressed;
     bool view_toggle_manual_layout_pressed;
@@ -116,6 +117,7 @@ struct Tracker {
     bool tracker_view_focused; // True when keyboard focus sits on the tracker's own view (map/info/controls) or
     // nowhere at all; gates the SPACE hotkey so it can't fire while settings/editor widgets are being navigated.
     bool notes_window_open; // Flag to control the visibility of the notes window.
+    bool settings_button_pressed; // The control bar's "Settings" button was clicked, main.cpp owns the open flag.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused; // Flag to track if the template creator window has focus.
     bool is_settings_focused; // Settings window has focus; Ctrl+F goes to its search bar instead.

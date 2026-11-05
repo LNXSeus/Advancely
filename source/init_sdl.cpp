@@ -105,6 +105,8 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->settings_revert_pressed = false;
     t->editor_next_goal_pressed = false;
     t->editor_prev_goal_pressed = false;
+    t->settings_button_pressed = false;
+    t->view_reset_camera_pressed = false;
     t->view_lock_camera_pressed = false;
     t->view_lock_layout_pressed = false;
     t->view_toggle_manual_layout_pressed = false;

@@ -556,6 +556,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             SDL_Keycode view_key = event.key.key;
             Uint16 view_mods = hotkey_mods_from_sdl(event.key.mod);
 
+            if (app_hotkey_matches(app_settings, APP_HOTKEY_RESET_CAMERA, view_key, view_mods)) {
+                t->view_reset_camera_pressed = true;
+            }
             if (app_hotkey_matches(app_settings, APP_HOTKEY_LOCK_CAMERA, view_key, view_mods)) {
                 t->view_lock_camera_pressed = true;
             }

@@ -13825,6 +13825,12 @@ static bool sweep_apply_target(Tracker *t, const AppSettings *settings, const Sw
     return true;
 }
 
+static void tracker_reset_camera(Tracker *t) {
+    t->camera_offset = ImVec2(0.0f, 0.0f);
+    t->zoom_level = 1.0f;
+    t->layout_locked = false;
+}
+
 // END OF STATIC FUNCTIONS ------------------------------------
 
 // Animate overlay, display more than just advancements
@@ -14573,6 +14579,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImVec2 view_menu_text_size = ImGui::CalcTextSize(view_menu_button_label);
     float view_menu_button_width = view_menu_text_size.x + frame_padding_x * 2.0f;
 
+    const char *settings_button_label = "Settings";
+    ImVec2 settings_button_text_size = ImGui::CalcTextSize(settings_button_label);
+    float settings_button_width = settings_button_text_size.x + frame_padding_x * 2.0f;
+
     // Checkbox width: the square (roughly frame_height) + inner spacing + label + padding.
     ImVec2 notes_text_size = ImGui::CalcTextSize("Notes");
     float notes_checkbox_width = frame_height + style.ItemInnerSpacing.x + notes_text_size.x + frame_padding_x * 0.5f;
@@ -14612,6 +14622,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     float controls_total_width = clear_button_width + button_padding_x +
                                  search_box_width + button_padding_x +
                                  view_menu_button_width + button_padding_x +
+                                 settings_button_width + button_padding_x +
                                  notes_checkbox_width;
     if (controls_show_dropdown) {
         controls_total_width += player_dropdown_width + button_padding_x;
@@ -14943,6 +14954,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // The View menu shortcuts land here rather than in the event handler, so a key press runs the
     // exact same code as clicking the checkbox. Each one pops the menu open afterwards, which is
     // the only feedback a state that lives in a menu can give.
+    if (t->view_reset_camera_pressed) {
+        if (!t->camera_locked) {
+            tracker_reset_camera(t);
+            t->view_menu_open_requested = true;
+        }
+        t->view_reset_camera_pressed = false;
+    }
     if (t->view_lock_camera_pressed) {
         t->camera_locked = !t->camera_locked;
         t->view_menu_open_requested = true;
@@ -14999,7 +15017,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         snprintf(view_menu_tooltip_buffer, sizeof(view_menu_tooltip_buffer),
                  "How the map is shown: Zoom, Reset Camera, the camera and\n"
                  "layout locks, Manual Layout and Goal Visibility.\n"
-                 "The locks and Manual Layout also have shortcuts (Settings > Hotkeys),\n"
+                 "Reset Camera, the locks and Manual Layout also have shortcuts (Settings > Hotkeys),\n"
                  "which open this menu so you can see what changed.");
         ImGui::SetTooltip("%s", view_menu_tooltip_buffer);
     }
@@ -15079,17 +15097,20 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         // "Reset Camera" button, it also turns off the lock layout
         if (ImGui::Button("Reset Camera")) {
-            t->camera_offset = ImVec2(0.0f, 0.0f);
-            t->zoom_level = 1.0f;
-            t->layout_locked = false; // Unlocks the layout
+            tracker_reset_camera(t);
         }
 
         if (ImGui::IsItemHovered()) {
+            char reset_camera_hotkey_label[96];
+            app_hotkey_display_label(&settings->app_hotkeys[APP_HOTKEY_RESET_CAMERA],
+                                     reset_camera_hotkey_label, sizeof(reset_camera_hotkey_label));
             char reset_layout_tooltip_buffer[1024];
             snprintf(reset_layout_tooltip_buffer, sizeof(reset_layout_tooltip_buffer),
                      "Resets camera position and zoom level to their defaults.\n"
                      "Also unlocks the layout. A locked camera stays locked,\n"
-                     "since this button is a deliberate action rather than a stray scroll.");
+                     "since this button is a deliberate action rather than a stray scroll.\n"
+                     "Hotkey: %s (configurable in Settings > Hotkeys), only while the camera is unlocked.",
+                     reset_camera_hotkey_label);
             ImGui::SetTooltip("%s", reset_layout_tooltip_buffer);
         }
 
@@ -15284,6 +15305,19 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // The event handler needs to know whether this menu is on screen, so its own shortcuts can
     // still fire while it is open.
     t->view_menu_popup_open = ImGui::IsPopupOpen("view_menu_popup");
+
+    ImGui::SameLine();
+
+    if (ImGui::Button(settings_button_label)) {
+        t->settings_button_pressed = true;
+    }
+    if (ImGui::IsItemHovered()) {
+        char settings_button_tooltip_buffer[256];
+        snprintf(settings_button_tooltip_buffer, sizeof(settings_button_tooltip_buffer),
+                 "Opens or closes the settings window, just like pressing ESC.\n"
+                 "It stays open while it needs a valid saves path or your account setup.");
+        ImGui::SetTooltip("%s", settings_button_tooltip_buffer);
+    }
 
     ImGui::SameLine();
 

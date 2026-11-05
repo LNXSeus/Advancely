@@ -4599,9 +4599,14 @@ int main(int argc, char *argv[]) {
             tracker_render_gui(tracker, &app_settings);
             PROFILE_END(render_tracker);
 
+            if (tracker->settings_button_pressed) {
+                if (g_force_open_reason == FORCE_OPEN_NONE) settings_opened = !settings_opened;
+                tracker->settings_button_pressed = false;
+            }
 
             // Render settings window in tracker window
-            // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
+            // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler,
+            // or by the "Settings" button in the tracker's control bar
             PROFILE_BEGIN(render_settings, "settings_render_gui");
             settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_reason,
                                 &tracker->temp_creator_window_open);
