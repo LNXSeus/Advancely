@@ -365,6 +365,11 @@ struct TrackableCategory {
     // If one criteria is defined it's still treated as a multi-stat in terms of rendering.
     bool is_single_stat_category;
 
+    // Post-run statistic (stat categories only): shows the raw value of its stats once the run is
+    // complete. Every criterion counts up without a target (-1), it has no linked goals, is never done
+    // and never counts towards progress or run completion.
+    bool is_post_run;
+
     SDL_Texture *texture_bg;
     SDL_Texture *texture_bg_half_done;
     SDL_Texture *texture_bg_done;

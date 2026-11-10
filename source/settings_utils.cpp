@@ -51,7 +51,19 @@ const char *TRACKER_SECTION_NAMES[SECTION_COUNT] = {
     "Unlocks",
     "Statistics",
     "Custom Goals",
-    "Multi-Stage Goals"
+    "Multi-Stage Goals",
+    "Post-Run Statistics"
+};
+
+const int TRACKER_SECTION_DEFAULT_ORDER[SECTION_COUNT] = {
+    SECTION_COUNTERS,
+    SECTION_ADVANCEMENTS,
+    SECTION_RECIPES,
+    SECTION_UNLOCKS,
+    SECTION_STATS,
+    SECTION_POST_RUN_STATS,
+    SECTION_CUSTOM,
+    SECTION_MULTISTAGE
 };
 
 const char *VERSION_STRINGS[] = {
@@ -485,6 +497,7 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
         if (!s) continue;
         if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
             continue;
+        if (s->is_post_run) continue;
         if (goal_is_hidden(s->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS)) continue;
         stat_total++;
         if (s->done) stat_done++;
@@ -603,7 +616,8 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
             case COMPACT_COUNTER_STATS: // simple (single-value) stat: targeted (goal>0) or open-ended (goal -1)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];
-                    if (s && s->is_single_stat_category && !goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS) &&
+                    if (s && s->is_single_stat_category && !s->is_post_run &&
+                        !goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS) &&
                         s->criteria_count >= 1 &&
                         s->criteria[0] && (s->criteria[0]->goal > 0 || s->criteria[0]->goal == -1) &&
                         strcmp(s->root_name, ci->root_name) == 0)
@@ -613,7 +627,8 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
             case COMPACT_COUNTER_SUB_STATS: // multi-stat (complex stat category)
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];
-                    if (s && !s->is_single_stat_category && !goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS) &&
+                    if (s && !s->is_single_stat_category && !s->is_post_run &&
+                        !goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS) &&
                         strcmp(s->root_name, ci->root_name) == 0)
                         present = true;
                 }
@@ -722,6 +737,7 @@ const char *const OVERLAY_HIDDEN_TYPE_KEYS[OVERLAY_HIDDEN_TYPE_COUNT] = {
     "overlay_show_hidden_criteria",
     "overlay_show_hidden_stats",
     "overlay_show_hidden_sub_stats",
+    "overlay_show_hidden_post_run_stats",
     "overlay_show_hidden_unlocks",
     "overlay_show_hidden_custom_goals",
     "overlay_show_hidden_multi_stage_goals",
@@ -742,7 +758,7 @@ bool overlay_template_has_row1_icons(const TemplateData *td, const AppSettings *
     }
     for (int i = 0; i < td->stat_count; i++) {
         const TrackableCategory *cat = td->stats[i];
-        if (cat->is_single_stat_category || cat->hide_substats_in_row1) continue;
+        if (cat->is_single_stat_category || cat->hide_substats_in_row1 || cat->is_post_run) continue;
         if (goal_is_hidden(cat->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS)) continue;
         for (int j = 0; j < cat->criteria_count; j++) {
             if (goal_is_hidden(cat->criteria[j]->is_hidden, hidden_rule, OVERLAY_HIDDEN_SUB_STATS)) continue;
@@ -1060,7 +1076,7 @@ void settings_set_defaults(AppSettings *settings) {
 
     // Set the default section order
     for (int i = 0; i < SECTION_COUNT; i++) {
-        settings->section_order[i] = i;
+        settings->section_order[i] = TRACKER_SECTION_DEFAULT_ORDER[i];
     }
     settings->hotkey_count = 0;
     memset(settings->hotkeys, 0, sizeof(settings->hotkeys));
@@ -1502,10 +1518,11 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
     if (general_settings) {
         // Load Section Order
         const cJSON *order_json = cJSON_GetObjectItem(general_settings, "section_order");
-        if (cJSON_IsArray(order_json) && cJSON_GetArraySize(order_json) == SECTION_COUNT) {
+        const int saved_order_size = cJSON_IsArray(order_json) ? cJSON_GetArraySize(order_json) : 0;
+        if (saved_order_size > 0 && saved_order_size <= SECTION_COUNT) {
             bool found[SECTION_COUNT] = {false};
             bool valid = true;
-            for (int i = 0; i < SECTION_COUNT; ++i) {
+            for (int i = 0; i < saved_order_size; ++i) {
                 cJSON *item = cJSON_GetArrayItem(order_json, i);
                 if (cJSON_IsNumber(item) && item->valueint >= 0 && item->valueint < SECTION_COUNT) {
                     int val = item->valueint;
@@ -1523,12 +1540,34 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
             }
             if (!valid) {
                 // If array is malformed, revert to default
-                for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = i;
+                for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = TRACKER_SECTION_DEFAULT_ORDER[i];
+                defaults_were_used = true;
+            } else if (saved_order_size < SECTION_COUNT) {
+                // Saved before newer sections existed: keep the user's order and slot each missing section in
+                // right after the section it follows by default (or at the end when that one is missing too).
+                int size = saved_order_size;
+                for (int d = 0; d < SECTION_COUNT; ++d) {
+                    int id = TRACKER_SECTION_DEFAULT_ORDER[d];
+                    if (found[id]) continue;
+                    int insert_at = size;
+                    if (d > 0) {
+                        for (int k = 0; k < size; ++k) {
+                            if (settings->section_order[k] == TRACKER_SECTION_DEFAULT_ORDER[d - 1]) {
+                                insert_at = k + 1;
+                                break;
+                            }
+                        }
+                    }
+                    for (int k = size; k > insert_at; --k) settings->section_order[k] = settings->section_order[k - 1];
+                    settings->section_order[insert_at] = id;
+                    found[id] = true;
+                    size++;
+                }
                 defaults_were_used = true;
             }
         } else {
             // If key is missing or wrong size, use default
-            for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = i;
+            for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = TRACKER_SECTION_DEFAULT_ORDER[i];
             defaults_were_used = true;
         }
         // Toggling the overlay window
@@ -2902,12 +2941,16 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         // --- Load Custom Tracker Spacing ---
         const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(
             visual_settings, "tracker_section_custom_width_enabled");
-        if (cJSON_IsArray(tracker_custom_enabled_array) && cJSON_GetArraySize(tracker_custom_enabled_array) ==
-            SECTION_COUNT) {
+        const int saved_enabled_size = cJSON_IsArray(tracker_custom_enabled_array)
+                                           ? cJSON_GetArraySize(tracker_custom_enabled_array)
+                                           : 0;
+        if (saved_enabled_size > 0 && saved_enabled_size <= SECTION_COUNT) {
             for (int i = 0; i < SECTION_COUNT; i++) {
-                cJSON *item = cJSON_GetArrayItem(tracker_custom_enabled_array, i);
-                settings->tracker_section_custom_width_enabled[i] = cJSON_IsTrue(item);
+                cJSON *item = (i < saved_enabled_size) ? cJSON_GetArrayItem(tracker_custom_enabled_array, i) : nullptr;
+                settings->tracker_section_custom_width_enabled[i] =
+                        item ? cJSON_IsTrue(item) : DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
             }
+            if (saved_enabled_size < SECTION_COUNT) defaults_were_used = true;
         } else {
             for (int i = 0; i < SECTION_COUNT; i++) {
                 settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
@@ -2916,9 +2959,10 @@ static bool settings_apply_json(AppSettings *settings, cJSON *json) {
         }
 
         const cJSON *tracker_width_array = cJSON_GetObjectItem(visual_settings, "tracker_section_custom_item_width");
-        if (cJSON_IsArray(tracker_width_array) && cJSON_GetArraySize(tracker_width_array) == SECTION_COUNT) {
+        const int saved_width_size = cJSON_IsArray(tracker_width_array) ? cJSON_GetArraySize(tracker_width_array) : 0;
+        if (saved_width_size > 0 && saved_width_size <= SECTION_COUNT) {
             for (int i = 0; i < SECTION_COUNT; i++) {
-                cJSON *item = cJSON_GetArrayItem(tracker_width_array, i);
+                cJSON *item = (i < saved_width_size) ? cJSON_GetArrayItem(tracker_width_array, i) : nullptr;
                 if (cJSON_IsNumber(item)) {
                     settings->tracker_section_custom_item_width[i] = (float) item->valuedouble;
                 } else {

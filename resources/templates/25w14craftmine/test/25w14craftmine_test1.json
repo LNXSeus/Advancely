@@ -120,6 +120,7 @@
 		},
 		"stat_category:inf_dirt_collection":	{
 			"icon":	"blocks/Dirt.png",
+			"post_run_stat":	true,
 			"criteria":	{
 				"minecraft:mined/minecraft:dirt":	{
 					"icon":	"blocks/Oak_Log_(UD)_JE8_BE3.png",

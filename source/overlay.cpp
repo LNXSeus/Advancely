@@ -1087,6 +1087,52 @@ static const char *name_value_sep(const char *name) {
     return (name && name[0] != '\0') ? " " : "";
 }
 
+// The name and value lines a post-run statistic shows on the overlay. A simple stat shows its raw
+// value; a multi-stat cycles through its sub-stats on the stat cycle speed. crit_index picks one
+// sub-stat instead of the cycling one (used to measure the widest line).
+static void overlay_post_run_stat_text(const TrackableCategory *stat, const AppSettings *settings,
+                                       char *name_buf, size_t name_size, char *prog_buf, size_t prog_size,
+                                       int crit_index = -1) {
+    snprintf(name_buf, name_size, "%s", stat->display_name);
+    prog_buf[0] = '\0';
+    if (stat->is_single_stat_category) {
+        if (stat->criteria_count > 0 && stat->criteria[0])
+            snprintf(prog_buf, prog_size, "(%d)", stat->criteria[0]->progress);
+        return;
+    }
+    if (crit_index < 0) {
+        std::vector<int> shown;
+        for (int j = 0; j < stat->criteria_count; j++) {
+            if (stat->criteria[j] &&
+                !goal_is_hidden(stat->criteria[j]->is_hidden, settings, OVERLAY_HIDDEN_POST_RUN_STATS))
+                shown.push_back(j);
+        }
+        if (shown.empty()) return;
+        int cycle_ms = (int) (settings->overlay_stat_cycle_speed * 1000.0f);
+        if (cycle_ms <= 0) cycle_ms = 1000;
+        crit_index = shown[(SDL_GetTicks() / (Uint32) cycle_ms) % shown.size()];
+    }
+    if (crit_index >= stat->criteria_count || !stat->criteria[crit_index]) return;
+    const TrackableItem *crit = stat->criteria[crit_index];
+    snprintf(prog_buf, prog_size, "%d. %s%s(%d)", crit_index + 1, crit->display_name,
+             name_value_sep(crit->display_name), crit->progress);
+}
+
+// The post-run statistics the overlay may show (template "Hidden" follows "Show Hidden Goals"), as
+// indices into td->stats. row2_only keeps those forced to the 2nd row, the rest go to the 3rd.
+static std::vector<int> overlay_post_run_stat_indices(const TemplateData *td, const AppSettings *settings,
+                                                      bool row2_only) {
+    std::vector<int> out;
+    if (!td) return out;
+    for (int i = 0; i < td->stat_count; i++) {
+        const TrackableCategory *s = td->stats[i];
+        if (!s || !s->is_post_run || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_POST_RUN_STATS)) continue;
+        if (row2_only && !s->in_2nd_row) continue;
+        out.push_back(i);
+    }
+    return out;
+}
+
 // Build the ordered list of Compact cycle entries from the user's selection: the progress text rows
 // the other modes show in their top bar (the run-completion counter, e.g. "Adv: 12/80", and the
 // overall percentage "Prog: 45.32%"), each selected whole-section type count that is present in the
@@ -1195,7 +1241,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // an open-ended stat (goal -1) shows the checkbox + running value. goal 0 = legacy helper, skip.
         for (int i = 0; i < td->stat_count && n < max_entries; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || !s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
+            if (!s || !s->is_single_stat_category || s->is_post_run ||
+                goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             if (s->criteria_count < 1 || !s->criteria[0]) continue;
             int goal = s->criteria[0]->goal;
             if (goal <= 0 && goal != -1) continue;
@@ -1224,7 +1271,8 @@ static int compact_build_cycle(const Tracker *t, const AppSettings *settings, Co
         // Multi-stats (complex stat categories) -> their sub-stat progress.
         for (int i = 0; i < td->stat_count && n < max_entries; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || s->is_single_stat_category || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
+            if (!s || s->is_single_stat_category || s->is_post_run ||
+                goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             int item_order = compact_item_order(settings, COMPACT_COUNTER_SUB_STATS, s->root_name);
             if (item_order < 0) continue;
             snprintf(out[n].label, sizeof(out[n].label), "%s", compact_display_name(s->display_name, s->root_name));
@@ -1835,7 +1883,7 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
         // Stats: simple stats pop as a graded single line; multi-stat sub-stats pop as 2-line groups.
         for (int i = 0; i < td->stat_count; i++) {
             TrackableCategory *s = td->stats[i];
-            if (!s || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
+            if (!s || s->is_post_run || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
             const char *sname = compact_display_name(s->display_name, s->root_name);
             if (s->is_single_stat_category) {
                 if (s->criteria_count < 1 || !s->criteria[0]) continue;
@@ -1912,7 +1960,9 @@ static void compact_render_stack(Overlay *o, const Tracker *t, const AppSettings
                             if (pshown < 1) pshown = 1; // grouped/edge safety
                         }
                     }
-                    snprintf(pbody, sizeof(pbody), "%s (%d/%d)", sname, pshown, s->criteria_count);
+                    char slabel[208];
+                    compact_ms_label(slabel, sizeof(slabel), sname);
+                    snprintf(pbody, sizeof(pbody), "%s (%d/%d)", slabel, pshown, s->criteria_count);
                     compact_marked_line(ptext, sizeof(ptext), catbox, right_align, pbody);
                     // Lone manual completer, else the highest contributor (HIGHEST merge only), matching
                     // the tracker's sub-stat manual-checkbox face and right-of-icon contributor face.
@@ -2234,7 +2284,7 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
     }
     for (int i = 0; i < td->stat_count; i++) {
         TrackableCategory *s = td->stats[i];
-        if (!s || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
+        if (!s || s->is_post_run || goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS)) continue;
         const char *sn = compact_display_name(s->display_name, s->root_name);
         if (s->is_single_stat_category) {
             if (s->criteria_count < 1 || !s->criteria[0]) continue;
@@ -2361,7 +2411,8 @@ static float compact_stack_worst_width(Overlay *o, const Tracker *t, const AppSe
 
 // One supporter currently up in the showcase.
 struct CompactSupporterPop {
-    int index; // into SUPPORTERS (and the run's fixed emote list)
+    int index; // into SUPPORTERS (and the run's fixed emote list), or -1 for a post-run statistic
+    int stat_index; // into td->stats for a post-run statistic, or -1 for a supporter
     float hold_left; // seconds until it leaves (the last one standing never does)
 };
 
@@ -2384,6 +2435,8 @@ struct CompactPromoState {
     const char *emotes[NUM_SUPPORTERS > 0 ? NUM_SUPPORTERS : 1] = {nullptr};
     std::vector<int> order; // supporter indices, reshuffled once every one of them has popped in
     int pos = 0; // how far through `order` this pass has got
+    int stat_pos = 0; // next post-run statistic to pop in (they take turns with the supporters)
+    bool next_is_stat = false; // whether the next pop is a post-run statistic instead of a supporter
     float spawn_left = 0.0f; // seconds until the next supporter pops in
     std::vector<CompactSupporterPop> pops; // newest first (index 0 = the row right under the promo)
 };
@@ -2460,6 +2513,8 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (run_complete != p.run_was_complete) {
         p.run_was_complete = run_complete;
         p.pops.clear();
+        p.stat_pos = 0;
+        p.next_is_stat = false;
         if (run_complete) {
             for (int i = 0; i < NUM_SUPPORTERS; i++)
                 p.emotes[i] = NUM_SUPPORTER_ICONS > 0 ? SUPPORTER_ICONS[rand() % NUM_SUPPORTER_ICONS] : "";
@@ -2475,12 +2530,23 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (run_complete && NUM_SUPPORTERS > 0 && supporter_rows > 0) {
         // Pop the next supporter in above the others once its wait runs out, walking the shuffled
         // order and reshuffling for the next pass once every supporter has had a turn.
+        // Post-run statistics take every other slot, so a supporter's turn simply moves one slot on and
+        // the timing stays exactly what it is with supporters alone.
+        std::vector<int> post_run = overlay_post_run_stat_indices(td, settings, false);
         p.spawn_left -= dt;
         if (p.spawn_left <= 0.0f) {
-            if (p.pos >= (int) p.order.size()) compact_promo_shuffle_order(p);
-            if (!p.order.empty()) {
-                CompactSupporterPop pop;
-                pop.index = p.order[p.pos++];
+            CompactSupporterPop pop;
+            pop.index = -1;
+            pop.stat_index = -1;
+            if (p.next_is_stat && !post_run.empty()) {
+                if (p.stat_pos >= (int) post_run.size()) p.stat_pos = 0;
+                pop.stat_index = post_run[p.stat_pos++];
+            } else {
+                if (p.pos >= (int) p.order.size()) compact_promo_shuffle_order(p);
+                if (!p.order.empty()) pop.index = p.order[p.pos++];
+            }
+            p.next_is_stat = !post_run.empty() && !p.next_is_stat;
+            if (pop.index >= 0 || pop.stat_index >= 0) {
                 pop.hold_left = compact_supporter_hold(settings);
                 p.pops.insert(p.pops.begin(), pop);
             }
@@ -2610,20 +2676,35 @@ static void compact_render_promo_line(Overlay *o, const Tracker *t, const AppSet
     if (!run_complete) return;
     for (size_t i = 0; i < p.pops.size(); i++) {
         int si = p.pops[i].index;
-        if (si < 0 || si >= NUM_SUPPORTERS) continue;
+        int sti = p.pops[i].stat_index;
+        const TrackableCategory *post_run_stat = nullptr;
+        if (sti >= 0) {
+            if (!td || sti >= td->stat_count || !td->stats[sti] || !td->stats[sti]->is_post_run) continue;
+            post_run_stat = td->stats[sti];
+        } else if (si < 0 || si >= NUM_SUPPORTERS) {
+            continue;
+        }
         // Ride the promo's entrance slide so the whole showcase moves in as one, and clip to below the
         // panel like the promo row.
         float row_y = snap_px(stack_top + (float) (i + 1) * line_h + slide);
-        char supporter_text[128];
-        snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
-                 SUPPORTERS[si].amount);
+        char supporter_text[512];
+        char emote_path[MAX_PATH_LENGTH];
+        if (post_run_stat) {
+            char nm[256], pg[256];
+            overlay_post_run_stat_text(post_run_stat, settings, nm, sizeof(nm), pg, sizeof(pg));
+            snprintf(supporter_text, sizeof(supporter_text), "%s%s%s",
+                     compact_display_name(nm, post_run_stat->root_name), pg[0] != '\0' ? " " : "", pg);
+            snprintf(emote_path, sizeof(emote_path), "%s", post_run_stat->icon_path);
+        } else {
+            snprintf(supporter_text, sizeof(supporter_text), "%s ($%.2f)", SUPPORTERS[si].name,
+                     SUPPORTERS[si].amount);
+            snprintf(emote_path, sizeof(emote_path), "%s/%s", get_icons_base_path(),
+                     p.emotes[si] ? p.emotes[si] : "");
+        }
         SDL_Texture *st = get_text_texture_from_cache(o, font, supporter_text, text_color);
         float stw = 0.0f;
         if (st) SDL_GetTextureSize(st, &stw, nullptr);
         RowPlacement row = place_row(stw);
-        char emote_path[MAX_PATH_LENGTH];
-        snprintf(emote_path, sizeof(emote_path), "%s/%s", get_icons_base_path(),
-                 p.emotes[si] ? p.emotes[si] : "");
         SDL_SetRenderClipRect(o->renderer, &reveal_clip);
         compact_draw_icon(o, emote_path, row.icon_x, row_y, icon_size);
         SDL_SetRenderClipRect(o->renderer, nullptr);
@@ -2662,7 +2743,7 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
         if (cat->is_single_stat_category) continue;
-        if (cat->hide_substats_in_row1) continue;
+        if (cat->hide_substats_in_row1 || cat->is_post_run) continue;
         for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
     }
 
@@ -3410,7 +3491,8 @@ static OverlayHiddenType display_item_hidden_type(const OverlayDisplayItem &disp
         case OverlayDisplayItem::ADVANCEMENT:
             return adv_hidden_type(static_cast<const TrackableCategory *>(display_item.item_ptr));
         case OverlayDisplayItem::UNLOCK: return OVERLAY_HIDDEN_UNLOCKS;
-        case OverlayDisplayItem::STAT: return OVERLAY_HIDDEN_STATS;
+        case OverlayDisplayItem::STAT:
+            return stat_hidden_type(static_cast<const TrackableCategory *>(display_item.item_ptr));
         case OverlayDisplayItem::CUSTOM: return OVERLAY_HIDDEN_CUSTOM;
         case OverlayDisplayItem::MULTISTAGE: return OVERLAY_HIDDEN_MULTISTAGE;
         case OverlayDisplayItem::COUNTER: return OVERLAY_HIDDEN_COUNTERS;
@@ -3508,8 +3590,8 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
             // Hide legacy helper stats
             MC_Version version = settings_get_version_from_string(settings->version_str);
-            bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && stat->is_single_stat_category && stat->criteria[0]->
-                                     goal <= 0);
+            bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && !stat->is_post_run &&
+                                     stat->is_single_stat_category && stat->criteria[0]->goal <= 0);
             return stat->done || is_hidden_legacy;
         }
         case OverlayDisplayItem::CUSTOM:
@@ -3550,7 +3632,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         }
 
         // The template can opt a multi-stat out of Row 1; it still cycles its sub-stats as sub-text.
-        if (cat->hide_substats_in_row1) {
+        if (cat->hide_substats_in_row1 || cat->is_post_run) {
             continue;
         }
 
@@ -3577,7 +3659,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     // Add forced items to Row 2 (custom goals, ms goals, and stats can be forced using "in_2nd_row")
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
-        if (cat->in_2nd_row) {
+        if (cat->in_2nd_row && !cat->is_post_run) {
             // Skip hidden helper stats even if forced (shouldn't happen but safe to check)
             if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 &&
                 cat->icon_path[0] == '\0') {
@@ -4062,6 +4144,38 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             // Completed Run: Render Supporter Showcase
             float max_text_width = 0.0f;
 
+            // Post-run statistics forced to row 2 take turns with the supporters: supporter, stat,
+            // supporter, stat, ... with the shorter list starting over until the longer one is through.
+            std::vector<int> row2_post_run = overlay_post_run_stat_indices(t->template_data, settings, true);
+            struct ShowcaseCell {
+                int supporter; // index into static_supporter_render_list, or -1
+                const TrackableCategory *stat; // post-run statistic, or nullptr
+            };
+            std::vector<ShowcaseCell> showcase;
+            const size_t supporter_count = static_supporter_render_list.size();
+            if (row2_post_run.empty()) {
+                for (size_t i = 0; i < supporter_count; ++i) showcase.push_back({(int) i, nullptr});
+            } else {
+                size_t pairs = supporter_count > row2_post_run.size() ? supporter_count : row2_post_run.size();
+                for (size_t k = 0; k < pairs; ++k) {
+                    if (supporter_count > 0) showcase.push_back({(int) (k % supporter_count), nullptr});
+                    showcase.push_back({-1, t->template_data->stats[row2_post_run[k % row2_post_run.size()]]});
+                }
+                for (int idx: row2_post_run) {
+                    const TrackableCategory *stat = t->template_data->stats[idx];
+                    char nm[256], pg[256];
+                    int crit_lines = stat->is_single_stat_category ? 1 : stat->criteria_count;
+                    for (int j = 0; j < crit_lines; ++j) {
+                        overlay_post_run_stat_text(stat, settings, nm, sizeof(nm), pg, sizeof(pg),
+                                                   stat->is_single_stat_category ? -1 : j);
+                        int nw = 0, pw = 0;
+                        TTF_MeasureString(o->font, nm, 0, 0, &nw, nullptr);
+                        TTF_MeasureString(o->font, pg, 0, 0, &pw, nullptr);
+                        max_text_width = fmaxf(max_text_width, (float) (nw > pw ? nw : pw));
+                    }
+                }
+            }
+
             // First pass: Prepare render info and calculate max width from the static list
             for (const auto &render_info: static_supporter_render_list) {
                 // Measure text widths for layout calculation
@@ -4075,6 +4189,55 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             const float cell_width = snap_px(fmaxf(ITEM_WIDTH, max_text_width));
             const float item_full_width = cell_width + ITEM_SPACING;
+
+            // Draws one post-run statistic cell (completed background, icon, name, value).
+            auto draw_post_run_stat = [&](const TrackableCategory *stat, float current_x) {
+                float bg_x_offset = snap_px((cell_width - ITEM_WIDTH) / 2.0f);
+                SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
+                render_texture_with_alpha(o->renderer, o->adv_bg_done, o->adv_bg_done_anim, &bg_rect, 255);
+                SDL_FRect icon_rect = {
+                    bg_rect.x + settings->adv_icon_offset_x * ICON_SCALE,
+                    bg_rect.y + settings->adv_icon_offset_y * ICON_SCALE,
+                    settings->adv_icon_size * ICON_SCALE, settings->adv_icon_size * ICON_SCALE
+                };
+                SDL_Texture *tex = nullptr;
+                AnimatedTexture *anim_tex = nullptr;
+                if (stat->icon_path[0] != '\0' && strstr(stat->icon_path, ".gif")) {
+                    anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                               &o->anim_cache_capacity, stat->icon_path,
+                                                               SDL_SCALEMODE_NEAREST);
+                } else if (stat->icon_path[0] != '\0') {
+                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                 &o->texture_cache_capacity, stat->icon_path, SDL_SCALEMODE_NEAREST);
+                }
+                render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+
+                char nm[256], pg[256];
+                overlay_post_run_stat_text(stat, settings, nm, sizeof(nm), pg, sizeof(pg));
+                float name_h = 0.0f;
+                SDL_Texture *name_tex = get_text_texture_from_cache(o, o->font, nm, text_color);
+                if (name_tex) {
+                    float w, h;
+                    SDL_GetTextureSize(name_tex, &w, &h);
+                    SDL_FRect dest_rect = {
+                        current_x + snap_px((cell_width - w) / 2.0f), ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h
+                    };
+                    SDL_RenderTexture(o->renderer, name_tex, nullptr, &dest_rect);
+                    name_h = h;
+                }
+                if (pg[0] != '\0') {
+                    SDL_Texture *prog_tex = get_text_texture_from_cache(o, o->font, pg, text_color);
+                    if (prog_tex) {
+                        float pw, ph;
+                        SDL_GetTextureSize(prog_tex, &pw, &ph);
+                        SDL_FRect p_dest_rect = {
+                            current_x + snap_px((cell_width - pw) / 2.0f),
+                            ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + name_h, pw, ph
+                        };
+                        SDL_RenderTexture(o->renderer, prog_tex, nullptr, &p_dest_rect);
+                    }
+                }
+            };
 
             // Draws one supporter cell (background, icon, name, amount) with its left edge at current_x.
             auto draw_supporter = [&](size_t i, float current_x) {
@@ -4150,26 +4313,33 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // if they all fit one page it simply shows them statically. Fixed signature since the
                 // showcase list stays constant for the whole run.
                 static PageView page_supporters;
-                std::vector<char> removed((size_t) NUM_SUPPORTERS, 0);
+                std::vector<char> removed(showcase.size(), 0);
                 std::vector<BeltTile> tiles;
+                unsigned long long showcase_sig = 0x5507702EULL; // "supporters"
+                for (const auto &cell: showcase)
+                    for (const char *c = cell.stat ? cell.stat->root_name : "#"; *c; c++)
+                        showcase_sig = (showcase_sig ^ (unsigned char) *c) * 1099511628211ULL;
                 page_update(page_supporters, o->page_index, settings->overlay_page_align,
                             window_w, item_full_width, cell_width,
-                            NUM_SUPPORTERS, removed, 0.0f, 0.0f, 0x5507702EULL /* "supporters" */, tiles);
+                            (int) showcase.size(), removed, 0.0f, 0.0f, showcase_sig, tiles);
                 for (size_t ti = 0; ti < tiles.size(); ++ti) {
                     if (tiles[ti].idx < 0) continue; // gap (never happens for supporters, but be safe)
-                    draw_supporter((size_t) tiles[ti].idx, snap_px(tiles[ti].x));
+                    const ShowcaseCell &cell = showcase[(size_t) tiles[ti].idx];
+                    if (cell.stat) draw_post_run_stat(cell.stat, snap_px(tiles[ti].x));
+                    else draw_supporter((size_t) cell.supporter, snap_px(tiles[ti].x));
                 }
             } else {
-                float total_row_width = NUM_SUPPORTERS * item_full_width;
+                float total_row_width = (float) showcase.size() * item_full_width;
                 float start_pos = snap_px(fmod(o->scroll_offset_row2, total_row_width)); // Sync with row 2's speed
                 int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
                 for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
                     float block_offset = start_pos + (block * total_row_width);
-                    for (size_t i = 0; i < static_supporter_render_list.size(); ++i) {
+                    for (size_t i = 0; i < showcase.size(); ++i) {
                         float current_x = snap_px(block_offset + (i * item_full_width));
                         if (current_x + item_full_width < 0 || current_x > window_w) continue;
-                        draw_supporter(i, current_x);
+                        if (showcase[i].stat) draw_post_run_stat(showcase[i].stat, current_x);
+                        else draw_supporter((size_t) showcase[i].supporter, current_x);
                     }
                 }
             }
@@ -4196,7 +4366,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             // Add forced items to Row 2
             for (int i = 0; i < t->template_data->stat_count; i++) {
                 TrackableCategory *cat = t->template_data->stats[i];
-                if (cat->in_2nd_row) {
+                if (cat->in_2nd_row && !cat->is_post_run) {
                     if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 &&
                         cat->icon_path[0] == '\0') {
                         continue;
@@ -4702,6 +4872,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         for (int i = 0; i < t->template_data->stat_count; ++i) {
             TrackableCategory *stat_cat = t->template_data->stats[i];
             if (stat_cat->in_2nd_row) continue; // SKIP if forced to Row 2 ("in_2nd_row")
+            if (stat_cat->is_post_run && !t->template_data->run_completed) continue;
             // Skip hidden helper stats that are not meant to be displayed
             if (stat_cat->is_single_stat_category && stat_cat->criteria_count > 0 && stat_cat->criteria[0]->goal <= 0 &&
                 stat_cat->icon_path[0] == '\0') {
@@ -4781,6 +4952,22 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
                 case OverlayDisplayItem::STAT: {
                     auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                    if (stat->is_post_run) {
+                        // Raw values can run far past 3 digits, so measure the real lines.
+                        char post_run_line[256];
+                        int lines = stat->is_single_stat_category ? 1 : stat->criteria_count;
+                        for (int j = 0; j < lines; ++j) {
+                            overlay_post_run_stat_text(stat, settings, name_buf, sizeof(name_buf), post_run_line,
+                                                       sizeof(post_run_line),
+                                                       stat->is_single_stat_category ? -1 : j);
+                            if (strlen(post_run_line) > strlen(longest_progress_buf)) {
+                                strncpy(longest_progress_buf, post_run_line, sizeof(longest_progress_buf) - 1);
+                                longest_progress_buf[sizeof(longest_progress_buf) - 1] = '\0';
+                            }
+                        }
+                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                        break;
+                    }
                     strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
                     name_buf[sizeof(name_buf) - 1] = '\0';
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
@@ -5002,6 +5189,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         case OverlayDisplayItem::STAT: {
                             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                            if (stat->is_post_run) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                                icon_path = stat->icon_path;
+                                overlay_post_run_stat_text(stat, settings, name_buf, sizeof(name_buf),
+                                                           progress_buf, sizeof(progress_buf));
+                                break;
+                            }
                             static_bg = o->adv_bg;
                             anim_bg = o->adv_bg_anim;
                             if (stat->done) {

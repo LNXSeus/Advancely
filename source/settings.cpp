@@ -338,7 +338,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         } else if (kind == COMPACT_COUNTER_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && st->is_single_stat_category && !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS) &&
+                if (st && st->is_single_stat_category && !st->is_post_run &&
+                    !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS) &&
                     st->criteria_count >= 1 &&
                     st->criteria[0] && (st->criteria[0]->goal > 0 || st->criteria[0]->goal == -1))
                     return st->root_name;
@@ -346,7 +347,8 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
         } else if (kind == COMPACT_COUNTER_SUB_STATS) {
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
-                if (st && !st->is_single_stat_category && !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS))
+                if (st && !st->is_single_stat_category && !st->is_post_run &&
+                    !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS))
                     return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_CUSTOM) {
@@ -3121,7 +3123,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Drag and drop to reorder the sections in the main tracker window.\n"
                          "This doesn't affect the 'Manual Layout'.\n"
                          "Drop items between others to insert them at that position.\n"
-                         "Default order: Counters, Advancements, Recipes, Unlocks, Stats, Custom, Multi-Stage");
+                         "Default order: Counters, Advancements, Recipes, Unlocks, Stats, Post-Run Stats,\n"
+                         "Custom, Multi-Stage");
                 settings_tooltip(section_order_tooltip_buffer);
             }
 
@@ -3293,7 +3296,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Indent();
 
             // We use the already-calculated selected_version and its labels
-            for (int i = 0; i < SECTION_COUNT; ++i) {
+            for (int order_index = 0; order_index < SECTION_COUNT; ++order_index) {
+                const int i = TRACKER_SECTION_DEFAULT_ORDER[order_index];
                 TrackerSection section_id = (TrackerSection) i;
                 bool is_visible = true;
                 const char *label = TRACKER_SECTION_NAMES[i];
@@ -4028,6 +4032,9 @@ settings_tooltip(tooltip_buffer); \
                     auto type_present = [&](OverlayCompactCounterType kind) {
                         return !hidden_td || hidden_cc[kind].total > 0;
                     };
+                    bool post_run_present = !hidden_td;
+                    for (int i = 0; hidden_td && i < hidden_td->stat_count && !post_run_present; i++)
+                        if (hidden_td->stats[i] && hidden_td->stats[i]->is_post_run) post_run_present = true;
 
                     char hidden_adv_label[32], hidden_adv_tip[160], hidden_crit_tip[192];
                     snprintf(hidden_adv_label, sizeof(hidden_adv_label), "Hidden %s",
@@ -4056,6 +4063,9 @@ settings_tooltip(tooltip_buffer); \
                          "Show sub-stats marked hidden in the template. A hidden sub-stat of a hidden stat\n"
                          "also needs the Hidden Stats box.",
                          type_present(COMPACT_COUNTER_SUB_STATS)},
+                        {OVERLAY_HIDDEN_POST_RUN_STATS, "Hidden Post-Run Stats",
+                         "Show post-run stats and their sub-stats marked hidden in the template.",
+                         post_run_present},
                         {OVERLAY_HIDDEN_UNLOCKS, "Hidden Unlocks", "Show unlocks marked hidden in the template.",
                          type_present(COMPACT_COUNTER_UNLOCKS)},
                         {OVERLAY_HIDDEN_CUSTOM, "Hidden Custom Goals",

@@ -516,8 +516,12 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
                                      bool is_recipe, bool manual_pos_set,
                                      bool is_multi_stat = false,
                                      bool substats_hidden_in_row1 = false,
-                                     bool is_complex = false) {
+                                     bool is_complex = false,
+                                     bool is_post_run = false) {
     if (!search || search[0] == '\0') return false;
+    if (is_post_run && (strcasecmp(search, "post") == 0 || strcasecmp(search, "postrun") == 0
+                        || strcasecmp(search, "post-run") == 0))
+        return true;
     if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
     if (is_complex && (strcasecmp(search, "complex") == 0 || strcasecmp(search, "cmplx") == 0)) return true;
     if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
@@ -589,7 +593,9 @@ static bool category_reveals_children(const TrackableCategory *cat, const char *
                                       bool is_stat_section, MC_Version version) {
     return category_text_matches_search(cat, search)
            || category_substat_keyword_matches(cat, search, is_stat_section)
-           || category_complex_keyword_matches(cat, search, is_stat_section, version);
+           || category_complex_keyword_matches(cat, search, is_stat_section, version)
+           || (cat->is_post_run &&
+               indicator_matches_search(search, false, 0, false, false, false, false, false, true));
 }
 
 // Search helpers: match display_name, root_name, and icon_path against the search buffer.
@@ -621,7 +627,8 @@ static bool category_matches_search(const TrackableCategory *cat, const char *se
                                        cat->progress_pos.is_set,
                                        is_multi_stat,
                                        is_multi_stat && cat->hide_substats_in_row1,
-                                       category_is_complex(cat, is_stat_section, version));
+                                       category_is_complex(cat, is_stat_section, version),
+                                       cat->is_post_run);
 }
 
 // Text-only counter match (no indicator keywords). Used for link expansion so that an indicator
@@ -2661,6 +2668,25 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                                        &new_cat->linked_goals, &new_cat->linked_goal_mode);
         }
 
+        // A post-run statistic only ever shows raw values: whatever a hand-edited template says, every
+        // criterion counts up without a target and nothing can auto-complete it.
+        if (is_stat_category && cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "post_run_stat"))) {
+            new_cat->is_post_run = true;
+            new_cat->in_3rd_row = false;
+            free(new_cat->linked_goals);
+            new_cat->linked_goals = nullptr;
+            new_cat->linked_goal_count = 0;
+            for (int pc = 0; pc < new_cat->criteria_count; pc++) {
+                TrackableItem *pcrit = new_cat->criteria[pc];
+                if (!pcrit) continue;
+                pcrit->goal = -1;
+                pcrit->hide_progress = false;
+                free(pcrit->linked_goals);
+                pcrit->linked_goals = nullptr;
+                pcrit->linked_goal_count = 0;
+            }
+        }
+
         // Implicitly, if criteria_obj exists but is empty, we do nothing.
         // This correctly leaves criteria_count at 0, making it a "simple" category.
         (*categories_array)[i++] = new_cat;
@@ -4560,6 +4586,7 @@ static void tracker_compute_completion_counts(TemplateData *td, MC_Version versi
         // Legacy hidden helper stats (<= 1.6.4) are not real goals, same as everywhere else.
         if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
             continue;
+        if (s->is_post_run) continue;
         if (rule->types[RC_TYPE_STATS] || rc_goal_listed(rule, RC_GOAL_STAT, s->root_name))
             take(RC_TYPE_STATS, s->done);
         if (!s->is_single_stat_category && rc_goal_listed(rule, RC_GOAL_STAT_SUB_STATS, s->root_name))
@@ -4715,9 +4742,33 @@ bool tracker_get_progress_counter(const TemplateData *td, MC_Version version, co
     return true;
 }
 
+// Post-run statistics are never complete. The stat update paths treat them like any other stat, so a
+// manual completion stored from before the stat became post-run could still mark one done; this undoes
+// that and takes it back out of the stat completion counts.
+static void tracker_clear_post_run_completion(TemplateData *td) {
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *cat = td->stats[i];
+        if (!cat || !cat->is_post_run) continue;
+        if (cat->done) td->stats_completed_count--;
+        td->stats_completed_criteria_count -= cat->completed_criteria_count;
+        cat->done = false;
+        cat->is_manually_completed = false;
+        cat->completed_criteria_count = 0;
+        for (int j = 0; j < cat->criteria_count; j++) {
+            if (!cat->criteria[j]) continue;
+            cat->criteria[j]->done = false;
+            cat->criteria[j]->is_manually_completed = false;
+        }
+    }
+    if (td->stats_completed_count < 0) td->stats_completed_count = 0;
+    if (td->stats_completed_criteria_count < 0) td->stats_completed_criteria_count = 0;
+}
+
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) settings;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
+
+    tracker_clear_post_run_completion(t->template_data);
 
     // Every update path ends here, so this is where a mirror stage picks up the numbers of the goal
     // it reflects, after that goal's own progress has settled.
@@ -4752,6 +4803,7 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
         if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal == 0) {
             continue; // Skip hidden legacy stats
         }
+        if (stat_cat->is_post_run) continue;
         total_steps += stat_cat->criteria_count;
         completed_steps += stat_cat->completed_criteria_count;
     }
@@ -8202,7 +8254,8 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                                           const char *root_name = nullptr,
                                           const char *parent_display_name = nullptr,
                                           const char *parent_root_name = nullptr,
-                                          ManualPos *hierarchy_parent_pos = nullptr) {
+                                          ManualPos *hierarchy_parent_pos = nullptr,
+                                          const char *goal_type_label = nullptr) {
     // Remember where this element actually rendered, so the template editor can seed manual
     // coordinates with the position the element currently has instead of a fixed default.
     record_auto_layout_rect(t, target_pos, item_screen_pos, hit_box_size);
@@ -8396,19 +8449,20 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     // Show tooltip on hover or while dragging
     if (is_hovered || is_dragging) {
         if (is_hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        const char *shown_type = goal_type_label ? goal_type_label : goal_type;
         char tooltip[512];
         if (is_dragging) {
             if (parent_display_name) {
                 snprintf(tooltip, sizeof(tooltip),
                          "%s: \"%s\" - %s\nPart of \"%s\"\n\n"
                          "X: %.0f   Y: %.0f",
-                         goal_type, display_name, element_type, parent_display_name,
+                         shown_type, display_name, element_type, parent_display_name,
                          target_pos.x, target_pos.y);
             } else {
                 snprintf(tooltip, sizeof(tooltip),
                          "%s: \"%s\" - %s\n\n"
                          "X: %.0f   Y: %.0f",
-                         goal_type, display_name, element_type,
+                         shown_type, display_name, element_type,
                          target_pos.x, target_pos.y);
             }
         } else {
@@ -8431,7 +8485,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                          "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.\n"
                          "The keys in Settings > Hotkeys move the selection by 1 or 10 pixels.",
-                         goal_type, display_name, element_type, parent_display_name,
+                         shown_type, display_name, element_type, parent_display_name,
                          display_x, display_y);
             } else {
                 snprintf(tooltip, sizeof(tooltip),
@@ -8439,7 +8493,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                          "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.\n"
                          "The keys in Settings > Hotkeys move the selection by 1 or 10 pixels.",
-                         goal_type, display_name, element_type,
+                         shown_type, display_name, element_type,
                          display_x, display_y);
             }
         }
@@ -8563,7 +8617,8 @@ static void tracker_fade_vertices_since(ImDrawList *draw_list, int vtx_start, fl
  * @param current_y The current y position in the world.
  * @param title The title of the section.
  * @param text_color The text color for the title.
- * @param completed_count Number of completed main items in this section (respecting hiding mode).
+ * @param completed_count Number of completed main items in this section (respecting hiding mode), or -1 to
+ * show only how many there are.
  * @param total_visible_count Total number of main items considered for this section (respecting hiding mode).
  * @param completed_sub_count Number of completed sub-items (criteria/sub-stats/stages) (use -1 if not applicable).
  * @param total_visible_sub_count Total number of sub-items considered (use -1 if not applicable).
@@ -8580,7 +8635,10 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 
     // Construct counter string based on hiding mode
     char counter_str[128] = "";
-    if (total_visible_count > 0) {
+    if (total_visible_count > 0 && completed_count < 0) {
+        // Sections whose goals never complete (post-run statistics) only show how many there are
+        snprintf(counter_str, sizeof(counter_str), "  (%d)", total_visible_count);
+    } else if (total_visible_count > 0) {
         // Only show counters if there are items to count
         if (settings->goal_hiding_mode == HIDE_ALL_COMPLETED ||
             settings->goal_hiding_mode == SHOW_ONLY_INCOMPLETE) {
@@ -8766,10 +8824,40 @@ static float get_global_safe_x(Tracker *t) {
  * @param is_stat_section True if the section is for stats, false if it's for advancements.
  * @param version The game version (MC_Version).
  */
-static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
+// Whether the post-run statistics are on the map at all. The Visual Layout Editor always shows them so
+// they can be placed. Otherwise "Show All" (inverted or not) shows them throughout the run, the two
+// hiding modes (inverted or not) once the run is completed, and "Show Only Incomplete/Completed" never.
+static bool tracker_post_run_stats_shown(const Tracker *t, const AppSettings *settings) {
+    if (t->is_visual_layout_editing) return true;
+    switch (settings->goal_hiding_mode) {
+        case SHOW_ALL:
+            return true;
+        case HIDE_ALL_COMPLETED:
+        case HIDE_ONLY_TEMPLATE_HIDDEN:
+            return t->template_data && t->template_data->run_completed;
+        default:
+            return false;
+    }
+}
+
+static void render_trackable_category_section(Tracker *t, const AppSettings *app_settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
     PROFILE_SCOPE(section_title);
+    const bool is_post_run_section = is_stat_section && strcmp(section_title, "Post-Run Statistics") == 0;
+    if (is_post_run_section && !tracker_post_run_stats_shown(t, app_settings)) return;
+
+    // Once shown, post-run statistics are never faded or hidden for being incomplete: only the template
+    // "Hidden" flag (and the manual layout's own hiding) still applies, the way "Hide Template-Hidden" does.
+    const AppSettings *settings = app_settings;
+    if (is_post_run_section) {
+        static AppSettings s_post_run_settings;
+        s_post_run_settings = *app_settings;
+        if (s_post_run_settings.goal_hiding_mode != SHOW_ALL)
+            s_post_run_settings.goal_hiding_mode = HIDE_ONLY_TEMPLATE_HIDDEN;
+        s_post_run_settings.invert_hiding_mode = false;
+        settings = &s_post_run_settings;
+    }
     // --- LOD THRESHOLDS ---
     // 1. Zoom < 0.60: Hide Sub-Item Text & Progress Text
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
@@ -8956,10 +9044,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     // Call the modified separator function with calculated counts
     if (!settings->use_manual_layout) {
         // Only if not in manual mode
-        render_section_separator(t, settings, current_y, section_title, text_color,
-                                 completed_count, total_visible_count,
-                                 section_has_sub_items ? completed_sub_count : -1, // Pass -1 if no sub-items
-                                 section_has_sub_items ? total_visible_sub_count : -1);
+        if (is_post_run_section) {
+            render_section_separator(t, settings, current_y, section_title, text_color, -1, total_visible_count,
+                                     -1, -1);
+        } else {
+            render_section_separator(t, settings, current_y, section_title, text_color,
+                                     completed_count, total_visible_count,
+                                     section_has_sub_items ? completed_sub_count : -1, // Pass -1 if no sub-items
+                                     section_has_sub_items ? total_visible_sub_count : -1);
+        }
     }
 
 
@@ -8970,7 +9063,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
     // Check if custom width is enabled for THIS section
-    TrackerSection section_id = is_stat_section
+    TrackerSection section_id = is_post_run_section
+                                    ? SECTION_POST_RUN_STATS
+                                    : is_stat_section
                                     ? SECTION_STATS
                                     : (strcmp(section_title, "Recipes") == 0 ? SECTION_RECIPES : SECTION_ADVANCEMENTS);
     if (settings->tracker_section_custom_width_enabled[section_id]) {
@@ -9472,7 +9567,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 SDL_Texture *static_bg = t->adv_bg;
                 AnimatedTexture *anim_bg = t->adv_bg_anim;
 
-                if (is_considered_complete_render) {
+                if (is_considered_complete_render || cat->is_post_run) {
                     static_bg = t->adv_bg_done;
                     anim_bg = t->adv_bg_done_anim;
                 } else {
@@ -9644,12 +9739,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 const char *crit_type = is_stat_section
                                             ? "Sub-Stat"
                                             : (version <= MC_VERSION_1_11_2 ? "Achievement" : "Criterion");
+                const char *cat_type_label = cat->is_post_run ? "Post-Run Stat" : nullptr;
+                const char *crit_type_label = cat->is_post_run ? "Post-Run Sub-Stat" : nullptr;
                 snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s_%s", is_stat_section ? "stat" : "adv",
                          cat->root_name);
                 handle_visual_layout_dragging(t, drag_id, screen_pos,
                                               ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
                                               cat->icon_pos, cat_type, cat->display_name, "Icon",
-                                              cat->root_name);
+                                              cat->root_name, nullptr, nullptr, nullptr, cat_type_label);
                 // Nothing is drawn here when the manual layout hides the icon, so nothing to explain.
                 if (!hide_icon_in_layout) {
                     tracker_show_goal_description(t, screen_pos, bg_max, is_stat_section ? 's' : 'a',
@@ -9700,7 +9797,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                              cat->root_name);
                     handle_visual_layout_dragging(t, drag_id, main_text_pos, main_text_screen_size,
                                                   cat->text_pos, cat_type, cat->display_name, "Text",
-                                                  cat->root_name, nullptr, nullptr, &cat->icon_pos);
+                                                  cat->root_name, nullptr, nullptr, &cat->icon_pos, cat_type_label);
                     tracker_show_goal_description(t, main_text_pos,
                                                   ImVec2(main_text_pos.x + main_text_screen_size.x,
                                                          main_text_pos.y + main_text_screen_size.y),
@@ -9777,7 +9874,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                           cat->root_name, nullptr, nullptr,
                                                           tracker_progress_hierarchy_parent(
                                                               cat_name_takes_line, cat->icon_pos,
-                                                              cat->text_pos));
+                                                              cat->text_pos), cat_type_label);
                         }
                         current_text_y = prog_y + prog_flow_shift + progress_text_size.y * t->zoom_level +
                                          4.0f * t->zoom_level;
@@ -10016,7 +10113,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                       ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level),
                                                       crit->icon_pos, crit_type, crit->display_name,
                                                       "Icon", crit->root_name,
-                                                      cat->display_name, cat->root_name, &cat->icon_pos);
+                                                      cat->display_name, cat->root_name, &cat->icon_pos,
+                                                      crit_type_label);
 
                         if (!hide_crit_icon_in_layout) {
                             current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
@@ -10076,7 +10174,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Render Checkbox for Multi-Criteria Stats
                         // LOD: Hide checkbox if zoomed out too far (tied to MAIN text threshold as requested)
-                        if (is_stat_section && cat->criteria_count > 1 && !hide_crit_icon_in_layout &&
+                        if (is_stat_section && !cat->is_post_run && cat->criteria_count > 1 &&
+                            !hide_crit_icon_in_layout &&
                             t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                             ImVec2 check_pos = ImVec2(current_element_x_screen,
                                                       crit_base_pos_screen.y + 6 * t->zoom_level);
@@ -10439,7 +10538,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                          child_text_size.y * t->zoom_level),
                                                                   crit->text_pos, crit_type, crit->display_name,
                                                                   "Text", crit->root_name,
-                                                                  cat->display_name, cat->root_name, &crit->icon_pos);
+                                                                  cat->display_name, cat->root_name, &crit->icon_pos,
+                                                                  crit_type_label);
 
                                     current_element_x_screen += (child_text_size.x * t->zoom_level) +
                                             (4.0f * t->zoom_level);
@@ -10505,7 +10605,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                       cat->display_name, cat->root_name,
                                                                       tracker_progress_hierarchy_parent(
                                                                           crit_name_takes_spot,
-                                                                          crit->icon_pos, crit->text_pos));
+                                                                          crit->icon_pos, crit->text_pos),
+                                                                      crit_type_label);
                                     }
                                 }
                             }
@@ -10626,7 +10727,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Render Parent Checkbox for Stats (single or multi)
                 // LOD: Hide parent checkbox if zoomed out too far (tied to main text threshold)
-                if (is_stat_section && !hide_icon_in_layout && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                if (is_stat_section && !cat->is_post_run && !hide_icon_in_layout &&
+                    t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                     ImVec2 check_pos_parent = ImVec2(screen_pos.x + 4 * t->zoom_level,
                                                      screen_pos.y + 4 * t->zoom_level); // Top-left corner
                     ImRect checkbox_rect_parent(check_pos_parent,
@@ -13905,6 +14007,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
     }
 
+    std::vector<TrackableCategory *> stats_only;
+    std::vector<TrackableCategory *> post_run_stats_only;
+    if (t->template_data) {
+        for (int i = 0; i < t->template_data->stat_count; ++i) {
+            TrackableCategory *item = t->template_data->stats[i];
+            if (!item) continue;
+            if (item->is_post_run) post_run_stats_only.push_back(item);
+            else stats_only.push_back(item);
+        }
+    }
+
     // Build search-linked sets for counter/header search propagation
     build_search_linked_sets(t);
 
@@ -13934,9 +14047,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                            "Unlocks");
                 break;
             case SECTION_STATS:
-                render_trackable_category_section(t, settings, current_y, t->template_data->stats,
-                                                  t->template_data->stat_count,
-                                                  "Statistics", true, version);
+                render_trackable_category_section(t, settings, current_y, stats_only.data(),
+                                                  (int) stats_only.size(), "Statistics", true, version);
+                break;
+            case SECTION_POST_RUN_STATS:
+                if (!post_run_stats_only.empty()) {
+                    render_trackable_category_section(t, settings, current_y, post_run_stats_only.data(),
+                                                      (int) post_run_stats_only.size(), "Post-Run Statistics",
+                                                      true, version);
+                }
                 break;
             case SECTION_CUSTOM:
                 render_custom_goals_section(t, settings, current_y, "Custom Goals");
@@ -14735,12 +14854,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::BulletText("row3 / r3     - every goal on the 3rd overlay row (default or forced)");
         ImGui::BulletText("multi         - multi-stat categories (with sub-stats)");
         ImGui::BulletText("nor1          - multi-stats with sub-stats hidden from Row 1");
+        ImGui::BulletText("post          - post-run statistics");
         ImGui::BulletText("pos / manual  - goals with custom manual-layout coordinates");
         ImGui::BulletText("desc          - goals with a description (hover them to read it)");
         ImGui::TextUnformatted("Row keywords match the overlay row a goal actually lands on, and show the\n"
             "goal itself only (an advancement matching \"r2\" is shown without its criteria).\n"
             "Descriptions and \"desc\" work the same way, showing the goal without its criteria.\n"
-            "\"complex\", \"multi\" and \"nor1\" instead show each matching goal with all of its\n"
+            "\"complex\", \"multi\", \"nor1\" and \"post\" instead show each matching goal with all of its\n"
             "criteria or sub-stats.");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");

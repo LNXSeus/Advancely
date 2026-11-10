@@ -88,11 +88,16 @@ enum TrackerSection {
     SECTION_STATS,
     SECTION_CUSTOM,
     SECTION_MULTISTAGE,
-    SECTION_COUNT // Currently 7
+    SECTION_POST_RUN_STATS, // Stats flagged as post-run statistics; last so older saved orders keep their indexes
+    SECTION_COUNT // Currently 8
 };
 
 // Helper array of names for the settings UI
 extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
+
+// The order the sections take by default and in the settings lists. Differs from the enum order, which
+// only ever grows at the end so saved per-section arrays keep their indexes.
+extern const int TRACKER_SECTION_DEFAULT_ORDER[SECTION_COUNT];
 
 #include <cJSON.h>
 
@@ -744,6 +749,7 @@ enum OverlayHiddenType {
     OVERLAY_HIDDEN_CRITERIA,
     OVERLAY_HIDDEN_STATS,
     OVERLAY_HIDDEN_SUB_STATS,
+    OVERLAY_HIDDEN_POST_RUN_STATS, // Post-run statistics and their sub-stats
     OVERLAY_HIDDEN_UNLOCKS,
     OVERLAY_HIDDEN_CUSTOM,
     OVERLAY_HIDDEN_MULTISTAGE,
@@ -1113,6 +1119,10 @@ inline bool goal_is_hidden(bool is_hidden, const AppSettings *settings, OverlayH
 
 inline OverlayHiddenType adv_hidden_type(const TrackableCategory *adv) {
     return adv->is_recipe ? OVERLAY_HIDDEN_RECIPES : OVERLAY_HIDDEN_ADVANCEMENTS;
+}
+
+inline OverlayHiddenType stat_hidden_type(const TrackableCategory *stat) {
+    return stat->is_post_run ? OVERLAY_HIDDEN_POST_RUN_STATS : OVERLAY_HIDDEN_STATS;
 }
 
 // Fills out[COMPACT_COUNTER_TYPE_COUNT] (indexed by OverlayCompactCounterType) with each Compact

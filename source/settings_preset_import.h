@@ -114,6 +114,7 @@ typedef enum {
     X("general.overlay_show_hidden_criteria", PRESET_GROUP_OVERLAY, "Hidden Criteria", 0, NULL) \
     X("general.overlay_show_hidden_stats", PRESET_GROUP_OVERLAY, "Hidden Stats", 0, NULL) \
     X("general.overlay_show_hidden_sub_stats", PRESET_GROUP_OVERLAY, "Hidden Sub-Stats", 0, NULL) \
+    X("general.overlay_show_hidden_post_run_stats", PRESET_GROUP_OVERLAY, "Hidden Post-Run Stats", 0, NULL) \
     X("general.overlay_show_hidden_unlocks", PRESET_GROUP_OVERLAY, "Hidden Unlocks", 0, NULL) \
     X("general.overlay_show_hidden_custom_goals", PRESET_GROUP_OVERLAY, "Hidden Custom Goals", 0, NULL) \
     X("general.overlay_show_hidden_multi_stage_goals", PRESET_GROUP_OVERLAY, "Hidden Multi-Stage Goals", 0, NULL) \

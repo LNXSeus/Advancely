@@ -310,6 +310,7 @@ struct EditorTrackableCategory {
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     bool hide_substats_in_row1; // Multi-stats only: keep the sub-stats out of the overlay's 1st row
+    bool is_post_run = false; // Stats only: post-run statistic (target -1, no linked goals, never counts)
     bool groups_enabled = false; // If true, show criterion grouping UI and persist groups_enabled flag.
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
@@ -488,7 +489,8 @@ static bool tc_run_completion_goal_exists(const EditorTemplate &data, const RunC
             for (const auto &a: data.advancements) if (strcmp(a.root_name, ref.root_name) == 0) return true;
             return false;
         case RC_GOAL_STAT:
-            for (const auto &s: data.stats) if (strcmp(s.root_name, ref.root_name) == 0) return true;
+            for (const auto &s: data.stats)
+                if (!s.is_post_run && strcmp(s.root_name, ref.root_name) == 0) return true;
             return false;
         case RC_GOAL_UNLOCK:
             for (const auto &u: data.unlocks) if (strcmp(u.root_name, ref.root_name) == 0) return true;
@@ -508,7 +510,7 @@ static bool tc_run_completion_goal_exists(const EditorTemplate &data, const RunC
             return false;
         case RC_GOAL_STAT_SUB_STATS:
             for (const auto &s: data.stats)
-                if (!s.is_simple_stat && strcmp(s.root_name, ref.root_name) == 0) return true;
+                if (!s.is_simple_stat && !s.is_post_run && strcmp(s.root_name, ref.root_name) == 0) return true;
             return false;
         default:
             return false;
@@ -786,12 +788,13 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
                                       bool is_multi_stat = false,
                                       bool substats_hidden_in_row1 = false,
                                       bool is_complex = false,
-                                      bool has_description = false) {
-    EditorRowTag tags[9];
+                                      bool has_description = false,
+                                      bool is_post_run = false) {
+    EditorRowTag tags[10];
     int n = 0;
     // Tag order mirrors the order of the checkboxes in the detail pane of every goal type:
-    // Is Recipe, Hidden, Row 2 / Row 3, Multi-Stat Category, Hide Sub-Stats from Row 1, then the
-    // manual-layout coordinates further down the pane. The complex tag has no checkbox and sits
+    // Is Recipe, Hidden, Row 2 / Row 3, Multi-Stat Category, Post-Run Stat, Hide Sub-Stats from Row 1,
+    // then the manual-layout coordinates further down the pane. The complex tag has no checkbox and sits
     // next to the recipe tag since both describe what kind of goal this is. The description tag
     // comes last.
     if (is_recipe)
@@ -817,6 +820,11 @@ static void draw_goal_row_status_tags(bool is_hidden, bool in_2nd_row, bool in_3
         tags[n++] = {
             "multi", IM_COL32(255, 140, 205, 255),
             "Multi-stat category (tracks several sub-stats)"
+        };
+    if (is_post_run)
+        tags[n++] = {
+            "post", IM_COL32(240, 200, 90, 255),
+            "Post-run statistic (shows its raw value once the run is completed, never counts as progress)"
         };
     if (substats_hidden_in_row1)
         tags[n++] = {
@@ -845,8 +853,12 @@ static bool indicator_matches_search(const char *search, bool is_hidden, int eff
                                      bool is_recipe, bool manual_pos_set,
                                      bool is_multi_stat = false,
                                      bool substats_hidden_in_row1 = false,
-                                     bool is_complex = false) {
+                                     bool is_complex = false,
+                                     bool is_post_run = false) {
     if (!search || search[0] == '\0') return false;
+    if (is_post_run && (strcasecmp(search, "post") == 0 || strcasecmp(search, "postrun") == 0
+                        || strcasecmp(search, "post-run") == 0))
+        return true;
     if (is_hidden && strcasecmp(search, "hidden") == 0) return true;
     if (is_complex && (strcasecmp(search, "complex") == 0 || strcasecmp(search, "cmplx") == 0)) return true;
     if (effective_row == 1 && (strcasecmp(search, "row1") == 0 || strcasecmp(search, "r1") == 0)) return true;
@@ -1213,6 +1225,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
         a.hide_substats_in_row1 != b.hide_substats_in_row1 ||
+        a.is_post_run != b.is_post_run ||
         a.groups_enabled != b.groups_enabled ||
         a.linked_goal_mode != b.linked_goal_mode ||
         are_linked_goals_different(a.linked_goals, b.linked_goals) ||
@@ -1439,6 +1452,95 @@ static void clear_goal_links(EditorTemplate &data, const char *root_name, const 
             }
         }
     }
+}
+
+// True when the link points at the stat category stat_root or one of its sub-stats.
+static bool tc_link_targets_stat(const EditorCounterLinkedGoal &lg, const char *stat_root) {
+    if (lg.type != LINK_TYPE_STAT && lg.type != LINK_TYPE_ANY) return false;
+    return lg.parent_root[0] == '\0' ? strcmp(lg.root_name, stat_root) == 0
+                                     : strcmp(lg.parent_root, stat_root) == 0;
+}
+
+// The links that turning this stat into a post-run statistic would remove: its own linked goals (and
+// its sub-stats'), and every link elsewhere in the template that points at it or its sub-stats.
+static void tc_count_post_run_links(const EditorTemplate &data, const EditorTrackableCategory &stat,
+                                    int &own_links, int &incoming_links) {
+    own_links = (int) stat.linked_goals.size();
+    for (const auto &crit: stat.criteria) own_links += (int) crit.linked_goals.size();
+    incoming_links = 0;
+    auto count = [&](const std::vector<EditorCounterLinkedGoal> &links) {
+        for (const auto &lg: links)
+            if (tc_link_targets_stat(lg, stat.root_name)) incoming_links++;
+    };
+    for (const auto &deco: data.decorations)
+        if (deco.type == DECORATION_TEXT_HEADER) count(deco.linked_goals);
+    for (const auto &counter: data.counter_goals) count(counter.linked_goals);
+    for (const auto &other: data.stats) {
+        if (&other == &stat) continue;
+        count(other.linked_goals);
+        for (const auto &sub: other.criteria) count(sub.linked_goals);
+    }
+    for (const auto &cg: data.custom_goals) count(cg.linked_goals);
+    for (const auto &msg: data.multi_stage_goals) {
+        for (const auto &st: msg.stages) {
+            count(st.linked_goals);
+            if (st.mirror_enabled && tc_link_targets_stat(st.mirror_target, stat.root_name)) incoming_links++;
+        }
+    }
+}
+
+// Keeps every post-run statistic valid: each of its stats counts up without a target, it has no linked
+// goals of its own, and no other goal (or text header) links to it or its sub-stats, because it never
+// completes. Returns true when something had to change.
+static bool tc_normalize_post_run_stats(EditorTemplate &data) {
+    bool changed = false;
+    auto links_post_run = [&](const EditorCounterLinkedGoal &lg) {
+        for (const auto &stat: data.stats)
+            if (stat.is_post_run && tc_link_targets_stat(lg, stat.root_name)) return true;
+        return false;
+    };
+    auto prune = [&](std::vector<EditorCounterLinkedGoal> &links) {
+        size_t before = links.size();
+        links.erase(std::remove_if(links.begin(), links.end(), links_post_run), links.end());
+        if (links.size() != before) changed = true;
+    };
+
+    bool any = false;
+    for (auto &stat: data.stats) {
+        if (!stat.is_post_run) continue;
+        any = true;
+        if (!stat.linked_goals.empty()) {
+            stat.linked_goals.clear();
+            changed = true;
+        }
+        for (auto &crit: stat.criteria) {
+            if (crit.goal != -1 || crit.hide_progress || !crit.linked_goals.empty()) changed = true;
+            crit.goal = -1;
+            crit.hide_progress = false;
+            crit.linked_goals.clear();
+        }
+    }
+    if (!any) return changed;
+
+    for (auto &deco: data.decorations)
+        if (deco.type == DECORATION_TEXT_HEADER) prune(deco.linked_goals);
+    for (auto &counter: data.counter_goals) prune(counter.linked_goals);
+    for (auto &stat: data.stats) {
+        prune(stat.linked_goals);
+        for (auto &sub: stat.criteria) prune(sub.linked_goals);
+    }
+    for (auto &cg: data.custom_goals) prune(cg.linked_goals);
+    for (auto &msg: data.multi_stage_goals) {
+        for (auto &st: msg.stages) {
+            prune(st.linked_goals);
+            if (st.mirror_enabled && links_post_run(st.mirror_target)) {
+                st.mirror_enabled = false;
+                st.mirror_target = {};
+                changed = true;
+            }
+        }
+    }
+    return changed;
 }
 
 // True when the template carries no trackable content. Used after Revert to drop the user
@@ -2345,6 +2447,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         if (cJSON_IsBool(in_2nd_row)) new_cat.in_2nd_row = cJSON_IsTrue(in_2nd_row); // Only for main stat not sub-stats
         if (cJSON_IsBool(in_3rd_row)) new_cat.in_3rd_row = cJSON_IsTrue(in_3rd_row);
         if (cJSON_IsBool(hide_substats)) new_cat.hide_substats_in_row1 = cJSON_IsTrue(hide_substats);
+        new_cat.is_post_run = cJSON_IsTrue(cJSON_GetObjectItem(category_json, "post_run_stat"));
 
         // Parse manual positions for the parent
         parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
@@ -3112,6 +3215,8 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     // Override the inline positions parsed above with the layout file's positions.
     apply_layout_to_editor(editor_data, layout_json);
 
+    tc_normalize_post_run_stats(editor_data);
+
     // Last, because it walks the goals the parses above created. The editor shows one language but
     // has to carry them all, or a rename would only ever reach the file it is showing.
     tc_load_other_language_text(base_path_str, template_info, lang_flag, editor_data);
@@ -3240,6 +3345,9 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
         }
         if (cat.in_2nd_row) {
             cJSON_AddBoolToObject(cat_json, "in_2nd_row", true);
+        }
+        if (cat.is_post_run) {
+            cJSON_AddBoolToObject(cat_json, "post_run_stat", true);
         }
 
         if (cat.is_simple_stat && !cat.criteria.empty()) {
@@ -3861,6 +3969,7 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     build_editor_template_paths(version, template_info, lang_flag, layout_flag,
                                 template_path, lang_path, layout_path);
 
+    tc_normalize_post_run_stats(editor_data);
     cJSON *root = build_editor_template_json(editor_data, template_path);
 
     // Write the modified JSON object back to the file
@@ -4127,6 +4236,7 @@ static int tc_append_visual_selection(const EditorTemplate &tpl,
             added += consider(crit.root_name, adv.root_name, LINK_TYPE_ADVANCEMENT);
     }
     for (const auto &stat: tpl.stats) {
+        if (stat.is_post_run) continue;
         added += consider(stat.root_name, nullptr, LINK_TYPE_STAT);
         for (const auto &sub: stat.criteria)
             added += consider(sub.root_name, stat.root_name, LINK_TYPE_STAT);
@@ -5740,6 +5850,7 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 // Legacy (<= 1.6.4) hidden helper stats for multi-stage goals are not real goals and stay out of every
 // count, the same rule the tracker and the Compact overlay apply.
 static bool tc_stat_counts_as_goal(const EditorTrackableCategory &s, MC_Version version) {
+    if (s.is_post_run) return false;
     return !(version <= MC_VERSION_1_6_4 && s.is_simple_stat && s.criteria.size() == 1 && s.criteria[0].goal == 0);
 }
 
@@ -5802,7 +5913,7 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
     for (const auto &a: data.advancements)
         tally_parts(RC_GOAL_ADVANCEMENT_CRITERIA, a.root_name, tc_criteria_progress_total(a), RC_MASK_CRITERIA);
     for (const auto &s: data.stats)
-        if (!s.is_simple_stat)
+        if (!s.is_simple_stat && !s.is_post_run)
             tally_parts(RC_GOAL_STAT_SUB_STATS, s.root_name, (int) s.criteria.size(), RC_MASK_SUB_STATS);
 
     bool any_type = false;
@@ -6067,7 +6178,7 @@ static void tc_render_run_completion_tab(EditorTemplate &data, MC_Version versio
                "are done; an open-ended stat (no target) never completes.");
     rows.clear();
     for (const auto &s: data.stats)
-        if (!s.is_simple_stat) rows.push_back({s.root_name, s.display_name, s.icon_path});
+        if (!s.is_simple_stat && !s.is_post_run) rows.push_back({s.root_name, s.display_name, s.icon_path});
     goal_combo(RC_SLOT_SUB_STATS, -1, RC_GOAL_STAT_SUB_STATS, "Multi-Stat Sub-Stats",
                "Multi-stats whose sub-stats each count as one required goal, e.g. 'Mobs Killed: 8/20'.\n"
                "The multi-stat itself is only required when it is also picked under Stats.");
@@ -6848,6 +6959,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Goal selector popup (for arrow goal linking and future features)
     enum GoalSelectorTarget { GOAL_SELECT_START, GOAL_SELECT_END };
     static bool show_goal_selector_popup = false;
+    static bool show_post_run_confirm_popup = false;
+    static char post_run_confirm_root[192] = "";
+    static int post_run_confirm_own_links = 0;
+    static int post_run_confirm_incoming_links = 0;
     static bool focus_goal_selector_search = false;
     static char goal_selector_search_buffer[256] = "";
     static bool goal_selector_selected_only = false;
@@ -7774,7 +7889,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // exposes a different subset (e.g. only advancements have recipes; only criteria/sub-stats
             // sit on Row 1). Build the keyword list to match the scope currently being searched.
             bool ind_hidden = false, ind_row1 = false, ind_row23 = false, ind_recipe = false, ind_pos = false;
-            bool ind_multi = false, ind_subh = false, ind_complex = false, ind_desc = false;
+            bool ind_multi = false, ind_subh = false, ind_complex = false, ind_desc = false, ind_post = false;
             switch (current_search_scope) {
                 case SCOPE_ADVANCEMENTS:
                     ind_hidden = ind_row1 = ind_row23 = ind_recipe = ind_pos = ind_desc = true;
@@ -7782,7 +7897,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     break;
                 case SCOPE_STATS:
                     ind_hidden = ind_row1 = ind_row23 = ind_pos = ind_desc = true;
-                    ind_multi = ind_subh = true;
+                    ind_multi = ind_subh = ind_post = true;
                     break;
                 case SCOPE_UNLOCKS:
                 case SCOPE_CUSTOM:
@@ -7802,7 +7917,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     break;
             }
             bool any_indicator = ind_hidden || ind_row1 || ind_row23 || ind_recipe || ind_pos
-                                 || ind_multi || ind_subh || ind_complex;
+                                 || ind_multi || ind_subh || ind_complex || ind_post;
 
             char tooltip_buffer[1024];
             int p = snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -7836,6 +7951,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ind_subh)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  nor1          - multi-stats with sub-stats hidden from Row 1");
+                if (ind_post)
+                    p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
+                                  "\n  post          - post-run statistics");
                 if (ind_pos)
                     p += snprintf(tooltip_buffer + p, sizeof(tooltip_buffer) - p,
                                   "\n  pos / manual  - goals with custom manual-layout coordinates");
@@ -13395,7 +13513,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          stat_cat.progress_pos.is_set,
                                                          !stat_cat.is_simple_stat,
                                                          !stat_cat.is_simple_stat &&
-                                                         stat_cat.hide_substats_in_row1)) {
+                                                         stat_cat.hide_substats_in_row1,
+                                                         false, stat_cat.is_post_run)) {
                                 should_render = true;
                             }
 
@@ -14020,7 +14139,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             stat.icon_pos.is_set || stat.text_pos.is_set || stat.progress_pos.is_set,
                             !stat.is_simple_stat,
                             !stat.is_simple_stat && stat.hide_substats_in_row1,
-                            false, !stat.description.empty());
+                            false, !stat.description.empty(), stat.is_post_run);
 
                         // Scroll to this item when clicked in visual layout
                         if (scroll_to_goal_root_name[0] != '\0' &&
@@ -14448,9 +14567,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                         }
 
+                        ImGui::SameLine();
+                        bool post_run_checked = stat_cat.is_post_run;
+                        if (ImGui::Checkbox("Post-Run Stat", &post_run_checked)) {
+                            int own_links = 0, incoming_links = 0;
+                            if (post_run_checked)
+                                tc_count_post_run_links(current_template_data, stat_cat, own_links, incoming_links);
+                            if (post_run_checked && own_links + incoming_links > 0) {
+                                show_post_run_confirm_popup = true;
+                                snprintf(post_run_confirm_root, sizeof(post_run_confirm_root), "%s",
+                                         stat_cat.root_name);
+                                post_run_confirm_own_links = own_links;
+                                post_run_confirm_incoming_links = incoming_links;
+                            } else {
+                                stat_cat.is_post_run = post_run_checked;
+                                if (post_run_checked) tc_normalize_post_run_stats(current_template_data);
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char post_run_tooltip_buffer[512];
+                            snprintf(post_run_tooltip_buffer, sizeof(post_run_tooltip_buffer),
+                                     "Shows this %s's raw value only once the run is completed.\n"
+                                     "Never counts towards progress and can't be linked to goals.\n"
+                                     "Gets its own section in the automatic tracker layout.",
+                                     stat_cat.is_simple_stat ? "stat" : "multi-stat");
+                            ImGui::SetTooltip("%s", post_run_tooltip_buffer);
+                        }
+
                         // Only a multi-stat has sub-stats that reach Row 1 in the first place.
                         if (!stat_cat.is_simple_stat) {
-                            ImGui::SameLine();
                             if (ImGui::Checkbox("Hide Sub-Stats from Row 1",
                                                 &stat_cat.hide_substats_in_row1)) {
                                 save_message_type = MSG_NONE;
@@ -14476,8 +14622,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
+                        if (stat_cat.is_post_run) {
+                            for (auto &post_run_crit: stat_cat.criteria) {
+                                post_run_crit.goal = -1;
+                                post_run_crit.hide_progress = false;
+                                post_run_crit.linked_goals.clear();
+                            }
+                        }
                         // --- Stat Category Linked Goals (Auto-Completion) ---
-                        {
+                        if (!stat_cat.is_post_run) {
                             ImGui::Text("Auto-Complete Goals: %d", (int) stat_cat.linked_goals.size());
                             ImGui::SameLine();
                             char select_btn_id[64];
@@ -14641,6 +14794,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                             }
+                            ImGui::BeginDisabled(stat_cat.is_post_run);
                             if (ImGui::InputInt("Target Value", &simple_crit.goal)) {
                                 // Clamping to -1
                                 if (simple_crit.goal < -1) {
@@ -14648,7 +14802,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 save_message_type = MSG_NONE;
                             }
-                            if (ImGui::IsItemHovered()) {
+                            ImGui::EndDisabled();
+                            if (stat_cat.is_post_run && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char target_tooltip_buffer[256];
+                                snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                         "A post-run statistic always shows the raw value (target -1).");
+                                ImGui::SetTooltip("%s", target_tooltip_buffer);
+                            } else if (ImGui::IsItemHovered()) {
                                 char target_tooltip_buffer[512];
                                 snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
                                          "Set the stat's behavior:\n"
@@ -15377,6 +15537,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "The icon must be inside the '%s' folder!", get_icons_display_path());
                                     ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                                 }
+                                ImGui::BeginDisabled(stat_cat.is_post_run);
                                 if (ImGui::InputInt("Target Value", &crit.goal)) {
                                     // Clamping to -1
                                     if (crit.goal < -1) {
@@ -15384,7 +15545,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                     save_message_type = MSG_NONE;
                                 }
-                                if (ImGui::IsItemHovered()) {
+                                ImGui::EndDisabled();
+                                if (stat_cat.is_post_run && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char target_tooltip_buffer[256];
+                                    snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                             "A post-run statistic always shows the raw value (target -1).");
+                                    ImGui::SetTooltip("%s", target_tooltip_buffer);
+                                } else if (ImGui::IsItemHovered()) {
                                     char target_tooltip_buffer[512];
                                     snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
                                              "Set the sub-stat's behavior:\n"
@@ -15511,7 +15678,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
 
                                 // --- Sub-Stat Linked Goals (Auto-Completion) ---
-                                {
+                                if (!stat_cat.is_post_run) {
                                     ImGui::Text("Auto-Complete Goals: %d", (int) crit.linked_goals.size());
                                     ImGui::SameLine();
                                     char crit_select_btn_id[128];
@@ -28710,6 +28877,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     template_import_popup_done: ;
     }
 
+    // ========== Post-Run Stat Confirmation Popup ==========
+    if (show_post_run_confirm_popup) {
+        ImGui::OpenPopup("Make Post-Run Stat?");
+        show_post_run_confirm_popup = false;
+    }
+    if (ImGui::BeginPopupModal("Make Post-Run Stat?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        EditorTrackableCategory *post_run_target = nullptr;
+        for (auto &stat: current_template_data.stats) {
+            if (strcmp(stat.root_name, post_run_confirm_root) == 0) {
+                post_run_target = &stat;
+                break;
+            }
+        }
+        if (!post_run_target) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::Text("Make '%s' a post-run stat?", post_run_target->display_name);
+            if (post_run_confirm_own_links > 0)
+                ImGui::BulletText("Its %d linked goal(s) will be removed.", post_run_confirm_own_links);
+            if (post_run_confirm_incoming_links > 0)
+                ImGui::BulletText("%d link(s) to it from other goals will be removed.",
+                                  post_run_confirm_incoming_links);
+            ImGui::Text("A post-run stat never completes, so it can't be linked.");
+            ImGui::Separator();
+            if (ImGui::Button("Continue", ImVec2(120, 0)) || (
+                    !ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+                post_run_target->is_post_run = true;
+                tc_normalize_post_run_stats(current_template_data);
+                save_message_type = MSG_NONE;
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char press_enter_confirm_tooltip_buffer[1024];
+                snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
+                         "Press ENTER to confirm.");
+                ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char press_esc_cancel_tooltip_buffer[1024];
+                snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
+                         "Press ESC to cancel.");
+                ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
+            }
+        }
+        ImGui::EndPopup();
+    }
+
     // ========== Goal Selector Popup ==========
     char goal_selector_popup_title[512];
     if (goal_selector_target_id[0] != '\0') {
@@ -29005,6 +29223,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
         for (const auto &stat: current_template_data.stats) {
+            if (stat.is_post_run) continue; // never completes, so nothing can be linked to it
             bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
             if (row_shown(parent_match, stat.root_name, nullptr, nullptr, LINK_TYPE_STAT)) {
                 snprintf(row_label, sizeof(row_label), "%s##stat_%s", stat.root_name, stat.root_name);

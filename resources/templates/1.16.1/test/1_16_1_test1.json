@@ -931,8 +931,9 @@
 	"stats":	{
 		"stat_cat:gold_blocks_picked_up":	{
 			"icon":	"blocks/Trapped_Chest.png",
+			"post_run_stat":	true,
 			"root_name":	"minecraft:picked_up/minecraft:gold_block",
-			"target":	164
+			"target":	-1
 		},
 		"stat_cat:whatever2":	{
 			"icon":	"blocks/Trapped_Chest.png",
