@@ -13565,9 +13565,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // --- Counter for the list ---
 
                     char counter_text[160];
-                    int stat_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s",
-                                                    stats_to_render.size(),
-                                                    stats_to_render.size() == 1 ? "Stat" : "Stats");
+                    size_t post_run_count_disp = 0;
+                    for (const auto *stat_ptr: stats_to_render) {
+                        if (stat_ptr->is_post_run) post_run_count_disp++;
+                    }
+                    size_t stat_only_count = stats_to_render.size() - post_run_count_disp;
+                    int stat_counter_pos = snprintf(counter_text, sizeof(counter_text), "%zu %s \xC2\xB7 %zu %s",
+                                                    stat_only_count,
+                                                    stat_only_count == 1 ? "Stat" : "Stats",
+                                                    post_run_count_disp,
+                                                    post_run_count_disp == 1
+                                                        ? "Post-Run Stat"
+                                                        : "Post-Run Stats");
                     if (!s_stat_selection.empty() && stat_counter_pos < (int) sizeof(counter_text)) {
                         snprintf(counter_text + stat_counter_pos, sizeof(counter_text) - stat_counter_pos,
                                  " \xC2\xB7 %d selected", (int) s_stat_selection.size());
