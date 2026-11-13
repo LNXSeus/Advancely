@@ -72,6 +72,7 @@ Love using Advancely? You can have your name immortalized in the tracker!
 **Supporters:**
 
 * diggitydingdong: $100
+* McMonkey819: $40
 * Totorewa: $31
 * ethansplace98: $30
 * zurtleTif: $20
