@@ -4306,6 +4306,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
             };
 
+            unsigned long long showcase_sig = 0x5507702EULL; // "supporters"
+            for (const auto &cell: showcase)
+                for (const char *c = cell.stat ? cell.stat->root_name : "#"; *c; c++)
+                    showcase_sig = (showcase_sig ^ (unsigned char) *c) * 1099511628211ULL;
+            static FreezeView freeze_supporters;
+            std::vector<BeltTile> frozen_tiles;
+
             if (settings->overlay_render_mode == OVERLAY_RENDER_MODE_PAGE) {
                 // Page mode: flip through the supporters in centered pages (sharp cut) on the shared
                 // page index, just like the goal rows. Supporters never "complete", so nothing is
@@ -4315,10 +4322,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 static PageView page_supporters;
                 std::vector<char> removed(showcase.size(), 0);
                 std::vector<BeltTile> tiles;
-                unsigned long long showcase_sig = 0x5507702EULL; // "supporters"
-                for (const auto &cell: showcase)
-                    for (const char *c = cell.stat ? cell.stat->root_name : "#"; *c; c++)
-                        showcase_sig = (showcase_sig ^ (unsigned char) *c) * 1099511628211ULL;
+                freeze_supporters.init = false;
                 page_update(page_supporters, o->page_index, settings->overlay_page_align,
                             window_w, item_full_width, cell_width,
                             (int) showcase.size(), removed, 0.0f, 0.0f, showcase_sig, tiles);
@@ -4327,6 +4331,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     const ShowcaseCell &cell = showcase[(size_t) tiles[ti].idx];
                     if (cell.stat) draw_post_run_stat(cell.stat, snap_px(tiles[ti].x));
                     else draw_supporter((size_t) cell.supporter, snap_px(tiles[ti].x));
+                }
+            } else if (freeze_layout(freeze_supporters, settings->overlay_row2_freeze_enabled,
+                                     settings->overlay_row2_freeze_align,
+                                     window_w, item_full_width, cell_width,
+                                     (int) showcase.size(), std::vector<char>(showcase.size(), 0),
+                                     0.0f, 0.0f, showcase_sig, frozen_tiles)) {
+                for (const auto &tile: frozen_tiles) {
+                    const ShowcaseCell &cell = showcase[(size_t) tile.idx];
+                    if (cell.stat) draw_post_run_stat(cell.stat, snap_px(tile.x));
+                    else draw_supporter((size_t) cell.supporter, snap_px(tile.x));
                 }
             } else {
                 float total_row_width = (float) showcase.size() * item_full_width;
