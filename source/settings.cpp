@@ -332,7 +332,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
                 TrackableCategory *a = ctd->advancements[i];
                 bool want_recipe = (kind == COMPACT_COUNTER_RECIPE_CRITERIA);
                 if (a && a->is_recipe == want_recipe && a->criteria_count > 0 &&
-                    !goal_is_hidden(a->is_hidden, hidden_rule, adv_hidden_type(a)))
+                    adv_has_shown_criterion(a, hidden_rule))
                     return a->root_name;
             }
         } else if (kind == COMPACT_COUNTER_STATS) {
@@ -348,7 +348,7 @@ static void compact_selection_ui(const char *suffix, const TemplateData *ctd, co
             if (i < ctd->stat_count) {
                 TrackableCategory *st = ctd->stats[i];
                 if (st && !st->is_single_stat_category && !st->is_post_run &&
-                    !goal_is_hidden(st->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS))
+                    multi_stat_has_shown_sub_stat(st, hidden_rule))
                     return st->root_name;
             }
         } else if (kind == COMPACT_COUNTER_CUSTOM) {
@@ -4009,11 +4009,12 @@ settings_tooltip(tooltip_buffer); \
                 // Applies to every render mode, so it lives here (outside the mode-specific sections).
                 ImGui::Checkbox("Show Hidden Goals", &temp_settings.overlay_show_hidden_goals);
                 if (settings_tooltip_wanted()) {
-                    char show_hidden_tooltip_buffer[640];
+                    char show_hidden_tooltip_buffer[768];
                     snprintf(show_hidden_tooltip_buffer, sizeof(show_hidden_tooltip_buffer),
                              "Show goals that are marked hidden in the template anyway, in every overlay mode\n"
                              "(scrolling belt, page and compact). The boxes below it pick which goal types\n"
-                             "this applies to. Turn this on to also select hidden goals in the Compact\n"
+                             "this applies to, listing only the types the current template hides.\n"
+                             "Turn this on to also select hidden goals in the Compact\n"
                              "panel/stack dropdowns.\n"
                              "The Stack Content dropdowns list and count only goals that can pop, so an\n"
                              "optimized template shows fewer of them there until this is on. The Panel Content\n"
@@ -4027,24 +4028,60 @@ settings_tooltip(tooltip_buffer); \
                                                      settings_template_is_loaded(&temp_settings, t))
                                                         ? t->template_data
                                                         : nullptr;
-                    CompactCounter hidden_cc[COMPACT_COUNTER_TYPE_COUNT];
-                    compact_compute_type_counters(hidden_td, selected_version, hidden_cc, nullptr);
-                    auto type_present = [&](OverlayCompactCounterType kind) {
-                        return !hidden_td || hidden_cc[kind].total > 0;
-                    };
-                    bool post_run_present = !hidden_td;
-                    for (int i = 0; hidden_td && i < hidden_td->stat_count && !post_run_present; i++)
-                        if (hidden_td->stats[i] && hidden_td->stats[i]->is_post_run) post_run_present = true;
+                    bool hidden_present[OVERLAY_HIDDEN_TYPE_COUNT];
+                    for (bool &p: hidden_present) p = !hidden_td;
+                    if (hidden_td) {
+                        for (int i = 0; i < hidden_td->advancement_count; i++) {
+                            const TrackableCategory *adv = hidden_td->advancements[i];
+                            if (!adv) continue;
+                            if (adv->is_hidden) hidden_present[adv_hidden_type(adv)] = true;
+                            for (int j = 0; j < adv->criteria_count; j++) {
+                                const TrackableItem *crit = adv->criteria[j];
+                                if (crit && !crit->hidden_by_group && (adv->is_hidden || crit->is_hidden))
+                                    hidden_present[OVERLAY_HIDDEN_CRITERIA] = true;
+                            }
+                        }
+                        for (int i = 0; i < hidden_td->stat_count; i++) {
+                            const TrackableCategory *stat = hidden_td->stats[i];
+                            if (!stat) continue;
+                            if (stat->is_post_run) {
+                                bool any = stat->is_hidden;
+                                for (int j = 0; j < stat->criteria_count && !any; j++)
+                                    if (stat->criteria[j] && stat->criteria[j]->is_hidden) any = true;
+                                if (any) hidden_present[OVERLAY_HIDDEN_POST_RUN_STATS] = true;
+                                continue;
+                            }
+                            if (stat->is_hidden) hidden_present[OVERLAY_HIDDEN_STATS] = true;
+                            if (stat->is_single_stat_category) continue;
+                            for (int j = 0; j < stat->criteria_count; j++) {
+                                const TrackableItem *sub = stat->criteria[j];
+                                if (sub && (stat->is_hidden || sub->is_hidden))
+                                    hidden_present[OVERLAY_HIDDEN_SUB_STATS] = true;
+                            }
+                        }
+                        for (int i = 0; i < hidden_td->unlock_count; i++)
+                            if (hidden_td->unlocks[i] && hidden_td->unlocks[i]->is_hidden)
+                                hidden_present[OVERLAY_HIDDEN_UNLOCKS] = true;
+                        for (int i = 0; i < hidden_td->custom_goal_count; i++)
+                            if (hidden_td->custom_goals[i] && hidden_td->custom_goals[i]->is_hidden)
+                                hidden_present[OVERLAY_HIDDEN_CUSTOM] = true;
+                        for (int i = 0; i < hidden_td->multi_stage_goal_count; i++)
+                            if (hidden_td->multi_stage_goals[i] && hidden_td->multi_stage_goals[i]->is_hidden)
+                                hidden_present[OVERLAY_HIDDEN_MULTISTAGE] = true;
+                        for (int i = 0; i < hidden_td->counter_goal_count; i++)
+                            if (hidden_td->counter_goals[i] && hidden_td->counter_goals[i]->is_hidden)
+                                hidden_present[OVERLAY_HIDDEN_COUNTERS] = true;
+                    }
 
-                    char hidden_adv_label[32], hidden_adv_tip[160], hidden_crit_tip[192];
+                    char hidden_adv_label[32], hidden_adv_tip[160], hidden_crit_tip[256];
                     snprintf(hidden_adv_label, sizeof(hidden_adv_label), "Hidden %s",
                              advancements_label_plural_uppercase);
                     snprintf(hidden_adv_tip, sizeof(hidden_adv_tip), "Show %s marked hidden in the template.",
                              advancements_label_plural_lowercase);
                     snprintf(hidden_crit_tip, sizeof(hidden_crit_tip),
-                             "Show criteria marked hidden in the template. A hidden criterion of a hidden\n"
-                             "%s also needs the %s box.",
-                             advancement_label_uppercase, hidden_adv_label);
+                             "Show criteria marked hidden in the template, or whose %s is hidden, on their\n"
+                             "own (Row 1 icons and the Compact pop-out stack), independent of the %s box.",
+                             advancement_label_lowercase, hidden_adv_label);
                     const struct {
                         OverlayHiddenType type;
                         const char *label;
@@ -4052,29 +4089,30 @@ settings_tooltip(tooltip_buffer); \
                         bool present;
                     } hidden_rows[OVERLAY_HIDDEN_TYPE_COUNT] = {
                         {OVERLAY_HIDDEN_ADVANCEMENTS, hidden_adv_label, hidden_adv_tip,
-                         type_present(COMPACT_COUNTER_ADVANCEMENTS)},
+                         hidden_present[OVERLAY_HIDDEN_ADVANCEMENTS]},
                         {OVERLAY_HIDDEN_RECIPES, "Hidden Recipes", "Show recipes marked hidden in the template.",
-                         type_present(COMPACT_COUNTER_RECIPES)},
+                         hidden_present[OVERLAY_HIDDEN_RECIPES]},
                         {OVERLAY_HIDDEN_CRITERIA, "Hidden Criteria", hidden_crit_tip,
-                         type_present(COMPACT_COUNTER_CRITERIA) || type_present(COMPACT_COUNTER_RECIPE_CRITERIA)},
+                         hidden_present[OVERLAY_HIDDEN_CRITERIA]},
                         {OVERLAY_HIDDEN_STATS, "Hidden Stats", "Show stats marked hidden in the template.",
-                         type_present(COMPACT_COUNTER_STATS)},
+                         hidden_present[OVERLAY_HIDDEN_STATS]},
                         {OVERLAY_HIDDEN_SUB_STATS, "Hidden Sub-Stats",
-                         "Show sub-stats marked hidden in the template. A hidden sub-stat of a hidden stat\n"
-                         "also needs the Hidden Stats box.",
-                         type_present(COMPACT_COUNTER_SUB_STATS)},
+                         "Show sub-stats marked hidden in the template, or whose stat is hidden, on their own\n"
+                         "(Row 1 icons and the Compact pop-out stack), independent of the Hidden Stats box.\n"
+                         "Inside a stat's own Row 2/3 cell, only the sub-stat's own hidden mark counts.",
+                         hidden_present[OVERLAY_HIDDEN_SUB_STATS]},
                         {OVERLAY_HIDDEN_POST_RUN_STATS, "Hidden Post-Run Stats",
                          "Show post-run stats and their sub-stats marked hidden in the template.",
-                         post_run_present},
+                         hidden_present[OVERLAY_HIDDEN_POST_RUN_STATS]},
                         {OVERLAY_HIDDEN_UNLOCKS, "Hidden Unlocks", "Show unlocks marked hidden in the template.",
-                         type_present(COMPACT_COUNTER_UNLOCKS)},
+                         hidden_present[OVERLAY_HIDDEN_UNLOCKS]},
                         {OVERLAY_HIDDEN_CUSTOM, "Hidden Custom Goals",
-                         "Show custom goals marked hidden in the template.", type_present(COMPACT_COUNTER_CUSTOM)},
+                         "Show custom goals marked hidden in the template.", hidden_present[OVERLAY_HIDDEN_CUSTOM]},
                         {OVERLAY_HIDDEN_MULTISTAGE, "Hidden Multi-Stage Goals",
                          "Show multi-stage goals marked hidden in the template.",
-                         type_present(COMPACT_COUNTER_MULTISTAGE)},
+                         hidden_present[OVERLAY_HIDDEN_MULTISTAGE]},
                         {OVERLAY_HIDDEN_COUNTERS, "Hidden Counters", "Show counters marked hidden in the template.",
-                         type_present(COMPACT_COUNTER_COUNTERS)},
+                         hidden_present[OVERLAY_HIDDEN_COUNTERS]},
                     };
                     ImGui::Indent();
                     for (const auto &row: hidden_rows) {

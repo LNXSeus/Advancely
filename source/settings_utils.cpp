@@ -434,7 +434,8 @@ MC_Version settings_get_version_from_string(const char *version_str) {
 // `hidden_rule` picks which totals these are. Null: template-"hidden" goals still count, i.e. the
 // real totals the panel shows (all 80 advancements, even if some are hidden from the item rows).
 // The settings: hidden goals are left out, matching what can actually pop into the pop-out stack.
-// A hidden goal takes its criteria / sub-stats out with it; a hidden criterion inside a VISIBLE
+// Criteria and sub-stats of a hidden goal follow only the Criteria / Sub-Stats box (criterion_is_hidden,
+// sub_stat_is_hidden), not the goal's own box; a hidden criterion inside a VISIBLE
 // advancement still counts, because the criteria totals are pre-grouped aggregates (the stack's type
 // list only offers the whole-goal types, so this never surfaces there).
 void compact_compute_type_counters(const TemplateData *td, MC_Version version, CompactCounter *out,
@@ -453,17 +454,26 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
     for (int i = 0; i < td->advancement_count; i++) {
         const TrackableCategory *a = td->advancements[i];
         if (!a) continue;
-        if (goal_is_hidden(a->is_hidden, hidden_rule, adv_hidden_type(a))) continue;
+        bool goal_shown = !goal_is_hidden(a->is_hidden, hidden_rule, adv_hidden_type(a));
+        bool crits_shown = !goal_is_hidden(a->is_hidden, hidden_rule, OVERLAY_HIDDEN_CRITERIA);
         if (a->is_recipe) {
-            rec_total++;
-            if (a->done) rec_done++;
-            rec_crit_done += a->completed_criteria_count;
-            rec_crit_total += a->criteria_progress_total;
+            if (goal_shown) {
+                rec_total++;
+                if (a->done) rec_done++;
+            }
+            if (crits_shown) {
+                rec_crit_done += a->completed_criteria_count;
+                rec_crit_total += a->criteria_progress_total;
+            }
         } else {
-            adv_total++;
-            if (a->done) adv_done++;
-            adv_crit_done += a->completed_criteria_count;
-            adv_crit_total += a->criteria_progress_total;
+            if (goal_shown) {
+                adv_total++;
+                if (a->done) adv_done++;
+            }
+            if (crits_shown) {
+                adv_crit_done += a->completed_criteria_count;
+                adv_crit_total += a->criteria_progress_total;
+            }
         }
     }
 
@@ -498,16 +508,17 @@ void compact_compute_type_counters(const TemplateData *td, MC_Version version, C
         if (version <= MC_VERSION_1_6_4 && s->criteria_count == 1 && s->criteria[0] && s->criteria[0]->goal == 0)
             continue;
         if (s->is_post_run) continue;
-        if (goal_is_hidden(s->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS)) continue;
-        stat_total++;
-        if (s->done) stat_done++;
+        if (!goal_is_hidden(s->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS)) {
+            stat_total++;
+            if (s->done) stat_done++;
+        }
         // Sub-stats only exist for multi-stat categories (template "Multi-Stat Category" checked). A
         // single stat's lone synthetic criterion is not a sub-stat and must not count here.
         if (!s->is_single_stat_category) {
             for (int j = 0; j < s->criteria_count; j++) {
                 const TrackableItem *sub_stat = s->criteria[j];
                 if (!sub_stat) continue;
-                if (goal_is_hidden(sub_stat->is_hidden, hidden_rule, OVERLAY_HIDDEN_SUB_STATS)) continue;
+                if (sub_stat_is_hidden(s, sub_stat, hidden_rule)) continue;
                 sub_total++;
                 if (sub_stat->done) sub_done++;
             }
@@ -607,7 +618,7 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
                 for (int j = 0; j < td->advancement_count && !present; j++) {
                     const TrackableCategory *a = td->advancements[j];
                     if (a && a->is_recipe == want_recipe && a->criteria_count > 0 &&
-                        !goal_is_hidden(a->is_hidden, settings, adv_hidden_type(a)) &&
+                        adv_has_shown_criterion(a, settings) &&
                         strcmp(a->root_name, ci->root_name) == 0)
                         present = true;
                 }
@@ -628,7 +639,7 @@ static void prune_compact_items(const TemplateData *td, CompactCycleItem *items,
                 for (int j = 0; j < td->stat_count && !present; j++) {
                     const TrackableCategory *s = td->stats[j];
                     if (s && !s->is_single_stat_category && !s->is_post_run &&
-                        !goal_is_hidden(s->is_hidden, settings, OVERLAY_HIDDEN_STATS) &&
+                        multi_stat_has_shown_sub_stat(s, settings) &&
                         strcmp(s->root_name, ci->root_name) == 0)
                         present = true;
                 }
@@ -748,20 +759,13 @@ bool overlay_template_has_row1_icons(const TemplateData *td, const AppSettings *
     if (!td) return false;
     for (int i = 0; i < td->advancement_count; i++) {
         const TrackableCategory *cat = td->advancements[i];
-        if (goal_is_hidden(cat->is_hidden, hidden_rule, adv_hidden_type(cat))) continue;
-        for (int j = 0; j < cat->criteria_count; j++) {
-            const TrackableItem *crit = cat->criteria[j];
-            if (crit->hidden_by_group) continue;
-            if (goal_is_hidden(crit->is_hidden, hidden_rule, OVERLAY_HIDDEN_CRITERIA)) continue;
-            return true;
-        }
+        if (adv_has_shown_criterion(cat, hidden_rule)) return true;
     }
     for (int i = 0; i < td->stat_count; i++) {
         const TrackableCategory *cat = td->stats[i];
         if (cat->is_single_stat_category || cat->hide_substats_in_row1 || cat->is_post_run) continue;
-        if (goal_is_hidden(cat->is_hidden, hidden_rule, OVERLAY_HIDDEN_STATS)) continue;
         for (int j = 0; j < cat->criteria_count; j++) {
-            if (goal_is_hidden(cat->criteria[j]->is_hidden, hidden_rule, OVERLAY_HIDDEN_SUB_STATS)) continue;
+            if (sub_stat_is_hidden(cat, cat->criteria[j], hidden_rule)) continue;
             return true;
         }
     }

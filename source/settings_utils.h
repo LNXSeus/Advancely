@@ -1121,6 +1121,34 @@ inline OverlayHiddenType adv_hidden_type(const TrackableCategory *adv) {
     return adv->is_recipe ? OVERLAY_HIDDEN_RECIPES : OVERLAY_HIDDEN_ADVANCEMENTS;
 }
 
+// A sub-stat shown on its own (row 1, pop-out stack, counters) counts as hidden when it or its stat is
+// hidden in the template, and only the Sub-Stats box brings it back, independent of the Stats box.
+inline bool sub_stat_is_hidden(const TrackableCategory *stat, const TrackableItem *sub, const AppSettings *settings) {
+    return goal_is_hidden(stat->is_hidden || sub->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS);
+}
+
+// True when a multi-stat has at least one sub-stat that sub_stat_is_hidden() lets through.
+inline bool multi_stat_has_shown_sub_stat(const TrackableCategory *stat, const AppSettings *settings) {
+    for (int j = 0; j < stat->criteria_count; j++)
+        if (stat->criteria[j] && !sub_stat_is_hidden(stat, stat->criteria[j], settings)) return true;
+    return false;
+}
+
+// Same split for criteria: a criterion shown on its own counts as hidden when it or its advancement /
+// recipe is hidden in the template, and only the Criteria box brings it back.
+inline bool criterion_is_hidden(const TrackableCategory *adv, const TrackableItem *crit, const AppSettings *settings) {
+    return goal_is_hidden(adv->is_hidden || crit->is_hidden, settings, OVERLAY_HIDDEN_CRITERIA);
+}
+
+// True when a complex advancement / recipe has at least one criterion criterion_is_hidden() lets through.
+inline bool adv_has_shown_criterion(const TrackableCategory *adv, const AppSettings *settings) {
+    for (int j = 0; j < adv->criteria_count; j++) {
+        const TrackableItem *crit = adv->criteria[j];
+        if (crit && !crit->hidden_by_group && !criterion_is_hidden(adv, crit, settings)) return true;
+    }
+    return false;
+}
+
 inline OverlayHiddenType stat_hidden_type(const TrackableCategory *stat) {
     return stat->is_post_run ? OVERLAY_HIDDEN_POST_RUN_STATS : OVERLAY_HIDDEN_STATS;
 }
