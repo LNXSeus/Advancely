@@ -66,7 +66,7 @@
 Love using Advancely? You can have your name immortalized in the tracker!
 
 <p align="center">
-  <img src="readme_assets/Supporters_Screen_Overlay_v1.6.1.png" alt="Supporters Screen">
+  <img src="readme_assets/Supporters_Screen_Overlay_v1.8.1.png" alt="Supporters Screen">
 </p>
 
 **Supporters:**
