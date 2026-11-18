@@ -4045,10 +4045,11 @@ settings_tooltip(tooltip_buffer); \
                             const TrackableCategory *stat = hidden_td->stats[i];
                             if (!stat) continue;
                             if (stat->is_post_run) {
-                                bool any = stat->is_hidden;
-                                for (int j = 0; j < stat->criteria_count && !any; j++)
-                                    if (stat->criteria[j] && stat->criteria[j]->is_hidden) any = true;
-                                if (any) hidden_present[OVERLAY_HIDDEN_POST_RUN_STATS] = true;
+                                if (stat->is_hidden) hidden_present[OVERLAY_HIDDEN_POST_RUN_STATS] = true;
+                                if (stat->is_single_stat_category) continue;
+                                for (int j = 0; j < stat->criteria_count; j++)
+                                    if (stat->criteria[j] && (stat->is_hidden || stat->criteria[j]->is_hidden))
+                                        hidden_present[OVERLAY_HIDDEN_POST_RUN_SUB_STATS] = true;
                                 continue;
                             }
                             if (stat->is_hidden) hidden_present[OVERLAY_HIDDEN_STATS] = true;
@@ -4102,8 +4103,14 @@ settings_tooltip(tooltip_buffer); \
                          "Inside a stat's own Row 2/3 cell, only the sub-stat's own hidden mark counts.",
                          hidden_present[OVERLAY_HIDDEN_SUB_STATS]},
                         {OVERLAY_HIDDEN_POST_RUN_STATS, "Hidden Post-Run Stats",
-                         "Show post-run stats and their sub-stats marked hidden in the template.",
+                         "Show post-run stats marked hidden in the template.",
                          hidden_present[OVERLAY_HIDDEN_POST_RUN_STATS]},
+                        {OVERLAY_HIDDEN_POST_RUN_SUB_STATS, "Hidden Post-Run Sub-Stats",
+                         "Show post-run sub-stats marked hidden in the template, or whose post-run stat is\n"
+                         "hidden, as Row 1 icons once the run is completed, independent of the Hidden\n"
+                         "Post-Run Stats box. Inside a post-run stat's own cell, only the sub-stat's own\n"
+                         "hidden mark counts.",
+                         hidden_present[OVERLAY_HIDDEN_POST_RUN_SUB_STATS]},
                         {OVERLAY_HIDDEN_UNLOCKS, "Hidden Unlocks", "Show unlocks marked hidden in the template.",
                          hidden_present[OVERLAY_HIDDEN_UNLOCKS]},
                         {OVERLAY_HIDDEN_CUSTOM, "Hidden Custom Goals",

@@ -749,7 +749,8 @@ enum OverlayHiddenType {
     OVERLAY_HIDDEN_CRITERIA,
     OVERLAY_HIDDEN_STATS,
     OVERLAY_HIDDEN_SUB_STATS,
-    OVERLAY_HIDDEN_POST_RUN_STATS, // Post-run statistics and their sub-stats
+    OVERLAY_HIDDEN_POST_RUN_STATS,
+    OVERLAY_HIDDEN_POST_RUN_SUB_STATS,
     OVERLAY_HIDDEN_UNLOCKS,
     OVERLAY_HIDDEN_CUSTOM,
     OVERLAY_HIDDEN_MULTISTAGE,
@@ -1125,6 +1126,13 @@ inline OverlayHiddenType adv_hidden_type(const TrackableCategory *adv) {
 // hidden in the template, and only the Sub-Stats box brings it back, independent of the Stats box.
 inline bool sub_stat_is_hidden(const TrackableCategory *stat, const TrackableItem *sub, const AppSettings *settings) {
     return goal_is_hidden(stat->is_hidden || sub->is_hidden, settings, OVERLAY_HIDDEN_SUB_STATS);
+}
+
+// Post-run sub-stats shown on their own (Row 1 once the run is completed) follow the same split, under
+// the Post-Run Sub-Stats box.
+inline bool post_run_sub_stat_is_hidden(const TrackableCategory *stat, const TrackableItem *sub,
+                                        const AppSettings *settings) {
+    return goal_is_hidden(stat->is_hidden || sub->is_hidden, settings, OVERLAY_HIDDEN_POST_RUN_SUB_STATS);
 }
 
 // True when a multi-stat has at least one sub-stat that sub_stat_is_hidden() lets through.

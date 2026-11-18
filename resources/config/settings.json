@@ -33,6 +33,8 @@
 		"overlay_show_hidden_criteria":	true,
 		"overlay_show_hidden_stats":	true,
 		"overlay_show_hidden_sub_stats":	true,
+		"overlay_show_hidden_post_run_stats":	true,
+		"overlay_show_hidden_post_run_sub_stats":	true,
 		"overlay_show_hidden_unlocks":	true,
 		"overlay_show_hidden_custom_goals":	true,
 		"overlay_show_hidden_multi_stage_goals":	true,

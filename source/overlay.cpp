@@ -1104,7 +1104,7 @@ static void overlay_post_run_stat_text(const TrackableCategory *stat, const AppS
         std::vector<int> shown;
         for (int j = 0; j < stat->criteria_count; j++) {
             if (stat->criteria[j] &&
-                !goal_is_hidden(stat->criteria[j]->is_hidden, settings, OVERLAY_HIDDEN_POST_RUN_STATS))
+                !goal_is_hidden(stat->criteria[j]->is_hidden, settings, OVERLAY_HIDDEN_POST_RUN_SUB_STATS))
                 shown.push_back(j);
         }
         if (shown.empty()) return;
@@ -2750,6 +2750,15 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
         if (cat->hide_substats_in_row1 || cat->is_post_run) continue;
         for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
     }
+    // Post-run sub-stats join once the run is completed. They are never done, so they stay put.
+    const int first_post_run = (int) items.size();
+    if (t->template_data->run_completed) {
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            TrackableCategory *cat = t->template_data->stats[i];
+            if (!cat->is_post_run || cat->is_single_stat_category || cat->hide_substats_in_row1) continue;
+            for (int j = 0; j < cat->criteria_count; j++) items.push_back({cat->criteria[j], cat});
+        }
+    }
 
     int F = (int) items.size();
     removed.assign((size_t) F, 0);
@@ -2757,10 +2766,10 @@ static void build_row1_items(const Tracker *t, const AppSettings *settings,
     for (int i = 0; i < F; i++) {
         TrackableItem *item = items[i].first;
         TrackableCategory *parent = items[i].second;
-        const bool is_sub_stat = i >= first_sub_stat;
-        bool hidden = is_sub_stat
-                          ? sub_stat_is_hidden(parent, item, settings)
-                          : criterion_is_hidden(parent, item, settings);
+        bool hidden;
+        if (i >= first_post_run) hidden = post_run_sub_stat_is_hidden(parent, item, settings);
+        else if (i >= first_sub_stat) hidden = sub_stat_is_hidden(parent, item, settings);
+        else hidden = criterion_is_hidden(parent, item, settings);
         removed[i] = (item->done || hidden) ? 1 : 0;
         for (const char *s = item->root_name; *s; s++) signature = (signature ^ (unsigned char) *s) * 1099511628211ULL;
     }
@@ -3634,7 +3643,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         }
 
         // The template can opt a multi-stat out of Row 1; it still cycles its sub-stats as sub-text.
-        if (cat->hide_substats_in_row1 || cat->is_post_run) {
+        if (cat->hide_substats_in_row1 || (cat->is_post_run && !t->template_data->run_completed)) {
             continue;
         }
 

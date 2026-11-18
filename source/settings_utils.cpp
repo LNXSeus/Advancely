@@ -749,6 +749,7 @@ const char *const OVERLAY_HIDDEN_TYPE_KEYS[OVERLAY_HIDDEN_TYPE_COUNT] = {
     "overlay_show_hidden_stats",
     "overlay_show_hidden_sub_stats",
     "overlay_show_hidden_post_run_stats",
+    "overlay_show_hidden_post_run_sub_stats",
     "overlay_show_hidden_unlocks",
     "overlay_show_hidden_custom_goals",
     "overlay_show_hidden_multi_stage_goals",
